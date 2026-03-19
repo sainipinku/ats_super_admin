@@ -104,6 +104,43 @@ const Sidebar = ({ isOpen, onClose }) => {
                                         </Link>
                 </li>
 
+                <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
+                    <Link
+                        href={route("admin.resumes.index")}
+                        className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
+                            route().current('admin.resumes.index') ||
+                            route().current('admin.resumes.create') ||
+                            route().current('admin.resumes.edit') ||
+                            route().current('admin.resumes.show')
+                                ? 'text-[#4F46E5] dark:text-[#4F46E5] bg-[#4F46E5]/10'
+                                : 'text-[#727272] hover:text-[#4F46E5] dark:hover:text-[#4F46E5]'
+                        }`}
+                    >
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M7 2H14L19 7V22H7V2ZM14 3.5V8H18.5"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                            <path
+                                d="M9 12H17M9 16H17M9 8H12"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                        Resume Builder
+                    </Link>
+                </li>
 
             </ul>
         </div>

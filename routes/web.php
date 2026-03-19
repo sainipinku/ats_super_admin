@@ -7,6 +7,8 @@ use App\Http\Controllers\SuperAdmin\AdminDashboardController;
 use App\Http\Controllers\SuperAdmin\DepartmentController;
 use App\Http\Controllers\SuperAdmin\DesignationController;
 use App\Http\Controllers\SuperAdmin\RolesController;
+use App\Http\Controllers\SuperAdmin\ResumeController as SuperResumeController;
+use App\Http\Controllers\Admin\ResumeController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -29,6 +31,15 @@ Route::prefix('super')->name('super.')->group(function () {
         Route::post('/profile/photo/update', [AdminDashboardController::class, 'userProfilePhotoUpdate'])->name('profile.photo.update');
         Route::post('/profile/photo/remove', [AdminDashboardController::class, 'userProfilePhotoRemove'])->name('profile.photo.remove');
         Route::post('/profile/password/update', [AdminDashboardController::class, 'userProfilePasswordUpdate'])->name('profile.password.update');
+
+        // Resume Builder routes
+        Route::get('/resumes', [SuperResumeController::class, 'index'])->name('resumes.index');
+        Route::get('/resumes/create', [SuperResumeController::class, 'create'])->name('resumes.create');
+        Route::post('/resumes', [SuperResumeController::class, 'store'])->name('resumes.store');
+        Route::get('/resumes/{resume}', [SuperResumeController::class, 'show'])->name('resumes.show');
+        Route::get('/resumes/{resume}/edit', [SuperResumeController::class, 'edit'])->name('resumes.edit');
+        Route::post('/resumes/{resume}', [SuperResumeController::class, 'update'])->name('resumes.update');
+        Route::delete('/resumes/{resume}', [SuperResumeController::class, 'destroy'])->name('resumes.destroy');
 
         // Departments Route
         Route::get('/departments', [DepartmentController::class, 'departments'])->name('departments');
@@ -62,6 +73,13 @@ Route::prefix('super')->name('super.')->group(function () {
 Route::prefix('admin')->middleware(['admin'])->group(function () {
     // Profile routes
     Route::get('/dashboard', [App\Http\Controllers\Admin\AdminController::class, 'dashboard'])->name('admin.dashboard');
+    Route::get('/resumes', [ResumeController::class, 'index'])->name('admin.resumes.index');
+    Route::get('/resumes/create', [ResumeController::class, 'create'])->name('admin.resumes.create');
+    Route::post('/resumes', [ResumeController::class, 'store'])->name('admin.resumes.store');
+    Route::get('/resumes/{resume}', [ResumeController::class, 'show'])->name('admin.resumes.show');
+    Route::get('/resumes/{resume}/edit', [ResumeController::class, 'edit'])->name('admin.resumes.edit');
+    Route::post('/resumes/{resume}', [ResumeController::class, 'update'])->name('admin.resumes.update');
+    Route::delete('/resumes/{resume}', [ResumeController::class, 'destroy'])->name('admin.resumes.destroy');
     Route::post('/logout', [App\Http\Controllers\Admin\AdminController::class, 'logout'])->name('admin.logout');
     Route::get('/profile', [App\Http\Controllers\Admin\AdminController::class, 'userProfile'])->name('admin.profile');
     Route::post('/profile-update', [App\Http\Controllers\Admin\AdminController::class, 'userProfileUpdate'])->name('admin.profile.update');
