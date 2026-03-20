@@ -156,7 +156,13 @@ const Sidebar = ({ isOpen, onClose }) => {
                 </li>
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a]">
                     <a
-                        className={`flex items-center gap-1.5 px-2.5 py-2.5 text-[15px] rounded`}
+                        href={route("super.members.list")}
+                        className={`flex items-center gap-1.5 px-2.5 py-2.5 text-[15px] rounded ${
+                            route().current("super.members.list") ||
+                            route().current("super.members.details")
+                                ? "text-white bg-[#5146E6]"
+                                : "text-[#727272] hover:text-white hover:bg-[#5146E6]"
+                        }`}
                     >
                         <svg
                             width="24"
@@ -173,6 +179,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                         Members
                     </a>
                 </li>
+                {false && (
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
                     {/* <a
                         href={route("super.task.list")}
@@ -197,6 +204,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                         Tasks
                     {/* </a> */}
                 </li>
+                )}
 
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
                     <a

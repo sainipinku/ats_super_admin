@@ -6,6 +6,7 @@ use App\Http\Controllers\SuperAdmin\AdminAuthController;
 use App\Http\Controllers\SuperAdmin\AdminDashboardController;
 use App\Http\Controllers\SuperAdmin\DepartmentController;
 use App\Http\Controllers\SuperAdmin\DesignationController;
+use App\Http\Controllers\SuperAdmin\MemberController;
 use App\Http\Controllers\SuperAdmin\RolesController;
 use App\Http\Controllers\SuperAdmin\ResumeController as SuperResumeController;
 use App\Http\Controllers\Admin\ResumeController;
@@ -64,6 +65,18 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::put('/update/{id}', [DesignationController::class, 'store'])->name('update');
             Route::delete('/{id}', [DesignationController::class, 'destroy'])->name('destroy');
             Route::post('/update-status/{uuid}', [DesignationController::class, 'updateStatus'])->name('status');
+        });
+
+        Route::get('/designations/by-departments', [MemberController::class, 'getByDepartments'])->name('designations.by_departments');
+
+        Route::group(['prefix' => 'members', 'as' => 'members.'], function () {
+            Route::get('/list', [MemberController::class, 'index'])->name('list');
+            Route::post('/store', [MemberController::class, 'store'])->name('store');
+            Route::put('/update/{id}', [MemberController::class, 'store'])->name('update');
+            Route::delete('/{uuid}', [MemberController::class, 'destroy'])->name('destroy');
+            Route::post('/update-status/{uuid}', [MemberController::class, 'updateStatus'])->name('status');
+            Route::put('/{member}/password', [MemberController::class, 'updatePassword'])->name('password');
+            Route::get('/{uuid}/details', [MemberController::class, 'memberDetails'])->name('details');
         });
     });
 });

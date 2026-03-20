@@ -301,12 +301,17 @@ export default function AuthenticatedLayout({ header, children }) {
                                                 </NavLink>
                                                 <NavLink
                                                     className=""
-                                                    // href={route(
-                                                    //     "super.members.list"
-                                                    // )}
-                                                    // active={route().current(
-                                                    //     "super.members.list"
-                                                    // )}
+                                                    href={route(
+                                                        "super.members.list"
+                                                    )}
+                                                    active={
+                                                        route().current(
+                                                            "super.members.list"
+                                                        ) ||
+                                                        route().current(
+                                                            "super.members.details"
+                                                        )
+                                                    }
                                                 >
                                                     <svg
                                                         width="24"
@@ -322,8 +327,6 @@ export default function AuthenticatedLayout({ header, children }) {
                                                     </svg>{" "}
                                                     Members
                                                 </NavLink>
-
-
                                             </div>
                                         </div>
 
