@@ -44,7 +44,7 @@ const IdCard = ({ user, isOpen, onClose }) => {
                   <div className="id-card-top-section flex justify-between items-start mb-4">
                     <div className="id-card-logo">
                       <img
-                        src="https://firebasestorage.googleapis.com/v0/b/test-1bb9e.firebasestorage.app/o/documents%2Flogo_id_card.png?alt=media&token=7c406146-3940-4d55-a63f-d0556533ce55"
+                        src="/images/logo.png"
                         alt="Company Logo"
                         className="h-10 object-contain"
                       />

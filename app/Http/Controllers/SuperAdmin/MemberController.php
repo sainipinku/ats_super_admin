@@ -25,9 +25,9 @@ use App\Models\User;
 use App\Models\SuperAdminPasswordLog;
 use App\Jobs\SuperAdminPasswordChangeNotification;
 use App\Models\WhatsappLog;
-use App\Services\InteraktServices;
-use App\Services\FirebaseService;
-use function App\createMessagePayload;
+// use App\Services\InteraktServices;
+// use App\Services\FirebaseService;
+// use function App\createMessagePayload;
 
 class MemberController extends Controller
 {
@@ -93,7 +93,7 @@ class MemberController extends Controller
      * @throws \Illuminate\Database\Eloquent\ModelNotFoundException If the member is not found for update.
      */
 
-    public function store(Request $request, $id = null,FirebaseService $firebaseService)
+    public function store(Request $request, $id = null)
     {
         $rules = [
             'name' => ['required', 'string', 'max:255'],
@@ -111,7 +111,7 @@ class MemberController extends Controller
             'designations' => 'required|array',
             'roles' => 'required|array',
             'gender' => 'nullable|in:male,female,other',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            // 'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'password' => $id ? 'nullable|min:6|same:confirm_password' : 'required|min:6|same:confirm_password',
             'confirm_password' => $id ? 'nullable|min:6' : 'required|min:6',
             'dob' => 'nullable',
@@ -149,15 +149,15 @@ class MemberController extends Controller
                 $data['password'] = Hash::make($validated['password']);
             }
 
-            if ($request->hasFile('image')) {
-                 $now = now();
-        $profilePhoto = $request->file('image');
-        $filename = $now->format('Y_m_d_His_') . Str::random(16) . '.' . $profilePhoto->getClientOriginalExtension();
-                        $path = 'profile_image/' . $filename;
-                        $mediaUrl = $firebaseService->uploadFile($profilePhoto, $path);
+        //     if ($request->hasFile('image')) {
+        //          $now = now();
+        // $profilePhoto = $request->file('image');
+        // $filename = $now->format('Y_m_d_His_') . Str::random(16) . '.' . $profilePhoto->getClientOriginalExtension();
+        //                 $path = 'profile_image/' . $filename;
+        //                 $mediaUrl = $firebaseService->uploadFile($profilePhoto, $path);
 
-                $data['image'] = $mediaUrl;
-            }
+        //         $data['image'] = $mediaUrl;
+        //     }
 
             if ($id) {
                 // Update case
@@ -175,7 +175,7 @@ class MemberController extends Controller
                         'status'         => 1,
                         'username'       => $data['username'] ?? null,
                         'password'       => Hash::make($request->password),
-                        'profile_image'  => $member->image ?? ($data['image'] ?? null),
+                        // 'profile_image'  => $member->image ?? ($data['image'] ?? null),
                     ]);
                 }
             }
@@ -192,22 +192,22 @@ class MemberController extends Controller
                     $member->designation_names ?? '--',
                     $member->role_names ?? '--'
                 ];
-                $payload = createMessagePayload($phoneNumber, $templateName, $languageCode, null, $bodyParameters);
-                $int = new InteraktServices();
-                $resp = $int->sendMessage($payload);
+                // $payload = createMessagePayload($phoneNumber, $templateName, $languageCode, null, $bodyParameters);
+                // $int = new InteraktServices();
+                // $resp = $int->sendMessage($payload);
 
-                if ($resp['status'] == true) {
-                    $status = 'success';
-                } else {
-                    $status = 'failed';
-                }
-                WhatsappLog::create([
-                    'member_id' => $member->id,
-                    'phone' => $phoneNumber,
-                    'error' => $resp,
-                    'error_message' => $resp['result']['message'],
-                    'status' => $status
-                ]);
+                // if ($resp['status'] == true) {
+                //     $status = 'success';
+                // } else {
+                //     $status = 'failed';
+                // }
+                // WhatsappLog::create([
+                //     'member_id' => $member->id,
+                //     'phone' => $phoneNumber,
+                //     'error' => $resp,
+                //     'error_message' => $resp['result']['message'],
+                //     'status' => $status
+                // ]);
             } else {
                 $existing = Member::withTrashed()
                     ->where(function ($q) use ($validated) {
@@ -240,22 +240,22 @@ class MemberController extends Controller
                         $member->designation_names ?? '--',
                         $member->role_names ?? '--'
                     ];
-                    $payload = createMessagePayload($phoneNumber, $templateName, $languageCode, null, $bodyParameters);
-                    $int = new InteraktServices();
-                    $resp = $int->sendMessage($payload);
+                    // $payload = createMessagePayload($phoneNumber, $templateName, $languageCode, null, $bodyParameters);
+                    // $int = new InteraktServices();
+                    // $resp = $int->sendMessage($payload);
 
-                    if ($resp['status'] == true) {
-                        $status = 'success';
-                    } else {
-                        $status = 'failed';
-                    }
-                    WhatsappLog::create([
-                        'member_id' => $member->id,
-                        'phone' => $phoneNumber,
-                        'error' => $resp,
-                        'error_message' => $resp['result']['message'],
-                        'status' => $status
-                    ]);
+                    // if ($resp['status'] == true) {
+                    //     $status = 'success';
+                    // } else {
+                    //     $status = 'failed';
+                    // }
+                    // WhatsappLog::create([
+                    //     'member_id' => $member->id,
+                    //     'phone' => $phoneNumber,
+                    //     'error' => $resp,
+                    //     'error_message' => $resp['result']['message'],
+                    //     'status' => $status
+                    // ]);
 
                     $message = 'Member created successfully!';
                 }
@@ -471,28 +471,28 @@ class MemberController extends Controller
                     $member->name ?? '--'
                 ];
 
-                if ($member->status == 0) {
-                    $payload = createMessagePayload($phoneNumber, $templateName, $languageCode, null, $bodyParameters);
-                } else {
-                    $buttonParameters = ["1" => ["/member/login"]];
-                    $payload = createMessagePayload($phoneNumber, $templateName, $languageCode, null, $bodyParameters, $buttonParameters);
-                }
+                // if ($member->status == 0) {
+                //     $payload = createMessagePayload($phoneNumber, $templateName, $languageCode, null, $bodyParameters);
+                // } else {
+                //     $buttonParameters = ["1" => ["/member/login"]];
+                //     $payload = createMessagePayload($phoneNumber, $templateName, $languageCode, null, $bodyParameters, $buttonParameters);
+                // }
 
-                $int = new InteraktServices();
-                $resp = $int->sendMessage($payload);
+                // $int = new InteraktServices();
+                // $resp = $int->sendMessage($payload);
 
-                if ($resp['status'] == true) {
-                    $status = 'success';
-                } else {
-                    $status = 'failed';
-                }
-                WhatsappLog::create([
-                    'member_id' => $member->id,
-                    'phone' => $phoneNumber,
-                    'error' => $resp,
-                    'error_message' => $resp['result']['message'],
-                    'status' => $status
-                ]);
+                // if ($resp['status'] == true) {
+                //     $status = 'success';
+                // } else {
+                //     $status = 'failed';
+                // }
+                // WhatsappLog::create([
+                //     'member_id' => $member->id,
+                //     'phone' => $phoneNumber,
+                //     'error' => $resp,
+                //     'error_message' => $resp['result']['message'],
+                //     'status' => $status
+                // ]);
             }
 
             return redirect()->back()->with('success', 'Member status updated successfully!');

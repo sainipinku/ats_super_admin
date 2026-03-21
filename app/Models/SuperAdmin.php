@@ -99,9 +99,17 @@ class SuperAdmin extends Authenticatable
   public function profilePhotoUrl(): Attribute
 {
     return Attribute::make(
-        get: fn () => !empty($this->profile_image) && filter_var($this->profile_image, FILTER_VALIDATE_URL)
-            ? $this->profile_image
-            : "https://storage.googleapis.com/test-1bb9e.firebasestorage.app/profile_image/2025_09_11_110136_x6pzUFwLVK8HSjwM.png"
+        get: function () {
+            if (!empty($this->profile_image)) {
+                if (filter_var($this->profile_image, FILTER_VALIDATE_URL)) {
+                    return $this->profile_image;
+                }
+
+                return Storage::disk('public')->url($this->profile_image);
+            }
+
+            return asset('images/profileimg.png');
+        }
     );
 }
 

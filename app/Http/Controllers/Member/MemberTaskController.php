@@ -19,9 +19,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Hash;
-use App\Models\FcmToken;
 use App\Models\TaskDocument;
-use App\Services\FirebaseService;
 use App\Models\SuperAdminPasswordLog;
 use App\Models\SuperAdmin;
 use App\Models\WhatsappLog;
@@ -428,20 +426,26 @@ class MemberTaskController extends Controller
         return redirect()->back()->with('success', 'Profile updated successfully!');
     }
 
-    public function userProfilePhotoUpdate(Request $request, FirebaseService $firebaseService)
+    public function userProfilePhotoUpdate(Request $request)
     {
         $request->validate([
-            'profile_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
+            'profile_photo' => 'required|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
         ]);
         $auth = Auth::guard('member')->user();
-        $now = now();
+        $member = Member::findOrFail($auth->id);
+
+        if (!empty($member->image) && !filter_var($member->image, FILTER_VALIDATE_URL)) {
+            if (Storage::disk('public')->exists($member->image)) {
+                Storage::disk('public')->delete($member->image);
+            }
+        }
+
         $profilePhoto = $request->file('profile_photo');
-        $filename = $now->format('Y_m_d_His_') . Str::random(16) . '.' . $profilePhoto->getClientOriginalExtension();
-        $path = 'profile_image/' . $filename;
-        $mediaUrl = $firebaseService->uploadFile($profilePhoto, $path);
-        $superAdmin = Member::findOrFail($auth->id);
-        $superAdmin->update([
-            'image' => $mediaUrl,
+        $filename = now()->format('Y_m_d_His_') . Str::random(16) . '.' . $profilePhoto->getClientOriginalExtension();
+        $storedPath = $profilePhoto->storeAs('profile_image', $filename, 'public');
+
+        $member->update([
+            'image' => $storedPath,
         ]);
 
 
@@ -483,28 +487,7 @@ class MemberTaskController extends Controller
         return redirect()->back()->with('success', 'Password updated successfully.');
     }
 
-    public function saveFcmToken(Request $request)
-    {
-        $request->validate([
-            'token' => 'required|string',
-            'browserId' => 'nullable|string',
-        ]);
-        $guard = 'member';
-        FcmToken::updateOrCreate(
-            [
-                'user_id' => Auth::guard('member')->user()->id,
-                'guard' => $guard,
-                'device_id' => $request->browserId,
-            ],
-            [
-                'token' => $request->token,
-            ]
-        );
-
-        return back()->with('success', 'Notification settings saved!');
-    }
-
-    public function uploadDocuments(Request $request, FirebaseService $firebaseService)
+    public function uploadDocuments(Request $request)
     {
         $request->validate([
             'documents.*' => 'required|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png|max:10240',
@@ -516,15 +499,14 @@ class MemberTaskController extends Controller
         try {
             if ($request->hasFile('documents')) {
                 foreach ($request->file('documents') as $file) {
-                    $filename = time() . '_' . $file->getClientOriginalName();
-                    $path = 'task_documents/' . $filename;
-                    $mediaUrl = $firebaseService->uploadFile($file, $path);
+                    $filename = now()->format('Y_m_d_His_') . Str::random(12) . '.' . $file->getClientOriginalExtension();
+                    $storedPath = $file->storeAs('task_documents', $filename, 'public');
                     $document = TaskDocument::create([
                         'uuid' => Str::uuid(),
                         'task_id' => $request->task_id,
                         'uploaded_by' => Auth::guard('member')->id(),
-                        'link' => $mediaUrl,
-                        'path' => $path,
+                        'link' => null,
+                        'path' => $storedPath,
                         'type' => $file->getMimeType(),
                     ]);
 

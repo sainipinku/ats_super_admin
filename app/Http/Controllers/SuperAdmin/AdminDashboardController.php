@@ -19,11 +19,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Hash;
 use App\Models\ActivityLog;
-use App\Models\FcmToken;
 use App\Models\SuperAdminPasswordLog;
 use App\Models\ImageActionLog;
 use Illuminate\Support\Facades\Validator;
-use App\Services\FirebaseService;
 use App\Models\Holiday;
 class AdminDashboardController extends Controller
 {
@@ -227,21 +225,27 @@ class AdminDashboardController extends Controller
         return redirect()->back()->with('success', 'Profile updated successfully!');
     }
 
-  public function userProfilePhotoUpdate(Request $request, FirebaseService $firebaseService)
+  public function userProfilePhotoUpdate(Request $request)
 {
     $superAdminId = Auth::guard('superadmin')->id();
-    $now = now();
     $request->validate([
         'profile_photo' => 'required|file|max:2048|mimes:jpg,jpeg,png',
     ]);
     try {
         $profilePhoto = $request->file('profile_photo');
-        $filename = $now->format('Y_m_d_His_') . Str::random(16) . '.' . $profilePhoto->getClientOriginalExtension();
-        $path = 'profile_image/' . $filename;
-        $mediaUrl = $firebaseService->uploadFile($profilePhoto, $path);
         $superAdmin = SuperAdmin::findOrFail($superAdminId);
+
+        if (!empty($superAdmin->profile_image) && !filter_var($superAdmin->profile_image, FILTER_VALIDATE_URL)) {
+            if (Storage::disk('public')->exists($superAdmin->profile_image)) {
+                Storage::disk('public')->delete($superAdmin->profile_image);
+            }
+        }
+
+        $filename = now()->format('Y_m_d_His_') . Str::random(16) . '.' . $profilePhoto->getClientOriginalExtension();
+        $storedPath = $profilePhoto->storeAs('profile_image', $filename, 'public');
+
         $superAdmin->update([
-            'profile_image' => $mediaUrl,
+            'profile_image' => $storedPath,
         ]);
         return redirect()->back()->with('success', 'Profile image updated successfully.');
     } catch (\Exception $e) {
@@ -251,6 +255,13 @@ class AdminDashboardController extends Controller
 public function userProfilePhotoRemove(Request $request){
         $superAdminId = Auth::guard('superadmin')->id();
         $superAdmin = SuperAdmin::findOrFail($superAdminId);
+
+        if (!empty($superAdmin->profile_image) && !filter_var($superAdmin->profile_image, FILTER_VALIDATE_URL)) {
+            if (Storage::disk('public')->exists($superAdmin->profile_image)) {
+                Storage::disk('public')->delete($superAdmin->profile_image);
+            }
+        }
+
           $superAdmin->update([
             'profile_image' => null,
         ]);
@@ -316,39 +327,6 @@ public function userProfilePhotoRemove(Request $request){
             'updated_at'   => now(),
         ]);
         return redirect()->back()->with('success', 'Password updated successfully.');
-    }
-
-    public function saveFcmToken(Request $request)
-    {
-        $request->validate([
-            'token' => 'required|string',
-            'browserId' => 'nullable|string',
-        ]);
-        if ($request->user('admin')) {
-            $user = $request->user('admin');
-            $guard = 'admin';
-        } elseif ($request->user('superadmin')) {
-            $user = $request->user('superadmin');
-            $guard = 'superadmin';
-        } elseif ($request->user('member')) {
-            $user = $request->user('member');
-            $guard = 'member';
-        } else {
-            return back()->with('error', 'User not authenticated');
-        }
-
-        FcmToken::updateOrCreate(
-            [
-                'user_id' => $user->id,
-                'guard' => $guard,
-                'device_id' => $request->browserId,
-            ],
-            [
-                'token' => $request->token,
-            ]
-        );
-
-        return back()->with('success', 'Notification settings saved!');
     }
 
     public function exportDashboardData(Request $request)

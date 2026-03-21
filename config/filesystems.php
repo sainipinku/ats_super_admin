@@ -60,14 +60,6 @@ return [
             'report' => false,
         ],
 
-        'google' => [
-            'driver' => 'gcs',
-            'project_id' => env('FIREBASE_PROJECT_ID'),
-            'key_file' => env('GOOGLE_APPLICATION_CREDENTIALS'),
-            'bucket' => env('FIREBASE_STORAGE_BUCKET'),
-        ],
-
-
     ],
 
     /*

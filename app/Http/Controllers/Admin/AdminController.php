@@ -16,11 +16,9 @@ use Illuminate\Validation\Rules\Password;
 use App\Models\Role;
 use App\Models\TaskInstance;
 use App\Models\Task;
-use App\Models\FcmToken;
 use App\Models\ActivityLog;
 use App\Models\TaskAssignment;
 use App\Models\SuperAdminPasswordLog;
-use App\Services\FirebaseService;
 use Carbon\Carbon;
 use App\Models\CheckInOut;
 
@@ -266,20 +264,26 @@ if ($activeMembers->count() > 0) {
         return redirect()->back()->with('success', 'Profile updated successfully!');
     }
 
-    public function userProfilePhotoUpdate(Request $request, FirebaseService $firebaseService)
+    public function userProfilePhotoUpdate(Request $request)
     {
         $request->validate([
-            'profile_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
+            'profile_photo' => 'required|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
         ]);
         $auth = Auth::guard('admin')->user();
-        $now = now();
+        $member = Member::findOrFail($auth->id);
+
+        if (!empty($member->image) && !filter_var($member->image, FILTER_VALIDATE_URL)) {
+            if (Storage::disk('public')->exists($member->image)) {
+                Storage::disk('public')->delete($member->image);
+            }
+        }
+
         $profilePhoto = $request->file('profile_photo');
-        $filename = $now->format('Y_m_d_His_') . Str::random(16) . '.' . $profilePhoto->getClientOriginalExtension();
-        $path = 'profile_image/' . $filename;
-        $mediaUrl = $firebaseService->uploadFile($profilePhoto, $path);
-        $superAdmin = Member::findOrFail($auth->id);
-        $superAdmin->update([
-            'image' => $mediaUrl,
+        $filename = now()->format('Y_m_d_His_') . Str::random(16) . '.' . $profilePhoto->getClientOriginalExtension();
+        $storedPath = $profilePhoto->storeAs('profile_image', $filename, 'public');
+
+        $member->update([
+            'image' => $storedPath,
         ]);
 
 
@@ -321,31 +325,17 @@ if ($activeMembers->count() > 0) {
         return redirect()->back()->with('success', 'Password updated successfully.');
     }
 
-    public function saveFcmToken(Request $request)
-    {
-        $request->validate([
-            'token' => 'required|string',
-            'browserId' => 'nullable|string',
-        ]);
-        $guard = 'admin';
-        FcmToken::updateOrCreate(
-            [
-                'user_id' => Auth::guard('admin')->user()->id,
-                'guard' => $guard,
-                'device_id' => $request->browserId,
-            ],
-            [
-                'token' => $request->token,
-            ]
-        );
-
-        return back()->with('success', 'Notification settings saved!');
-    }
-
     public function userProfilePhotoRemove(Request $request)
     {
         $memberId = Auth::guard('admin')->id();
         $member = Member::findOrFail($memberId);
+
+        if (!empty($member->image) && !filter_var($member->image, FILTER_VALIDATE_URL)) {
+            if (Storage::disk('public')->exists($member->image)) {
+                Storage::disk('public')->delete($member->image);
+            }
+        }
+
         $member->update([
             'image' => null,
         ]);

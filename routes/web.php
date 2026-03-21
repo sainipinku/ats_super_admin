@@ -86,6 +86,15 @@ Route::prefix('super')->name('super.')->group(function () {
 Route::prefix('admin')->middleware(['admin'])->group(function () {
     // Profile routes
     Route::get('/dashboard', [App\Http\Controllers\Admin\AdminController::class, 'dashboard'])->name('admin.dashboard');
+    Route::get('/tasks/dashboard', [App\Http\Controllers\Admin\AdminController::class, 'dashboard'])->name('admin.task.dashboard');
+    Route::get('/tasks/tasklist', [App\Http\Controllers\Admin\AdminController::class, 'dashboard'])->name('admin.task.tasklist');
+
+    Route::get('/members/dashboard', [App\Http\Controllers\Admin\AdminMemberController::class, 'dashboard'])->name('admin.members.dashboard');
+    Route::post('/members/{member}/update-status', [App\Http\Controllers\Admin\AdminMemberController::class, 'updateStatus'])->name('admin.members.update-status');
+    Route::get('/members/{uuid}/details', [App\Http\Controllers\Admin\AdminMemberController::class, 'memberDetails'])->name('admin.members.details');
+
+    Route::post('/checkin', [App\Http\Controllers\Member\CheckInOutController::class, 'checkIn'])->name('admin.checkin');
+    Route::post('/checkout', [App\Http\Controllers\Member\CheckInOutController::class, 'checkOut'])->name('admin.checkout');
     Route::get('/resumes', [ResumeController::class, 'index'])->name('admin.resumes.index');
     Route::get('/resumes/create', [ResumeController::class, 'create'])->name('admin.resumes.create');
     Route::post('/resumes', [ResumeController::class, 'store'])->name('admin.resumes.store');
@@ -106,6 +115,11 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
 Route::prefix('member')->middleware(['member'])->group(function () {
     // Profile routes
     Route::get('/dashboard', [App\Http\Controllers\Admin\AdminController::class, 'dashboard'])->name('member.dashboard');
+    Route::get('/tasks/dashboard', [App\Http\Controllers\Member\MemberTaskController::class, 'dashboard'])->name('member.task.dashboard');
+    Route::get('/tasks/tasklist', [App\Http\Controllers\Member\MemberTaskController::class, 'taskList'])->name('member.task.tasklist');
+
+    Route::post('/checkin', [App\Http\Controllers\Member\CheckInOutController::class, 'checkIn'])->name('member.checkin');
+    Route::post('/checkout', [App\Http\Controllers\Member\CheckInOutController::class, 'checkOut'])->name('member.checkout');
     Route::post('/logout', [App\Http\Controllers\Admin\AdminController::class, 'logout'])->name('member.logout');
     Route::get('/profile', [App\Http\Controllers\Member\MemberTaskController::class, 'userProfile'])->name('member.profile');
     Route::post('/profile-update', [App\Http\Controllers\Member\MemberTaskController::class, 'userProfileUpdate'])->name('member.profile.update');

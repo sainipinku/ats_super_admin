@@ -92,9 +92,17 @@ class Member extends Authenticatable
     public function profilePhotoUrl(): Attribute
     {
         return Attribute::make(
-        get: fn () => !empty($this->image) && filter_var($this->image, FILTER_VALIDATE_URL)
-            ? $this->image
-            : "https://storage.googleapis.com/test-1bb9e.firebasestorage.app/profile_image/2025_09_11_110136_x6pzUFwLVK8HSjwM.png"
+            get: function () {
+                if (!empty($this->image)) {
+                    if (filter_var($this->image, FILTER_VALIDATE_URL)) {
+                        return $this->image;
+                    }
+
+                    return Storage::disk('public')->url($this->image);
+                }
+
+                return asset('images/profileimg.png');
+            }
     );
     }
    public function notify_tokens()

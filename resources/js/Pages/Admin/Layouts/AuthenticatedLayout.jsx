@@ -25,7 +25,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import NavDropdown from "@/Components/NavDropdown";
-import { FirebaseAuthProvider } from "@/Context/FirebaseAuthContext";
 
 export default function AuthenticatedLayout({ header, children }) {
     const { hasPermissionLike, hasPermission, hasAnyPermission } = useHelpers();
@@ -147,7 +146,6 @@ export default function AuthenticatedLayout({ header, children }) {
         // }, [settings]);
     return (
         <>
-                    <FirebaseAuthProvider>
             <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
 
             <div className="min-h-screen mainbg">
@@ -310,7 +308,6 @@ export default function AuthenticatedLayout({ header, children }) {
                 <main>{children}</main>
                 <Toaster position="top-right" reverseOrder={false} gutter={8} />
             </div>
-                        </FirebaseAuthProvider>
         </>
     );
 }

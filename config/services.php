@@ -50,16 +50,4 @@ return [
         'region' => env('REGION'),
     ],
 
-
-     'firebase' => [
-        'apiKey' => env('FIREBASE_API_KEY'),
-        'auth_domain' => env('FIREBASE_AUTH_DOMAIN'),
-        'projectId' => env('FIREBASE_PROJECT_ID'),
-        'storage_bucket' => env('FIREBASE_STORAGE_BUCKET'),
-        'messagingSenderId' => env('FIREBASE_MESSAGING_SENDER_ID'),
-        'appId' => env('FIREBASE_APP_ID'),
-        'measurement_id' => env('FIREBASE_MEASUREMENT_ID'),
-        'vapid_key' => env('FIREBASE_VAPID_KEY'),
-    ],
-
 ];

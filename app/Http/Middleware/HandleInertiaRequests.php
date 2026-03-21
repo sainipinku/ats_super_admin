@@ -5,7 +5,6 @@ namespace App\Http\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Middleware;
-use App\Models\FcmToken;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -47,30 +46,12 @@ class HandleInertiaRequests extends Middleware
             $guard = 'member';
         }
 
-        $notificationEnabled = collect();
-
-        if ($user) {
-            $notificationEnabled = FcmToken::where('user_id', $user->id)
-                ->where('guard', $guard)
-                ->pluck('device_id');
-        }
         return array_merge(parent::share($request), [
             'messages' => flash()->render('array'),
 
             'auth' => [
                 'user' => $user,
                 'guard' => $guard,
-            ],
-                            'is_notification_enabled' => $notificationEnabled,
-            'creds'  => [
-                'apiKey' => env('FIREBASE_API_KEY'),
-                'authDomain' => env('FIREBASE_AUTH_DOMAIN'),
-                'projectId' => env('FIREBASE_PROJECT_ID'),
-                'storageBucket' => env('FIREBASE_STORAGE_BUCKET'),
-                'messagingSenderId' => env('FIREBASE_MESSAGING_SENDER_ID'),
-                'appId' => env('FIREBASE_APP_ID'),
-                'measurementId' => env('FIREBASE_MEASUREMENT_ID'),
-                'vapidApiKey' => env('FIREBASE_VAPID_API_KEY')
             ],
             'flash' => [
                 'success' => $request->session()->get('success'),
