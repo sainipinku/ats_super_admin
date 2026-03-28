@@ -189,7 +189,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                         >
                                             Dashboard
                                         </NavLink>
-                                        <NavLink
+                                        {/* <NavLink
                                             href={route("admin.task.dashboard")}
                                             active={
                                                 route().current(
@@ -201,7 +201,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                             }
                                         >
                                             Tasks
-                                        </NavLink>
+                                        </NavLink> */}
                                         <NavLink
                                             href={route(
                                                 "admin.members.dashboard"

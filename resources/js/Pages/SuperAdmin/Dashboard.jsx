@@ -15,6 +15,9 @@ import {
     FaChartBar,
     FaFileExport,
     FaPrint,
+    FaUsers,
+    FaUserTie,
+    FaBuilding,
 } from "react-icons/fa";
 import {
     LineChart,
@@ -642,172 +645,199 @@ export default function Dashboard({
             <Head title="Dashboard" />
             <div className="mt-[75px]">
                 <div className="min-h-screen py-[40px] px-[15px]">
+                    {/* First Row - Core Stats */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        {/* <a
-                            href={route("super.task.list", {
-                                member_id: stats?.tasks?.filter?.member_id,
-                            })}
-                            className=""
-                        > */}
-                            <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-[14px] font-[400] text-prime-color uppercase">
-                                            Total Tasks
-                                        </p>
-                                        <h3 className="text-[30px] font-[500] text-second-color mt-1">
-                                            {stats.tasks.total || (
-                                                <span className="text-[15px] font-[500] text-second-color">
-                                                    No Data Available
-                                                </span>
-                                            )}
-                                        </h3>
-                                    </div>
+                        {/* Total Tasks Card */}
+                        <div className="cards border borderbx rounded-lg p-4 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[14px] font-[400] text-prime-color uppercase">
+                                        Total Tasks
+                                    </p>
+                                    <h3 className="text-[30px] font-[500] text-second-color mt-1">
+                                        {stats.tasks.total || (
+                                            <span className="text-[15px] font-[500] text-second-color">
+                                                No Data Available
+                                            </span>
+                                        )}
+                                    </h3>
+                                </div>
+                                <div className="taskdone px-[13px] py-[10px] rounded-lg border">
+                                    <FaTasks className="text-[#5146E6]" size={20} />
                                 </div>
                             </div>
-                        {/* </a> */}
+                        </div>
 
-                        {/* <a
-                            href={
-                                route("super.task.list") +
-                                "?page=1&per_page=10&search=&status=0"
-                            }
-                            className=""
-                        > */}
-                            <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-[14px] font-[400] text-prime-color uppercase">
-                                            Closed Tasks
-                                        </p>
-                                        <h3 className="text-[30px] font-[500] text-second-color mt-1">
-                                            {stats.tasks.completed || (
+                        {/* Closed Tasks Card */}
+                        <div className="cards border borderbx rounded-lg p-4 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[14px] font-[400] text-prime-color uppercase">
+                                        Closed Tasks
+                                    </p>
+                                    <h3 className="text-[30px] font-[500] text-second-color mt-1">
+                                        {stats.tasks.completed || (
+                                            <span className="text-[15px] font-semibold text-second-color">
+                                                No Data Available
+                                            </span>
+                                        )}
+                                    </h3>
+                                </div>
+                                <div className="taskdone px-[13px] py-[10px] rounded-lg border">
+                                    <FaCheckCircle
+                                        className="text-green-500 dark:text-green-400"
+                                        size={20}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Total Active Staff Card */}
+                        <div className="cards border borderbx rounded-lg p-4 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <div className="w-0 flex-1">
+                                    <dt className="text-[14px] font-[400] text-prime-color uppercase">
+                                        Total Active Staff
+                                    </dt>
+                                    <dd className="flex items-baseline">
+                                        <div className="text-2xl font-semibold text-gray-900 dark:text-white">
+                                            {stats.staff.count || (
                                                 <span className="text-[15px] font-semibold text-second-color">
                                                     No Data Available
                                                 </span>
                                             )}
-                                        </h3>
-                                    </div>
-                                    <div className="taskdone px-[13px] py-[10px] rounded-lg border">
-                                        <FaCheckCircle
-                                            className="text-green-500 dark:text-green-400"
-                                            size={20}
-                                        />
-                                    </div>
+                                        </div>
+                                    </dd>
+                                </div>
+                                <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
+                                    <FaUsers size={20} className="text-[#5146E6]" />
                                 </div>
                             </div>
-                        {/* </a> */}
+                        </div>
 
-                        {/* Active Staff Card */}
-                        <a  className="">
-                            <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                                <div className="flex items-center justify-between">
-                                    <div className="w-0 flex-1">
-                                        <dt className="text-[14px] font-[400] text-prime-color uppercase">
-                                            Total Active Staff
-                                        </dt>
-                                        <dd className="flex items-baseline">
-                                            <div className="text-2xl font-semibold text-gray-900 dark:text-white">
-                                                {stats.staff.count || (
-                                                    <span className="text-[15px] font-semibold text-second-color">
-                                                        No Data Available
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </dd>
-                                    </div>
-
-                                    <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
-                                        <svg
-                                            size={20}
-                                            className="h-6 w-6 text-[#5146E6]"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                                            />
-                                        </svg>
-                                    </div>
+                        {/* Total Departments Card */}
+                        <div className="cards border borderbx rounded-lg p-4 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <div className="w-0 flex-1">
+                                    <dt className="text-[14px] font-[400] text-prime-color uppercase">
+                                        Departments
+                                    </dt>
+                                    <dd className="flex items-baseline">
+                                        <div className="text-2xl font-semibold text-gray-900 dark:text-white">
+                                            {stats.departments.count || (
+                                                <span className="text-[15px] font-semibold text-second-color">
+                                                    No Data Available
+                                                </span>
+                                            )}
+                                        </div>
+                                    </dd>
+                                </div>
+                                <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
+                                    <FaBuilding size={20} className="text-[#5146E6]" />
                                 </div>
                             </div>
-                        </a>
+                        </div>
                     </div>
 
-                    {/* Second Row Cards */}
+                    {/* Second Row - Additional Stats */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        {/* Departments Card */}
+                        {/* Total Roles Card */}
                         <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                            <a href={route("super.departments")} className="">
-                                <div className="flex items-center justify-between">
-                                    <div className="w-0 flex-1">
-                                        <dt className="text-[14px] font-[400] text-prime-color uppercase">
-                                            Departments In Use
-                                        </dt>
-                                        <dd className="flex items-baseline">
-                                            <div className="text-2xl font-semibold text-gray-900 dark:text-white">
-                                                {stats.departments.count || (
-                                                    <span className="text-[15px] font-semibold text-second-color">
-                                                        No Data Available
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </dd>
-                                    </div>
-
-                                    <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
-                                        <svg
-                                            className="h-6 w-6 text-[#5146E6]"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                                            />
-                                        </svg>
-                                    </div>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[14px] font-[400] text-prime-color uppercase">
+                                        Total Roles
+                                    </p>
+                                    <h3 className="text-[30px] font-[500] text-second-color mt-1">
+                                        {stats.roles?.count || (
+                                            <span className="text-[15px] font-semibold text-second-color">
+                                                No Data Available
+                                            </span>
+                                        )}
+                                    </h3>
                                 </div>
-                            </a>
+                                <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
+                                    <FaUserTie className="text-[#5146E6]" size={20} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Total Designations Card */}
+                        <div className="cards border borderbx rounded-lg p-4 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[14px] font-[400] text-prime-color uppercase">
+                                        Total Designations
+                                    </p>
+                                    <h3 className="text-[30px] font-[500] text-second-color mt-1">
+                                        {stats.designations?.count || (
+                                            <span className="text-[15px] font-semibold text-second-color">
+                                                No Data Available
+                                            </span>
+                                        )}
+                                    </h3>
+                                </div>
+                                <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
+                                    <svg
+                                        className="h-6 w-6 text-[#5146E6]"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                        />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Total Members Card */}
+                        <div className="cards border borderbx rounded-lg p-4 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[14px] font-[400] text-prime-color uppercase">
+                                        Total Members
+                                    </p>
+                                    <h3 className="text-[30px] font-[500] text-second-color mt-1">
+                                        {stats.members?.count || (
+                                            <span className="text-[15px] font-semibold text-second-color">
+                                                No Data Available
+                                            </span>
+                                        )}
+                                    </h3>
+                                </div>
+                                <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
+                                    <FaUsers size={20} className="text-[#5146E6]" />
+                                </div>
+                            </div>
                         </div>
 
                         {/* Overdue Tasks Card */}
                         <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                            {/* <a
-                                href={route("super.task.tasklist", {
-                                    member_id: stats?.tasks?.filter?.member_id,
-                                    status: "overdue",
-                                })}
-                                className=""
-                            > */}
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-[14px] font-[400] text-prime-color uppercase">
-                                            Overdue Task Instance
-                                        </p>
-                                        <h3 className="text-[30px] font-[500] text-second-color mt-1">
-                                            {stats.tasks.overdue || (
-                                                <span className="text-[15px] font-semibold text-second-color">
-                                                    No Data Available
-                                                </span>
-                                            )}
-                                        </h3>
-                                    </div>
-                                    <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30">
-                                        <FaExclamationTriangle
-                                            className="text-red-500 dark:text-red-400"
-                                            size={20}
-                                        />
-                                    </div>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[14px] font-[400] text-prime-color uppercase">
+                                        Overdue Task Instance
+                                    </p>
+                                    <h3 className="text-[30px] font-[500] text-second-color mt-1">
+                                        {stats.tasks.overdue || (
+                                            <span className="text-[15px] font-semibold text-second-color">
+                                                No Data Available
+                                            </span>
+                                        )}
+                                    </h3>
                                 </div>
-                            {/* </a> */}
+                                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30">
+                                    <FaExclamationTriangle
+                                        className="text-red-500 dark:text-red-400"
+                                        size={20}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -1212,3 +1242,4 @@ export default function Dashboard({
         </AuthenticatedLayout>
     );
 }
+
