@@ -1,0 +1,936 @@
+import React, { useState } from 'react';
+import { Head, Link } from '@inertiajs/react';
+import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
+import LocationInput from '../../../Components/LocationInput';
+
+// Reusable JobCard Component
+const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-2xl transform hover:scale-[1.03] transition-all duration-300 border border-gray-100 dark:border-gray-700 overflow-hidden">
+            {/* Company Header */}
+            <div className="relative h-32 bg-gradient-to-r from-blue-500 to-purple-600 p-4">
+                <div className="absolute top-4 left-4">
+                    <div className="w-16 h-16 rounded-xl border-4 border-white shadow-lg overflow-hidden bg-white">
+                        {job.companyImage ? (
+                            <img 
+                                src={job.companyImage} 
+                                alt={job.company}
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+                    <span className="px-3 py-1 text-xs font-bold bg-white/90 backdrop-blur text-blue-600 rounded-full shadow-md">
+                        {job.type}
+                    </span>
+                    <div className="text-right">
+                        <h3 className="text-white font-bold text-lg line-clamp-1 mb-1">{job.title}</h3>
+                        <p className="text-white/90 text-sm font-medium">{job.company}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-6">
+                {/* Location and Experience */}
+                <div className="flex items-center gap-4 mb-4 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span className="font-medium">{job.location}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <span className="font-medium">{job.experience}</span>
+                    </div>
+                </div>
+
+                {/* Salary */}
+                <div className="text-xl font-bold text-green-600 dark:text-green-400 mb-4 flex items-center gap-2">
+                    <span>{job.salary}</span>
+                    <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2-1.343-2-3-2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+
+                {/* Skills */}
+                <div className="mb-4">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Skills Required</p>
+                    <div className="flex flex-wrap gap-2">
+                        {job.skills.map((skill, index) => (
+                            <span
+                                key={index}
+                                className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 dark:from-blue-900/20 dark:to-indigo-900/20 dark:text-blue-300 rounded-lg border border-blue-200 dark:border-blue-800"
+                            >
+                                {skill}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Perks */}
+                <div className="mb-4">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Perks & Benefits</p>
+                    <div className="flex flex-wrap gap-2">
+                        {job.perks.map((perk, index) => (
+                            <span
+                                key={index}
+                                className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 dark:from-green-900/20 dark:to-emerald-900/20 dark:text-green-300 rounded-lg border border-green-200 dark:border-green-800 flex items-center gap-1"
+                            >
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                {perk}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Posted Info */}
+                <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-1 mb-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Posted 2 days ago</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 4M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            <span className="font-semibold">{job.applicants || 0} applicants</span>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => onViewDetails(job)}
+                            className="px-4 py-2 text-xs font-bold text-blue-600 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg hover:from-blue-100 hover:to-indigo-100 transition-all duration-200 shadow-sm hover:shadow-md"
+                        >
+                            View Details
+                        </button>
+                        <button
+                            onClick={() => onEdit(job)}
+                            className="px-4 py-2 text-xs font-bold text-gray-600 bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200 rounded-lg hover:from-gray-100 hover:to-slate-100 transition-all duration-200 shadow-sm hover:shadow-md"
+                        >
+                            Edit
+                        </button>
+                        <button
+                            onClick={() => onDelete(job)}
+                            className="px-4 py-2 text-xs font-bold text-red-600 bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-lg hover:from-red-100 hover:to-pink-100 transition-all duration-200 shadow-sm hover:shadow-md"
+                        >
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default function JobPostsIndex({ auth }) {
+    const [formData, setFormData] = useState({
+        jobTitle: "",
+        companyName: "",
+        location: "",
+        jobType: "Full Time",
+        experience: "",
+        salary: "",
+        skills: [],
+        jobDescription: "",
+        perks: []
+    });
+
+    console.log('Job Posts Index page loaded successfully!');
+    console.log('Current route:', window.location.pathname);
+
+    const [showPreview, setShowPreview] = useState(false);
+    const [selectedJob, setSelectedJob] = useState(null);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [jobs, setJobs] = useState([
+        {
+            id: 1,
+            title: "Frontend Developer",
+            company: "Digital Agency",
+            location: "Mumbai",
+            experience: "2-4 years",
+            salary: "₹8,00,000 - ₹12,00,000/year",
+            skills: ["Vue.js", "TypeScript", "CSS"],
+            perks: ["Flexible hours", "Learning budget"],
+            type: "Remote",
+            applicants: 12,
+            companyImage: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop&crop=face&auto=format",
+            description: "We are looking for a skilled Frontend Developer to join our creative team. You will work on cutting-edge web applications using Vue.js and modern JavaScript frameworks. Strong experience in responsive design and user experience is required."
+        },
+        {
+            id: 2,
+            title: "React Developer",
+            company: "Tech Startup",
+            location: "Bangalore",
+            experience: "1-3 years",
+            salary: "₹6,00,000 - ₹10,00,000/year",
+            skills: ["React", "Node.js", "MongoDB"],
+            perks: ["Health insurance", "Work from home"],
+            type: "Full Time",
+            applicants: 8,
+            companyImage: "https://images.unsplash.com/photo-1499204249359-4b7bdfb9b8b5?w=200&h=200&fit=crop&crop=face&auto=format",
+            description: "Join our fast-growing startup as a React Developer! You'll build scalable web applications and work closely with our design team. Experience with full-stack development and modern web technologies is essential."
+        },
+        {
+            id: 3,
+            title: "Full Stack Engineer",
+            company: "E-commerce Platform",
+            location: "Delhi",
+            experience: "3-5 years",
+            salary: "₹10,00,000 - ₹15,00,000/year",
+            skills: ["JavaScript", "Python", "AWS"],
+            perks: ["Gym membership", "Free lunch"],
+            type: "Full Time",
+            applicants: 25,
+            companyImage: "https://images.unsplash.com/photo-1566499185221-6a2399b81893?w=200&h=200&fit=crop&crop=face&auto=format",
+            description: "We're seeking a talented Full Stack Engineer to develop and maintain our e-commerce platform. You'll work with modern technologies including JavaScript, Python, and AWS cloud services. Strong problem-solving skills required."
+        },
+        {
+            id: 4,
+            title: "UI/UX Designer",
+            company: "Design Studio",
+            location: "Pune",
+            experience: "1-2 years",
+            salary: "₹4,00,000 - ₹7,00,000/year",
+            skills: ["Figma", "Adobe XD", "Sketch"],
+            perks: ["Creative freedom", "Team outings"],
+            type: "Part Time",
+            applicants: 6,
+            companyImage: "https://images.unsplash.com/photo-1573496359142-b8d87729a4ff?w=200&h=200&fit=crop&crop=face&auto=format",
+            description: "Creative UI/UX Designer needed for our design studio! You'll create beautiful user interfaces and experiences for various digital products. Proficiency in Figma, Adobe XD, and user research methodologies is required."
+        },
+        {
+            id: 5,
+            title: "Backend Developer",
+            company: "FinTech Company",
+            location: "Hyderabad",
+            experience: "4-6 years",
+            salary: "₹12,00,000 - ₹18,00,000/year",
+            skills: ["Java", "Spring Boot", "PostgreSQL"],
+            perks: ["Stock options", "Annual bonus"],
+            type: "Full Time",
+            applicants: 18,
+            companyImage: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face&auto=format",
+            description: "Looking for an experienced Backend Developer to join our FinTech team. You'll develop robust APIs and work with database systems. Experience with Java, Spring Boot, and financial systems is highly valued."
+        },
+        {
+            id: 6,
+            title: "Mobile App Developer",
+            company: "Gaming Studio",
+            location: "Chennai",
+            experience: "2-4 years",
+            salary: "₹7,00,000 - ₹11,00,000/year",
+            skills: ["React Native", "Flutter", "Firebase"],
+            perks: ["Game room", "Flexible timing"],
+            type: "Remote",
+            applicants: 15,
+            companyImage: "https://images.unsplash.com/photo-1519074019808-3bc74e2a3d2a?w=200&h=200&fit=crop&crop=face&auto=format",
+            description: "Exciting opportunity for a Mobile App Developer in the gaming industry! You'll create engaging mobile games using React Native and Flutter. Experience with Firebase and mobile game development is a plus."
+        }
+    ]);
+
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFormData(prev => ({
+                    ...prev,
+                    companyLogo: file,
+                    companyLogoPreview: reader.result
+                }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleRemoveImage = () => {
+        setFormData(prev => ({
+            ...prev,
+            companyLogo: null,
+            companyLogoPreview: null
+        }));
+    };
+
+    const handleAddSkill = () => {
+        if (formData.currentSkill.trim() && !formData.skills.includes(formData.currentSkill.trim())) {
+            setFormData(prev => ({
+                ...prev,
+                skills: [...prev.skills, prev.currentSkill.trim()],
+                currentSkill: ""
+            }));
+        }
+    };
+
+    const handleRemoveSkill = (skillToRemove) => {
+        setFormData(prev => ({
+            ...prev,
+            skills: prev.skills.filter(skill => skill !== skillToRemove)
+        }));
+    };
+
+    const handleSkillKeyPress = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddSkill();
+        }
+    };
+
+    const handlePreview = () => {
+        setShowPreview(true);
+    };
+
+    const handleClosePreview = () => {
+        setShowPreview(false);
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        
+        // Create new job object
+        const newJob = {
+            id: Date.now(), // Unique ID
+            title: formData.jobTitle,
+            company: formData.companyName,
+            location: formData.location,
+            experience: formData.experience,
+            salary: formData.salary,
+            skills: formData.skills,
+            perks: formData.perks.split(',').map(p => p.trim()).filter(p => p),
+            type: formData.jobType || 'Full Time',
+            applicants: 0,
+            companyImage: formData.companyLogoPreview || `https://images.unsplash.com/photo-${Math.random().toString(36).substr(2, 9)}?w=200&h=200&fit=crop&crop=face&auto=format`,
+            description: formData.jobDescription,
+            lastDate: formData.lastDate,
+            createdAt: new Date().toISOString()
+        };
+
+        // Save to localStorage
+        const existingJobs = JSON.parse(localStorage.getItem('jobPosts') || '[]');
+        const updatedJobs = [newJob, ...existingJobs];
+        localStorage.setItem('jobPosts', JSON.stringify(updatedJobs));
+
+        // Reset form
+        setFormData({
+            jobTitle: '',
+            companyName: '',
+            companyLogo: null,
+            companyLogoPreview: '',
+            location: '',
+            jobType: '',
+            salary: '',
+            experience: '',
+            lastDate: '',
+            skills: [],
+            currentSkill: '',
+            perks: '',
+            jobDescription: ''
+        });
+
+        // Show success message
+        alert('Job post created successfully! Check Job Listing page.');
+    };
+
+    const handleCancel = () => {
+        setFormData({
+            jobTitle: "",
+            companyName: "",
+            companyLogo: null,
+            companyLogoPreview: null,
+            location: "",
+            jobType: "",
+            salary: "",
+            experience: "",
+            lastDate: "",
+            skills: [],
+            currentSkill: "",
+            perks: "",
+            jobDescription: "",
+        });
+    };
+
+    const handleViewDetails = (job) => {
+        setSelectedJob(job);
+        setShowDetailsModal(true);
+    };
+
+    const handleCloseDetailsModal = () => {
+        setShowDetailsModal(false);
+        setSelectedJob(null);
+    };
+
+    const handleEdit = (job) => {
+        console.log("Edit job:", job);
+        // Static - no backend logic
+    };
+
+    const handleDelete = (job) => {
+        console.log("Delete job:", job);
+        // Static - no backend logic
+    };
+
+    return (
+        <AuthenticatedLayout user={auth.user}>
+            <Head title="Job Posts" />
+            
+            <div className="py-6 sm:py-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    {/* Page Header */}
+                    <div className="mb-6 sm:mb-8">
+                       
+                       
+                    </div>
+
+                    {/* Job Post Form Only */}
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+                        <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
+                                Create New Job Post
+                            </h2>
+                        </div>
+                        <div className="p-4 sm:p-6">
+                            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                                {/* Job Title */}
+                                <div>
+                                    <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Job Title <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="jobTitle"
+                                        name="jobTitle"
+                                        value={formData.jobTitle}
+                                        onChange={handleInputChange}
+                                        required
+                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                        placeholder=" Enter Job Title"
+                                    />
+                                </div>
+
+                                {/* Company Name */}
+                                <div>
+                                    <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                      Enter Company Name <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="companyName"
+                                        name="companyName"
+                                        value={formData.companyName}
+                                        onChange={handleInputChange}
+                                        required
+                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                        placeholder="Enter company name "
+                                    />
+                                </div>
+
+                                {/* Company Logo */}
+                                <div>
+                                    <label htmlFor="companyLogo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Company Logo
+                                    </label>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                        <input
+                                            type="file"
+                                            id="companyLogo"
+                                            name="companyLogo"
+                                            onChange={handleImageUpload}
+                                            accept="image/*"
+                                            className="hidden"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => document.getElementById('companyLogo').click()}
+                                            className="px-4 py-2 sm:py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors dark:border-gray-600 dark:hover:bg-gray-700 text-sm sm:text-base"
+                                        >
+                                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                            <span className="ml-2 text-gray-700 dark:text-gray-300">
+                                                Choose File
+                                            </span>
+                                        </button>
+                                        {formData.companyLogoPreview && (
+                                            <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-gray-200">
+                                                <img 
+                                                    src={formData.companyLogoPreview} 
+                                                    alt="Company logo preview"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        JPG, PNG, GIF (Max 5MB)
+                                    </p>
+                                </div>
+
+                                {/* Location */}
+                                <div>
+                                    <label htmlFor="location" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Location <span className="text-red-500">*</span>
+                                    </label>
+                                    <LocationInput
+                                        value={formData.location}
+                                        onChange={(value) => setFormData(prev => ({ ...prev, location: value }))}
+                                        placeholder="Enter job location "
+                                    />
+                                </div>
+
+                                {/* Job Type */}
+                                <div>
+                                    <label htmlFor="jobType" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Job Type
+                                    </label>
+                                    <select
+                                        id="jobType"
+                                        name="jobType"
+                                        value={formData.jobType}
+                                        onChange={handleInputChange}
+                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                    >
+                                        <option value="">Select Job Type</option>
+                                        <option value="Full Time">Full Time</option>
+                                        <option value="Part Time">Part Time</option>
+                                        <option value="Contract">Contract</option>
+                                        <option value="Internship">Internship</option>
+                                        <option value="Remote">Remote</option>
+                                        <option value="Hybrid">Hybrid</option>
+                                    </select>
+                                </div>
+
+                                {/* Salary */}
+                                <div>
+                                    <label htmlFor="salary" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Salary Range <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="salary"
+                                        name="salary"
+                                        value={formData.salary}
+                                        onChange={handleInputChange}
+                                        required
+                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                        placeholder="e.g., ₹8,00,000 - ₹12,00,000/year"
+                                    />
+                                </div>
+
+                                {/* Experience */}
+                                <div>
+                                    <label htmlFor="experience" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Experience Required <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="experience"
+                                        name="experience"
+                                        value={formData.experience}
+                                        onChange={handleInputChange}
+                                        required
+                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                        placeholder="e.g., 2-4 years"
+                                    />
+                                </div>
+
+                                {/* Last Date to Apply */}
+                                <div>
+                                    <label htmlFor="lastDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Last Date to Apply
+                                    </label>
+                                    <input
+                                        type="date"
+                                        id="lastDate"
+                                        name="lastDate"
+                                        value={formData.lastDate}
+                                        onChange={handleInputChange}
+                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                    />
+                                </div>
+
+                                {/* Skills */}
+                                <div>
+                                    <label htmlFor="currentSkill" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Skills Required
+                                    </label>
+                                    <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                                        <input
+                                            type="text"
+                                            id="currentSkill"
+                                            value={formData.currentSkill}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, currentSkill: e.target.value }))}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    handleAddSkill();
+                                                }
+                                            }}
+                                            className="flex-1 px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            placeholder="Type skill and press Enter"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleAddSkill}
+                                            className="px-4 sm:px-6 py-2 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                                        >
+                                            Add Skill
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {formData.skills.map((skill, index) => (
+                                            <span
+                                                key={index}
+                                                className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm flex items-center gap-2"
+                                            >
+                                                {skill}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveSkill(index)}
+                                                    className="text-blue-600 hover:text-blue-800"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Perks */}
+                                <div>
+                                    <label htmlFor="perks" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Perks & Benefits
+                                    </label>
+                                    <textarea
+                                        id="perks"
+                                        name="perks"
+                                        value={formData.perks}
+                                        onChange={handleInputChange}
+                                        rows={3}
+                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                        placeholder="e.g., Health insurance, Flexible hours, Learning budget"
+                                    />
+                                </div>
+
+                                {/* Job Description */}
+                                <div>
+                                    <label htmlFor="jobDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Job Description
+                                    </label>
+                                    <textarea
+                                        id="jobDescription"
+                                        name="jobDescription"
+                                        value={formData.jobDescription}
+                                        onChange={handleInputChange}
+                                        rows={6}
+                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                        placeholder="Describe role, responsibilities, and requirements..."
+                                    />
+                                </div>
+
+                                {/* Form Actions */}
+                                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                                    <button
+                                        type="submit"
+                                        className="flex-1 px-4 sm:px-6 py-2 sm:py-3 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    >
+                                        Submit Job Post
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handlePreview}
+                                        className="px-4 sm:px-6 py-2 sm:py-3 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                                    >
+                                        Preview
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleCancel}
+                                        className="px-4 sm:px-6 py-2 sm:py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Preview Modal */}
+            {showPreview && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6">
+                            <div className="flex justify-between items-start mb-6">
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                    Job Post Preview
+                                </h3>
+                                <button
+                                    onClick={handleClosePreview}
+                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Job Title:</span>
+                                        <p className="text-gray-900 dark:text-white">{formData.jobTitle || "N/A"}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Company:</span>
+                                        <p className="text-gray-900 dark:text-white">{formData.companyName || "N/A"}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Location:</span>
+                                        <p className="text-gray-900 dark:text-white">{formData.location || "N/A"}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Job Type:</span>
+                                        <p className="text-gray-900 dark:text-white">{formData.jobType || "N/A"}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Salary:</span>
+                                        <p className="text-gray-900 dark:text-white">{formData.salary || "N/A"}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Experience:</span>
+                                        <p className="text-gray-900 dark:text-white">{formData.experience || "N/A"}</p>
+                                    </div>
+                                </div>
+
+                                {formData.skills.length > 0 && (
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Skills:</span>
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                            {formData.skills.map((skill, index) => (
+                                                <span key={index} className="px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
+                                                    {skill}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div>
+                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Perks:</span>
+                                    <p className="text-gray-900 dark:text-white">{formData.perks || "N/A"}</p>
+                                </div>
+
+                                <div>
+                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Description:</span>
+                                    <p className="text-gray-700 dark:text-gray-300">{formData.jobDescription || "N/A"}</p>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end mt-6">
+                                <button
+                                    onClick={handleClosePreview}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Job Details Modal */}
+            {showDetailsModal && selectedJob && (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                        {/* Modal Header */}
+                        <div className="relative h-40 bg-gradient-to-r from-blue-500 to-purple-600 p-6">
+                            <div className="absolute top-6 left-6">
+                                <div className="w-20 h-20 rounded-2xl border-4 border-white shadow-xl overflow-hidden bg-white">
+                                    {selectedJob.companyImage ? (
+                                        <img 
+                                            src={selectedJob.companyImage} 
+                                            alt={selectedJob.company}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                            <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                            </svg>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="absolute top-6 right-6">
+                                <button
+                                    onClick={handleCloseDetailsModal}
+                                    className="w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-lg"
+                                >
+                                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div className="absolute bottom-6 left-6 right-6">
+                                <h2 className="text-white font-bold text-2xl line-clamp-1 mb-2">{selectedJob.title}</h2>
+                                <p className="text-white/95 text-lg font-medium">{selectedJob.company}</p>
+                            </div>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                                {/* Left Column */}
+                                <div className="space-y-6">
+                                    <div className="flex items-center gap-3">
+                                        <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        <div>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">Location</p>
+                                            <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.location}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
+                                        <div>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">Experience</p>
+                                            <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.experience}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
+                                        <div>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">Job Type</p>
+                                            <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.type}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2-1.343-2-3-2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">Salary</p>
+                                            <p className="font-bold text-xl text-green-600 dark:text-green-400">{selectedJob.salary}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right Column */}
+                                <div className="space-y-6">
+                                    <div>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Skills Required</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedJob.skills.map((skill, index) => (
+                                                <span
+                                                    key={index}
+                                                    className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 dark:from-blue-900/20 dark:to-indigo-900/20 dark:text-blue-300 rounded-xl border border-blue-200 dark:border-blue-800"
+                                                >
+                                                    {skill}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Perks & Benefits</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedJob.perks.map((perk, index) => (
+                                                <span
+                                                    key={index}
+                                                    className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 dark:from-green-900/20 dark:to-emerald-900/20 dark:text-green-300 rounded-xl border border-green-200 dark:border-green-800 flex items-center gap-2"
+                                                >
+                                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                    </svg>
+                                                    {perk}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Job Description Section */}
+                            <div className="mb-8">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Job Description</h3>
+                                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600">
+                                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                                        {selectedJob.description || "We are looking for a talented professional to join our team. This role offers excellent growth opportunities and a chance to work on exciting projects with cutting-edge technologies."}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+                                <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                                    <div className="flex items-center gap-1">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span>Posted 2 days ago</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 4M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        </svg>
+                                        <span className="font-semibold">{selectedJob.applicants || 0} applicants</span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button className="px-6 py-3 text-sm font-bold text-blue-600 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl hover:from-blue-100 hover:to-indigo-100 transition-all duration-200 shadow-md hover:shadow-lg">
+                                        Apply Now
+                                    </button>
+                                    <button className="px-6 py-3 text-sm font-bold text-gray-600 bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200 rounded-xl hover:from-gray-100 hover:to-slate-100 transition-all duration-200 shadow-md hover:shadow-lg">
+                                        Save Job
+                                    </button>
+                                    <button
+                                        onClick={handleCloseDetailsModal}
+                                        className="px-6 py-3 text-sm font-bold text-gray-700 bg-gray-100 border border-gray-300 rounded-xl hover:bg-gray-200 transition-all duration-200"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </AuthenticatedLayout>
+    );
+}

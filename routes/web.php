@@ -12,6 +12,7 @@ use App\Http\Controllers\SuperAdmin\ResumeController as SuperResumeController;
 use App\Http\Controllers\Admin\ResumeController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 /** SUPER ADMIN ROUTES START HERE **/
 Route::prefix('super')->name('super.')->group(function () {
@@ -95,6 +96,7 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
 
     Route::post('/checkin', [App\Http\Controllers\Member\CheckInOutController::class, 'checkIn'])->name('admin.checkin');
     Route::post('/checkout', [App\Http\Controllers\Member\CheckInOutController::class, 'checkOut'])->name('admin.checkout');
+    
     Route::get('/resumes', [ResumeController::class, 'index'])->name('admin.resumes.index');
     Route::get('/resumes/create', [ResumeController::class, 'create'])->name('admin.resumes.create');
     Route::post('/resumes', [ResumeController::class, 'store'])->name('admin.resumes.store');
@@ -102,6 +104,16 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::get('/resumes/{resume}/edit', [ResumeController::class, 'edit'])->name('admin.resumes.edit');
     Route::post('/resumes/{resume}', [ResumeController::class, 'update'])->name('admin.resumes.update');
     Route::delete('/resumes/{resume}', [ResumeController::class, 'destroy'])->name('admin.resumes.destroy');
+    
+    // Job Posts routes
+    Route::get('/job-posts', function () {
+        return Inertia::render('Admin/JobPosts/Index');
+    })->name('admin.job.posts.index');
+    
+    Route::get('/job-listing', function () {
+        return Inertia::render('Admin/JobPosts/JobListing');
+    })->name('admin.job.posts.listing');
+    
     Route::post('/logout', [App\Http\Controllers\Admin\AdminController::class, 'logout'])->name('admin.logout');
     Route::get('/profile', [App\Http\Controllers\Admin\AdminController::class, 'userProfile'])->name('admin.profile');
     Route::post('/profile-update', [App\Http\Controllers\Admin\AdminController::class, 'userProfileUpdate'])->name('admin.profile.update');
