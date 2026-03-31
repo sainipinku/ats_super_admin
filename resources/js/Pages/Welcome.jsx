@@ -1,38 +1,48 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import GuestLayout from "@/Layouts/GuestLayout";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { FaChartLine, FaUsers, FaFileAlt, FaClock } from "react-icons/fa";
 
 export default function Welcome({ auth, laravelVersion, phpVersion }) {
-    const [days, setDays] = useState(0);
-    const [hours, setHours] = useState(0);
-    const [minutes, setMinutes] = useState(0);
-    const [seconds, setSeconds] = useState(0);
+    const [timeLeft, setTimeLeft] = useState({
+        days: 0,
+        hours: 0,
+        minutes: 0,
+        seconds: 0
+    });
 
-    // Set launch date (adjust as needed)
-    const launchDate = new Date("2025-01-15T00:00:00").getTime();
+    const launchDate = useMemo(() => {
+        const launch = new Date();
+        launch.setDate(launch.getDate() + 60);
+        launch.setHours(0, 0, 0, 0);
+        return launch.getTime();
+    }, []);
 
     useEffect(() => {
-        const timer = setInterval(() => {
+        const calculateTimeLeft = () => {
             const now = new Date().getTime();
             const distance = launchDate - now;
 
             if (distance < 0) {
-                clearInterval(timer);
-                setDays(0);
-                setHours(0);
-                setMinutes(0);
-                setSeconds(0);
-            } else {
-                setDays(Math.floor(distance / (1000 * 60 * 60 * 24)));
-                setHours(Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
-                setMinutes(Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)));
-                setSeconds(Math.floor((distance % (1000 * 60)) / 1000));
+                return { days: 0, hours: 0, minutes: 0, seconds: 0 };
             }
+
+            return {
+                days: Math.floor(distance / (1000 * 60 * 60 * 24)),
+                hours: Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+                minutes: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
+                seconds: Math.floor((distance % (1000 * 60)) / 1000)
+            };
+        };
+
+        setTimeLeft(calculateTimeLeft());
+
+        const timer = setInterval(() => {
+            setTimeLeft(calculateTimeLeft());
         }, 1000);
 
         return () => clearInterval(timer);
-    }, []);
+    }, [launchDate]);
 
     const features = [
         { icon: FaChartLine, title: "Analytics Dashboard", description: "Real-time recruitment metrics and insights" },
@@ -45,10 +55,8 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
         <GuestLayout>
             <Head title="ATS - Coming Soon" />
 
-            {/* Hero Section */}
             <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
                 <div className="container mx-auto px-4 py-16">
-                    {/* Logo/Brand */}
                     <div className="mb-12 text-center">
                         <h1 className="text-5xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent dark:from-indigo-400 dark:to-purple-400">
                             ATS
@@ -56,7 +64,6 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                         <p className="mt-2 text-gray-600 dark:text-gray-400">Applicant Tracking System</p>
                     </div>
 
-                    {/* Main Content */}
                     <div className="mx-auto max-w-4xl text-center">
                         <div className="mb-8">
                             <span className="inline-block rounded-full bg-indigo-100 px-4 py-2 text-sm font-semibold text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
@@ -72,37 +79,16 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                             candidate management, and data-driven hiring decisions.
                         </p>
 
-                        {/* Countdown Timer */}
+                        {/* Simple Countdown Timer */}
                         <div className="mb-12">
                             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                                <div className="rounded-lg bg-white p-4 shadow-lg dark:bg-gray-800">
-                                    <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400 md:text-4xl">
-                                        {String(days).padStart(2, '0')}
-                                    </div>
-                                    <div className="text-sm text-gray-600 dark:text-gray-400">Days</div>
-                                </div>
-                                <div className="rounded-lg bg-white p-4 shadow-lg dark:bg-gray-800">
-                                    <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400 md:text-4xl">
-                                        {String(hours).padStart(2, '0')}
-                                    </div>
-                                    <div className="text-sm text-gray-600 dark:text-gray-400">Hours</div>
-                                </div>
-                                <div className="rounded-lg bg-white p-4 shadow-lg dark:bg-gray-800">
-                                    <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400 md:text-4xl">
-                                        {String(minutes).padStart(2, '0')}
-                                    </div>
-                                    <div className="text-sm text-gray-600 dark:text-gray-400">Minutes</div>
-                                </div>
-                                <div className="rounded-lg bg-white p-4 shadow-lg dark:bg-gray-800">
-                                    <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400 md:text-4xl">
-                                        {String(seconds).padStart(2, '0')}
-                                    </div>
-                                    <div className="text-sm text-gray-600 dark:text-gray-400">Seconds</div>
-                                </div>
+                                <CountdownBox value={timeLeft.days} label="Days" />
+                                <CountdownBox value={timeLeft.hours} label="Hours" />
+                                <CountdownBox value={timeLeft.minutes} label="Minutes" />
+                                <CountdownBox value={timeLeft.seconds} label="Seconds" />
                             </div>
                         </div>
 
-                        {/* Email Signup Form */}
                         <div className="mx-auto mb-12 max-w-md">
                             <div className="flex gap-2">
                                 <input
@@ -120,7 +106,6 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                         </div>
                     </div>
 
-                    {/* Features Section */}
                     <div className="mt-20">
                         <h3 className="mb-12 text-center text-3xl font-bold text-gray-900 dark:text-white">
                             What to Expect
@@ -148,7 +133,6 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                         </div>
                     </div>
 
-                    {/* Footer */}
                     <div className="mt-20 border-t border-gray-200 pt-8 text-center dark:border-gray-700">
                         <p className="text-gray-600 dark:text-gray-400">
                             © {new Date().getFullYear()} ATS. All rights reserved.
@@ -159,3 +143,83 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
         </GuestLayout>
     );
 }
+
+// Simple Countdown Box Component
+const CountdownBox = ({ value, label }) => {
+    const formattedValue = String(Math.floor(value)).padStart(2, '0');
+
+    return (
+        <div className="countdown-box">
+            <div className="countdown-value">
+                {formattedValue}
+            </div>
+            <div className="countdown-label">{label}</div>
+
+            <style jsx>{`
+                .countdown-box {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                }
+
+                .countdown-value {
+                    background: linear-gradient(145deg, #1e1a4b 0%, #2d2a5e 100%);
+                    border-radius: 16px;
+                    padding: 1rem 0.5rem;
+                    min-width: 100px;
+                    text-align: center;
+                    font-size: 3rem;
+                    font-weight: 800;
+                    color: white;
+                    text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+                    box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.2);
+                    letter-spacing: 0.1em;
+                }
+
+                @media (min-width: 640px) {
+                    .countdown-value {
+                        min-width: 120px;
+                        font-size: 3.5rem;
+                        padding: 1.25rem 0.75rem;
+                    }
+                }
+
+                @media (min-width: 768px) {
+                    .countdown-value {
+                        min-width: 140px;
+                        font-size: 4rem;
+                        padding: 1.5rem 1rem;
+                    }
+                }
+
+                .countdown-label {
+                    margin-top: 1rem;
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.15em;
+                    color: #6b7280;
+                    text-align: center;
+                }
+
+                @media (min-width: 640px) {
+                    .countdown-label {
+                        font-size: 0.875rem;
+                        margin-top: 1.25rem;
+                    }
+                }
+
+                @media (min-width: 768px) {
+                    .countdown-label {
+                        font-size: 1rem;
+                        margin-top: 1.5rem;
+                    }
+                }
+
+                .dark .countdown-label {
+                    color: #9ca3af;
+                }
+            `}</style>
+        </div>
+    );
+};
