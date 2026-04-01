@@ -9,7 +9,9 @@ use App\Http\Controllers\SuperAdmin\DesignationController;
 use App\Http\Controllers\SuperAdmin\MemberController;
 use App\Http\Controllers\SuperAdmin\RolesController;
 use App\Http\Controllers\SuperAdmin\ResumeController as SuperResumeController;
+use App\Http\Controllers\SuperAdmin\JobRequestController;
 use App\Http\Controllers\Admin\ResumeController;
+use App\Http\Controllers\Admin\JobController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -79,6 +81,19 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::put('/{member}/password', [MemberController::class, 'updatePassword'])->name('password');
             Route::get('/{uuid}/details', [MemberController::class, 'memberDetails'])->name('details');
         });
+
+        // Job Requests Routes (Super Admin)
+        Route::group(['prefix' => 'job-requests', 'as' => 'job.requests.'], function () {
+            Route::get('/', [JobRequestController::class, 'index'])->name('index');
+            Route::get('/api/all', [JobRequestController::class, 'getAllRequests'])->name('api.all');
+            Route::get('/api/pending', [JobRequestController::class, 'getPendingRequests'])->name('api.pending');
+            Route::get('/api/statistics', [JobRequestController::class, 'getStatistics'])->name('api.statistics');
+            Route::get('/api/{job}', [JobRequestController::class, 'show'])->name('api.show');
+            Route::patch('/api/{job}/approve', [JobRequestController::class, 'approve'])->name('api.approve');
+            Route::patch('/api/{job}/reject', [JobRequestController::class, 'reject'])->name('api.reject');
+            Route::patch('/api/{job}/request-changes', [JobRequestController::class, 'requestChanges'])->name('api.request_changes');
+            Route::delete('/api/{job}', [JobRequestController::class, 'destroy'])->name('api.destroy');
+        });
     });
 });
 /** SUPER ADMIN ROUTES END HERE **/
@@ -106,13 +121,15 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::delete('/resumes/{resume}', [ResumeController::class, 'destroy'])->name('admin.resumes.destroy');
     
     // Job Posts routes
-    Route::get('/job-posts', function () {
-        return Inertia::render('Admin/JobPosts/Index');
-    })->name('admin.job.posts.index');
+    Route::get('/job-posts', [JobController::class, 'index'])->name('admin.job.posts.index');
+    Route::get('/job-listing', [JobController::class, 'listing'])->name('admin.job.posts.listing');
     
-    Route::get('/job-listing', function () {
-        return Inertia::render('Admin/JobPosts/JobListing');
-    })->name('admin.job.posts.listing');
+    // Job API routes
+    Route::get('/api/jobs', [JobController::class, 'getAdminJobs'])->name('admin.api.jobs.list');
+    Route::post('/api/jobs', [JobController::class, 'store'])->name('admin.api.jobs.store');
+    Route::post('/api/jobs/{job}', [JobController::class, 'update'])->name('admin.api.jobs.update');
+    Route::delete('/api/jobs/{job}', [JobController::class, 'destroy'])->name('admin.api.jobs.destroy');
+    Route::patch('/api/jobs/{job}/resend', [JobController::class, 'resend'])->name('admin.api.jobs.resend');
     
     Route::post('/logout', [App\Http\Controllers\Admin\AdminController::class, 'logout'])->name('admin.logout');
     Route::get('/profile', [App\Http\Controllers\Admin\AdminController::class, 'userProfile'])->name('admin.profile');

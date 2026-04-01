@@ -49,6 +49,7 @@ class Member extends Authenticatable
         'dob' => 'date',
         'phone_verify_at' => 'datetime',
         'reset_password_token_expires_at' => 'datetime',
+        'password' => 'hashed',
     ];
     public function uniqueIds()
     {

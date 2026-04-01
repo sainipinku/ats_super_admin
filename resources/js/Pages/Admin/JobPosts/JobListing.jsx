@@ -1,19 +1,26 @@
 import React, { useState } from 'react';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import LocationInput from '../../../Components/LocationInput';
 
 // Reusable JobCard Component
-const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
+const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend }) => {
     const [showFullPerks, setShowFullPerks] = useState(false);
     
     const perksToShow = showFullPerks ? job.perks : job.perks?.slice(0, 2);
     const hasMorePerks = job.perks && job.perks.length > 2;
+
+    const getStatusBadge = (status) => {
+        const badges = {
+            pending: 'bg-yellow-100 text-yellow-800',
+            active: 'bg-green-100 text-green-800',
+            declined: 'bg-red-100 text-red-800',
+        };
+        return badges[status] || 'bg-gray-100 text-gray-800';
+    };
     
     return (
-        <div className={`bg-white rounded-3xl shadow-sm p-4 border min-h-[320px] relative flex flex-col ${
-            job.active ? 'border-blue-300 ring-2 ring-blue-200' : 'border-slate-200'
-        }`}>
+        <div className={`bg-white rounded-3xl shadow-sm p-4 border min-h-[320px] relative flex flex-col border-slate-200 hover:border-blue-300 hover:ring-2 hover:ring-blue-200 transition-all duration-200`}>
             {/* Action Icons - Outside Card */}
             <div className="absolute -top-4 -right-2 z-10 flex gap-1">
                 <button
@@ -38,15 +45,20 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
 
             <div className="flex items-start justify-between mb-2">
                 <div className="flex gap-3">
-                    <img src={job.companyImage} alt={job.title} className="w-10 h-10 rounded-xl object-cover" />
+                    <img src={job.company_image || job.companyImage} alt={job.title} className="w-10 h-10 rounded-xl object-cover" />
                     <div>
                         <h2 className="text-[16px] font-semibold text-slate-900 line-clamp-1">{job.title}</h2>
                         <p className="text-slate-500 text-[12px]">{job.company}</p>
                     </div>
                 </div>
-                <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-medium">
-                    {job.type}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                    <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-medium">
+                        {job.job_type || job.type}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${getStatusBadge(job.status)}`}>
+                        {job.status}
+                    </span>
+                </div>
             </div>
 
             <div className="space-y-1 text-slate-600 text-[12px] mb-2">
@@ -101,19 +113,32 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
             <div className="mt-auto">
                 <hr className="my-2" />
 
+                {job.status === 'declined' && (
+                    <button
+                        onClick={() => onResend(job)}
+                        className="w-full mb-2 py-2 rounded-xl bg-yellow-500 text-white text-[12px] font-semibold hover:bg-yellow-600 transition-colors"
+                    >
+                        ↻ Resend for Approval
+                    </button>
+                )}
+
                 <div className="flex justify-between items-center text-[12px] text-slate-500 mb-3">
-                    <p>Posted {job.createdAt ? new Date(job.createdAt).toLocaleDateString('en-US', { 
+                    <p>Posted {job.created_at ? new Date(job.created_at).toLocaleDateString('en-US', { 
                         month: 'short', 
                         day: 'numeric', 
                         year: 'numeric' 
-                    }) : 'Just now'} <span className="mx-2">•</span> {job.applicants || 0} applicants</p>
+                    }) : (job.createdAt ? new Date(job.createdAt).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                    }) : 'Just now')} <span className="mx-2">•</span> {job.applicants || 0} applicants</p>
                 </div>
 
                 <button 
                     onClick={() => onViewDetails(job)}
                     className="w-full py-2 rounded-xl text-blue-600 text-[14px] font-semibold hover:bg-blue-50 transition-colors"
                 >
-                    👁 View Details
+                    View Details
                 </button>
             </div>
         </div>
@@ -122,22 +147,29 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
 
 export default function JobListing({ auth }) {
     const [jobs, setJobs] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    // Load jobs from localStorage on component mount
+    // Load jobs from API on component mount
     React.useEffect(() => {
-        console.log('JobListing component mounted');
-        const savedJobs = JSON.parse(localStorage.getItem('jobPosts') || '[]');
-        console.log('Saved jobs from localStorage:', savedJobs);
-        
-        // If no saved jobs, show empty state
-        if (savedJobs.length === 0) {
-            console.log('No saved jobs found');
-            setJobs([]);
-        } else {
-            console.log('Loading saved jobs:', savedJobs);
-            setJobs(savedJobs);
-        }
+        fetchJobs();
     }, []);
+
+    const fetchJobs = async () => {
+        try {
+            const response = await fetch(route('admin.api.jobs.list'));
+            const data = await response.json();
+            if (data.success) {
+                setJobs(data.data);
+            } else {
+                setJobs([]);
+            }
+        } catch (error) {
+            console.error('Error fetching jobs:', error);
+            setJobs([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const [selectedJob, setSelectedJob] = useState(null);
 
@@ -146,21 +178,58 @@ export default function JobListing({ auth }) {
     };
 
     const handleEdit = (job) => {
-        console.log("Edit job:", job);
-        // Static - no backend logic
+        // Navigate to job post form with full job data for editing
+        router.visit(route('admin.job.posts.index'), {
+            data: { edit: job.id },
+            preserveState: true,
+        });
     };
 
-    const handleDelete = (job) => {
+    const handleDelete = async (job) => {
         if (confirm(`Are you sure you want to delete "${job.title}" job post?`)) {
-            // Remove from localStorage
-            const existingJobs = JSON.parse(localStorage.getItem('jobPosts') || '[]');
-            const updatedJobs = existingJobs.filter(j => j.id !== job.id);
-            localStorage.setItem('jobPosts', JSON.stringify(updatedJobs));
-            
-            // Update state
-            setJobs(updatedJobs);
-            
-            alert('Job post deleted successfully!');
+            try {
+                const response = await fetch(route('admin.api.jobs.destroy', job.id), {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        'Accept': 'application/json',
+                    },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    setJobs(jobs.filter(j => j.id !== job.id));
+                    alert('Job post deleted successfully!');
+                } else {
+                    alert(data.message || 'Failed to delete job.');
+                }
+            } catch (error) {
+                console.error('Error deleting job:', error);
+                alert('Failed to delete job.');
+            }
+        }
+    };
+
+    const handleResend = async (job) => {
+        if (confirm(`Resend "${job.title}" for approval?`)) {
+            try {
+                const response = await fetch(route('admin.api.jobs.resend', job.id), {
+                    method: 'PATCH',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        'Accept': 'application/json',
+                    },
+                });
+                const data = await response.json();
+                if (data.success) {
+                    setJobs(jobs.map(j => j.id === job.id ? data.data : j));
+                    alert('Job resent for approval successfully!');
+                } else {
+                    alert(data.message || 'Failed to resend job.');
+                }
+            } catch (error) {
+                console.error('Error resending job:', error);
+                alert('Failed to resend job.');
+            }
         }
     };
 
@@ -172,7 +241,11 @@ export default function JobListing({ auth }) {
                 <h1 className="text-4xl font-bold text-slate-800 mb-6">Listed Jobs Posts</h1>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {jobs.length > 0 ? (
+                    {loading ? (
+                        <div className="col-span-full flex items-center justify-center py-12">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                        </div>
+                    ) : jobs.length > 0 ? (
                         jobs.map((job, idx) => (
                             <JobCard 
                                 key={idx} 
@@ -180,6 +253,7 @@ export default function JobListing({ auth }) {
                                 onViewDetails={handleViewDetails}
                                 onEdit={handleEdit}
                                 onDelete={handleDelete}
+                                onResend={handleResend}
                             />
                         ))
                     ) : (
@@ -215,13 +289,21 @@ export default function JobListing({ auth }) {
                             <div className="flex justify-between items-start mb-6">
                                 <div className="flex gap-4">
                                     <img 
-                                        src={selectedJob.companyImage} 
+                                        src={selectedJob.company_image || selectedJob.companyImage} 
                                         alt={selectedJob.company}
                                         className="w-16 h-16 rounded-xl object-cover"
                                     />
                                     <div>
                                         <h2 className="text-2xl font-bold text-gray-900">{selectedJob.title}</h2>
                                         <p className="text-lg text-gray-600">{selectedJob.company}</p>
+                                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium capitalize ${
+                                            selectedJob.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                            selectedJob.status === 'active' ? 'bg-green-100 text-green-800' :
+                                            selectedJob.status === 'declined' ? 'bg-red-100 text-red-800' :
+                                            'bg-gray-100 text-gray-800'
+                                        }`}>
+                                            {selectedJob.status}
+                                        </span>
                                     </div>
                                 </div>
                                 <button
@@ -235,15 +317,15 @@ export default function JobListing({ auth }) {
                             <div className="grid grid-cols-2 gap-6 mb-6">
                                 <div>
                                     <p className="text-sm text-gray-500 mb-1">Location</p>
-                                    <p className="font-medium">📍 {selectedJob.location}</p>
+                                    <p className="font-medium">{selectedJob.location}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-500 mb-1">Experience</p>
-                                    <p className="font-medium">💼 {selectedJob.experience}</p>
+                                    <p className="font-medium">{selectedJob.experience}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-500 mb-1">Job Type</p>
-                                    <p className="font-medium">{selectedJob.type}</p>
+                                    <p className="font-medium">{selectedJob.job_type || selectedJob.type}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-500 mb-1">Salary</p>
@@ -285,7 +367,7 @@ export default function JobListing({ auth }) {
                                 <h3 className="text-lg font-semibold mb-3">Key Responsibilities</h3>
                                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
                                     <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                                        {selectedJob.keyResponsibilities || 'No key responsibilities specified.'}
+                                        {selectedJob.key_responsibilities || selectedJob.keyResponsibilities || 'No key responsibilities specified.'}
                                     </p>
                                 </div>
                             </div>
@@ -310,12 +392,16 @@ export default function JobListing({ auth }) {
 
                             <div className="flex justify-between items-center pt-4 border-t">
                                 <div className="text-sm text-gray-500">
-                                    <p>Posted: {selectedJob.createdAt ? new Date(selectedJob.createdAt).toLocaleDateString('en-US', { 
+                                    <p>Posted: {selectedJob.created_at ? new Date(selectedJob.created_at).toLocaleDateString('en-US', { 
                                         month: 'short', 
                                         day: 'numeric', 
                                         year: 'numeric' 
-                                    }) : 'Just now'}</p>
-                                    <p>Last Date to Apply: {selectedJob.lastDate || 'Not specified'}</p>
+                                    }) : (selectedJob.createdAt ? new Date(selectedJob.createdAt).toLocaleDateString('en-US', { 
+                                        month: 'short', 
+                                        day: 'numeric', 
+                                        year: 'numeric' 
+                                    }) : 'Just now')}</p>
+                                    <p>Last Date to Apply: {selectedJob.last_date || selectedJob.lastDate || 'Not specified'}</p>
                                     <p>{selectedJob.applicants || 0} applicants</p>
                                 </div>
                                 <div className="flex gap-3">

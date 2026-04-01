@@ -135,6 +135,40 @@ export default function JobPostsIndex({ auth }) {
     console.log('Job Posts Index page loaded successfully!');
     console.log('Current route:', window.location.pathname);
 
+    // Check for edit mode on mount
+    React.useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const editJobId = urlParams.get('edit');
+        
+        if (editJobId) {
+            // Find job in local jobs array
+            setJobs(currentJobs => {
+                const jobToEdit = currentJobs.find(job => job.id === parseInt(editJobId));
+                if (jobToEdit) {
+                    // Pre-fill form with job data
+                    setFormData({
+                        jobTitle: jobToEdit.title || '',
+                        companyName: jobToEdit.company || '',
+                        companyLogo: null,
+                        companyLogoPreview: jobToEdit.companyImage || '',
+                        location: jobToEdit.location || '',
+                        jobType: jobToEdit.type || 'Full Time',
+                        salary: jobToEdit.salary || '',
+                        experience: jobToEdit.experience || '',
+                        lastDate: '',
+                        skills: jobToEdit.skills || [],
+                        currentSkill: '',
+                        perks: jobToEdit.perks ? jobToEdit.perks.join(', ') : '',
+                        jobDescription: jobToEdit.description || '',
+                        keyResponsibilities: jobToEdit.keyResponsibilities || '',
+                        qualifications: jobToEdit.qualifications || ''
+                    });
+                }
+                return currentJobs;
+            });
+        }
+    }, []);
+
     const [showPreview, setShowPreview] = useState(false);
     const [selectedJob, setSelectedJob] = useState(null);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -288,55 +322,67 @@ export default function JobPostsIndex({ auth }) {
         setShowPreview(false);
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         
-        // Create new job object
-        const newJob = {
-            id: Date.now(), // Unique ID
-            title: formData.jobTitle,
-            company: formData.companyName,
-            location: formData.location,
-            experience: formData.experience,
-            salary: formData.salary,
-            skills: formData.skills,
-            perks: formData.perks.split(',').map(p => p.trim()).filter(p => p),
-            type: formData.jobType || 'Full Time',
-            applicants: 0,
-            companyImage: formData.companyLogoPreview || `https://images.unsplash.com/photo-${Math.random().toString(36).substr(2, 9)}?w=200&h=200&fit=crop&crop=face&auto=format`,
-            description: formData.jobDescription,
-            keyResponsibilities: formData.keyResponsibilities,
-            qualifications: formData.qualifications,
-            lastDate: formData.lastDate,
-            createdAt: new Date().toISOString()
-        };
+        const formDataObj = new FormData();
+        formDataObj.append('title', formData.jobTitle);
+        formDataObj.append('company', formData.companyName);
+        formDataObj.append('description', formData.jobDescription);
+        formDataObj.append('location', formData.location);
+        formDataObj.append('job_type', formData.jobType || 'Full Time');
+        formDataObj.append('experience', formData.experience);
+        formDataObj.append('salary', formData.salary);
+        formDataObj.append('skills', JSON.stringify(formData.skills));
+        formDataObj.append('perks', JSON.stringify(formData.perks.split(',').map(p => p.trim()).filter(p => p)));
+        formDataObj.append('key_responsibilities', formData.keyResponsibilities);
+        formDataObj.append('qualifications', formData.qualifications);
+        formDataObj.append('last_date', formData.lastDate);
+        
+        if (formData.companyLogo) {
+            formDataObj.append('company_image', formData.companyLogo);
+        }
 
-        // Save to localStorage
-        const existingJobs = JSON.parse(localStorage.getItem('jobPosts') || '[]');
-        const updatedJobs = [newJob, ...existingJobs];
-        localStorage.setItem('jobPosts', JSON.stringify(updatedJobs));
-
-        // Reset form
-        setFormData({
-            jobTitle: '',
-            companyName: '',
-            companyLogo: null,
-            companyLogoPreview: '',
-            location: '',
-            jobType: '',
-            salary: '',
-            experience: '',
-            lastDate: '',
-            skills: [],
-            currentSkill: '',
-            perks: '',
-            jobDescription: '',
-            keyResponsibilities: '',
-            qualifications: ''
-        });
-
-        // Show success message
-        alert('Job post created successfully! Check Job Listing page.');
+        try {
+            const response = await fetch(route('admin.api.jobs.store'), {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Accept': 'application/json',
+                },
+                body: formDataObj,
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Reset form
+                setFormData({
+                    jobTitle: '',
+                    companyName: '',
+                    companyLogo: null,
+                    companyLogoPreview: '',
+                    location: '',
+                    jobType: '',
+                    salary: '',
+                    experience: '',
+                    lastDate: '',
+                    skills: [],
+                    currentSkill: '',
+                    perks: '',
+                    jobDescription: '',
+                    keyResponsibilities: '',
+                    qualifications: ''
+                });
+                
+                alert('Job post created successfully and sent for approval!');
+            } else {
+                alert(data.message || 'Failed to create job post.');
+            }
+        } catch (error) {
+            console.error('Error creating job:', error);
+            alert('Failed to create job post. Please try again.');
+        }
     };
 
     const handleCancel = () => {
