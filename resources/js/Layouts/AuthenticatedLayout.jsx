@@ -21,6 +21,7 @@ import { RiAccountBoxFill } from "react-icons/ri";
 import { MdContactSupport } from "react-icons/md";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { IoCloseSharp } from "react-icons/io5";
+import Sidebar from '@/Pages/Admin/Layouts/Sidebar';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -40,6 +41,7 @@ export default function AuthenticatedLayout({ header, children }) {
     const { successAlert, errorAlert, warningAlert, infoAlert } = useAlerts();
 
     const { ziggy, flash, errors, messages } = usePage().props;
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     useEffect(() => {
         if (errors && !isValidationError(errors)) {
             Object.entries(errors).forEach(([key, value]) => {
@@ -114,18 +116,34 @@ function isValidationError(errors) {
         setIsMenuOpen(prev => !prev);
     };
     return (
+        <>
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-            <nav className="border-b border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800 fixed top-0 left-0 right-0 z-50 print:hidden">
+            {/* Sidebar */}
+            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+            
+            {/* Main Content */}
+            <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-[288px]' : 'ml-0'}`}>
+                <nav className="border-b border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800 fixed top-0 left-0 right-0 z-50 print:hidden">
                 <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8 ">
                     <div className="flex h-16 justify-between border-gray-200 dark:border-gray-700 ">
                         <div className="flex">
+                            {/* Sidebar Toggle Button */}
+                            <button
+                                onClick={() => setSidebarOpen(!sidebarOpen)}
+                                className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                            >
+                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            </button>
+                            
                             <div className="flex shrink-0 items-center">
                                 <Link href="/dashboard">
                                     <ApplicationLogo className="block w-auto fill-current text-gray-800 dark:text-gray-200" />
                                 </Link>
                             </div>
 
-                            <div className="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                            {/* <div className="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex"> */}
                                 {/* <NavLink
                                     href={route('dashboard')}
                                     active={route().current('dashboard')}
@@ -172,7 +190,7 @@ function isValidationError(errors) {
                                         Aadhar Verification
                                     </NavLink>
                                 )} */}
-                            </div>
+                            {/* </div> */}
                         </div>
 
 
@@ -236,7 +254,7 @@ function isValidationError(errors) {
                             {/* Dark/Light Toggle */}
                             <button
                                 onClick={() => setDarkMode(!darkMode)}
-                                className="md:flex items-center gap-2 bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-xl text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition hidden md:block "
+                                className=" items-center gap-2 bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-xl text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition hidden md:block "
                             >
                                 {darkMode ? (
                                     <FaSun size={18} className="text-gray-200" />
@@ -250,7 +268,7 @@ function isValidationError(errors) {
 
 
                             {/* Button for setting */}
-                            <div className='flex items-center gap-2 bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-xl text-xl text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition cursor-pointer md:block hidden '>
+                            <div className=' items-center gap-2 bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-xl text-xl text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition cursor-pointer md:block hidden '>
                                 <IoSettings />
                             </div>
                         </div>
@@ -577,7 +595,8 @@ function isValidationError(errors) {
                             </div>
                         )}
 
-                    </div> */}
+                    </div> 
+                    
                 </div>
 
 
@@ -658,14 +677,16 @@ function isValidationError(errors) {
                     </div>
                 </header>
             )}
+<main>{children}</main>
 
-            <main>{children}</main>
+<Toaster
+    position="top-right"
+    reverseOrder={false}
+    gutter={8}
+/>
+</div> 
+</div>
 
-            <Toaster
-                position='top-right'
-                reverseOrder={false}
-                gutter={8}
-            />
-        </div>
+</>
     );
 }

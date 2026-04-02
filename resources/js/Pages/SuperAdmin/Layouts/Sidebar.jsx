@@ -208,6 +208,60 @@ const Sidebar = ({ isOpen, onClose }) => {
 
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
                     <a
+                        href={route("super.job.requests.index")}
+                        className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
+                            route().current("super.job.requests.index")
+                                ? "text-white bg-[#5146E6]"
+                                : "text-[#727272] hover:text-white hover:bg-[#5146E6]"
+                        }`}
+                    >
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M9 12H15M9 16H15M17 21H7C5.89543 21 5 20.1046 5 19V5C5 3.89543 5.89543 3 7 3H12.5858C12.851 3 13.1054 3.10536 13.2929 3.29289L18.7071 8.70711C18.8946 8.89464 19 9.149 19 9.41421V19C19 20.1046 18.1046 21 17 21Z"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                        Job Requests
+                    </a>
+                </li>
+                <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
+                    <a
+                        href={route("super.job.requests.all.jobs")}
+                        className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
+                            route().current("super.job.requests.all.jobs")
+                                ? "text-white bg-[#5146E6]"
+                                : "text-[#727272] hover:text-white hover:bg-[#5146E6]"
+                        }`}
+                    >
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                        All Job Listings
+                    </a>
+                </li>
+                <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
+                    <a
                         href={route("super.resumes.index")}
                         className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
                             route().current("super.resumes.index") ||

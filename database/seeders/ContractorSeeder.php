@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Contractor;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class ContractorSeeder extends Seeder
 {
@@ -18,7 +19,7 @@ class ContractorSeeder extends Seeder
             'email' => 'contractor@gmail.com',
             'phone' => '7733844020',
             'whatsapp_phone' => '7733844020',
-            'password' => 'contractor@123',
+            'password' => Hash::make('contractor@123'),
         ]);
     }
 }
