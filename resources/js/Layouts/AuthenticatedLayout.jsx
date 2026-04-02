@@ -116,6 +116,7 @@ function isValidationError(errors) {
         setIsMenuOpen(prev => !prev);
     };
     return (
+        <>
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
             {/* Sidebar */}
             <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -142,7 +143,7 @@ function isValidationError(errors) {
                                 </Link>
                             </div>
 
-                            <div className="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                            {/* <div className="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex"> */}
                                 {/* <NavLink
                                     href={route('dashboard')}
                                     active={route().current('dashboard')}
@@ -189,7 +190,7 @@ function isValidationError(errors) {
                                         Aadhar Verification
                                     </NavLink>
                                 )} */}
-                            </div>
+                            {/* </div> */}
                         </div>
 
 
@@ -253,7 +254,7 @@ function isValidationError(errors) {
                             {/* Dark/Light Toggle */}
                             <button
                                 onClick={() => setDarkMode(!darkMode)}
-                                className="md:flex items-center gap-2 bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-xl text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition hidden md:block "
+                                className=" items-center gap-2 bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-xl text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition hidden md:block "
                             >
                                 {darkMode ? (
                                     <FaSun size={18} className="text-gray-200" />
@@ -267,7 +268,7 @@ function isValidationError(errors) {
 
 
                             {/* Button for setting */}
-                            <div className='flex items-center gap-2 bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-xl text-xl text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition cursor-pointer md:block hidden '>
+                            <div className=' items-center gap-2 bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-xl text-xl text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition cursor-pointer md:block hidden '>
                                 <IoSettings />
                             </div>
                         </div>
@@ -594,7 +595,8 @@ function isValidationError(errors) {
                             </div>
                         )}
 
-                    </div> */}
+                    </div> 
+                    
                 </div>
 
 
@@ -675,14 +677,16 @@ function isValidationError(errors) {
                     </div>
                 </header>
             )}
+<main>{children}</main>
 
-            <main>{children}</main>
+<Toaster
+    position="top-right"
+    reverseOrder={false}
+    gutter={8}
+/>
+</div> 
+</div>
 
-            <Toaster
-                position='top-right'
-                reverseOrder={false}
-                gutter={8}
-            />
-        </div>
+</>
     );
 }
