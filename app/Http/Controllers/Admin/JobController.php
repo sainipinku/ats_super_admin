@@ -202,11 +202,57 @@ class JobController extends Controller
             ], 400);
         }
 
-        $job->resend();
+        $job->update([
+            'status' => 'pending',
+            'resubmitted_at' => now(),
+            'rejection_reason' => null,
+        ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Job resent for approval successfully.',
+            'data' => $job,
+        ]);
+    }
+
+    /**
+     * Toggle job active/inactive status
+     */
+    public function toggleStatus(Request $request, Job $job)
+    {
+        // Check if the job belongs to the authenticated admin
+        if ($job->created_by !== Auth::guard('admin')->id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to update this job status.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|in:active,inactive,closed',
+        ]);
+
+        // If job is already closed, only super admin can reactivate it
+        if ($job->status === 'closed' && in_array($validated['status'], ['active', 'inactive'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Closed jobs can only be reactivated by Super Admin.',
+            ], 403);
+        }
+
+        // Admin can only close their own jobs that are active or inactive
+        if ($validated['status'] === 'closed' && !in_array($job->status, ['active', 'inactive'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only active or inactive jobs can be closed.',
+            ], 400);
+        }
+
+        $job->update(['status' => $validated['status']]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Job status updated successfully.',
             'data' => $job,
         ]);
     }

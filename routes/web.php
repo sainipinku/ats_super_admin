@@ -85,6 +85,7 @@ Route::prefix('super')->name('super.')->group(function () {
         // Job Requests Routes (Super Admin)
         Route::group(['prefix' => 'job-requests', 'as' => 'job.requests.'], function () {
             Route::get('/', [JobRequestController::class, 'index'])->name('index');
+            Route::get('/all-jobs', [JobRequestController::class, 'allJobs'])->name('all.jobs');
             Route::get('/api/all', [JobRequestController::class, 'getAllRequests'])->name('api.all');
             Route::get('/api/pending', [JobRequestController::class, 'getPendingRequests'])->name('api.pending');
             Route::get('/api/statistics', [JobRequestController::class, 'getStatistics'])->name('api.statistics');
@@ -92,6 +93,8 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::patch('/api/{job}/approve', [JobRequestController::class, 'approve'])->name('api.approve');
             Route::patch('/api/{job}/reject', [JobRequestController::class, 'reject'])->name('api.reject');
             Route::patch('/api/{job}/request-changes', [JobRequestController::class, 'requestChanges'])->name('api.request_changes');
+            Route::patch('/api/{job}/toggle-status', [JobRequestController::class, 'toggleStatus'])->name('api.toggle-status');
+            Route::patch('/api/{job}/close', [JobRequestController::class, 'close'])->name('api.close');
             Route::delete('/api/{job}', [JobRequestController::class, 'destroy'])->name('api.destroy');
         });
     });
@@ -130,6 +133,7 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::post('/api/jobs/{job}', [JobController::class, 'update'])->name('admin.api.jobs.update');
     Route::delete('/api/jobs/{job}', [JobController::class, 'destroy'])->name('admin.api.jobs.destroy');
     Route::patch('/api/jobs/{job}/resend', [JobController::class, 'resend'])->name('admin.api.jobs.resend');
+    Route::patch('/api/jobs/{job}/toggle-status', [JobController::class, 'toggleStatus'])->name('admin.api.jobs.toggle-status');
     
     Route::post('/logout', [App\Http\Controllers\Admin\AdminController::class, 'logout'])->name('admin.logout');
     Route::get('/profile', [App\Http\Controllers\Admin\AdminController::class, 'userProfile'])->name('admin.profile');

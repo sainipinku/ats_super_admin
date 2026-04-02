@@ -144,48 +144,6 @@ const Sidebar = ({ isOpen, onClose }) => {
 
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
                     <Link
-                        href={route("admin.job.posts.index")}
-                        className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
-                            route().current('admin.job.posts.index')
-                                ? 'text-[#4F46E5] dark:text-[#4F46E5] bg-[#4F46E5]/10'
-                                : 'text-[#727272] hover:text-[#4F46E5] dark:hover:text-[#4F46E5]'
-                        }`}
-                    >
-                        <svg
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <path
-                                d="M20 6H4C2.89543 6 2 6.89543 2 8V16C2 17.1046 2.89543 18 4 18H20C21.1046 18 22 17.1046 22 16V8C22 6.89543 21.1046 6 20 6Z"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                            <path
-                                d="M6 10H8M6 14H8"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                            <path
-                                d="M12 10H18M12 14H18"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                        </svg>
-                        Job Posts
-                    </Link>
-                </li>
-
-                <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
-                    <Link
                         href={route("admin.job.posts.listing")}
                         onClick={(e) => {
                             console.log('Job Listing clicked');

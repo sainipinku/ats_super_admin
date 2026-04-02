@@ -124,7 +124,7 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
             <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="relative h-32 bg-gradient-to-r from-blue-500 to-purple-600 p-6">
-                    <div className="absolute top-4 left-4">
+                    <div className="absolute top-3 left-3">
                         <div className="w-16 h-16 rounded-xl border-4 border-white shadow-lg overflow-hidden bg-white">
                             {job.company_image ? (
                                 <img
@@ -151,7 +151,7 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
                             )}
                         </div>
                     </div>
-                    <div className="absolute top-4 right-4">
+                    <div className="absolute top-2 right-3">
                         <button
                             onClick={onClose}
                             className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors"
@@ -171,7 +171,7 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
                             </svg>
                         </button>
                     </div>
-                    <div className="absolute bottom-4 left-4 right-4">
+                    <div className="absolute bottom-1  left-4 right-4">
                         <div className="flex items-center gap-2">
                             <h2 className="text-white font-bold text-xl">{job.title}</h2>
                             <span

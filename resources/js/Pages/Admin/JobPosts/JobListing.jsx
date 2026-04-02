@@ -1,11 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import LocationInput from '../../../Components/LocationInput';
 
 // Reusable JobCard Component
-const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend }) => {
+const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend, onStatusChange }) => {
     const [showFullPerks, setShowFullPerks] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const dropdownRef = useRef(null);
+    
+    // Close dropdown when clicking outside
+    React.useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
     
     const perksToShow = showFullPerks ? job.perks : job.perks?.slice(0, 2);
     const hasMorePerks = job.perks && job.perks.length > 2;
@@ -14,14 +27,19 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend }) => {
         const badges = {
             pending: 'bg-yellow-100 text-yellow-800',
             active: 'bg-green-100 text-green-800',
+            inactive: 'bg-gray-100 text-gray-800',
             declined: 'bg-red-100 text-red-800',
+            closed: 'bg-red-200 text-red-900',
         };
         return badges[status] || 'bg-gray-100 text-gray-800';
     };
-    
+
+    // Check if job can have status changed (active, inactive, closed)
+    const canChangeStatus = ['active', 'inactive', 'closed'].includes(job.status);
+
     return (
         <div className={`bg-white rounded-3xl shadow-sm p-4 border min-h-[320px] relative flex flex-col border-slate-200 hover:border-blue-300 hover:ring-2 hover:ring-blue-200 transition-all duration-200`}>
-            {/* Action Icons - Outside Card */}
+            {/* Action Icons - Outside Card - Edit, Delete */}
             <div className="absolute -top-4 -right-2 z-10 flex gap-1">
                 <button
                     onClick={() => onEdit(job)}
@@ -55,8 +73,9 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend }) => {
                     <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-medium">
                         {job.job_type || job.type}
                     </span>
+                    {/* Show status badge */}
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${getStatusBadge(job.status)}`}>
-                        {job.status}
+                        {job.status === 'active' ? 'Active' : job.status === 'inactive' ? 'Deactive' : job.status === 'closed' ? 'Closed' : job.status}
                     </span>
                 </div>
             </div>
@@ -132,6 +151,71 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend }) => {
                         day: 'numeric', 
                         year: 'numeric' 
                     }) : 'Just now')} <span className="mx-2">•</span> {job.applicants || 0} applicants</p>
+                    
+                    {/* Job Status Dropdown - Only for active/inactive/closed jobs */}
+                    {canChangeStatus && (
+                        <div className="relative" ref={dropdownRef}>
+                            <button
+                                onClick={() => setShowDropdown(!showDropdown)}
+                                className="flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 text-[10px] font-medium transition-colors"
+                                title="Change Job Status"
+                            >
+                                Job Status
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            {showDropdown && (
+                                <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20">
+                                    <button
+                                        onClick={() => {
+                                            // If job is closed, show message to contact Super Admin
+                                            if (job.status === 'closed') {
+                                                alert('Please contact to Super Admin for active job post');
+                                            } else {
+                                                onStatusChange(job, 'active');
+                                            }
+                                            setShowDropdown(false);
+                                        }}
+                                        disabled={job.status === 'active'}
+                                        className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${
+                                            job.status === 'active' ? 'text-green-600 font-semibold bg-green-50' : 'text-slate-700'
+                                        }`}
+                                    >
+                                        Active
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            onStatusChange(job, 'inactive');
+                                            setShowDropdown(false);
+                                        }}
+                                        disabled={job.status === 'inactive'}
+                                        className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${
+                                            job.status === 'inactive' ? 'text-gray-600 font-semibold bg-gray-50' : 'text-slate-700'
+                                        }`}
+                                    >
+                                        Deactive
+                                    </button>
+                                    <div className="border-t border-slate-100 my-1"></div>
+                                    <button
+                                        onClick={() => {
+                                            // Admin can close active/inactive jobs
+                                            if (job.status === 'active' || job.status === 'inactive') {
+                                                onStatusChange(job, 'closed');
+                                            }
+                                            setShowDropdown(false);
+                                        }}
+                                        disabled={job.status === 'closed'}
+                                        className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${
+                                            job.status === 'closed' ? 'text-red-600 font-semibold bg-red-50' : 'text-red-600'
+                                        }`}
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <button 
@@ -148,6 +232,16 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend }) => {
 export default function JobListing({ auth }) {
     const [jobs, setJobs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Filter jobs based on search query
+    const filteredJobs = jobs.filter(job => {
+        const query = searchQuery.toLowerCase();
+        return (
+            job.title?.toLowerCase().includes(query) ||
+            job.company?.toLowerCase().includes(query)
+        );
+    });
 
     // Load jobs from API on component mount
     React.useEffect(() => {
@@ -233,20 +327,99 @@ export default function JobListing({ auth }) {
         }
     };
 
+    const handleStatusChange = async (job, newStatus) => {
+        if (job.status === newStatus) return;
+        
+        // Determine action text based on new status
+        let actionText;
+        if (newStatus === 'active') {
+            actionText = 'activate';
+        } else if (newStatus === 'inactive') {
+            actionText = 'deactivate';
+        } else if (newStatus === 'closed') {
+            actionText = 'close';
+        } else {
+            actionText = 'update';
+        }
+        
+        if (confirm(`Are you sure you want to ${actionText} "${job.title}"?`)) {
+            try {
+                const response = await fetch(route('admin.api.jobs.toggle-status', job.id), {
+                    method: 'PATCH',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: newStatus }),
+                });
+                const data = await response.json();
+                if (data.success) {
+                    setJobs(jobs.map(j => j.id === job.id ? { ...j, status: newStatus } : j));
+                    alert(`Job ${actionText}d successfully!`);
+                } else {
+                    alert(data.message || `Failed to ${actionText} job.`);
+                }
+            } catch (error) {
+                console.error('Error changing job status:', error);
+                alert(`Failed to ${actionText} job.`);
+            }
+        }
+    };
+
     return (
         <AuthenticatedLayout user={auth.user}>
             <Head title="Job Listing" />
             
             <div className="min-h-screen bg-slate-100 p-4">
                 <h1 className="text-4xl font-bold text-slate-800 mb-6">Listed Jobs Posts</h1>
+                
+                {/* Search and Post New Job Row */}
+                <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                    {/* Search Bar */}
+                    <div className="relative w-full sm:w-96">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search by job title or company name..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm"
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            >
+                                <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
+
+                    <Link
+                        href={route("admin.job.posts.index")}
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-md whitespace-nowrap"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Post New Job
+                    </Link>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {loading ? (
                         <div className="col-span-full flex items-center justify-center py-12">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                         </div>
-                    ) : jobs.length > 0 ? (
-                        jobs.map((job, idx) => (
+                    ) : filteredJobs.length > 0 ? (
+                        filteredJobs.map((job, idx) => (
                             <JobCard 
                                 key={idx} 
                                 job={job} 
@@ -254,6 +427,7 @@ export default function JobListing({ auth }) {
                                 onEdit={handleEdit}
                                 onDelete={handleDelete}
                                 onResend={handleResend}
+                                onStatusChange={handleStatusChange}
                             />
                         ))
                     ) : (
@@ -267,14 +441,22 @@ export default function JobListing({ auth }) {
                                 >
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                                 </svg>
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">No Job Listings Found</h3>
-                                <p className="text-gray-500">No job posts have been created yet.</p>
-                                <Link
-                                    href={route("admin.job.posts.index")}
-                                    className="inline-flex items-center px-4 py-2 mt-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                                >
-                                    Create First Job Post
-                                </Link>
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                    {searchQuery ? 'No Jobs Found' : 'No Job Listings Found'}
+                                </h3>
+                                <p className="text-gray-500">
+                                    {searchQuery 
+                                        ? `No jobs matching "${searchQuery}" found. Try a different search term.` 
+                                        : 'No job posts have been created yet.'}
+                                </p>
+                                {!searchQuery && (
+                                    <Link
+                                        href={route("admin.job.posts.index")}
+                                        className="inline-flex items-center px-4 py-2 mt-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                                    >
+                                        Create First Job Post
+                                    </Link>
+                                )}
                             </div>
                         </div>
                     )}

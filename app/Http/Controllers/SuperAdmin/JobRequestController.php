@@ -19,6 +19,14 @@ class JobRequestController extends Controller
     }
 
     /**
+     * Display all jobs listing page (Inertia)
+     */
+    public function allJobs()
+    {
+        return Inertia::render('SuperAdmin/JobRequests/AllJobs');
+    }
+
+    /**
      * Get all job requests (pending, active, declined)
      */
     public function getAllRequests()
@@ -160,6 +168,67 @@ class JobRequestController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Job request deleted successfully.',
+        ]);
+    }
+
+    /**
+     * Permanently close a job
+     */
+    public function close(Job $job)
+    {
+        // Only active or inactive jobs can be closed
+        if (!in_array($job->status, ['active', 'inactive'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only active or inactive jobs can be closed.',
+            ], 400);
+        }
+
+        $superAdminId = Auth::guard('superadmin')->id();
+        
+        // Add log entry for closing
+        $logs = $job->approval_logs ?? [];
+        $logs[] = [
+            'action' => 'closed',
+            'user_id' => $superAdminId,
+            'timestamp' => now()->toDateTimeString(),
+        ];
+
+        $job->update([
+            'status' => 'closed',
+            'approval_logs' => $logs,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Job closed successfully.',
+            'data' => $job->fresh(['creator', 'approver']),
+        ]);
+    }
+
+    /**
+     * Toggle job active/inactive status (Super Admin)
+     */
+    public function toggleStatus(Request $request, Job $job)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:active,inactive',
+        ]);
+
+        // Allow toggling if job is approved (active, inactive) or closed (can be reactivated)
+        if (!in_array($job->status, ['active', 'inactive', 'closed'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only approved or closed jobs can be toggled.',
+            ], 400);
+        }
+
+        $job->update(['status' => $validated['status']]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Job status updated successfully.',
+            'data' => $job->fresh(['creator', 'approver']),
         ]);
     }
 

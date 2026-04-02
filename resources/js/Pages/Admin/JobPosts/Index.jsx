@@ -6,14 +6,13 @@ import LocationInput from '../../../Components/LocationInput';
 // Reusable JobCard Component
 const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
     const [showFullPerks, setShowFullPerks] = useState(false);
-    
+
     const perksToShow = showFullPerks ? job.perks : job.perks?.slice(0, 2);
     const hasMorePerks = job.perks && job.perks.length > 2;
-    
+
     return (
-        <div className={`bg-white rounded-3xl shadow-sm p-4 border min-h-[320px] relative flex flex-col ${
-            job.active ? 'border-blue-300 ring-2 ring-blue-200' : 'border-slate-200'
-        }`}>
+        <div className={`bg-white rounded-3xl shadow-sm p-4 border min-h-[320px] relative flex flex-col ${job.active ? 'border-blue-300 ring-2 ring-blue-200' : 'border-slate-200'
+            }`}>
             {/* Action Icons - Outside Card */}
             <div className="absolute -top-4 -right-2 z-10 flex gap-1">
                 <button
@@ -85,7 +84,7 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
                 <div className="text-[10px] text-slate-600 leading-4">
                     {perksToShow?.join(' • ') || 'Flexible working hours • Health Insurance • Learning opportunities'}
                     {hasMorePerks && (
-                        <button 
+                        <button
                             onClick={() => setShowFullPerks(!showFullPerks)}
                             className="text-blue-600 hover:text-blue-800 ml-1 underline"
                         >
@@ -99,14 +98,14 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
                 <hr className="my-2" />
 
                 <div className="flex justify-between items-center text-[12px] text-slate-500 mb-3">
-                    <p>Posted {job.createdAt ? new Date(job.createdAt).toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        day: 'numeric', 
-                        year: 'numeric' 
+                    <p>Posted {job.createdAt ? new Date(job.createdAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
                     }) : 'Just now'} <span className="mx-2">•</span> {job.applicants || 0} applicants</p>
                 </div>
 
-                <button 
+                <button
                     onClick={() => onViewDetails(job)}
                     className="w-full py-2 rounded-xl text-blue-600 text-[14px] font-semibold hover:bg-blue-50 transition-colors"
                 >
@@ -124,7 +123,9 @@ export default function JobPostsIndex({ auth }) {
         location: "",
         jobType: "Full Time",
         experience: "",
-        salary: "",
+        minSalary: "",
+        maxSalary: "",
+        salaryPeriod: "year",
         skills: [],
         jobDescription: "",
         keyResponsibilities: "",
@@ -139,7 +140,7 @@ export default function JobPostsIndex({ auth }) {
     React.useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const editJobId = urlParams.get('edit');
-        
+
         if (editJobId) {
             // Find job in local jobs array
             setJobs(currentJobs => {
@@ -153,7 +154,9 @@ export default function JobPostsIndex({ auth }) {
                         companyLogoPreview: jobToEdit.companyImage || '',
                         location: jobToEdit.location || '',
                         jobType: jobToEdit.type || 'Full Time',
-                        salary: jobToEdit.salary || '',
+                        minSalary: '',
+                        maxSalary: '',
+                        salaryPeriod: 'year',
                         experience: jobToEdit.experience || '',
                         lastDate: '',
                         skills: jobToEdit.skills || [],
@@ -173,90 +176,90 @@ export default function JobPostsIndex({ auth }) {
     const [selectedJob, setSelectedJob] = useState(null);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [jobs, setJobs] = useState([
-        {
-            id: 1,
-            title: "Frontend Developer",
-            company: "Digital Agency",
-            location: "Mumbai",
-            experience: "2-4 years",
-            salary: "₹8,00,000 - ₹12,00,000/year",
-            skills: ["Vue.js", "TypeScript", "CSS"],
-            perks: ["Flexible hours", "Learning budget"],
-            type: "Remote",
-            applicants: 12,
-            companyImage: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop&crop=face&auto=format",
-            description: "We are looking for a skilled Frontend Developer to join our creative team. You will work on cutting-edge web applications using Vue.js and modern JavaScript frameworks. Strong experience in responsive design and user experience is required."
-        },
-        {
-            id: 2,
-            title: "React Developer",
-            company: "Tech Startup",
-            location: "Bangalore",
-            experience: "1-3 years",
-            salary: "₹6,00,000 - ₹10,00,000/year",
-            skills: ["React", "Node.js", "MongoDB"],
-            perks: ["Health insurance", "Work from home"],
-            type: "Full Time",
-            applicants: 8,
-            companyImage: "https://images.unsplash.com/photo-1499204249359-4b7bdfb9b8b5?w=200&h=200&fit=crop&crop=face&auto=format",
-            description: "Join our fast-growing startup as a React Developer! You'll build scalable web applications and work closely with our design team. Experience with full-stack development and modern web technologies is essential."
-        },
-        {
-            id: 3,
-            title: "Full Stack Engineer",
-            company: "E-commerce Platform",
-            location: "Delhi",
-            experience: "3-5 years",
-            salary: "₹10,00,000 - ₹15,00,000/year",
-            skills: ["JavaScript", "Python", "AWS"],
-            perks: ["Gym membership", "Free lunch"],
-            type: "Full Time",
-            applicants: 25,
-            companyImage: "https://images.unsplash.com/photo-1566499185221-6a2399b81893?w=200&h=200&fit=crop&crop=face&auto=format",
-            description: "We're seeking a talented Full Stack Engineer to develop and maintain our e-commerce platform. You'll work with modern technologies including JavaScript, Python, and AWS cloud services. Strong problem-solving skills required."
-        },
-        {
-            id: 4,
-            title: "UI/UX Designer",
-            company: "Design Studio",
-            location: "Pune",
-            experience: "1-2 years",
-            salary: "₹4,00,000 - ₹7,00,000/year",
-            skills: ["Figma", "Adobe XD", "Sketch"],
-            perks: ["Creative freedom", "Team outings"],
-            type: "Part Time",
-            applicants: 6,
-            companyImage: "https://images.unsplash.com/photo-1573496359142-b8d87729a4ff?w=200&h=200&fit=crop&crop=face&auto=format",
-            description: "Creative UI/UX Designer needed for our design studio! You'll create beautiful user interfaces and experiences for various digital products. Proficiency in Figma, Adobe XD, and user research methodologies is required."
-        },
-        {
-            id: 5,
-            title: "Backend Developer",
-            company: "FinTech Company",
-            location: "Hyderabad",
-            experience: "4-6 years",
-            salary: "₹12,00,000 - ₹18,00,000/year",
-            skills: ["Java", "Spring Boot", "PostgreSQL"],
-            perks: ["Stock options", "Annual bonus"],
-            type: "Full Time",
-            applicants: 18,
-            companyImage: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face&auto=format",
-            description: "Looking for an experienced Backend Developer to join our FinTech team. You'll develop robust APIs and work with database systems. Experience with Java, Spring Boot, and financial systems is highly valued."
-        },
-        {
-            id: 6,
-            title: "Mobile App Developer",
-            company: "Gaming Studio",
-            location: "Chennai",
-            experience: "2-4 years",
-            salary: "₹7,00,000 - ₹11,00,000/year",
-            skills: ["React Native", "Flutter", "Firebase"],
-            perks: ["Game room", "Flexible timing"],
-            type: "Remote",
-            applicants: 15,
-            companyImage: "https://images.unsplash.com/photo-1519074019808-3bc74e2a3d2a?w=200&h=200&fit=crop&crop=face&auto=format",
-            description: "Exciting opportunity for a Mobile App Developer in the gaming industry! You'll create engaging mobile games using React Native and Flutter. Experience with Firebase and mobile game development is a plus."
-        }
+        // {
+        //     id: 1,
+        //     title: "Frontend Developer",
+        //     company: "Digital Agency",
+        //     location: "Mumbai",
+        //     experience: "2-4 years",
+        //     salary: "₹8,00,000 - ₹12,00,000/year",
+        //     skills: ["Vue.js", "TypeScript", "CSS"],
+        //     perks: ["Flexible hours", "Learning budget"],
+        //     type: "Remote",
+        //     applicants: 12,
+        //     companyImage: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop&crop=face&auto=format",
+        //     description: "We are looking for a skilled Frontend Developer to join our creative team. You will work on cutting-edge web applications using Vue.js and modern JavaScript frameworks. Strong experience in responsive design and user experience is required."
+        // },
+        // {
+        //     id: 2,
+        //     title: "React Developer",
+        //     company: "Tech Startup",
+        //     location: "Bangalore",
+        //     experience: "1-3 years",
+        //     salary: "₹6,00,000 - ₹10,00,000/year",
+        //     skills: ["React", "Node.js", "MongoDB"],
+        //     perks: ["Health insurance", "Work from home"],
+        //     type: "Full Time",
+        //     applicants: 8,
+        //     companyImage: "https://images.unsplash.com/photo-1499204249359-4b7bdfb9b8b5?w=200&h=200&fit=crop&crop=face&auto=format",
+        //     description: "Join our fast-growing startup as a React Developer! You'll build scalable web applications and work closely with our design team. Experience with full-stack development and modern web technologies is essential."
+        // },
+        // {
+        //     id: 3,
+        //     title: "Full Stack Engineer",
+        //     company: "E-commerce Platform",
+        //     location: "Delhi",
+        //     experience: "3-5 years",
+        //     salary: "₹10,00,000 - ₹15,00,000/year",
+        //     skills: ["JavaScript", "Python", "AWS"],
+        //     perks: ["Gym membership", "Free lunch"],
+        //     type: "Full Time",
+        //     applicants: 25,
+        //     companyImage: "https://images.unsplash.com/photo-1566499185221-6a2399b81893?w=200&h=200&fit=crop&crop=face&auto=format",
+        //     description: "We're seeking a talented Full Stack Engineer to develop and maintain our e-commerce platform. You'll work with modern technologies including JavaScript, Python, and AWS cloud services. Strong problem-solving skills required."
+        // },
+        // {
+        //     id: 4,
+        //     title: "UI/UX Designer",
+        //     company: "Design Studio",
+        //     location: "Pune",
+        //     experience: "1-2 years",
+        //     salary: "₹4,00,000 - ₹7,00,000/year",
+        //     skills: ["Figma", "Adobe XD", "Sketch"],
+        //     perks: ["Creative freedom", "Team outings"],
+        //     type: "Part Time",
+        //     applicants: 6,
+        //     companyImage: "https://images.unsplash.com/photo-1573496359142-b8d87729a4ff?w=200&h=200&fit=crop&crop=face&auto=format",
+        //     description: "Creative UI/UX Designer needed for our design studio! You'll create beautiful user interfaces and experiences for various digital products. Proficiency in Figma, Adobe XD, and user research methodologies is required."
+        // },
+        // {
+        //     id: 5,
+        //     title: "Backend Developer",
+        //     company: "FinTech Company",
+        //     location: "Hyderabad",
+        //     experience: "4-6 years",
+        //     salary: "₹12,00,000 - ₹18,00,000/year",
+        //     skills: ["Java", "Spring Boot", "PostgreSQL"],
+        //     perks: ["Stock options", "Annual bonus"],
+        //     type: "Full Time",
+        //     applicants: 18,
+        //     companyImage: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face&auto=format",
+        //     description: "Looking for an experienced Backend Developer to join our FinTech team. You'll develop robust APIs and work with database systems. Experience with Java, Spring Boot, and financial systems is highly valued."
+        // },
+        // {
+        //     id: 6,
+        //     title: "Mobile App Developer",
+        //     company: "Gaming Studio",
+        //     location: "Chennai",
+        //     experience: "2-4 years",
+        //     salary: "₹7,00,000 - ₹11,00,000/year",
+        //     skills: ["React Native", "Flutter", "Firebase"],
+        //     perks: ["Game room", "Flexible timing"],
+        //     type: "Remote",
+        //     applicants: 15,
+        //     companyImage: "https://images.unsplash.com/photo-1519074019808-3bc74e2a3d2a?w=200&h=200&fit=crop&crop=face&auto=format",
+        //     description: "Exciting opportunity for a Mobile App Developer in the gaming industry! You'll create engaging mobile games using React Native and Flutter. Experience with Firebase and mobile game development is a plus."
+        // }
     ]);
 
     const handleInputChange = (e) => {
@@ -324,7 +327,7 @@ export default function JobPostsIndex({ auth }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         const formDataObj = new FormData();
         formDataObj.append('title', formData.jobTitle);
         formDataObj.append('company', formData.companyName);
@@ -332,13 +335,14 @@ export default function JobPostsIndex({ auth }) {
         formDataObj.append('location', formData.location);
         formDataObj.append('job_type', formData.jobType || 'Full Time');
         formDataObj.append('experience', formData.experience);
-        formDataObj.append('salary', formData.salary);
+        const salaryRange = `₹${formData.minSalary} - ₹${formData.maxSalary}/${formData.salaryPeriod}`;
+        formDataObj.append('salary', salaryRange);
         formDataObj.append('skills', JSON.stringify(formData.skills));
         formDataObj.append('perks', JSON.stringify(formData.perks.split(',').map(p => p.trim()).filter(p => p)));
         formDataObj.append('key_responsibilities', formData.keyResponsibilities);
         formDataObj.append('qualifications', formData.qualifications);
         formDataObj.append('last_date', formData.lastDate);
-        
+
         if (formData.companyLogo) {
             formDataObj.append('company_image', formData.companyLogo);
         }
@@ -352,9 +356,9 @@ export default function JobPostsIndex({ auth }) {
                 },
                 body: formDataObj,
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 // Reset form
                 setFormData({
@@ -364,7 +368,9 @@ export default function JobPostsIndex({ auth }) {
                     companyLogoPreview: '',
                     location: '',
                     jobType: '',
-                    salary: '',
+                    minSalary: '',
+                    maxSalary: '',
+                    salaryPeriod: 'year',
                     experience: '',
                     lastDate: '',
                     skills: [],
@@ -374,7 +380,7 @@ export default function JobPostsIndex({ auth }) {
                     keyResponsibilities: '',
                     qualifications: ''
                 });
-                
+
                 alert('Job post created successfully and sent for approval!');
             } else {
                 alert(data.message || 'Failed to create job post.');
@@ -393,7 +399,9 @@ export default function JobPostsIndex({ auth }) {
             companyLogoPreview: null,
             location: "",
             jobType: "",
-            salary: "",
+            minSalary: "",
+            maxSalary: "",
+            salaryPeriod: "year",
             experience: "",
             lastDate: "",
             skills: [],
@@ -428,13 +436,13 @@ export default function JobPostsIndex({ auth }) {
     return (
         <AuthenticatedLayout user={auth.user}>
             <Head title="Job Posts" />
-            
+
             <div className="py-6 sm:py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Page Header */}
                     <div className="mb-6 sm:mb-8">
-                       
-                       
+
+
                     </div>
 
                     {/* Job Post Form Only */}
@@ -446,165 +454,226 @@ export default function JobPostsIndex({ auth }) {
                         </div>
                         <div className="p-4 sm:p-6">
                             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-                                {/* Job Title */}
-                                <div>
-                                    <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Job Title <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="jobTitle"
-                                        name="jobTitle"
-                                        value={formData.jobTitle}
-                                        onChange={handleInputChange}
-                                        required
-                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                        placeholder=" Enter Job Title"
-                                    />
-                                </div>
-
-                                {/* Company Name */}
-                                <div>
-                                    <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                      Enter Company Name <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="companyName"
-                                        name="companyName"
-                                        value={formData.companyName}
-                                        onChange={handleInputChange}
-                                        required
-                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                        placeholder="Enter company name "
-                                    />
-                                </div>
-
-                                {/* Company Logo */}
-                                <div>
-                                    <label htmlFor="companyLogo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Company Logo
-                                    </label>
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                {/* Row 1: Job Title & Company Name */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Job Title */}
+                                    <div>
+                                        <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Job Title <span className="text-red-500">*</span>
+                                        </label>
                                         <input
-                                            type="file"
-                                            id="companyLogo"
-                                            name="companyLogo"
-                                            onChange={handleImageUpload}
-                                            accept="image/*"
-                                            className="hidden"
+                                            type="text"
+                                            id="jobTitle"
+                                            name="jobTitle"
+                                            value={formData.jobTitle}
+                                            onChange={handleInputChange}
+                                            required
+                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            placeholder="Enter Job Title"
                                         />
-                                        <button
-                                            type="button"
-                                            onClick={() => document.getElementById('companyLogo').click()}
-                                            className="px-4 py-2 sm:py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors dark:border-gray-600 dark:hover:bg-gray-700 text-sm sm:text-base"
+                                    </div>
+
+                                    {/* Company Name */}
+                                    <div>
+                                        <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Company Name <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="companyName"
+                                            name="companyName"
+                                            value={formData.companyName}
+                                            onChange={handleInputChange}
+                                            required
+                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            placeholder="Enter company name"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Row 2: Company Logo & Location */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Company Logo */}
+                                    <div>
+                                        <label htmlFor="companyLogo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Company Logo
+                                        </label>
+                                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                            <input
+                                                type="file"
+                                                id="companyLogo"
+                                                name="companyLogo"
+                                                onChange={handleImageUpload}
+                                                accept="image/*"
+                                                className="hidden"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => document.getElementById('companyLogo').click()}
+                                                className="px-4 py-2 sm:py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors dark:border-gray-600 dark:hover:bg-gray-700 text-sm sm:text-base"
+                                            >
+                                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                </svg>
+                                                <span className="ml-2 text-gray-700 dark:text-gray-300">
+                                                    Choose File
+                                                </span>
+                                            </button>
+                                            {formData.companyLogoPreview && (
+                                                <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-gray-200">
+                                                    <img
+                                                        src={formData.companyLogoPreview}
+                                                        alt="Company logo preview"
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            JPG, PNG, GIF (Max 5MB)
+                                        </p>
+                                    </div>
+
+                                    {/* Location */}
+                                    <div>
+                                        <label htmlFor="location" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Location <span className="text-red-500">*</span>
+                                        </label>
+                                        <LocationInput
+                                            value={formData.location}
+                                            onChange={(value) => setFormData(prev => ({ ...prev, location: value }))}
+                                            placeholder="Enter job location"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Row 3: Job Type & Salary */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Job Type */}
+                                    <div>
+                                        <label htmlFor="jobType" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Job Type
+                                        </label>
+                                        <select
+                                            id="jobType"
+                                            name="jobType"
+                                            value={formData.jobType}
+                                            onChange={handleInputChange}
+                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
                                         >
-                                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                            </svg>
-                                            <span className="ml-2 text-gray-700 dark:text-gray-300">
-                                                Choose File
-                                            </span>
-                                        </button>
-                                        {formData.companyLogoPreview && (
-                                            <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-gray-200">
-                                                <img 
-                                                    src={formData.companyLogoPreview} 
-                                                    alt="Company logo preview"
-                                                    className="w-full h-full object-cover"
+                                            <option value="">Select Job Type</option>
+                                            <option value="Full Time">Full Time</option>
+                                            <option value="Part Time">Part Time</option>
+                                            <option value="Contract">Contract</option>
+                                            <option value="Internship">Internship</option>
+                                            <option value="Remote">Remote</option>
+                                            <option value="Hybrid">Hybrid</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Salary */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Salary Range <span className="text-red-500">*</span>
+                                        </label>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_120px] gap-4">
+                                            {/* Minimum Salary */}
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                                                    ₹
+                                                </span>
+                                                <input
+                                                    type="number"
+                                                    id="minSalary"
+                                                    name="minSalary"
+                                                    value={formData.minSalary}
+                                                    onChange={handleInputChange}
+                                                    required
+                                                    min="0"
+                                                    placeholder="Minimum"
+                                                    className="w-full pl-8 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
                                                 />
                                             </div>
-                                        )}
+
+                                            {/* Maximum Salary */}
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                                                    ₹
+                                                </span>
+                                                <input
+                                                    type="number"
+                                                    id="maxSalary"
+                                                    name="maxSalary"
+                                                    value={formData.maxSalary}
+                                                    onChange={handleInputChange}
+                                                    required
+                                                    min="0"
+                                                    placeholder="Maximum"
+                                                    className="w-full pl-8 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                                />
+                                            </div>
+
+                                            {/* Common Salary Period */}
+                                            <select
+                                                id="salaryPeriod"
+                                                name="salaryPeriod"
+                                                value={formData.salaryPeriod}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            >
+                                                <option value="year"> Year</option>
+                                                <option value="month"> Month</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                        JPG, PNG, GIF (Max 5MB)
-                                    </p>
                                 </div>
 
-                                {/* Location */}
-                                <div>
-                                    <label htmlFor="location" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Location <span className="text-red-500">*</span>
-                                    </label>
-                                    <LocationInput
-                                        value={formData.location}
-                                        onChange={(value) => setFormData(prev => ({ ...prev, location: value }))}
-                                        placeholder="Enter job location "
-                                    />
+                                {/* Row 4: Experience & Last Date */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Experience */}
+                                    <div>
+                                        <label
+                                            htmlFor="experience"
+                                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                                        >
+                                            Experience Required <span className="text-red-500">*</span>
+                                        </label>
+
+                                        <select
+                                            id="experience"
+                                            name="experience"
+                                            value={formData.experience}
+                                            onChange={handleInputChange}
+                                            required
+                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                        >
+                                            <option value="">Select Experience</option>
+                                            <option value="0-1 Year">0-1 Year</option>
+                                            <option value="1-2 Years">1-2 Years</option>
+                                            <option value="2-3 Years">2-3 Years</option>
+                                            <option value="3-4 Years">3-4 Years</option>
+                                            <option value="4+ Years">4+ Years</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Last Date to Apply */}
+                                    <div>
+                                        <label htmlFor="lastDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Last Date to Apply
+                                        </label>
+                                        <input
+                                            type="date"
+                                            id="lastDate"
+                                            name="lastDate"
+                                            value={formData.lastDate}
+                                            onChange={handleInputChange}
+                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                        />
+                                    </div>
                                 </div>
 
-                                {/* Job Type */}
-                                <div>
-                                    <label htmlFor="jobType" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Job Type
-                                    </label>
-                                    <select
-                                        id="jobType"
-                                        name="jobType"
-                                        value={formData.jobType}
-                                        onChange={handleInputChange}
-                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                    >
-                                        <option value="">Select Job Type</option>
-                                        <option value="Full Time">Full Time</option>
-                                        <option value="Part Time">Part Time</option>
-                                        <option value="Contract">Contract</option>
-                                        <option value="Internship">Internship</option>
-                                        <option value="Remote">Remote</option>
-                                        <option value="Hybrid">Hybrid</option>
-                                    </select>
-                                </div>
-
-                                {/* Salary */}
-                                <div>
-                                    <label htmlFor="salary" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Salary Range <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="salary"
-                                        name="salary"
-                                        value={formData.salary}
-                                        onChange={handleInputChange}
-                                        required
-                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                        placeholder="e.g., ₹8,00,000 - ₹12,00,000/year"
-                                    />
-                                </div>
-
-                                {/* Experience */}
-                                <div>
-                                    <label htmlFor="experience" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Experience Required <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="experience"
-                                        name="experience"
-                                        value={formData.experience}
-                                        onChange={handleInputChange}
-                                        required
-                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                        placeholder="e.g., 2-4 years"
-                                    />
-                                </div>
-
-                                {/* Last Date to Apply */}
-                                <div>
-                                    <label htmlFor="lastDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Last Date to Apply
-                                    </label>
-                                    <input
-                                        type="date"
-                                        id="lastDate"
-                                        name="lastDate"
-                                        value={formData.lastDate}
-                                        onChange={handleInputChange}
-                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                    />
-                                </div>
-
-                                {/* Skills */}
+                                {/* Row 5: Skills (Full Width) */}
                                 <div>
                                     <label htmlFor="currentSkill" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                         Skills Required
@@ -653,68 +722,74 @@ export default function JobPostsIndex({ auth }) {
                                     </div>
                                 </div>
 
-                                {/* Perks */}
-                                <div>
-                                    <label htmlFor="perks" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Perks & Benefits
-                                    </label>
-                                    <textarea
-                                        id="perks"
-                                        name="perks"
-                                        value={formData.perks}
-                                        onChange={handleInputChange}
-                                        rows={3}
-                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                        placeholder="e.g., Health insurance, Flexible hours, Learning budget"
-                                    />
+                                {/* Row 6: Perks & Key Responsibilities */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Perks */}
+                                    <div>
+                                        <label htmlFor="perks" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Perks & Benefits
+                                        </label>
+                                        <textarea
+                                            id="perks"
+                                            name="perks"
+                                            value={formData.perks}
+                                            onChange={handleInputChange}
+                                            rows={3}
+                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            placeholder="e.g., Health insurance, Flexible hours, Learning budget"
+                                        />
+                                    </div>
+
+                                    {/* Key Responsibilities */}
+                                    <div>
+                                        <label htmlFor="keyResponsibilities" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Key Responsibilities
+                                        </label>
+                                        <textarea
+                                            id="keyResponsibilities"
+                                            name="keyResponsibilities"
+                                            value={formData.keyResponsibilities}
+                                            onChange={handleInputChange}
+                                            rows={3}
+                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            placeholder="List the main responsibilities for this role..."
+                                        />
+                                    </div>
                                 </div>
 
-                                {/* Key Responsibilities */}
-                                <div>
-                                    <label htmlFor="keyResponsibilities" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Key Responsibilities
-                                    </label>
-                                    <textarea
-                                        id="keyResponsibilities"
-                                        name="keyResponsibilities"
-                                        value={formData.keyResponsibilities}
-                                        onChange={handleInputChange}
-                                        rows={4}
-                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                        placeholder="List the main responsibilities for this role..."
-                                    />
-                                </div>
+                                {/* Row 7: Qualifications & Job Description */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Qualifications */}
+                                    <div>
+                                        <label htmlFor="qualifications" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Qualifications
+                                        </label>
+                                        <textarea
+                                            id="qualifications"
+                                            name="qualifications"
+                                            value={formData.qualifications}
+                                            onChange={handleInputChange}
+                                            rows={4}
+                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            placeholder="Required qualifications, education, certifications..."
+                                        />
+                                    </div>
 
-                                {/* Qualifications */}
-                                <div>
-                                    <label htmlFor="qualifications" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Qualifications
-                                    </label>
-                                    <textarea
-                                        id="qualifications"
-                                        name="qualifications"
-                                        value={formData.qualifications}
-                                        onChange={handleInputChange}
-                                        rows={4}
-                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                        placeholder="Required qualifications, education, certifications..."
-                                    />
-                                </div>
-
-                                {/* Job Description */}
-                                <div>
-                                    <label htmlFor="jobDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Job Description
-                                    </label>
-                                    <textarea
-                                        id="jobDescription"
-                                        name="jobDescription"
-                                        value={formData.jobDescription}
-                                        onChange={handleInputChange}
-                                        rows={6}
-                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                        placeholder="Describe role, responsibilities, and requirements..."
-                                    />
+                                    {/* Job Description */}
+                                    <div>
+                                        <label htmlFor="jobDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Job Description
+                                        </label>
+                                        <textarea
+                                            id="jobDescription"
+                                            name="jobDescription"
+                                            value={formData.jobDescription}
+                                            onChange={handleInputChange}
+                                            rows={4}
+                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            placeholder="Describe role, responsibilities, and requirements..."
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Form Actions */}
@@ -849,8 +924,8 @@ export default function JobPostsIndex({ auth }) {
                             <div className="absolute top-6 left-6">
                                 <div className="w-20 h-20 rounded-2xl border-4 border-white shadow-xl overflow-hidden bg-white">
                                     {selectedJob.companyImage ? (
-                                        <img 
-                                            src={selectedJob.companyImage} 
+                                        <img
+                                            src={selectedJob.companyImage}
                                             alt={selectedJob.company}
                                             className="w-full h-full object-cover"
                                         />
