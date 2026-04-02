@@ -160,10 +160,10 @@ Route::prefix('member')->middleware(['member'])->group(function () {
 
 /** PUBLIC ROUTES START HERE **/
 Route::get('/', [HomeController::class, 'authShowPage'])->name('home');
-Route::get('/login', [HomeController::class, 'login'])->name('login');
-Route::post('/verify', [HomeController::class, 'AuthLogin'])->name('auth.login');
-Route::get('/admin/login', [HomeController::class, 'login'])->name('admin.login');
-Route::get('/member/login', [HomeController::class, 'login'])->name('doer.login');
+Route::redirect('/login', '/super/login')->name('login');
+Route::post('/verify', [AdminAuthController::class, 'verify'])->name('auth.login');
+Route::redirect('/admin/login', '/super/login')->name('admin.login');
+Route::redirect('/member/login', '/super/login')->name('doer.login');
 
 // Password Reset Routes
 Route::get('/forget-password', [HomeController::class, 'forgetPassword'])->name('password.request');

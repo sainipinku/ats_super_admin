@@ -206,19 +206,6 @@ export default function AuthenticatedLayout({ header, children }) {
                                             Job Listing
                                         </NavLink>
                                         <NavLink
-                                            href={route("admin.task.dashboard")}
-                                            active={
-                                                route().current(
-                                                    "admin.task.dashboard"
-                                                ) ||
-                                                route().current(
-                                                    "admin.task.tasklist"
-                                                )
-                                            }
-                                        >
-                                            Tasks
-                                        </NavLink>
-                                        <NavLink
                                             href={route(
                                                 "admin.members.dashboard"
                                             )}

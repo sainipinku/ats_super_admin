@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tasks', function (Blueprint $table) {
-            $table->text('task_type')->default('one_time')->after('description');
-            $table->text('recurring_type')->nullable()->after('task_type');
+            $table->string('task_type')->default('one_time')->after('description');
+            $table->string('recurring_type')->nullable()->after('task_type');
             $table->json('recurring_days')->nullable()->after('recurring_type');
-            $table->text('start_from')->nullable()->after('recurring_days');
+            $table->date('start_from')->nullable()->after('recurring_days');
         });
     }
 
@@ -25,7 +25,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('tasks', function (Blueprint $table) {
-         $table->dropColumn(['task_type', 'recurring_type', 'recurring_days', 'start_from']);
+            $table->dropColumn(['task_type', 'recurring_type', 'recurring_days', 'start_from']);
         });
     }
 };

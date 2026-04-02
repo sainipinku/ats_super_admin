@@ -258,7 +258,9 @@ class HomeController extends Controller
             'email' => 'required|email'
         ]);
 
-        $exists = SuperAdmin::where('email', $request->email)->exists();
+        $exists =
+            SuperAdmin::where('email', $request->email)->exists()
+            || Member::where('email', $request->email)->exists();
 
         return response()->json([
             'exists' => $exists
@@ -295,23 +297,44 @@ class HomeController extends Controller
     {
         $request->validate(['email' => 'required|email']);
         $superAdmin = SuperAdmin::where('email', $request->email)->first();
-        if (!$superAdmin) {
+        if ($superAdmin) {
+            $token = $superAdmin->generatePasswordResetToken();
+            $resetUrl = route('super.password.reset', ['token' => $token]);
+            dispatch(new SuperSendPasswordResetEmail($superAdmin, $resetUrl));
+            EmailLog::create([
+                'user_id'    => $superAdmin->id,
+                'subject'    => 'Password Reset Request',
+                'to'         => $superAdmin->email,
+                'from'       => config('mail.from.address'),
+                'body_html'  => 'Password reset link sent to ' . $superAdmin->name,
+                'status'     => 'sent',
+                'sent_at'    => now(),
+                'ip'         => $request->ip(),
+                'user_agent' => $request->header('User-Agent'),
+            ]);
+
             return back()->with('success', 'We\'ve sent a password reset link to your email address.');
         }
-        $token = $superAdmin->generatePasswordResetToken();
-        $resetUrl = route('super.password.reset', ['token' => $token]);
-        dispatch(new SuperSendPasswordResetEmail($superAdmin, $resetUrl));
-        EmailLog::create([
-            'user_id'    => $superAdmin->id,
-            'subject'    => 'Password Reset Request',
-            'to'         => $superAdmin->email,
-            'from'       => config('mail.from.address'),
-            'body_html'  => 'Password reset link sent to ' . $superAdmin->name,
-            'status'     => 'sent',
-            'sent_at'    => now(),
-            'ip'         => $request->ip(),
-            'user_agent' => $request->header('User-Agent'),
-        ]);
+
+        $member = Member::where('email', $request->email)->first();
+        if ($member) {
+            $token = $member->generatePasswordResetToken();
+            $resetUrl = route('password.reset', [
+                'token' => $token,
+            ]);
+            SendPasswordResetEmail::dispatchSync($member, $resetUrl);
+            EmailLog::create([
+                'user_id' => $member->id,
+                'subject' => 'Password Reset Request',
+                'to' => $member->email,
+                'from' => config('mail.from.address'),
+                'body_html' => 'Password reset link sent to ' . $member->name,
+                'status' => 'sent',
+                'sent_at' => now(),
+                'ip' => $request->ip(),
+                'user_agent' => $request->header('User-Agent'),
+            ]);
+        }
 
         return back()->with('success', 'We\'ve sent a password reset link to your email address.');
     }

@@ -1,9 +1,9 @@
 import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
 import AuthenticatedLayout from "./Layouts/AuthenticatedLayout";
-import ActivityLogSectionAdmin from "@/Components/ActivityLogSectionAdmin";
-import AdminPasswordLogSection from "@/Components/AdminPasswordLogSection";
-import AdminCalendar from "@/Components/AdminCalendar";
+// import ActivityLogSectionAdmin from "@/Components/ActivityLogSectionAdmin";
+// import AdminPasswordLogSection from "@/Components/AdminPasswordLogSection";
+// import AdminCalendar from "@/Components/AdminCalendar";
 import {
     BarChart,
     Bar,
@@ -25,7 +25,7 @@ export default function Dashboard({
     activityLogs,
     members,
     passwordLogs,
-      checkCheckoutToday,
+    checkCheckoutToday,
     checkCheckoutList,
 }) {
     const isAdmin = auth.guard == "admin";
@@ -99,26 +99,62 @@ export default function Dashboard({
         handleFilterChange(newFilters);
     };
 
-    const tasksData = [
-        { name: "Completed", value: stats.completedTasks },
-        { name: "Pending", value: stats.pendingTasks },
-        { name: "In Progress", value: stats.inProgressTasks },
-        { name: "Overdue", value: stats.overdueTasks },
-    ];
+    // Commented out tasks data
+    // const tasksData = [
+    //     { name: "Completed", value: stats.completedTasks },
+    //     { name: "Pending", value: stats.pendingTasks },
+    //     { name: "In Progress", value: stats.inProgressTasks },
+    //     { name: "Overdue", value: stats.overdueTasks },
+    // ];
 
     const COLORS = ["#0088FE", "#FFBB28", "#00C49F", "#FF5733"];
     const BAR_COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#a4de6c"];
 
     return (
         <AuthenticatedLayout>
-            <Head title="Task Dashboard" />
+            <Head title="Dashboard" />
             <div className="mt-[75px]">
                 <div className="min-h-screen py-[40px] px-[15px]">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                    <a href={route("admin.task.dashboard", {
-    member_id: initialFilters?.member_id,
-})}>
+                    {/* Member Count Card Only */}
+                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-8">
+                        <div className="cards border borderbx rounded-lg p-4 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Total Members
+                                    </h3>
+                                    <h2 className="text-3xl font-bold mt-2 text-gray-900 dark:text-white">
+                                        {members?.length || 0}
+                                    </h2>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Active members in the system
+                                    </p>
+                                </div>
+                                <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
+                                    <svg
+                                        className="h-8 w-8 text-[#5146E6]"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                                        />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
+                    {/* Commented out all other sections */}
+                    {/*
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                        <a href={route("admin.task.dashboard", {
+                            member_id: initialFilters?.member_id,
+                        })}>
                             <div className="cards border borderbx rounded-lg p-4 shadow-sm">
                                 <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                     Total Tasks
@@ -136,9 +172,9 @@ export default function Dashboard({
                                 </p>
                             </div>
                         </a>
-                         <a href={route("admin.task.tasklist", {
-    member_id: initialFilters?.member_id, status: "pending"
-})}>
+                        <a href={route("admin.task.tasklist", {
+                            member_id: initialFilters?.member_id, status: "pending"
+                        })}>
                             <div className="cards border borderbx rounded-lg p-4 shadow-sm">
                                 <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                     Total Department Pending Tasks Instances
@@ -155,7 +191,7 @@ export default function Dashboard({
                                     {filters.year}
                                 </p>
                             </div>
-                            </a>
+                        </a>
                         <div className="cards border borderbx rounded-lg p-4 shadow-sm">
                             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                 Total Department Completed Tasks Instances
@@ -409,7 +445,6 @@ export default function Dashboard({
                         </div>
                     </div>
 
-                    {/* Recent Tasks Section */}
                     <div className="cards border borderbx rounded-lg p-4 shadow-sm mt-[30px]">
                         <div className="mb-[20px] py-4 border-b border-gray-200 dark:border-gray-700">
                             <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
@@ -491,8 +526,8 @@ export default function Dashboard({
                     {activityLogs && (
                         <ActivityLogSectionAdmin activityLogs={activityLogs} />
                     )}
-                                                            <AdminPasswordLogSection passwordLogs={passwordLogs} auth={auth} />
-
+                    <AdminPasswordLogSection passwordLogs={passwordLogs} auth={auth} />
+                    */}
                 </div>
             </div>
         </AuthenticatedLayout>

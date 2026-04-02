@@ -77,16 +77,16 @@ export default function Login({ status, errors: serverErrors }) {
                     <div className="absolute inset-0 bg-gradient-to-br from-blue-600/80 to-purple-600/80 z-10"></div>
                     <img
                         src="https://images.unsplash.com/photo-1579548122080-c35fd6820ecb?q=80&w=1470&auto=format&fit=crop"
-                        alt="Dashboard Analytics"
+                        alt="Login"
                         width={1000}
                         height={1000}
                         className="object-cover w-full h-full"
                     />
                     <div className="absolute inset-0 z-20 flex flex-col justify-center items-center text-white p-12">
                         <div className="max-w-md text-center">
-                            <h1 className="text-4xl font-bold mb-6">Welcome To Super Admin Dashboard</h1>
+                            <h1 className="text-4xl font-bold mb-6">Welcome Back</h1>
                             <p className="text-lg opacity-90 mb-8">
-                                Track your business performance with our powerful analytics tools and make data-driven decisions.
+                                Sign in to continue to your dashboard.
                             </p>
                             <div className="flex justify-center space-x-3">
                                 {/* <span className="w-3 h-3 rounded-full bg-white opacity-50"></span>
