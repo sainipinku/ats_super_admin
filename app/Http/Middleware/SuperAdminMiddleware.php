@@ -17,7 +17,7 @@ class SuperAdminMiddleware
     public function handle($request, Closure $next)
     {
         if (!Auth::guard('superadmin')->check()) {
-            return redirect()->route('super.login');
+            return redirect()->route('login');
         }
 
         return $next($request);

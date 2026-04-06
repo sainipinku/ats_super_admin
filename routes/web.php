@@ -20,7 +20,7 @@ use Inertia\Inertia;
 Route::prefix('super')->name('super.')->group(function () {
     // Public routes (no auth required)
     Route::middleware('authorized:superadmin')->group(function () {
-        Route::get('/login', [AdminAuthController::class, 'login'])->name('login');
+        Route::redirect('/login', '/login');
         Route::post('/verify', [AdminAuthController::class, 'verify'])->name('verify');
         Route::get('/forgot-password', [AdminAuthController::class, 'forgotPassword'])->name('forgotPassword');
     });
@@ -171,10 +171,10 @@ Route::prefix('member')->middleware(['member'])->group(function () {
 
 /** PUBLIC ROUTES START HERE **/
 Route::get('/', [HomeController::class, 'authShowPage'])->name('home');
-Route::redirect('/login', '/super/login')->name('login');
+Route::get('/login', [AdminAuthController::class, 'login'])->name('login');
 Route::post('/verify', [AdminAuthController::class, 'verify'])->name('auth.login');
-Route::redirect('/admin/login', '/super/login')->name('admin.login');
-Route::redirect('/member/login', '/super/login')->name('doer.login');
+Route::redirect('/admin/login', '/login')->name('admin.login');
+Route::redirect('/member/login', '/login')->name('doer.login');
 
 // Password Reset Routes
 Route::get('/forget-password', [HomeController::class, 'forgetPassword'])->name('password.request');

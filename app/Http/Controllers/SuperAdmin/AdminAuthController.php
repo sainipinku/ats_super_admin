@@ -117,7 +117,7 @@ class AdminAuthController extends Controller
         $roleId = $this->getFirstValidRoleId($authenticatedUser);
         if (!$roleId) {
             Auth::guard($guard)->logout();
-            return redirect()->route('super.login')->withErrors([
+            return redirect()->route('login')->withErrors([
                 'login' => 'You do not have access to any valid roles',
             ]);
         }

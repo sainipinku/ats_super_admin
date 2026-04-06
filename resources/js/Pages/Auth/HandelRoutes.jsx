@@ -11,7 +11,7 @@ export default function Login({ status }) {
     };
 
     const handleSuperAdminLogin = () => {
-        window.location.href = route('super.login');
+        window.location.href = route('login');
     };
 
     return (

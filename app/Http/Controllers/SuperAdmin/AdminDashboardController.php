@@ -242,7 +242,7 @@ class AdminDashboardController extends Controller
     public function logout(Request $request)
     {
         Auth::guard('superadmin')->logout();
-        return redirect(route('super.login'))->with('success', 'Logout Succesfull');
+        return redirect(route('login'))->with('success', 'Logout Succesfull');
     }
 
     public function userProfile(Request $request)
