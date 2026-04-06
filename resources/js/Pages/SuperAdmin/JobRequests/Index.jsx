@@ -88,6 +88,7 @@ const JobRequestCard = ({ job, onView, onApprove, onReject }) => {
                     >
                         Approve
                     </button>
+                    
                     <button
                         onClick={() => onReject(job)}
                         className="flex-1 py-2 rounded-lg bg-red-600 text-white text-[12px] font-medium hover:bg-red-700 transition-colors"

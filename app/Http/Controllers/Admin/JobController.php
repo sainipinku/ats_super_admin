@@ -16,7 +16,35 @@ class JobController extends Controller
      */
     public function index()
     {
-        return Inertia::render('Admin/JobPosts/Index');
+        $jobs = Job::where('created_by', Auth::guard('admin')->id())
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($job) {
+                return [
+                    'id' => $job->id,
+                    'title' => $job->title,
+                    'company' => $job->company,
+                    'companyImage' => $job->company_image ? Storage::url($job->company_image) : null,
+                    'location' => $job->location,
+                    'type' => $job->job_type,
+                    'experience' => $job->experience,
+                    'salary' => $job->salary,
+                    'skills' => $job->skills,
+                    'perks' => $job->perks,
+                    'description' => $job->description,
+                    'keyResponsibilities' => $job->key_responsibilities,
+                    'qualifications' => $job->qualifications,
+                    'lastDate' => $job->last_date,
+                    'active' => $job->status === 'active',
+                    'status' => $job->status,
+                    'createdAt' => $job->created_at,
+                    'applicants' => $job->applicants ?? 0,
+                ];
+            });
+
+        return Inertia::render('Admin/JobPosts/Index', [
+            'jobs' => $jobs
+        ]);
     }
 
     /**

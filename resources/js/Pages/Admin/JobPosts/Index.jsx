@@ -116,10 +116,12 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
     );
 };
 
-export default function JobPostsIndex({ auth }) {
+export default function JobPostsIndex({ auth, jobs: initialJobs }) {
     const [formData, setFormData] = useState({
         jobTitle: "",
         companyName: "",
+        companyLogo: null,
+        companyLogoPreview: "",
         location: "",
         jobType: "Full Time",
         experience: "",
@@ -127,6 +129,7 @@ export default function JobPostsIndex({ auth }) {
         maxSalary: "",
         salaryPeriod: "year",
         skills: [],
+        currentSkill: "",
         jobDescription: "",
         keyResponsibilities: "",
         qualifications: "",
@@ -141,126 +144,38 @@ export default function JobPostsIndex({ auth }) {
         const urlParams = new URLSearchParams(window.location.search);
         const editJobId = urlParams.get('edit');
 
-        if (editJobId) {
-            // Find job in local jobs array
-            setJobs(currentJobs => {
-                const jobToEdit = currentJobs.find(job => job.id === parseInt(editJobId));
-                if (jobToEdit) {
-                    // Pre-fill form with job data
-                    setFormData({
-                        jobTitle: jobToEdit.title || '',
-                        companyName: jobToEdit.company || '',
-                        companyLogo: null,
-                        companyLogoPreview: jobToEdit.companyImage || '',
-                        location: jobToEdit.location || '',
-                        jobType: jobToEdit.type || 'Full Time',
-                        minSalary: '',
-                        maxSalary: '',
-                        salaryPeriod: 'year',
-                        experience: jobToEdit.experience || '',
-                        lastDate: '',
-                        skills: jobToEdit.skills || [],
-                        currentSkill: '',
-                        perks: jobToEdit.perks ? jobToEdit.perks.join(', ') : '',
-                        jobDescription: jobToEdit.description || '',
-                        keyResponsibilities: jobToEdit.keyResponsibilities || '',
-                        qualifications: jobToEdit.qualifications || ''
-                    });
-                }
-                return currentJobs;
-            });
+        if (editJobId && initialJobs) {
+            // Find job in initialJobs array from props
+            const jobToEdit = initialJobs.find(job => job.id === parseInt(editJobId));
+            if (jobToEdit) {
+                // Pre-fill form with job data
+                setFormData({
+                    jobTitle: jobToEdit.title || '',
+                    companyName: jobToEdit.company || '',
+                    companyLogo: null,
+                    companyLogoPreview: jobToEdit.companyImage || '',
+                    location: jobToEdit.location || '',
+                    jobType: jobToEdit.type || 'Full Time',
+                    minSalary: '',
+                    maxSalary: '',
+                    salaryPeriod: 'year',
+                    experience: jobToEdit.experience || '',
+                    lastDate: jobToEdit.lastDate || '',
+                    skills: jobToEdit.skills || [],
+                    currentSkill: '',
+                    perks: jobToEdit.perks || [],
+                    jobDescription: jobToEdit.description || '',
+                    keyResponsibilities: jobToEdit.keyResponsibilities || '',
+                    qualifications: jobToEdit.qualifications || ''
+                });
+            }
         }
-    }, []);
+    }, [initialJobs]);
 
     const [showPreview, setShowPreview] = useState(false);
     const [selectedJob, setSelectedJob] = useState(null);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
-    const [jobs, setJobs] = useState([
-        // {
-        //     id: 1,
-        //     title: "Frontend Developer",
-        //     company: "Digital Agency",
-        //     location: "Mumbai",
-        //     experience: "2-4 years",
-        //     salary: "₹8,00,000 - ₹12,00,000/year",
-        //     skills: ["Vue.js", "TypeScript", "CSS"],
-        //     perks: ["Flexible hours", "Learning budget"],
-        //     type: "Remote",
-        //     applicants: 12,
-        //     companyImage: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop&crop=face&auto=format",
-        //     description: "We are looking for a skilled Frontend Developer to join our creative team. You will work on cutting-edge web applications using Vue.js and modern JavaScript frameworks. Strong experience in responsive design and user experience is required."
-        // },
-        // {
-        //     id: 2,
-        //     title: "React Developer",
-        //     company: "Tech Startup",
-        //     location: "Bangalore",
-        //     experience: "1-3 years",
-        //     salary: "₹6,00,000 - ₹10,00,000/year",
-        //     skills: ["React", "Node.js", "MongoDB"],
-        //     perks: ["Health insurance", "Work from home"],
-        //     type: "Full Time",
-        //     applicants: 8,
-        //     companyImage: "https://images.unsplash.com/photo-1499204249359-4b7bdfb9b8b5?w=200&h=200&fit=crop&crop=face&auto=format",
-        //     description: "Join our fast-growing startup as a React Developer! You'll build scalable web applications and work closely with our design team. Experience with full-stack development and modern web technologies is essential."
-        // },
-        // {
-        //     id: 3,
-        //     title: "Full Stack Engineer",
-        //     company: "E-commerce Platform",
-        //     location: "Delhi",
-        //     experience: "3-5 years",
-        //     salary: "₹10,00,000 - ₹15,00,000/year",
-        //     skills: ["JavaScript", "Python", "AWS"],
-        //     perks: ["Gym membership", "Free lunch"],
-        //     type: "Full Time",
-        //     applicants: 25,
-        //     companyImage: "https://images.unsplash.com/photo-1566499185221-6a2399b81893?w=200&h=200&fit=crop&crop=face&auto=format",
-        //     description: "We're seeking a talented Full Stack Engineer to develop and maintain our e-commerce platform. You'll work with modern technologies including JavaScript, Python, and AWS cloud services. Strong problem-solving skills required."
-        // },
-        // {
-        //     id: 4,
-        //     title: "UI/UX Designer",
-        //     company: "Design Studio",
-        //     location: "Pune",
-        //     experience: "1-2 years",
-        //     salary: "₹4,00,000 - ₹7,00,000/year",
-        //     skills: ["Figma", "Adobe XD", "Sketch"],
-        //     perks: ["Creative freedom", "Team outings"],
-        //     type: "Part Time",
-        //     applicants: 6,
-        //     companyImage: "https://images.unsplash.com/photo-1573496359142-b8d87729a4ff?w=200&h=200&fit=crop&crop=face&auto=format",
-        //     description: "Creative UI/UX Designer needed for our design studio! You'll create beautiful user interfaces and experiences for various digital products. Proficiency in Figma, Adobe XD, and user research methodologies is required."
-        // },
-        // {
-        //     id: 5,
-        //     title: "Backend Developer",
-        //     company: "FinTech Company",
-        //     location: "Hyderabad",
-        //     experience: "4-6 years",
-        //     salary: "₹12,00,000 - ₹18,00,000/year",
-        //     skills: ["Java", "Spring Boot", "PostgreSQL"],
-        //     perks: ["Stock options", "Annual bonus"],
-        //     type: "Full Time",
-        //     applicants: 18,
-        //     companyImage: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face&auto=format",
-        //     description: "Looking for an experienced Backend Developer to join our FinTech team. You'll develop robust APIs and work with database systems. Experience with Java, Spring Boot, and financial systems is highly valued."
-        // },
-        // {
-        //     id: 6,
-        //     title: "Mobile App Developer",
-        //     company: "Gaming Studio",
-        //     location: "Chennai",
-        //     experience: "2-4 years",
-        //     salary: "₹7,00,000 - ₹11,00,000/year",
-        //     skills: ["React Native", "Flutter", "Firebase"],
-        //     perks: ["Game room", "Flexible timing"],
-        //     type: "Remote",
-        //     applicants: 15,
-        //     companyImage: "https://images.unsplash.com/photo-1519074019808-3bc74e2a3d2a?w=200&h=200&fit=crop&crop=face&auto=format",
-        //     description: "Exciting opportunity for a Mobile App Developer in the gaming industry! You'll create engaging mobile games using React Native and Flutter. Experience with Firebase and mobile game development is a plus."
-        // }
-    ]);
+    const [jobs, setJobs] = useState(initialJobs || []);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -392,25 +307,9 @@ export default function JobPostsIndex({ auth }) {
     };
 
     const handleCancel = () => {
-        setFormData({
-            jobTitle: "",
-            companyName: "",
-            companyLogo: null,
-            companyLogoPreview: null,
-            location: "",
-            jobType: "",
-            minSalary: "",
-            maxSalary: "",
-            salaryPeriod: "year",
-            experience: "",
-            lastDate: "",
-            skills: [],
-            currentSkill: "",
-            perks: "",
-            jobDescription: "",
-            keyResponsibilities: "",
-            qualifications: ""
-        });
+        // Navigate back to job listing without clearing form data
+        // This preserves edit form data if user returns to edit
+        window.location.href = '/admin/job-listing';
     };
 
     const handleViewDetails = (job) => {
