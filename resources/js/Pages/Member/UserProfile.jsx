@@ -25,8 +25,7 @@ export default function Dashboard() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [passwordMatchError, setPasswordMatchError] = useState("");
     const [isPasswordMatching, setIsPasswordMatching] = useState(false);
-    const [showRemoveProfileDialog, setShowRemoveProfileDialog] =
-        useState(false);
+    const [showRemoveProfileDialog, setShowRemoveProfileDialog] =useState(false);
     const [isImageEditorOpen, setIsImageEditorOpen] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
     const [zoomLevel, setZoomLevel] = useState(1);
