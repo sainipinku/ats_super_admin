@@ -18,7 +18,8 @@ class DatabaseSeeder extends Seeder
             // RolesSeeder::class,
             // DeveloperSeeder::class,
             // DefaultSystemSettings::class
-            // SuperAdminSeeder::class
+            // SuperAdminSeeder::class,
+            // MemberSeeder::class,
         ]);
     }
 }

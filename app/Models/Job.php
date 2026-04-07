@@ -58,6 +58,32 @@ class Job extends Model
     }
 
     /**
+     * Get key_responsibilities as responsibilities array
+     */
+    public function getResponsibilitiesAttribute()
+    {
+        $value = $this->key_responsibilities;
+        if (empty($value)) {
+            return [];
+        }
+        // Split by newlines and filter empty items, re-index array
+        return array_values(array_filter(array_map('trim', explode("\n", $value))));
+    }
+
+    /**
+     * Get qualifications as requirements array
+     */
+    public function getRequirementsAttribute()
+    {
+        $value = $this->qualifications;
+        if (empty($value)) {
+            return [];
+        }
+        // Split by newlines and filter empty items, re-index array
+        return array_values(array_filter(array_map('trim', explode("\n", $value))));
+    }
+
+    /**
      * Get the member who created this job
      */
     public function creator()

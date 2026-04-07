@@ -178,6 +178,18 @@ const [settings, setSettings] = useState(null);
                                     Dashboard
                                 </NavLink>
                                 <NavLink
+                                    href={route("member.jobs.index")}
+                                    active={route().current("member.jobs.index")}
+                                >
+                                    Browse Jobs
+                                </NavLink>
+                                <NavLink
+                                    href={route("member.applications.index")}
+                                    active={route().current("member.applications.index")}
+                                >
+                                    My Applications
+                                </NavLink>
+                                <NavLink
                                     href={route("member.task.dashboard")}
                                     active={
                                         route().current(

@@ -159,6 +159,13 @@ Route::prefix('member')->middleware(['member'])->group(function () {
     Route::post('/profile/photo/update', [App\Http\Controllers\Member\MemberTaskController::class, 'userProfilePhotoUpdate'])->name('member.profile.photo.update');
     Route::post('/profile/password/update', [App\Http\Controllers\Member\MemberTaskController::class, 'userProfilePasswordUpdate'])->name('member.profile.password.update');
     Route::post('/profile/photo/remove', [App\Http\Controllers\Member\MemberTaskController::class, 'userProfilePhotoRemove'])->name('member.profile.photo.remove');
+
+    // Candidate Job Portal Routes
+    Route::get('/jobs', [App\Http\Controllers\Member\CandidateJobController::class, 'index'])->name('member.jobs.index');
+    Route::get('/jobs/{job}', [App\Http\Controllers\Member\CandidateJobController::class, 'show'])->name('member.jobs.show');
+    Route::post('/jobs/{job}/apply', [App\Http\Controllers\Member\CandidateJobController::class, 'apply'])->name('member.jobs.apply');
+    Route::get('/my-applications', [App\Http\Controllers\Member\CandidateJobController::class, 'myApplications'])->name('member.applications.index');
+    Route::delete('/applications/{application}/withdraw', [App\Http\Controllers\Member\CandidateJobController::class, 'withdraw'])->name('member.applications.withdraw');
 });
 /** MEMBER ROUTES END HERE **/
 
