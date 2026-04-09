@@ -11,9 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('departments', function (Blueprint $table) {
-                    Schema::rename('roles', 'departments');
-        });
+        if (Schema::hasTable('roles') && ! Schema::hasTable('departments')) {
+            Schema::rename('roles', 'departments');
+        }
     }
 
     /**
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('departments', function (Blueprint $table) {
-                   Schema::rename('departments', 'roles');
-        });
+        if (Schema::hasTable('departments') && ! Schema::hasTable('roles')) {
+            Schema::rename('departments', 'roles');
+        }
     }
 };

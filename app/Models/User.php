@@ -2,19 +2,25 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Ramsey\Uuid\Uuid;
 
-class User extends Model
+class User extends Authenticatable
 {
+    use HasFactory, SoftDeletes, Notifiable;
+
     protected $fillable = [
+        'uuid',
         'name',
         'email',
         'phone',
         'whatsapp_phone',
-        'status'
+        'password',
+        'status',
     ];
 
     /**
@@ -27,7 +33,7 @@ class User extends Model
         'remember_token',
     ];
 
-    public static function boot()
+    public static function boot(): void
     {
         parent::boot();
         static::creating(function ($v) {

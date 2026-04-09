@@ -12,10 +12,11 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 class Member extends Authenticatable
 {
-    use HasFactory, SoftDeletes, HasUuids, Notifiable;
+    use HasApiTokens, HasFactory, SoftDeletes, HasUuids, Notifiable;
 
     protected $fillable = [
         'uuid',

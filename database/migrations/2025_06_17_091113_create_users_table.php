@@ -16,9 +16,11 @@ return new class extends Migration
             $table->uuid();
             $table->string('name');
             $table->string('email');
+            $table->timestamp('email_verified_at')->nullable();
             $table->string('phone');
             $table->string('whatsapp_phone')->nullable();
             $table->string('password');
+            $table->rememberToken();
             $table->tinyInteger('status')->default(1)->comment('1-Active, 0-InActive');
             $table->timestamps();
             $table->softDeletes();

@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('notification_logs', function (Blueprint $table) {
-            $table->id('id')->primary();
+            $table->id();
             $table->uuid('uuid');
             $table->string('type')->nullable();
             $table->text('morphs')->nullable();
