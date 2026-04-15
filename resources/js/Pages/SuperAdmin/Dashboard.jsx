@@ -841,6 +841,169 @@ export default function Dashboard({
                         </div>
                     </div>
 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div
+                            className="cards border borderbx rounded-lg p-4 shadow-sm cursor-pointer"
+                            onClick={() => router.visit(route("super.job.requests.all.jobs"))}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[14px] font-[400] text-prime-color uppercase">
+                                        Total Jobs
+                                    </p>
+                                    <h3 className="text-[30px] font-[500] text-second-color mt-1">
+                                        {stats.jobs?.count ?? (
+                                            <span className="text-[15px] font-semibold text-second-color">
+                                                No Data Available
+                                            </span>
+                                        )}
+                                    </h3>
+                                </div>
+                                <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
+                                    <FaChartBar size={20} className="text-[#5146E6]" />
+                                </div>
+                            </div>
+                            <div className="mt-2 text-[12px] text-[#5146E6] font-medium">
+                                View all job posts
+                            </div>
+                        </div>
+
+                        <div
+                            className="cards border borderbx rounded-lg p-4 shadow-sm cursor-pointer"
+                            onClick={() => {
+                                const el = document.getElementById("job-applications");
+                                if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[14px] font-[400] text-prime-color uppercase">
+                                        Total Job Applicants
+                                    </p>
+                                    <h3 className="text-[30px] font-[500] text-second-color mt-1">
+                                        {stats.jobs?.applicationsCount ?? (
+                                            <span className="text-[15px] font-semibold text-second-color">
+                                                No Data Available
+                                            </span>
+                                        )}
+                                    </h3>
+                                </div>
+                                <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
+                                    <FaUsers size={20} className="text-[#5146E6]" />
+                                </div>
+                            </div>
+                            <div className="mt-2 text-[12px] text-[#5146E6] font-medium">
+                                View applicants list
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        id="job-applications"
+                        className="cards border borderbx rounded-lg p-4 shadow-sm mb-6"
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+                                Recent Job Applications
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => router.visit(route("super.job.requests.all.jobs"))}
+                                className="px-4 py-2 rounded-lg bg-[#5146E6] text-white text-sm font-medium hover:bg-[#4338CA]"
+                            >
+                                Go to Jobs
+                            </button>
+                        </div>
+
+                        {Array.isArray(stats.jobs?.recentApplications) &&
+                        stats.jobs.recentApplications.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="text-left text-slate-500">
+                                            <th className="py-2 pr-3 font-medium">
+                                                Candidate
+                                            </th>
+                                            <th className="py-2 pr-3 font-medium">
+                                                Email
+                                            </th>
+                                            <th className="py-2 pr-3 font-medium">
+                                                Job
+                                            </th>
+                                            <th className="py-2 pr-3 font-medium">
+                                                Status
+                                            </th>
+                                            <th className="py-2 pr-3 font-medium">
+                                                Applied
+                                            </th>
+                                            <th className="py-2 font-medium">
+                                                Resume
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {stats.jobs.recentApplications.map((app) => (
+                                            <tr
+                                                key={app.id}
+                                                className="align-top"
+                                            >
+                                                <td className="py-2 pr-3 text-slate-800">
+                                                    {app.candidate_name || "-"}
+                                                </td>
+                                                <td className="py-2 pr-3">
+                                                    {app.candidate_email || "-"}
+                                                </td>
+                                                <td className="py-2 pr-3">
+                                                    {app.job?.title || "-"}
+                                                </td>
+                                                <td className="py-2 pr-3 capitalize">
+                                                    {app.status || "-"}
+                                                </td>
+                                                <td className="py-2 pr-3">
+                                                    {app.created_at
+                                                        ? new Date(
+                                                              app.created_at
+                                                          ).toLocaleString(
+                                                              "en-US"
+                                                          )
+                                                        : "-"}
+                                                </td>
+                                                <td className="py-2">
+                                                    {app.resume_url ? (
+                                                        <a
+                                                            href={
+                                                                String(
+                                                                    app.resume_url
+                                                                ).startsWith(
+                                                                    "/"
+                                                                )
+                                                                    ? app.resume_url
+                                                                    : `/${app.resume_url}`
+                                                            }
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="text-[#5146E6] hover:underline"
+                                                        >
+                                                            View
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-slate-400">
+                                                            —
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="text-sm text-slate-500">
+                                No applications yet.
+                            </div>
+                        )}
+                    </div>
+
                     <div className="cards border borderbx rounded-lg p-4 shadow-sm">
                         <GlobalFilters />
                         {/* Main Charts Section */}
@@ -1242,4 +1405,3 @@ export default function Dashboard({
         </AuthenticatedLayout>
     );
 }
-

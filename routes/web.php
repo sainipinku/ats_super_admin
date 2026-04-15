@@ -93,6 +93,7 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::patch('/api/{job}/approve', [JobRequestController::class, 'approve'])->name('api.approve');
             Route::patch('/api/{job}/reject', [JobRequestController::class, 'reject'])->name('api.reject');
             Route::patch('/api/{job}/request-changes', [JobRequestController::class, 'requestChanges'])->name('api.request_changes');
+            Route::post('/api/{job}/update', [JobRequestController::class, 'update'])->name('api.update');
             Route::patch('/api/{job}/toggle-status', [JobRequestController::class, 'toggleStatus'])->name('api.toggle-status');
             Route::patch('/api/{job}/close', [JobRequestController::class, 'close'])->name('api.close');
             Route::delete('/api/{job}', [JobRequestController::class, 'destroy'])->name('api.destroy');

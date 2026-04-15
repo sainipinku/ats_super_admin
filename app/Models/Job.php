@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class Job extends Model
@@ -11,6 +12,11 @@ class Job extends Model
     use HasFactory;
 
     protected $table = 'job_posts';
+
+    protected $appends = [
+        'responsibilities',
+        'requirements',
+    ];
 
     protected $fillable = [
         'uuid',
@@ -97,6 +103,11 @@ class Job extends Model
     public function approver()
     {
         return $this->belongsTo(SuperAdmin::class, 'approved_by');
+    }
+
+    public function applications(): HasMany
+    {
+        return $this->hasMany(JobApplication::class, 'job_id');
     }
 
     /**

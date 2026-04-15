@@ -2,6 +2,21 @@
 
 use Illuminate\Support\Str;
 
+$sessionDomain = env('SESSION_DOMAIN');
+
+if ($sessionDomain === null) {
+    $appUrl = env('APP_URL');
+
+    if (is_string($appUrl) && $appUrl !== '') {
+        $host = parse_url($appUrl, PHP_URL_HOST);
+
+        if (is_string($host) && $host !== '' && $host !== 'localhost' && filter_var($host, FILTER_VALIDATE_IP) === false) {
+            $baseHost = Str::startsWith($host, 'www.') ? Str::after($host, 'www.') : $host;
+            $sessionDomain = '.'.$baseHost;
+        }
+    }
+}
+
 return [
 
     /*
@@ -156,7 +171,7 @@ return [
     |
     */
 
-    'domain' => env('SESSION_DOMAIN'),
+    'domain' => $sessionDomain,
 
     /*
     |--------------------------------------------------------------------------

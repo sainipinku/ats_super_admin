@@ -155,6 +155,7 @@ export default function ResumeForm({ mode, resume }) {
                     </div>
 
                     <form onSubmit={submit} className="space-y-6">
+                        @csrf
                         <div className="tablebxbg p-[15px] rounded-[15px]">
                             <h3 className="text-base font-semibold text-gray-800 dark:text-white mb-4">
                                 Basic Info

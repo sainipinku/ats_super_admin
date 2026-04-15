@@ -22,6 +22,8 @@ use App\Models\SuperAdminPasswordLog;
 use App\Models\ImageActionLog;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Holiday;
+use App\Models\Job;
+use App\Models\JobApplication;
 
 class AdminDashboardController extends Controller
 {
@@ -176,6 +178,31 @@ class AdminDashboardController extends Controller
             ->appends($request->except('pageImageLog'));
 
         $holidays = Holiday::where('status', 1)->get();
+        $jobsCount = Job::count();
+        $jobApplicationsCount = JobApplication::count();
+        $recentJobApplications = JobApplication::query()
+            ->with(['job' => function ($q) {
+                $q->select('id', 'title', 'company');
+            }])
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get()
+            ->map(function ($application) {
+                return [
+                    'id' => $application->id,
+                    'status' => $application->status,
+                    'created_at' => $application->created_at,
+                    'candidate_name' => $application->candidate_name,
+                    'candidate_email' => $application->candidate_email,
+                    'candidate_phone' => $application->candidate_phone,
+                    'resume_url' => $application->resume_url,
+                    'job' => $application->job ? [
+                        'id' => $application->job->id,
+                        'title' => $application->job->title,
+                        'company' => $application->job->company,
+                    ] : null,
+                ];
+            });
 
         return Inertia::render('SuperAdmin/Dashboard', [
             'auth' => $auth,
@@ -202,6 +229,11 @@ class AdminDashboardController extends Controller
                 ],
                 'members' => [
                     'count' => $totalMembers,
+                ],
+                'jobs' => [
+                    'count' => $jobsCount,
+                    'applicationsCount' => $jobApplicationsCount,
+                    'recentApplications' => $recentJobApplications,
                 ],
                 'tasks' => $taskData,
                 'holidays' => $holidays,

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Job;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class JobRequestController extends Controller
@@ -62,11 +63,69 @@ class JobRequestController extends Controller
      */
     public function show(Job $job)
     {
-        $job->load(['creator', 'approver']);
+        $job->load([
+            'creator',
+            'approver',
+            'applications' => function ($q) {
+                $q->orderByDesc('created_at');
+            },
+            'applications.candidate',
+        ]);
 
         return response()->json([
             'success' => true,
             'data' => $job,
+        ]);
+    }
+
+    public function update(Request $request, Job $job)
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'company' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'location' => 'required|string|max:255',
+            'job_type' => 'required|string|max:50',
+            'experience' => 'nullable|string|max:100',
+            'salary' => 'nullable|string|max:100',
+            'skills' => 'nullable',
+            'perks' => 'nullable',
+            'key_responsibilities' => 'nullable|string',
+            'qualifications' => 'nullable|string',
+            'last_date' => 'nullable|date',
+            'company_image' => 'nullable|image|max:5120',
+        ]);
+
+        if (array_key_exists('skills', $validated) && is_string($validated['skills'])) {
+            $validated['skills'] = json_decode($validated['skills'], true) ?: [];
+        }
+        if (array_key_exists('perks', $validated) && is_string($validated['perks'])) {
+            $validated['perks'] = json_decode($validated['perks'], true) ?: [];
+        }
+
+        if (array_key_exists('skills', $validated) && is_array($validated['skills']) === false && $validated['skills'] !== null) {
+            $validated['skills'] = [];
+        }
+        if (array_key_exists('perks', $validated) && is_array($validated['perks']) === false && $validated['perks'] !== null) {
+            $validated['perks'] = [];
+        }
+
+        if ($request->hasFile('company_image')) {
+            if ($job->company_image) {
+                $oldPath = str_replace('/storage/', '', $job->company_image);
+                Storage::disk('public')->delete($oldPath);
+            }
+
+            $path = $request->file('company_image')->store('job-images', 'public');
+            $validated['company_image'] = Storage::url($path);
+        }
+
+        $job->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Job updated successfully.',
+            'data' => $job->fresh(['creator', 'approver']),
         ]);
     }
 
@@ -160,7 +219,7 @@ class JobRequestController extends Controller
         // Delete company image if exists
         if ($job->company_image) {
             $oldPath = str_replace('/storage/', '', $job->company_image);
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($oldPath);
+            Storage::disk('public')->delete($oldPath);
         }
 
         $job->delete();

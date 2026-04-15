@@ -6,7 +6,6 @@ use App\Http\Controllers\Api\Member\ProfileController;
 use App\Http\Controllers\Api\Member\TaskController;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
@@ -34,4 +33,3 @@ Route::prefix('v1')->group(function () {
         Route::post('/tasks/{task}/notes', [TaskController::class, 'notesStore']);
         Route::delete('/notes/{note}', [TaskController::class, 'notesDestroy']);
     });
-});

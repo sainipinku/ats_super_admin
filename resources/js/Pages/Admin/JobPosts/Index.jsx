@@ -353,6 +353,7 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                         </div>
                         <div className="p-4 sm:p-6">
                             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                                @csrf
                                 {/* Row 1: Job Title & Company Name */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {/* Job Title */}
