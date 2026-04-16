@@ -250,7 +250,12 @@ export default function JobListing({ auth }) {
 
     const fetchJobs = async () => {
         try {
-            const response = await fetch(route('admin.api.jobs.list'));
+            const response = await fetch(route('admin.api.jobs.list'), {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Accept': 'application/json',
+                },
+            });
             const data = await response.json();
             if (data.success) {
                 setJobs(data.data);

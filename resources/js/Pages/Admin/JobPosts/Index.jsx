@@ -760,7 +760,11 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                     </div>
                                     <div>
                                         <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Salary:</span>
-                                        <p className="text-gray-900 dark:text-white">{formData.salary || "N/A"}</p>
+                                        <p className="text-gray-900 dark:text-white">
+                                            {formData.minSalary && formData.maxSalary
+                                                ? `₹${formData.minSalary} - ₹${formData.maxSalary}/${formData.salaryPeriod}`
+                                                : "N/A"}
+                                        </p>
                                     </div>
                                     <div>
                                         <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Experience:</span>

@@ -146,9 +146,8 @@ const JobCard = ({ job, onStatusChange, onCloseJob, onViewDetails, onEdit, onDel
                                             setShowDropdown(false);
                                         }}
                                         disabled={job.status === 'active'}
-                                        className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${
-                                            job.status === 'active' ? 'text-green-600 font-semibold bg-green-50' : 'text-slate-700'
-                                        }`}
+                                        className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${job.status === 'active' ? 'text-green-600 font-semibold bg-green-50' : 'text-slate-700'
+                                            }`}
                                     >
                                         Active
                                     </button>
@@ -158,9 +157,8 @@ const JobCard = ({ job, onStatusChange, onCloseJob, onViewDetails, onEdit, onDel
                                             setShowDropdown(false);
                                         }}
                                         disabled={job.status === 'inactive'}
-                                        className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${
-                                            job.status === 'inactive' ? 'text-gray-600 font-semibold bg-gray-50' : 'text-slate-700'
-                                        }`}
+                                        className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${job.status === 'inactive' ? 'text-gray-600 font-semibold bg-gray-50' : 'text-slate-700'
+                                            }`}
                                     >
                                         Deactive
                                     </button>
@@ -507,18 +505,16 @@ export default function AllJobs({ auth }) {
                             <button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                    activeTab === tab.key
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.key
                                         ? "bg-[#5146E6] text-white"
                                         : "bg-white text-slate-600 hover:bg-slate-50"
-                                }`}
+                                    }`}
                             >
                                 {tab.label}
-                                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-                                    activeTab === tab.key
+                                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${activeTab === tab.key
                                         ? "bg-white/20 text-white"
                                         : "bg-slate-200 text-slate-700"
-                                }`}>
+                                    }`}>
                                     {tab.count}
                                 </span>
                             </button>
@@ -607,14 +603,13 @@ export default function AllJobs({ auth }) {
                                     ) : (
                                         <>
                                             <div className="flex items-center gap-2 mb-4">
-                                                <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${
-                                                    selectedJob?.status === 'active' ? 'bg-green-100 text-green-800' :
-                                                    selectedJob?.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
-                                                    selectedJob?.status === 'closed' ? 'bg-red-100 text-red-800' :
-                                                    selectedJob?.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                    selectedJob?.status === 'declined' ? 'bg-red-100 text-red-800' :
-                                                    'bg-gray-100 text-gray-800'
-                                                }`}>
+                                                <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${selectedJob?.status === 'active' ? 'bg-green-100 text-green-800' :
+                                                        selectedJob?.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
+                                                            selectedJob?.status === 'closed' ? 'bg-red-100 text-red-800' :
+                                                                selectedJob?.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                                    selectedJob?.status === 'declined' ? 'bg-red-100 text-red-800' :
+                                                                        'bg-gray-100 text-gray-800'
+                                                    }`}>
                                                     {selectedJob?.status}
                                                 </span>
                                                 <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium">
