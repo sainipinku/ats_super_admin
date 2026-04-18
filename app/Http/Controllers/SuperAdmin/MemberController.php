@@ -111,7 +111,7 @@ class MemberController extends Controller
             'designations' => 'required|array',
             'roles' => 'required|array',
             'gender' => 'nullable|in:male,female,other',
-            // 'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'password' => $id ? 'nullable|min:6|same:confirm_password' : 'required|min:6|same:confirm_password',
             'confirm_password' => $id ? 'nullable|min:6' : 'required|min:6',
             'dob' => 'nullable',
@@ -149,19 +149,16 @@ class MemberController extends Controller
                 $data['password'] = Hash::make($validated['password']);
             }
 
-        //     if ($request->hasFile('image')) {
-        //          $now = now();
-        // $profilePhoto = $request->file('image');
-        // $filename = $now->format('Y_m_d_His_') . Str::random(16) . '.' . $profilePhoto->getClientOriginalExtension();
-        //                 $path = 'profile_image/' . $filename;
-        //                 $mediaUrl = $firebaseService->uploadFile($profilePhoto, $path);
-
-        //         $data['image'] = $mediaUrl;
-        //     }
-
             if ($id) {
                 // Update case
                 $member = Member::findOrFail($id);
+                if ($request->hasFile('image')) {
+                    $oldImage = $member->getRawOriginal('image');
+                    if (!empty($oldImage) && !filter_var($oldImage, FILTER_VALIDATE_URL)) {
+                        Storage::disk('public')->delete($oldImage);
+                    }
+                    $data['image'] = $request->file('image')->store('member-images', 'public');
+                }
                 $member->update($data);
                 $message = 'Member updated successfully!';
                 if (in_array(2, $member->roles)) {
@@ -221,11 +218,21 @@ class MemberController extends Controller
                 if ($existing && $existing->trashed()) {
                     // Restore instead of inserting duplicate
                     $existing->restore();
+                    if ($request->hasFile('image')) {
+                        $oldImage = $existing->getRawOriginal('image');
+                        if (!empty($oldImage) && !filter_var($oldImage, FILTER_VALIDATE_URL)) {
+                            Storage::disk('public')->delete($oldImage);
+                        }
+                        $data['image'] = $request->file('image')->store('member-images', 'public');
+                    }
                     $existing->update($data);
                     $member = $existing;
                     $message = 'Member restored successfully!';
                 } else {
                     $data['created_by'] = auth('superadmin')->id();
+                    if ($request->hasFile('image')) {
+                        $data['image'] = $request->file('image')->store('member-images', 'public');
+                    }
                     $member = Member::create($data);
 
                     //Send Message

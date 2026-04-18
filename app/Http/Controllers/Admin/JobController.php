@@ -11,6 +11,27 @@ use Inertia\Inertia;
 
 class JobController extends Controller
 {
+    private function publicDiskPathFromDbValue(?string $value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            $path = parse_url($value, PHP_URL_PATH) ?: '';
+        } else {
+            $path = $value;
+        }
+
+        if (str_starts_with($path, '/storage/')) {
+            $path = substr($path, strlen('/storage/'));
+        } elseif (str_starts_with($path, 'storage/')) {
+            $path = substr($path, strlen('storage/'));
+        }
+
+        return ltrim($path, '/');
+    }
+
     /**
      * Display job posts page (Inertia)
      */
@@ -24,7 +45,7 @@ class JobController extends Controller
                     'id' => $job->id,
                     'title' => $job->title,
                     'company' => $job->company,
-                    'companyImage' => $job->company_image ? Storage::url($job->company_image) : null,
+                    'companyImage' => $job->company_image,
                     'location' => $job->location,
                     'type' => $job->job_type,
                     'experience' => $job->experience,
@@ -87,7 +108,7 @@ class JobController extends Controller
         // Handle company image upload
         if ($request->hasFile('company_image')) {
             $path = $request->file('company_image')->store('job-images', 'public');
-            $validated['company_image'] = Storage::url($path);
+            $validated['company_image'] = $path;
         }
 
         // Set default status and creator
@@ -158,13 +179,14 @@ class JobController extends Controller
         // Handle company image upload
         if ($request->hasFile('company_image')) {
             // Delete old image if exists
-            if ($job->company_image) {
-                $oldPath = str_replace('/storage/', '', $job->company_image);
+            $oldValue = $job->getRawOriginal('company_image');
+            $oldPath = $this->publicDiskPathFromDbValue($oldValue);
+            if (!empty($oldPath)) {
                 Storage::disk('public')->delete($oldPath);
             }
             
             $path = $request->file('company_image')->store('job-images', 'public');
-            $validated['company_image'] = Storage::url($path);
+            $validated['company_image'] = $path;
         }
 
         // If job was declined, resubmit for approval
@@ -197,8 +219,9 @@ class JobController extends Controller
         }
 
         // Delete company image if exists
-        if ($job->company_image) {
-            $oldPath = str_replace('/storage/', '', $job->company_image);
+        $oldValue = $job->getRawOriginal('company_image');
+        $oldPath = $this->publicDiskPathFromDbValue($oldValue);
+        if (!empty($oldPath)) {
             Storage::disk('public')->delete($oldPath);
         }
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Job extends Model
@@ -51,6 +52,27 @@ class Job extends Model
         'resubmitted_at' => 'datetime',
         'last_date' => 'date',
     ];
+
+    public function getCompanyImageAttribute($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            return $value;
+        }
+
+        if (str_starts_with($value, '/storage/')) {
+            return $value;
+        }
+
+        if (str_starts_with($value, 'storage/')) {
+            return '/' . $value;
+        }
+
+        return Storage::disk('public')->url($value);
+    }
 
     protected static function boot()
     {

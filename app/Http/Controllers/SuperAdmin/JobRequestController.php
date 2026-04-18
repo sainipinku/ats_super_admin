@@ -11,6 +11,27 @@ use Inertia\Inertia;
 
 class JobRequestController extends Controller
 {
+    private function publicDiskPathFromDbValue(?string $value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            $path = parse_url($value, PHP_URL_PATH) ?: '';
+        } else {
+            $path = $value;
+        }
+
+        if (str_starts_with($path, '/storage/')) {
+            $path = substr($path, strlen('/storage/'));
+        } elseif (str_starts_with($path, 'storage/')) {
+            $path = substr($path, strlen('storage/'));
+        }
+
+        return ltrim($path, '/');
+    }
+
     /**
      * Display job requests page (Inertia)
      */
@@ -111,13 +132,14 @@ class JobRequestController extends Controller
         }
 
         if ($request->hasFile('company_image')) {
-            if ($job->company_image) {
-                $oldPath = str_replace('/storage/', '', $job->company_image);
+            $oldValue = $job->getRawOriginal('company_image');
+            $oldPath = $this->publicDiskPathFromDbValue($oldValue);
+            if (!empty($oldPath)) {
                 Storage::disk('public')->delete($oldPath);
             }
 
             $path = $request->file('company_image')->store('job-images', 'public');
-            $validated['company_image'] = Storage::url($path);
+            $validated['company_image'] = $path;
         }
 
         $job->update($validated);
@@ -217,8 +239,9 @@ class JobRequestController extends Controller
     public function destroy(Job $job)
     {
         // Delete company image if exists
-        if ($job->company_image) {
-            $oldPath = str_replace('/storage/', '', $job->company_image);
+        $oldValue = $job->getRawOriginal('company_image');
+        $oldPath = $this->publicDiskPathFromDbValue($oldValue);
+        if (!empty($oldPath)) {
             Storage::disk('public')->delete($oldPath);
         }
 

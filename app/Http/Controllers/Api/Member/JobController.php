@@ -11,52 +11,57 @@ use Illuminate\Support\Str;
 
 class JobController extends Controller
 {
-    public function index(Request $request)
-    {
-        $query = Job::query()
-            ->with(['creator' => function ($q) {
-                $q->select('id', 'name', 'email');
-            }])
-            ->where('status', 'active')
-            ->where(function ($q) {
-                $q->whereNull('last_date')
-                    ->orWhere('last_date', '>=', now()->format('Y-m-d'));
-            })
-            ->orderByDesc('created_at');
+   public function index(Request $request)
+{
+    $query = Job::query()
+        ->with(['creator'])
+        ->where('status', 'active')
+        // ->where(function ($q) {
+        //     $q->whereNull('last_date')
+        //         ->orWhere('last_date', '>=', date('Y-m-d')); // Fixed format
+        // })
+        ->orderByDesc('created_at');
 
-        if ($request->filled('search')) {
-            $search = $request->string('search')->toString();
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('company', 'like', "%{$search}%")
-                    ->orWhere('location', 'like', "%{$search}%");
-            });
-        }
+    // Optional: Add debug logging to see total count
 
-        if ($request->filled('job_type')) {
-            $query->where('job_type', $request->string('job_type')->toString());
-        }
+    if ($request->filled('search')) {
+        $search = $request->string('search')->toString();
+        $query->where(function ($q) use ($search) {
+            $q->where('title', 'like', "%{$search}%")
+                ->orWhere('company', 'like', "%{$search}%")
+                ->orWhere('location', 'like', "%{$search}%");
+        });
+    }
 
-        if ($request->filled('location')) {
-            $location = $request->string('location')->toString();
-            $query->where('location', 'like', "%{$location}%");
-        }
+    if ($request->filled('job_type')) {
+        $query->where('job_type', $request->string('job_type')->toString());
+    }
 
-        $perPage = (int) ($request->input('per_page', 12));
-        $jobs = $query->paginate(max(1, min($perPage, 50)))->withQueryString();
+    if ($request->filled('location')) {
+        $location = $request->string('location')->toString();
+        $query->where('location', 'like', "%{$location}%");
+    }
 
-        $member = $request->user();
+    $perPage = max(1, min((int)$request->input('per_page', 12), 50));
+    $jobs = $query->paginate($perPage)->withQueryString();
+
+    $member = $request->user();
+    $appliedJobIds = [];
+    
+    if ($member) { // Add null check for guest users
         $appliedJobIds = JobApplication::query()
             ->where('candidate_id', $member->id)
             ->pluck('job_id')
             ->toArray();
-
-        return response()->json([
-            'success' => true,
-            'jobs' => $jobs,
-            'applied_job_ids' => $appliedJobIds,
-        ]);
     }
+    
+    return response()->json([
+        'success' => true,
+        'jobs' => $jobs,
+        'applied_job_ids' => $appliedJobIds,
+        'total_jobs' => $jobs->total(), // Add total for debugging
+    ]);
+}
 
     public function show(Request $request, Job $job)
     {

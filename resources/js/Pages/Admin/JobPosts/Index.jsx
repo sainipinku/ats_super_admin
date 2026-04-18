@@ -117,6 +117,26 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
 };
 
 export default function JobPostsIndex({ auth, jobs: initialJobs }) {
+    const defaultFormData = {
+        jobTitle: "",
+        companyName: "",
+        companyLogo: null,
+        companyLogoPreview: "",
+        location: "",
+        jobType: "Full Time",
+        experience: "",
+        minSalary: "",
+        maxSalary: "",
+        salaryPeriod: "year",
+        lastDate: "",
+        skills: [],
+        currentSkill: "",
+        jobDescription: "",
+        keyResponsibilities: "",
+        qualifications: "",
+        perks: ""
+    };
+
     const [formData, setFormData] = useState({
         jobTitle: "",
         companyName: "",
@@ -133,11 +153,60 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
         jobDescription: "",
         keyResponsibilities: "",
         qualifications: "",
-        perks: []
+        perks: "",
+        lastDate: ""
     });
+
+    const [editingJobId, setEditingJobId] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     console.log('Job Posts Index page loaded successfully!');
     console.log('Current route:', window.location.pathname);
+
+    const parseSalary = (salaryString) => {
+        if (!salaryString) {
+            return { minSalary: '', maxSalary: '', salaryPeriod: 'year' };
+        }
+
+        const str = String(salaryString).replace(/\s+/g, ' ').trim();
+        const match = str.match(/₹?\s*([\d,]+)\s*-\s*₹?\s*([\d,]+)\s*\/\s*(year|month)/i);
+        if (match) {
+            return {
+                minSalary: match[1].replace(/,/g, ''),
+                maxSalary: match[2].replace(/,/g, ''),
+                salaryPeriod: match[3].toLowerCase(),
+            };
+        }
+
+        return { minSalary: '', maxSalary: '', salaryPeriod: 'year' };
+    };
+
+    const fillFormForEdit = (job) => {
+        if (!job) return;
+
+        const { minSalary, maxSalary, salaryPeriod } = parseSalary(job.salary);
+
+        setEditingJobId(job.id);
+        setFormData({
+            ...defaultFormData,
+            jobTitle: job.title || '',
+            companyName: job.company || '',
+            companyLogo: null,
+            companyLogoPreview: job.companyImage || '',
+            location: job.location || '',
+            jobType: job.type || 'Full Time',
+            experience: job.experience || '',
+            minSalary,
+            maxSalary,
+            salaryPeriod,
+            lastDate: job.lastDate || '',
+            skills: Array.isArray(job.skills) ? job.skills : [],
+            perks: Array.isArray(job.perks) ? job.perks.join(', ') : (job.perks || ''),
+            jobDescription: job.description || '',
+            keyResponsibilities: job.keyResponsibilities || '',
+            qualifications: job.qualifications || ''
+        });
+    };
 
     // Check for edit mode on mount
     React.useEffect(() => {
@@ -148,26 +217,7 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
             // Find job in initialJobs array from props
             const jobToEdit = initialJobs.find(job => job.id === parseInt(editJobId));
             if (jobToEdit) {
-                // Pre-fill form with job data
-                setFormData({
-                    jobTitle: jobToEdit.title || '',
-                    companyName: jobToEdit.company || '',
-                    companyLogo: null,
-                    companyLogoPreview: jobToEdit.companyImage || '',
-                    location: jobToEdit.location || '',
-                    jobType: jobToEdit.type || 'Full Time',
-                    minSalary: '',
-                    maxSalary: '',
-                    salaryPeriod: 'year',
-                    experience: jobToEdit.experience || '',
-                    lastDate: jobToEdit.lastDate || '',
-                    skills: jobToEdit.skills || [],
-                    currentSkill: '',
-                    perks: jobToEdit.perks || [],
-                    jobDescription: jobToEdit.description || '',
-                    keyResponsibilities: jobToEdit.keyResponsibilities || '',
-                    qualifications: jobToEdit.qualifications || ''
-                });
+                fillFormForEdit(jobToEdit);
             }
         }
     }, [initialJobs]);
@@ -218,10 +268,10 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
         }
     };
 
-    const handleRemoveSkill = (skillToRemove) => {
+    const handleRemoveSkill = (indexToRemove) => {
         setFormData(prev => ({
             ...prev,
-            skills: prev.skills.filter(skill => skill !== skillToRemove)
+            skills: prev.skills.filter((_, idx) => idx !== indexToRemove)
         }));
     };
 
@@ -243,27 +293,41 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        const formDataObj = new FormData();
-        formDataObj.append('title', formData.jobTitle);
-        formDataObj.append('company', formData.companyName);
-        formDataObj.append('description', formData.jobDescription);
-        formDataObj.append('location', formData.location);
-        formDataObj.append('job_type', formData.jobType || 'Full Time');
-        formDataObj.append('experience', formData.experience);
-        const salaryRange = `₹${formData.minSalary} - ₹${formData.maxSalary}/${formData.salaryPeriod}`;
-        formDataObj.append('salary', salaryRange);
-        formDataObj.append('skills', JSON.stringify(formData.skills));
-        formDataObj.append('perks', JSON.stringify(formData.perks.split(',').map(p => p.trim()).filter(p => p)));
-        formDataObj.append('key_responsibilities', formData.keyResponsibilities);
-        formDataObj.append('qualifications', formData.qualifications);
-        formDataObj.append('last_date', formData.lastDate);
-
-        if (formData.companyLogo) {
-            formDataObj.append('company_image', formData.companyLogo);
-        }
-
         try {
-            const response = await fetch(route('admin.api.jobs.store'), {
+            if (isSubmitting) return;
+            setIsSubmitting(true);
+
+            const normalizeList = (value) => {
+                if (Array.isArray(value)) {
+                    return value.map(v => String(v).trim()).filter(Boolean);
+                }
+                if (typeof value === 'string') {
+                    return value.split(',').map(v => v.trim()).filter(Boolean);
+                }
+                return [];
+            };
+
+            const formDataObj = new FormData();
+            formDataObj.append('title', formData.jobTitle);
+            formDataObj.append('company', formData.companyName);
+            formDataObj.append('description', formData.jobDescription);
+            formDataObj.append('location', formData.location);
+            formDataObj.append('job_type', formData.jobType || 'Full Time');
+            formDataObj.append('experience', formData.experience);
+            const salaryRange = `₹${formData.minSalary} - ₹${formData.maxSalary}/${formData.salaryPeriod}`;
+            formDataObj.append('salary', salaryRange);
+            formDataObj.append('skills', JSON.stringify(normalizeList(formData.skills)));
+            formDataObj.append('perks', JSON.stringify(normalizeList(formData.perks)));
+            formDataObj.append('key_responsibilities', formData.keyResponsibilities);
+            formDataObj.append('qualifications', formData.qualifications);
+            formDataObj.append('last_date', formData.lastDate);
+
+            if (formData.companyLogo) {
+                formDataObj.append('company_image', formData.companyLogo);
+            }
+
+            const url = editingJobId ? route('admin.api.jobs.update', editingJobId) : route('admin.api.jobs.store');
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
@@ -275,40 +339,66 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
             const data = await response.json();
 
             if (data.success) {
-                // Reset form
-                setFormData({
-                    jobTitle: '',
-                    companyName: '',
-                    companyLogo: null,
-                    companyLogoPreview: '',
-                    location: '',
-                    jobType: '',
-                    minSalary: '',
-                    maxSalary: '',
-                    salaryPeriod: 'year',
-                    experience: '',
-                    lastDate: '',
-                    skills: [],
-                    currentSkill: '',
-                    perks: '',
-                    jobDescription: '',
-                    keyResponsibilities: '',
-                    qualifications: ''
-                });
+                if (data.data) {
+                    const apiJob = data.data;
+                    const mappedJob = {
+                        id: apiJob.id,
+                        title: apiJob.title,
+                        company: apiJob.company,
+                        companyImage: apiJob.company_image || null,
+                        location: apiJob.location,
+                        type: apiJob.job_type,
+                        experience: apiJob.experience,
+                        salary: apiJob.salary,
+                        skills: Array.isArray(apiJob.skills) ? apiJob.skills : [],
+                        perks: Array.isArray(apiJob.perks) ? apiJob.perks : [],
+                        description: apiJob.description,
+                        keyResponsibilities: apiJob.key_responsibilities,
+                        qualifications: apiJob.qualifications,
+                        lastDate: apiJob.last_date,
+                        active: apiJob.status === 'active',
+                        status: apiJob.status,
+                        createdAt: apiJob.created_at,
+                        applicants: apiJob.applicants || 0,
+                    };
 
-                alert('Job post created successfully and sent for approval!');
+                    setJobs(prev => {
+                        if (editingJobId) {
+                            return prev.map(j => (j.id === editingJobId ? { ...j, ...mappedJob } : j));
+                        }
+                        return [mappedJob, ...prev];
+                    });
+                }
+
+                setEditingJobId(null);
+                setFormData(defaultFormData);
+
+                if (window.location.search.includes('edit=')) {
+                    window.history.replaceState({}, '', window.location.pathname);
+                }
+
+                alert(editingJobId ? 'Job post updated successfully!' : 'Job post created successfully and sent for approval!');
             } else {
                 alert(data.message || 'Failed to create job post.');
             }
         } catch (error) {
             console.error('Error creating job:', error);
             alert('Failed to create job post. Please try again.');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleCancel = () => {
-        // Navigate back to job listing without clearing form data
-        // This preserves edit form data if user returns to edit
+        if (editingJobId) {
+            setEditingJobId(null);
+            setFormData(defaultFormData);
+            if (window.location.search.includes('edit=')) {
+                window.history.replaceState({}, '', window.location.pathname);
+            }
+            return;
+        }
+
         window.location.href = '/admin/job-listing';
     };
 
@@ -323,8 +413,8 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
     };
 
     const handleEdit = (job) => {
-        console.log("Edit job:", job);
-        // Static - no backend logic
+        fillFormForEdit(job);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleDelete = (job) => {
@@ -348,12 +438,12 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
                         <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                             <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
-                                Create New Job Post
+                                {editingJobId ? 'Update Job Post' : 'Create New Job Post'}
                             </h2>
                         </div>
                         <div className="p-4 sm:p-6">
                             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-                                @csrf
+
                                 {/* Row 1: Job Title & Company Name */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {/* Job Title */}
@@ -696,23 +786,26 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                                     <button
                                         type="submit"
-                                        className="flex-1 px-4 sm:px-6 py-2 sm:py-3 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                        disabled={isSubmitting}
+                                        className={`flex-1 px-4 sm:px-6 py-2 sm:py-3 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-blue-700'}`}
                                     >
-                                        Submit Job Post
+                                        {isSubmitting ? (editingJobId ? 'Updating...' : 'Submitting...') : (editingJobId ? 'Update Job Post' : 'Submit Job Post')}
                                     </button>
                                     <button
                                         type="button"
                                         onClick={handlePreview}
-                                        className="px-4 sm:px-6 py-2 sm:py-3 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                                        disabled={isSubmitting}
+                                        className={`px-4 sm:px-6 py-2 sm:py-3 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors ${isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-200'}`}
                                     >
                                         Preview
                                     </button>
                                     <button
                                         type="button"
                                         onClick={handleCancel}
-                                        className="px-4 sm:px-6 py-2 sm:py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                                        disabled={isSubmitting}
+                                        className={`px-4 sm:px-6 py-2 sm:py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors ${isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'}`}
                                     >
-                                        Cancel
+                                        {editingJobId ? 'Cancel Edit' : 'Cancel'}
                                     </button>
                                 </div>
                             </form>
