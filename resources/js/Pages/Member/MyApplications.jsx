@@ -267,7 +267,7 @@ export default function MyApplications({ auth, applications, statusCounts }) {
             <div className="py-8 px-4 sm:px-6 lg:px-8">
                 {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2">My Applications</h1>
+                    <h1 className="text-3xl pt-10 font-bold text-slate-900 mb-2">My Applications</h1>
                     <p className="text-slate-600">Track and manage your job applications</p>
                 </div>
 
@@ -277,31 +277,31 @@ export default function MyApplications({ auth, applications, statusCounts }) {
                         count={statusCounts.pending}
                         label="Pending"
                         color="yellow"
-                        icon="⏳"
+                        // icon="⏳"
                     />
                     <StatCard
                         count={statusCounts.reviewing}
                         label="Reviewing"
                         color="blue"
-                        icon="👀"
+                        // icon="👀"
                     />
                     <StatCard
                         count={statusCounts.shortlisted}
                         label="Shortlisted"
                         color="emerald"
-                        icon="⭐"
+                        // icon="⭐"
                     />
                     <StatCard
                         count={statusCounts.rejected}
                         label="Not Selected"
                         color="red"
-                        icon="❌"
+                        // icon="❌"
                     />
                     <StatCard
                         count={statusCounts.hired}
                         label="Hired"
                         color="purple"
-                        icon="🎉"
+                        // icon="🎉"
                     />
                 </div>
 
