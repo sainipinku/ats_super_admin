@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Head, Link } from "@inertiajs/react";
 import AuthenticatedLayout from "../Layouts/AuthenticatedLayout";
+import ConfirmDialog from "../../../Components/ConfirmDialog";
+import { useAlerts } from "../../../Components/Alerts";
 
 // Reusable JobCard Component
 const JobCard = ({ job, onStatusChange, onCloseJob, onViewDetails, onEdit, onDelete }) => {
@@ -28,6 +30,9 @@ const JobCard = ({ job, onStatusChange, onCloseJob, onViewDetails, onEdit, onDel
         };
         return badges[status] || 'bg-gray-100 text-gray-800';
     };
+
+    const canToggleStatus = ['active', 'inactive', 'closed'].includes(job.status);
+    const canClose = ['active', 'inactive'].includes(job.status);
 
     return (
         <div className="bg-white rounded-3xl shadow-sm p-4 border min-h-[320px] relative flex flex-col border-slate-200 hover:border-blue-300 hover:ring-2 hover:ring-blue-200 transition-all duration-200">
@@ -127,6 +132,7 @@ const JobCard = ({ job, onStatusChange, onCloseJob, onViewDetails, onEdit, onDel
                             {job.applicants || 0} applicants
                         </span>
                         {/* Status Change Dropdown */}
+                        {canToggleStatus && (
                         <div className="relative" ref={dropdownRef}>
                             <button
                                 onClick={() => setShowDropdown(!showDropdown)}
@@ -162,19 +168,24 @@ const JobCard = ({ job, onStatusChange, onCloseJob, onViewDetails, onEdit, onDel
                                     >
                                         Deactive
                                     </button>
-                                    <div className="border-t border-slate-100 my-1"></div>
-                                    <button
-                                        onClick={() => {
-                                            onCloseJob(job);
-                                            setShowDropdown(false);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-[11px] text-red-600 hover:bg-red-50 transition-colors"
-                                    >
-                                        Close
-                                    </button>
+                                    {canClose && (
+                                        <>
+                                            <div className="border-t border-slate-100 my-1"></div>
+                                            <button
+                                                onClick={() => {
+                                                    onCloseJob(job);
+                                                    setShowDropdown(false);
+                                                }}
+                                                className="w-full text-left px-3 py-2 text-[11px] text-red-600 hover:bg-red-50 transition-colors"
+                                            >
+                                                Close
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -201,6 +212,13 @@ export default function AllJobs({ auth }) {
     const [editingJob, setEditingJob] = useState(null);
     const [editForm, setEditForm] = useState(null);
     const [editSaving, setEditSaving] = useState(false);
+    const [confirmToggleOpen, setConfirmToggleOpen] = useState(false);
+    const [confirmToggleJob, setConfirmToggleJob] = useState(null);
+    const [confirmToggleStatus, setConfirmToggleStatus] = useState(null);
+    const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+    const [confirmCloseJob, setConfirmCloseJob] = useState(null);
+
+    const { successAlert, errorAlert } = useAlerts();
 
     // Load jobs from API on component mount
     useEffect(() => {
@@ -224,58 +242,81 @@ export default function AllJobs({ auth }) {
         }
     };
 
-    const handleStatusChange = async (job, newStatus) => {
+    const handleStatusChange = (job, newStatus) => {
         if (job.status === newStatus) return;
+        setConfirmToggleJob(job);
+        setConfirmToggleStatus(newStatus);
+        setConfirmToggleOpen(true);
+    };
 
-        const actionText = newStatus === 'active' ? 'activate' : 'deactivate';
+    const confirmToggle = async () => {
+        if (!confirmToggleJob || !confirmToggleStatus) return;
 
-        if (confirm(`Are you sure you want to ${actionText} "${job.title}"?`)) {
-            try {
-                const response = await fetch(route('super.job.requests.api.toggle-status', job.id), {
-                    method: 'PATCH',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ status: newStatus }),
-                });
-                const data = await response.json();
-                if (data.success) {
-                    setJobs(jobs.map(j => j.id === job.id ? { ...j, status: newStatus } : j));
-                    alert(`Job ${actionText}d successfully!`);
-                } else {
-                    alert(data.message || `Failed to ${actionText} job.`);
-                }
-            } catch (error) {
-                console.error('Error changing job status:', error);
-                alert(`Failed to ${actionText} job.`);
+        try {
+            const response = await fetch(route('super.job.requests.api.toggle-status', confirmToggleJob.id), {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ status: confirmToggleStatus }),
+            });
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                const message =
+                    data?.message === 'Only approved or closed jobs can be toggled.'
+                        ? 'Approve the job first to change status.'
+                        : (data?.message || 'Failed to update job status.');
+                errorAlert(message);
+                return;
             }
+
+            setJobs(prev => prev.map(j => (j.id === confirmToggleJob.id ? data.data : j)));
+            successAlert('Job status updated successfully!');
+        } catch (error) {
+            console.error('Error changing job status:', error);
+            errorAlert('Failed to update job status.');
+        } finally {
+            setConfirmToggleOpen(false);
+            setConfirmToggleJob(null);
+            setConfirmToggleStatus(null);
         }
     };
 
-    const handleCloseJob = async (job) => {
-        if (confirm(`Are you sure you want to permanently CLOSE "${job.title}"?\n\nThis action cannot be undone and the job will be marked as closed.`)) {
-            try {
-                const response = await fetch(route('super.job.requests.api.close', job.id), {
-                    method: 'PATCH',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                    },
-                });
-                const data = await response.json();
-                if (data.success) {
-                    setJobs(jobs.map(j => j.id === job.id ? { ...j, status: 'closed' } : j));
-                    alert('Job closed successfully!');
-                } else {
-                    alert(data.message || 'Failed to close job.');
-                }
-            } catch (error) {
-                console.error('Error closing job:', error);
-                alert('Failed to close job.');
+    const handleCloseJob = (job) => {
+        setConfirmCloseJob(job);
+        setConfirmCloseOpen(true);
+    };
+
+    const confirmClose = async () => {
+        if (!confirmCloseJob) return;
+
+        try {
+            const response = await fetch(route('super.job.requests.api.close', confirmCloseJob.id), {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                errorAlert(data?.message || 'Failed to close job.');
+                return;
             }
+
+            setJobs(prev => prev.map(j => (j.id === confirmCloseJob.id ? data.data : j)));
+            successAlert('Job closed successfully!');
+        } catch (error) {
+            console.error('Error closing job:', error);
+            errorAlert('Failed to close job.');
+        } finally {
+            setConfirmCloseOpen(false);
+            setConfirmCloseJob(null);
         }
     };
 
@@ -292,12 +333,12 @@ export default function AllJobs({ auth }) {
             if (data.success) {
                 setSelectedJob(data.data);
             } else {
-                alert(data.message || 'Failed to load job details.');
+                errorAlert(data.message || 'Failed to load job details.');
                 setSelectedJob(job);
             }
         } catch (error) {
             console.error('Error fetching job details:', error);
-            alert('Failed to load job details.');
+            errorAlert('Failed to load job details.');
             setSelectedJob(job);
         } finally {
             setDetailsLoading(false);
@@ -322,13 +363,13 @@ export default function AllJobs({ auth }) {
                         setEditingJob(null);
                         setEditForm(null);
                     }
-                    alert('Job post deleted successfully!');
+                    successAlert('Job post deleted successfully!');
                 } else {
-                    alert(data.message || 'Failed to delete job.');
+                    errorAlert(data.message || 'Failed to delete job.');
                 }
             } catch (error) {
                 console.error('Error deleting job:', error);
-                alert('Failed to delete job.');
+                errorAlert('Failed to delete job.');
             }
         }
     };
@@ -403,13 +444,13 @@ export default function AllJobs({ auth }) {
                 }
                 setEditingJob(null);
                 setEditForm(null);
-                alert('Job updated successfully!');
+                successAlert('Job updated successfully!');
             } else {
-                alert(data.message || 'Failed to update job.');
+                errorAlert(data.message || 'Failed to update job.');
             }
         } catch (error) {
             console.error('Error updating job:', error);
-            alert('Failed to update job.');
+            errorAlert('Failed to update job.');
         } finally {
             setEditSaving(false);
         }
@@ -942,6 +983,41 @@ export default function AllJobs({ auth }) {
                             </div>
                         </div>
                     )}
+
+                    <ConfirmDialog
+                        isOpen={confirmToggleOpen}
+                        onClose={() => {
+                            setConfirmToggleOpen(false);
+                            setConfirmToggleJob(null);
+                            setConfirmToggleStatus(null);
+                        }}
+                        onConfirm={confirmToggle}
+                        message={
+                            confirmToggleJob
+                                ? `${confirmToggleStatus === 'active' ? 'Activate' : 'Deactivate'} "${confirmToggleJob.title}"?`
+                                : 'Are you sure you want to change job status?'
+                        }
+                        confirmText={confirmToggleStatus === 'active' ? 'Yes, Activate' : 'Yes, Deactivate'}
+                        cancelText="Cancel"
+                        modalSpinnerMessage="Processing Please Wait...."
+                    />
+
+                    <ConfirmDialog
+                        isOpen={confirmCloseOpen}
+                        onClose={() => {
+                            setConfirmCloseOpen(false);
+                            setConfirmCloseJob(null);
+                        }}
+                        onConfirm={confirmClose}
+                        message={
+                            confirmCloseJob
+                                ? `Close "${confirmCloseJob.title}"? This action cannot be undone.`
+                                : 'Are you sure you want to close this job?'
+                        }
+                        confirmText="Yes, Close"
+                        cancelText="Cancel"
+                        modalSpinnerMessage="Closing Please Wait...."
+                    />
                 </div>
             </div>
         </AuthenticatedLayout>

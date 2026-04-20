@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import LocationInput from '../../../Components/LocationInput';
+import ConfirmDialog from '../../../Components/ConfirmDialog';
+import { useAlerts } from '../../../Components/Alerts';
 
 // Reusable JobCard Component
 const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
@@ -159,6 +161,9 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
 
     const [editingJobId, setEditingJobId] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+
+    const { successAlert, errorAlert } = useAlerts();
 
     console.log('Job Posts Index page loaded successfully!');
     console.log('Current route:', window.location.pathname);
@@ -290,102 +295,119 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
         setShowPreview(false);
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const performSubmit = async () => {
+        const normalizeList = (value) => {
+            if (Array.isArray(value)) {
+                return value.map(v => String(v).trim()).filter(Boolean);
+            }
+            if (typeof value === 'string') {
+                return value.split(',').map(v => v.trim()).filter(Boolean);
+            }
+            return [];
+        };
 
+        const formDataObj = new FormData();
+        formDataObj.append('title', formData.jobTitle);
+        formDataObj.append('company', formData.companyName);
+        formDataObj.append('description', formData.jobDescription);
+        formDataObj.append('location', formData.location);
+        formDataObj.append('job_type', formData.jobType || 'Full Time');
+        formDataObj.append('experience', formData.experience);
+        const salaryRange = `₹${formData.minSalary} - ₹${formData.maxSalary}/${formData.salaryPeriod}`;
+        formDataObj.append('salary', salaryRange);
+        formDataObj.append('skills', JSON.stringify(normalizeList(formData.skills)));
+        formDataObj.append('perks', JSON.stringify(normalizeList(formData.perks)));
+        formDataObj.append('key_responsibilities', formData.keyResponsibilities);
+        formDataObj.append('qualifications', formData.qualifications);
+        formDataObj.append('last_date', formData.lastDate);
+
+        if (formData.companyLogo) {
+            formDataObj.append('company_image', formData.companyLogo);
+        }
+
+        const url = editingJobId ? route('admin.api.jobs.update', editingJobId) : route('admin.api.jobs.store');
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                'Accept': 'application/json',
+            },
+            body: formDataObj,
+        });
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+            if (data && data.errors) {
+                const firstKey = Object.keys(data.errors)[0];
+                const firstMessage = firstKey ? (data.errors[firstKey]?.[0] || data.message) : data.message;
+                errorAlert(firstMessage || 'Validation failed. Please check the form.');
+                return;
+            }
+            errorAlert((data && data.message) ? data.message : 'Failed to submit job post.');
+            return;
+        }
+
+        if (!data || !data.success) {
+            errorAlert((data && data.message) ? data.message : 'Failed to submit job post.');
+            return;
+        }
+
+        if (data.data) {
+            const apiJob = data.data;
+            const mappedJob = {
+                id: apiJob.id,
+                title: apiJob.title,
+                company: apiJob.company,
+                companyImage: apiJob.company_image || null,
+                location: apiJob.location,
+                type: apiJob.job_type,
+                experience: apiJob.experience,
+                salary: apiJob.salary,
+                skills: Array.isArray(apiJob.skills) ? apiJob.skills : [],
+                perks: Array.isArray(apiJob.perks) ? apiJob.perks : [],
+                description: apiJob.description,
+                keyResponsibilities: apiJob.key_responsibilities,
+                qualifications: apiJob.qualifications,
+                lastDate: apiJob.last_date,
+                active: apiJob.status === 'active',
+                status: apiJob.status,
+                createdAt: apiJob.created_at,
+                applicants: apiJob.applicants || 0,
+            };
+
+            setJobs(prev => {
+                if (editingJobId) {
+                    return prev.map(j => (j.id === editingJobId ? { ...j, ...mappedJob } : j));
+                }
+                return [mappedJob, ...prev];
+            });
+        }
+
+        setEditingJobId(null);
+        setFormData(defaultFormData);
+
+        if (window.location.search.includes('edit=')) {
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+
+        successAlert(editingJobId ? 'Job post updated successfully!' : 'Job post created successfully and sent for approval!');
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (isSubmitting) return;
+        setShowSubmitConfirm(true);
+    };
+
+    const confirmSubmit = async () => {
         try {
             if (isSubmitting) return;
             setIsSubmitting(true);
-
-            const normalizeList = (value) => {
-                if (Array.isArray(value)) {
-                    return value.map(v => String(v).trim()).filter(Boolean);
-                }
-                if (typeof value === 'string') {
-                    return value.split(',').map(v => v.trim()).filter(Boolean);
-                }
-                return [];
-            };
-
-            const formDataObj = new FormData();
-            formDataObj.append('title', formData.jobTitle);
-            formDataObj.append('company', formData.companyName);
-            formDataObj.append('description', formData.jobDescription);
-            formDataObj.append('location', formData.location);
-            formDataObj.append('job_type', formData.jobType || 'Full Time');
-            formDataObj.append('experience', formData.experience);
-            const salaryRange = `₹${formData.minSalary} - ₹${formData.maxSalary}/${formData.salaryPeriod}`;
-            formDataObj.append('salary', salaryRange);
-            formDataObj.append('skills', JSON.stringify(normalizeList(formData.skills)));
-            formDataObj.append('perks', JSON.stringify(normalizeList(formData.perks)));
-            formDataObj.append('key_responsibilities', formData.keyResponsibilities);
-            formDataObj.append('qualifications', formData.qualifications);
-            formDataObj.append('last_date', formData.lastDate);
-
-            if (formData.companyLogo) {
-                formDataObj.append('company_image', formData.companyLogo);
-            }
-
-            const url = editingJobId ? route('admin.api.jobs.update', editingJobId) : route('admin.api.jobs.store');
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                    'Accept': 'application/json',
-                },
-                body: formDataObj,
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                if (data.data) {
-                    const apiJob = data.data;
-                    const mappedJob = {
-                        id: apiJob.id,
-                        title: apiJob.title,
-                        company: apiJob.company,
-                        companyImage: apiJob.company_image || null,
-                        location: apiJob.location,
-                        type: apiJob.job_type,
-                        experience: apiJob.experience,
-                        salary: apiJob.salary,
-                        skills: Array.isArray(apiJob.skills) ? apiJob.skills : [],
-                        perks: Array.isArray(apiJob.perks) ? apiJob.perks : [],
-                        description: apiJob.description,
-                        keyResponsibilities: apiJob.key_responsibilities,
-                        qualifications: apiJob.qualifications,
-                        lastDate: apiJob.last_date,
-                        active: apiJob.status === 'active',
-                        status: apiJob.status,
-                        createdAt: apiJob.created_at,
-                        applicants: apiJob.applicants || 0,
-                    };
-
-                    setJobs(prev => {
-                        if (editingJobId) {
-                            return prev.map(j => (j.id === editingJobId ? { ...j, ...mappedJob } : j));
-                        }
-                        return [mappedJob, ...prev];
-                    });
-                }
-
-                setEditingJobId(null);
-                setFormData(defaultFormData);
-
-                if (window.location.search.includes('edit=')) {
-                    window.history.replaceState({}, '', window.location.pathname);
-                }
-
-                alert(editingJobId ? 'Job post updated successfully!' : 'Job post created successfully and sent for approval!');
-            } else {
-                alert(data.message || 'Failed to create job post.');
-            }
-        } catch (error) {
-            console.error('Error creating job:', error);
-            alert('Failed to create job post. Please try again.');
+            await performSubmit();
         } finally {
             setIsSubmitting(false);
+            setShowSubmitConfirm(false);
         }
     };
 
@@ -1098,6 +1120,16 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                     </div>
                 </div>
             )}
+
+            <ConfirmDialog
+                isOpen={showSubmitConfirm}
+                onClose={() => setShowSubmitConfirm(false)}
+                onConfirm={confirmSubmit}
+                message={editingJobId ? 'Are you sure you want to update this job post?' : 'Are you sure you want to submit this job post for approval?'}
+                confirmText={editingJobId ? 'Yes, Update' : 'Yes, Submit'}
+                cancelText="Cancel"
+                modalSpinnerMessage={editingJobId ? 'Updating Please Wait....' : 'Submitting Please Wait....'}
+            />
         </AuthenticatedLayout>
     );
 }
