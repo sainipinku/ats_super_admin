@@ -5,7 +5,7 @@ import ConfirmDialog from "../../../Components/ConfirmDialog";
 import { useAlerts } from "../../../Components/Alerts";
 
 // Reusable JobCard Component
-const JobCard = ({ job, onStatusChange, onCloseJob, onViewDetails, onEdit, onDelete }) => {
+const JobCard = ({ job, onStatusChange, onCloseJob, onApprove, onReject, onViewDetails, onEdit, onDelete }) => {
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -33,6 +33,7 @@ const JobCard = ({ job, onStatusChange, onCloseJob, onViewDetails, onEdit, onDel
 
     const canToggleStatus = ['active', 'inactive', 'closed'].includes(job.status);
     const canClose = ['active', 'inactive'].includes(job.status);
+    const isPending = job.status === 'pending';
 
     return (
         <div className="bg-white rounded-3xl shadow-sm p-4 border min-h-[320px] relative flex flex-col border-slate-200 hover:border-blue-300 hover:ring-2 hover:ring-blue-200 transition-all duration-200">
@@ -186,6 +187,22 @@ const JobCard = ({ job, onStatusChange, onCloseJob, onViewDetails, onEdit, onDel
                             )}
                         </div>
                         )}
+                        {isPending && (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => onApprove(job)}
+                                    className="px-2.5 py-1 rounded-lg bg-green-600 text-white text-[10px] font-semibold hover:bg-green-700 transition-colors"
+                                >
+                                    Approve
+                                </button>
+                                <button
+                                    onClick={() => onReject(job)}
+                                    className="px-2.5 py-1 rounded-lg bg-red-600 text-white text-[10px] font-semibold hover:bg-red-700 transition-colors"
+                                >
+                                    Reject
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -217,6 +234,14 @@ export default function AllJobs({ auth }) {
     const [confirmToggleStatus, setConfirmToggleStatus] = useState(null);
     const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
     const [confirmCloseJob, setConfirmCloseJob] = useState(null);
+    const [confirmApproveOpen, setConfirmApproveOpen] = useState(false);
+    const [confirmApproveJob, setConfirmApproveJob] = useState(null);
+    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+    const [confirmDeleteJob, setConfirmDeleteJob] = useState(null);
+    const [rejectOpen, setRejectOpen] = useState(false);
+    const [rejectJob, setRejectJob] = useState(null);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
     const { successAlert, errorAlert } = useAlerts();
 
@@ -320,6 +345,86 @@ export default function AllJobs({ auth }) {
         }
     };
 
+    const handleApproveJob = (job) => {
+        setConfirmApproveJob(job);
+        setConfirmApproveOpen(true);
+    };
+
+    const confirmApprove = async () => {
+        if (!confirmApproveJob) return;
+
+        try {
+            const response = await fetch(route('super.job.requests.api.approve', confirmApproveJob.id), {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Accept': 'application/json',
+                },
+            });
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                errorAlert(data?.message || 'Failed to approve job.');
+                return;
+            }
+
+            setJobs(prev => prev.map(j => (j.id === confirmApproveJob.id ? data.data : j)));
+            if (selectedJob?.id === confirmApproveJob.id) {
+                setSelectedJob(data.data);
+            }
+            successAlert('Job approved successfully!');
+        } catch (error) {
+            console.error('Error approving job:', error);
+            errorAlert('Failed to approve job.');
+        } finally {
+            setConfirmApproveOpen(false);
+            setConfirmApproveJob(null);
+        }
+    };
+
+    const handleRejectJob = (job) => {
+        setRejectJob(job);
+        setRejectionReason('');
+        setRejectOpen(true);
+    };
+
+    const submitReject = async () => {
+        if (!rejectJob || rejectSubmitting) return;
+        setRejectSubmitting(true);
+
+        try {
+            const response = await fetch(route('super.job.requests.api.reject', rejectJob.id), {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ rejection_reason: rejectionReason || null }),
+            });
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                errorAlert(data?.message || 'Failed to reject job.');
+                return;
+            }
+
+            setJobs(prev => prev.map(j => (j.id === rejectJob.id ? data.data : j)));
+            if (selectedJob?.id === rejectJob.id) {
+                setSelectedJob(data.data);
+            }
+            successAlert('Job rejected successfully!');
+            setRejectOpen(false);
+            setRejectJob(null);
+            setRejectionReason('');
+        } catch (error) {
+            console.error('Error rejecting job:', error);
+            errorAlert('Failed to reject job.');
+        } finally {
+            setRejectSubmitting(false);
+        }
+    };
+
     const handleViewDetails = async (job) => {
         setDetailsLoading(true);
         setSelectedJob(null);
@@ -346,31 +451,40 @@ export default function AllJobs({ auth }) {
     };
 
     const handleDelete = async (job) => {
-        if (confirm(`Are you sure you want to delete "${job.title}" job post?`)) {
-            try {
-                const response = await fetch(route('super.job.requests.api.destroy', job.id), {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                        'Accept': 'application/json',
-                    },
-                });
-                const data = await response.json();
-                if (data.success) {
-                    setJobs((prev) => prev.filter((j) => j.id !== job.id));
-                    if (selectedJob?.id === job.id) setSelectedJob(null);
-                    if (editingJob?.id === job.id) {
-                        setEditingJob(null);
-                        setEditForm(null);
-                    }
-                    successAlert('Job post deleted successfully!');
-                } else {
-                    errorAlert(data.message || 'Failed to delete job.');
-                }
-            } catch (error) {
-                console.error('Error deleting job:', error);
-                errorAlert('Failed to delete job.');
+        setConfirmDeleteJob(job);
+        setConfirmDeleteOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!confirmDeleteJob) return;
+
+        try {
+            const response = await fetch(route('super.job.requests.api.destroy', confirmDeleteJob.id), {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Accept': 'application/json',
+                },
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                errorAlert(data?.message || 'Failed to delete job.');
+                return;
             }
+
+            setJobs((prev) => prev.filter((j) => j.id !== confirmDeleteJob.id));
+            if (selectedJob?.id === confirmDeleteJob.id) setSelectedJob(null);
+            if (editingJob?.id === confirmDeleteJob.id) {
+                setEditingJob(null);
+                setEditForm(null);
+            }
+            successAlert('Job post deleted successfully!');
+        } catch (error) {
+            console.error('Error deleting job:', error);
+            errorAlert('Failed to delete job.');
+        } finally {
+            setConfirmDeleteOpen(false);
+            setConfirmDeleteJob(null);
         }
     };
 
@@ -575,6 +689,8 @@ export default function AllJobs({ auth }) {
                                     job={job}
                                     onStatusChange={handleStatusChange}
                                     onCloseJob={handleCloseJob}
+                                    onApprove={handleApproveJob}
+                                    onReject={handleRejectJob}
                                     onViewDetails={handleViewDetails}
                                     onEdit={handleEdit}
                                     onDelete={handleDelete}
@@ -657,6 +773,23 @@ export default function AllJobs({ auth }) {
                                                     {selectedJob?.job_type || selectedJob?.type}
                                                 </span>
                                             </div>
+
+                                            {selectedJob?.status === 'pending' && (
+                                                <div className="flex items-center gap-2 mb-4">
+                                                    <button
+                                                        onClick={() => handleApproveJob(selectedJob)}
+                                                        className="px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
+                                                    >
+                                                        Approve
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRejectJob(selectedJob)}
+                                                        className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors"
+                                                    >
+                                                        Reject
+                                                    </button>
+                                                </div>
+                                            )}
 
                                             <div className="space-y-4 text-slate-600">
                                                 <div className="grid grid-cols-2 gap-4">
@@ -1018,6 +1151,94 @@ export default function AllJobs({ auth }) {
                         cancelText="Cancel"
                         modalSpinnerMessage="Closing Please Wait...."
                     />
+
+                    <ConfirmDialog
+                        isOpen={confirmApproveOpen}
+                        onClose={() => {
+                            setConfirmApproveOpen(false);
+                            setConfirmApproveJob(null);
+                        }}
+                        onConfirm={confirmApprove}
+                        message={confirmApproveJob ? `Approve "${confirmApproveJob.title}"?` : 'Approve this job?'}
+                        confirmText="Yes, Approve"
+                        cancelText="Cancel"
+                        modalSpinnerMessage="Approving Please Wait...."
+                    />
+
+                    <ConfirmDialog
+                        isOpen={confirmDeleteOpen}
+                        onClose={() => {
+                            setConfirmDeleteOpen(false);
+                            setConfirmDeleteJob(null);
+                        }}
+                        onConfirm={confirmDelete}
+                        message={confirmDeleteJob ? `Delete "${confirmDeleteJob.title}" job post?` : 'Delete this job post?'}
+                        confirmText="Yes, Delete"
+                        cancelText="Cancel"
+                        modalSpinnerMessage="Deleting Please Wait...."
+                    />
+
+                    {rejectOpen && rejectJob && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-2xl max-w-md w-full shadow-xl">
+                                <div className="p-6">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-slate-900">Reject Job</h3>
+                                            <p className="text-sm text-slate-500">{rejectJob.title}</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (rejectSubmitting) return;
+                                                setRejectOpen(false);
+                                                setRejectJob(null);
+                                                setRejectionReason('');
+                                            }}
+                                            className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                                        >
+                                            <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Rejection Reason (optional)</label>
+                                    <textarea
+                                        value={rejectionReason}
+                                        onChange={(e) => setRejectionReason(e.target.value)}
+                                        rows={4}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                        placeholder="Write reason..."
+                                        disabled={rejectSubmitting}
+                                    />
+
+                                    <div className="mt-5 flex items-center justify-end gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setRejectOpen(false);
+                                                setRejectJob(null);
+                                                setRejectionReason('');
+                                            }}
+                                            className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                            disabled={rejectSubmitting}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={submitReject}
+                                            className="px-5 py-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+                                            disabled={rejectSubmitting}
+                                        >
+                                            {rejectSubmitting ? 'Rejecting...' : 'Reject'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </AuthenticatedLayout>
