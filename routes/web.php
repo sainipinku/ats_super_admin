@@ -97,6 +97,7 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::patch('/api/{job}/toggle-status', [JobRequestController::class, 'toggleStatus'])->name('api.toggle-status');
             Route::patch('/api/{job}/close', [JobRequestController::class, 'close'])->name('api.close');
             Route::delete('/api/{job}', [JobRequestController::class, 'destroy'])->name('api.destroy');
+            Route::patch('/api/applications/{application}/decision', [JobRequestController::class, 'applicationDecision'])->name('api.applications.decision');
         });
     });
 });
@@ -135,6 +136,8 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::delete('/api/jobs/{job}', [JobController::class, 'destroy'])->name('admin.api.jobs.destroy');
     Route::patch('/api/jobs/{job}/resend', [JobController::class, 'resend'])->name('admin.api.jobs.resend');
     Route::patch('/api/jobs/{job}/toggle-status', [JobController::class, 'toggleStatus'])->name('admin.api.jobs.toggle-status');
+    Route::get('/api/jobs/{job}/applications', [JobController::class, 'applications'])->name('admin.api.jobs.applications');
+    Route::patch('/api/applications/{application}/decision', [JobController::class, 'applicationDecision'])->name('admin.api.applications.decision');
     
     Route::post('/logout', [App\Http\Controllers\Admin\AdminController::class, 'logout'])->name('admin.logout');
     Route::get('/profile', [App\Http\Controllers\Admin\AdminController::class, 'userProfile'])->name('admin.profile');

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Job;
+use App\Models\JobApplication;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -136,6 +137,64 @@ class JobController extends Controller
         return response()->json([
             'success' => true,
             'data' => $jobs,
+        ]);
+    }
+
+    public function applications(Job $job)
+    {
+        if ((int) $job->created_by !== (int) Auth::guard('admin')->id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized.',
+            ], 403);
+        }
+
+        $applications = JobApplication::query()
+            ->with(['candidate' => function ($q) {
+                $q->select('id', 'name', 'email', 'phone', 'image');
+            }])
+            ->where('job_id', $job->id)
+            ->orderByDesc('created_at')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $applications,
+        ]);
+    }
+
+    public function applicationDecision(Request $request, JobApplication $application)
+    {
+        $application->load('job');
+        if (!$application->job || (int) $application->job->created_by !== (int) Auth::guard('admin')->id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'action' => 'required|in:approve,reject',
+            'admin_notes' => 'nullable|string|max:5000',
+        ]);
+
+        $newStatus = $validated['action'] === 'approve' ? 'shortlisted' : 'rejected';
+
+        $application->update([
+            'status' => $newStatus,
+            'admin_notes' => $validated['admin_notes'] ?? $application->admin_notes,
+            'reviewed_at' => now(),
+            'reviewed_by' => Auth::guard('admin')->id(),
+        ]);
+
+        $application->load(['candidate' => function ($q) {
+            $q->select('id', 'name', 'email', 'phone', 'image');
+        }]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Application updated successfully.',
+            'data' => $application,
         ]);
     }
 
