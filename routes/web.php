@@ -98,6 +98,12 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::patch('/api/{job}/close', [JobRequestController::class, 'close'])->name('api.close');
             Route::delete('/api/{job}', [JobRequestController::class, 'destroy'])->name('api.destroy');
         });
+
+        // Job Applicants Routes (Super Admin - All Applicants)
+        Route::get('/job-applicants', [JobRequestController::class, 'applicants'])->name('job.applicants');
+        Route::get('/api/job-applicants', [JobRequestController::class, 'getAllApplicants'])->name('api.job.applicants.list');
+        Route::get('/api/job-applicants/{application}', [JobRequestController::class, 'getApplicantDetails'])->name('api.job.applicants.details');
+        Route::patch('/api/job-applicants/{application}/status', [JobRequestController::class, 'updateApplicantStatus'])->name('api.job.applicants.status');
     });
 });
 /** SUPER ADMIN ROUTES END HERE **/
@@ -127,6 +133,7 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     // Job Posts routes
     Route::get('/job-posts', [JobController::class, 'index'])->name('admin.job.posts.index');
     Route::get('/job-listing', [JobController::class, 'listing'])->name('admin.job.posts.listing');
+    Route::get('/job-applicants', [JobController::class, 'applicants'])->name('admin.job.applicants');
     
     // Job API routes
     Route::get('/api/jobs', [JobController::class, 'getAdminJobs'])->name('admin.api.jobs.list');
@@ -135,6 +142,11 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::delete('/api/jobs/{job}', [JobController::class, 'destroy'])->name('admin.api.jobs.destroy');
     Route::patch('/api/jobs/{job}/resend', [JobController::class, 'resend'])->name('admin.api.jobs.resend');
     Route::patch('/api/jobs/{job}/toggle-status', [JobController::class, 'toggleStatus'])->name('admin.api.jobs.toggle-status');
+    
+    // Job Applicants API routes
+    Route::get('/api/job-applicants', [JobController::class, 'getApplicants'])->name('admin.api.job.applicants.list');
+    Route::get('/api/job-applicants/{application}', [JobController::class, 'getApplicantDetails'])->name('admin.api.job.applicants.details');
+    Route::patch('/api/job-applicants/{application}/status', [JobController::class, 'updateApplicantStatus'])->name('admin.api.job.applicants.status');
     
     Route::post('/logout', [App\Http\Controllers\Admin\AdminController::class, 'logout'])->name('admin.logout');
     Route::get('/profile', [App\Http\Controllers\Admin\AdminController::class, 'userProfile'])->name('admin.profile');

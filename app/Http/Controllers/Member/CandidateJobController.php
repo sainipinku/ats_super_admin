@@ -23,10 +23,6 @@ class CandidateJobController extends Controller
                 $q->select('id', 'name', 'email');
             }])
             ->where('status', 'active')
-            ->where(function($q) {
-                $q->whereNull('last_date')
-                  ->orWhere('last_date', '>=', now()->format('Y-m-d'));
-            })
             ->orderBy('created_at', 'desc');
 
         // Search by title or company

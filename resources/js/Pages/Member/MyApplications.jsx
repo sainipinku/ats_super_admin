@@ -55,162 +55,193 @@ const ApplicationCard = ({ application, onWithdraw }) => {
 
     const canWithdraw = ['pending', 'reviewing'].includes(application.status);
 
+    const getInitials = (name) => {
+        if (!name) return 'J';
+        return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        });
+    };
+
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
-            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                {/* Job Info */}
-                <div className="flex-1">
-                    <div className="flex items-start gap-4">
-                        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
-                            {application.job?.company?.charAt(0)?.toUpperCase() || 'J'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-semibold text-slate-900 line-clamp-1">
-                                {application.job?.title}
-                            </h3>
-                            <p className="text-slate-600 text-sm">{application.job?.company}</p>
-                            
-                            <div className="flex flex-wrap gap-2 mt-2">
-                                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-md">
-                                    {application.job?.job_type?.replace('-', ' ')?.toUpperCase()}
-                                </span>
-                                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-md">
-                                    {application.job?.location}
-                                </span>
-                            </div>
-                        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-blue-300 transition-all duration-300 overflow-hidden">
+            {/* Header with Job Info */}
+            <div className="p-5">
+                <div className="flex items-start gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
+                        {getInitials(application.job?.company_name || application.job?.company || 'Job')}
                     </div>
-
-                    {/* Application Details */}
-                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                            <p className="text-slate-500 mb-1">Applied On</p>
-                            <p className="font-medium text-slate-900">
-                                {new Date(application.created_at).toLocaleDateString('en-IN', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                })}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-slate-500 mb-1">Status</p>
-                            <StatusBadge status={application.status} />
-                        </div>
-                        {application.reviewed_at && (
-                            <div>
-                                <p className="text-slate-500 mb-1">Reviewed On</p>
-                                <p className="font-medium text-slate-900">
-                                    {new Date(application.reviewed_at).toLocaleDateString('en-IN', {
-                                        day: 'numeric',
-                                        month: 'short',
-                                        year: 'numeric',
-                                    })}
-                                </p>
-                            </div>
-                        )}
-                        {application.resume_url && (
-                            <div>
-                                <p className="text-slate-500 mb-1">Resume</p>
-                                <a
-                                    href={`/${application.resume_url}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    Download
-                                </a>
-                            </div>
-                        )}
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-semibold text-slate-900 line-clamp-1 mb-1">
+                            {application.job?.title}
+                        </h3>
+                        <p className="text-slate-600 text-sm">{application.job?.company_name || application.job?.company || 'Company'}</p>
                     </div>
+                    <div className="flex-shrink-0">
+                        <StatusBadge status={application.status} />
+                    </div>
+                </div>
 
-                    {/* Admin Notes */}
-                    {application.admin_notes && (
-                        <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                            <p className="text-xs text-slate-500 mb-1">Feedback from Recruiter</p>
-                            <p className="text-sm text-slate-700">{application.admin_notes}</p>
-                        </div>
+                {/* Job Details */}
+                <div className="mt-4 flex flex-wrap gap-2">
+                    <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs rounded-lg font-medium capitalize">
+                        {application.job?.job_type?.replace('-', ' ')}
+                    </span>
+                    <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs rounded-lg font-medium">
+                        {application.job?.location}
+                    </span>
+                    {application.job?.experience && (
+                        <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs rounded-lg font-medium">
+                            {application.job.experience} exp
+                        </span>
                     )}
+                </div>
 
-                    {/* Cover Letter Preview */}
-                    {application.cover_letter && (
-                        <div className="mt-4">
-                            <p className="text-xs text-slate-500 mb-2">Your Cover Letter</p>
-                            <p className="text-sm text-slate-600 line-clamp-3">{application.cover_letter}</p>
+                {/* Skills Preview */}
+                {application.job?.skills && application.job.skills.length > 0 && (
+                    <div className="mt-3">
+                        <p className="text-xs text-slate-500 mb-1">Required Skills:</p>
+                        <div className="flex flex-wrap gap-1">
+                            {application.job.skills.slice(0, 4).map((skill, idx) => (
+                                <span key={idx} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-md border border-blue-100">
+                                    {skill}
+                                </span>
+                            ))}
+                            {application.job.skills.length > 4 && (
+                                <span className="px-2 py-0.5 bg-slate-50 text-slate-500 text-xs rounded-md">
+                                    +{application.job.skills.length - 4}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Application Details Grid */}
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-slate-50 rounded-xl">
+                        <p className="text-xs text-slate-500 mb-1">Applied On</p>
+                        <p className="font-medium text-slate-900 text-sm">{formatDate(application.created_at)}</p>
+                    </div>
+                    {application.reviewed_at && (
+                        <div className="p-3 bg-slate-50 rounded-xl">
+                            <p className="text-xs text-slate-500 mb-1">Reviewed On</p>
+                            <p className="font-medium text-slate-900 text-sm">{formatDate(application.reviewed_at)}</p>
                         </div>
                     )}
                 </div>
 
-                {/* Actions */}
-                <div className="flex flex-col gap-2 lg:items-end">
-                    {canWithdraw ? (
-                        <>
-                            {!showWithdrawConfirm ? (
-                                <button
-                                    onClick={() => setShowWithdrawConfirm(true)}
-                                    className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-                                >
-                                    Withdraw Application
-                                </button>
-                            ) : (
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setShowWithdrawConfirm(false)}
-                                        className="px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleWithdraw}
-                                        disabled={isWithdrawing}
-                                        className="px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-1"
-                                    >
-                                        {isWithdrawing ? (
-                                            <>
-                                                <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                                Withdrawing...
-                                            </>
-                                        ) : (
-                                            'Confirm Withdraw'
-                                        )}
-                                    </button>
-                                </div>
-                            )}
-                        </>
-                    ) : (
-                        <div className="text-sm text-slate-500">
-                            {application.status === 'shortlisted' && (
-                                <span className="flex items-center gap-1 text-emerald-600">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Congratulations! You've been shortlisted
-                                </span>
-                            )}
-                            {application.status === 'hired' && (
-                                <span className="flex items-center gap-1 text-purple-600">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    You've been hired! Welcome aboard
-                                </span>
-                            )}
-                            {application.status === 'rejected' && (
-                                <span className="flex items-center gap-1 text-slate-500">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Keep applying to other opportunities
-                                </span>
-                            )}
+                {/* Admin Notes / Feedback */}
+                {application.admin_notes && (
+                    <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                        <div className="flex items-center gap-2 mb-2">
+                            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                            </svg>
+                            <p className="text-xs font-semibold text-blue-700">Feedback from Recruiter</p>
                         </div>
-                    )}
+                        <p className="text-sm text-slate-700">{application.admin_notes}</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Footer with Actions */}
+            <div className="px-5 py-4 bg-slate-50 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        {/* Resume Download */}
+                        {application.resume_url && (
+                            <a
+                                href={`/${application.resume_url}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Resume
+                            </a>
+                        )}
+
+                        {/* Status Messages */}
+                        {!canWithdraw && (
+                            <span className="text-sm">
+                                {application.status === 'shortlisted' && (
+                                    <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Shortlisted
+                                    </span>
+                                )}
+                                {application.status === 'hired' && (
+                                    <span className="flex items-center gap-1.5 text-purple-600 font-medium">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Hired
+                                    </span>
+                                )}
+                                {application.status === 'rejected' && (
+                                    <span className="flex items-center gap-1.5 text-slate-500">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Not selected
+                                    </span>
+                                )}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Withdraw Actions */}
+                    <div>
+                        {canWithdraw ? (
+                            <>
+                                {!showWithdrawConfirm ? (
+                                    <button
+                                        onClick={() => setShowWithdrawConfirm(true)}
+                                        className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                                    >
+                                        Withdraw
+                                    </button>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setShowWithdrawConfirm(false)}
+                                            className="px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleWithdraw}
+                                            disabled={isWithdrawing}
+                                            className="px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-1"
+                                        >
+                                            {isWithdrawing ? (
+                                                <>
+                                                    <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    Withdrawing...
+                                                </>
+                                            ) : (
+                                                'Confirm'
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        ) : null}
+                    </div>
                 </div>
             </div>
         </div>
@@ -329,7 +360,7 @@ export default function MyApplications({ auth, applications, statusCounts }) {
 
                 {/* Applications List */}
                 {filteredApplications.length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {filteredApplications.map((application) => (
                             <ApplicationCard
                                 key={application.id}
