@@ -21,6 +21,8 @@ use App\Models\TaskAssignment;
 use App\Models\SuperAdminPasswordLog;
 use Carbon\Carbon;
 use App\Models\CheckInOut;
+use App\Models\Job;
+use App\Models\JobApplication;
 
 class AdminController extends Controller
 {
@@ -140,6 +142,34 @@ if ($activeMembers->count() > 0) {
             });
             $checkCheckoutToday = CheckInOut::where('member_id', $auth->id)->where('date', Carbon::today()->toDateString())->first();
              $checkCheckoutList = CheckInOut::where('member_id',$auth->id)->get();
+            $jobsCount = Job::where('created_by', $auth->id)->count();
+            $jobApplicationsCount = JobApplication::query()
+                ->whereHas('job', function ($q) use ($auth) {
+                    $q->where('created_by', $auth->id);
+                })
+                ->count();
+            $recentJobApplications = JobApplication::query()
+                ->with(['job' => function ($q) {
+                    $q->select('id', 'title', 'company', 'created_by');
+                }])
+                ->whereHas('job', function ($q) use ($auth) {
+                    $q->where('created_by', $auth->id);
+                })
+                ->orderByDesc('created_at')
+                ->limit(10)
+                ->get()
+                ->map(function ($application) {
+                    return [
+                        'id' => $application->id,
+                        'status' => $application->status,
+                        'created_at' => $application->created_at,
+                        'candidate_name' => $application->candidate_name,
+                        'candidate_email' => $application->candidate_email,
+                        'candidate_phone' => $application->candidate_phone,
+                        'resume_url' => $application->resume_url,
+                        'job' => $application->job,
+                    ];
+                });
             $superAdminPasswordLog = $passwordLogQuery
                 ->paginate($perPagePasswordLog, ['*'], 'pagePasswordLog')
                 ->appends($request->except('pagePasswordLog'));
@@ -164,6 +194,11 @@ if ($activeMembers->count() > 0) {
                 'activityLogs' => $activityLogs,
                 'members' => $activeMembers,
                 'passwordLogs' => $superAdminPasswordLog,
+                'jobStats' => [
+                    'count' => $jobsCount,
+                    'applicationsCount' => $jobApplicationsCount,
+                    'recentApplications' => $recentJobApplications,
+                ],
                 'initialFilters' => [
                     'year' => $year,
                     'month' => $month,

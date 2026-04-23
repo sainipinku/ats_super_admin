@@ -24,7 +24,8 @@ use Illuminate\Support\Facades\Validator;
 use App\Models\Holiday;
 use App\Models\Job;
 use App\Models\JobApplication;
-
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 class AdminDashboardController extends Controller
 {
     /**

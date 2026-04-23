@@ -4,6 +4,8 @@ import ActivityLogSection from "@/Components/ActivityLogSection";
 import PasswordLogSection from "@/Components/PasswordLogSection";
 import ImageActionLogSection from "@/Components/ImageActionLogSection";
 import Calendar from "@/Components/Calendar";
+import ConfirmDialog from "@/Components/ConfirmDialog";
+import { useAlerts } from "@/Components/Alerts";
 
 import {
     FaTasks,
@@ -132,6 +134,57 @@ export default function Dashboard({
             label: member.name,
         })),
     ];
+
+    const [recentApplications, setRecentApplications] = useState(
+        Array.isArray(stats.jobs?.recentApplications)
+            ? stats.jobs.recentApplications
+            : []
+    );
+    const [confirmAppDecisionOpen, setConfirmAppDecisionOpen] = useState(false);
+    const [decisionApp, setDecisionApp] = useState(null);
+    const [decisionAction, setDecisionAction] = useState(null);
+
+    const { successAlert, errorAlert } = useAlerts();
+
+    const openDecision = (app, action) => {
+        setDecisionApp(app);
+        setDecisionAction(action);
+        setConfirmAppDecisionOpen(true);
+    };
+
+    const confirmDecision = async () => {
+        if (!decisionApp || !decisionAction) return;
+        try {
+            const response = await fetch(
+                route("super.job.requests.api.applications.decision", decisionApp.id),
+                {
+                    method: "PATCH",
+                    headers: {
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.content,
+                        Accept: "application/json",
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ action: decisionAction }),
+                }
+            );
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                errorAlert(data?.message || "Failed to update application.");
+                return;
+            }
+
+            setRecentApplications((prev) =>
+                prev.map((a) => (a.id === decisionApp.id ? { ...a, status: data.data.status } : a))
+            );
+            successAlert("Application updated successfully!");
+        } catch (e) {
+            errorAlert("Failed to update application.");
+        } finally {
+            setConfirmAppDecisionOpen(false);
+            setDecisionApp(null);
+            setDecisionAction(null);
+        }
+    };
     const handleFilterChange = async (year, month, member_id) => {
         setLoading(true);
         try {
@@ -915,8 +968,8 @@ export default function Dashboard({
                             </button>
                         </div>
 
-                        {Array.isArray(stats.jobs?.recentApplications) &&
-                        stats.jobs.recentApplications.length > 0 ? (
+                        {Array.isArray(recentApplications) &&
+                        recentApplications.length > 0 ? (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead>
@@ -934,6 +987,9 @@ export default function Dashboard({
                                                 Status
                                             </th>
                                             <th className="py-2 pr-3 font-medium">
+                                                Action
+                                            </th>
+                                            <th className="py-2 pr-3 font-medium">
                                                 Applied
                                             </th>
                                             <th className="py-2 font-medium">
@@ -942,7 +998,7 @@ export default function Dashboard({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {stats.jobs.recentApplications.map((app) => (
+                                        {recentApplications.map((app) => (
                                             <tr
                                                 key={app.id}
                                                 className="align-top"
@@ -958,6 +1014,41 @@ export default function Dashboard({
                                                 </td>
                                                 <td className="py-2 pr-3 capitalize">
                                                     {app.status || "-"}
+                                                </td>
+                                                <td className="py-2 pr-3">
+                                                    {app.status === "pending" ||
+                                                    app.status === "reviewing" ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    openDecision(
+                                                                        app,
+                                                                        "approve"
+                                                                    )
+                                                                }
+                                                                className="px-3 py-1 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700"
+                                                            >
+                                                                Approve
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    openDecision(
+                                                                        app,
+                                                                        "reject"
+                                                                    )
+                                                                }
+                                                                className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700"
+                                                            >
+                                                                Reject
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-400">
+                                                            —
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="py-2 pr-3">
                                                     {app.created_at
@@ -1003,6 +1094,28 @@ export default function Dashboard({
                             </div>
                         )}
                     </div>
+
+                    <ConfirmDialog
+                        isOpen={confirmAppDecisionOpen}
+                        onClose={() => {
+                            setConfirmAppDecisionOpen(false);
+                            setDecisionApp(null);
+                            setDecisionAction(null);
+                        }}
+                        onConfirm={confirmDecision}
+                        message={
+                            decisionApp
+                                ? `${decisionAction === "approve" ? "Approve" : "Reject"} application of "${decisionApp.candidate_name}" for "${decisionApp.job?.title || "Job"}"?`
+                                : "Are you sure?"
+                        }
+                        confirmText={
+                            decisionAction === "approve"
+                                ? "Yes, Approve"
+                                : "Yes, Reject"
+                        }
+                        cancelText="Cancel"
+                        modalSpinnerMessage="Processing Please Wait...."
+                    />
 
                     <div className="cards border borderbx rounded-lg p-4 shadow-sm">
                         <GlobalFilters />

@@ -1,13 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
-import ConfirmDialog from '@/Components/ConfirmDialog';
-import { useAlerts } from '@/Components/Alerts';
+import LocationInput from '../../../Components/LocationInput';
+import ConfirmDialog from '../../../Components/ConfirmDialog';
+import { useAlerts } from '../../../Components/Alerts';
 
 // Reusable JobCard Component
-const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend, onStatusChange, onCloseJob }) => {
+const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onResend, onStatusChange, onCloseJob }) => {
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
+
+
+    const canToggleStatus = ['active', 'inactive', 'closed'].includes(job.status);
+    const canClose = ['active', 'inactive'].includes(job.status);
+    const isPending = job.status === 'pending';
+    const isClosed = job.status === 'closed';
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -20,6 +27,7 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend, onStatusChang
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+
     const getStatusBadge = (status) => {
         const badges = {
             pending: 'bg-yellow-100 text-yellow-800',
@@ -31,13 +39,8 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend, onStatusChang
         return badges[status] || 'bg-gray-100 text-gray-800';
     };
 
-    const canToggleStatus = ['active', 'inactive', 'closed'].includes(job.status);
-    const canClose = ['active', 'inactive'].includes(job.status);
-    const isPending = job.status === 'pending';
-    const isClosed = job.status === 'closed';
-
     return (
-        <div className="bg-white rounded-3xl shadow-sm p-4 border min-h-[320px] relative flex flex-col border-slate-200 hover:border-blue-300 hover:ring-2 hover:ring-blue-200 transition-all duration-200">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm p-4 border min-h-[300px] relative flex flex-col border-slate-200 dark:border-gray-700 hover:border-blue-300 hover:ring-2 hover:ring-blue-200 transition-all duration-200">
             {/* Action Icons - Edit, Delete */}
             <div className="absolute -top-4 -right-2 z-10 flex gap-1">
                 <button
@@ -64,12 +67,12 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend, onStatusChang
                 <div className="flex gap-3">
                     <img src={job.company_image || job.companyImage} alt={job.title} className="w-10 h-10 rounded-xl object-cover" />
                     <div>
-                        <h2 className="text-[16px] font-semibold text-slate-900 line-clamp-1">{job.title}</h2>
-                        <p className="text-slate-500 text-[12px]">{job.company}</p>
+                        <h2 className="text-[16px] font-semibold text-slate-900 dark:text-white line-clamp-1">{job.title}</h2>
+                        <p className="text-slate-500 dark:text-gray-400 text-[12px]">{job.company}</p>
                     </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                    <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-medium">
+                    <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-medium whitespace-nowrap">
                         {job.job_type || job.type}
                     </span>
                     {/* Show status badge */}
@@ -79,22 +82,22 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend, onStatusChang
                 </div>
             </div>
 
-            <div className="space-y-1 text-slate-600 text-[12px] mb-2">
+            <div className="space-y-1 text-slate-600 dark:text-gray-300 text-[12px] mb-2">
                 <div className="flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5 text-slate-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                     <span>{job.location}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5 text-slate-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span>{job.experience}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5 text-slate-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span className="text-emerald-600 font-medium">{job.salary}</span>
@@ -115,109 +118,110 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete, onResend, onStatusChang
                 )}
             </div>
 
-            {/* Posted Date, Applicants & Status Dropdown */}
-            <div className="text-[11px] text-slate-400 mb-3 mt-auto">
-                <div className="flex items-center justify-between">
-                    <span>Posted: {job.created_at ? new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Just now'}</span>
-                    <div className="flex items-center gap-3">
-                        <span className="flex items-center gap-1">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5 0h-6v-1a6 6 0 00-9 5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                            </svg>
-                            {job.applicants || 0} applicants
-                        </span>
-                        {/* Status Change Dropdown */}
-                        {canToggleStatus && (
-                            <div className="relative" ref={dropdownRef}>
-                                <button
-                                    onClick={() => setShowDropdown(!showDropdown)}
-                                    className="flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 text-[10px] font-medium transition-colors"
-                                    title="Change Job Status"
-                                >
-                                    Job Status
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </button>
-                                {showDropdown && (
-                                    <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20">
-                                        {/* Active - Disabled if already active or if job is closed (only Super Admin can reactivate) */}
-                                        <button
-                                            onClick={() => {
-                                                if (!isClosed) {
-                                                    onStatusChange(job, 'active');
-                                                }
-                                                setShowDropdown(false);
-                                            }}
-                                            disabled={job.status === 'active' || isClosed}
-                                            title={isClosed ? 'Contact Super Admin to reactivate' : ''}
-                                            className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${
-                                                job.status === 'active' ? 'text-green-600 font-semibold bg-green-50' : 
-                                                isClosed ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700'
-                                            }`}
-                                        >
-                                            {isClosed ? 'Active (Locked)' : 'Active'}
-                                        </button>
-                                        {/* Inactive - Disabled if already inactive or if job is closed */}
-                                        <button
-                                            onClick={() => {
-                                                if (!isClosed) {
-                                                    onStatusChange(job, 'inactive');
-                                                }
-                                                setShowDropdown(false);
-                                            }}
-                                            disabled={job.status === 'inactive' || isClosed}
-                                            title={isClosed ? 'Contact Super Admin to reactivate' : ''}
-                                            className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${
-                                                job.status === 'inactive' ? 'text-gray-600 font-semibold bg-gray-50' : 
-                                                isClosed ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700'
-                                            }`}
-                                        >
-                                            {isClosed ? 'Deactive (Locked)' : 'Deactive'}
-                                        </button>
-                                        {canClose && (
-                                            <>
-                                                <div className="border-t border-slate-100 my-1"></div>
-                                                <button
-                                                    onClick={() => {
-                                                        onCloseJob(job);
-                                                        setShowDropdown(false);
-                                                    }}
-                                                    className="w-full text-left px-3 py-2 text-[11px] text-red-600 hover:bg-red-50 transition-colors"
-                                                >
-                                                    Close
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        {isPending && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-yellow-600 text-[10px]">Pending Approval</span>
-                            </div>
-                        )}
-                    </div>
-                </div>
+            <div className="mb-2">
+                <p className="text-[11px] font-medium text-slate-700 mb-1">Perks:</p>
+                <p className="text-[10px] text-slate-600 line-clamp-1">
+                    {job.perks?.join(' • ') || 'Flexible working hours • Health Insurance • Learning opportunities'}
+                </p>
             </div>
 
-            {/* Resend for Approval Button */}
-            {job.status === 'declined' && (
-                <button
-                    onClick={() => onResend(job)}
-                    className="w-full mb-2 py-2 rounded-xl bg-yellow-500 text-white text-[12px] font-semibold hover:bg-yellow-600 transition-colors"
-                >
-                    ↻ Resend for Approval
-                </button>
-            )}
+            <div className="mt-auto">
+                <hr className="my-2" />
 
-            <button
-                onClick={() => onViewDetails(job)}
-                className="w-full py-2.5 rounded-xl text-blue-600 text-[12px] font-semibold hover:bg-blue-50 transition-colors border border-blue-200 bg-white"
-            >
-                View Details
-            </button>
+                {job.status === 'declined' && (
+                    <button
+                        onClick={() => onResend(job)}
+                        className="w-full mb-2 py-2 rounded-xl bg-yellow-500 text-white text-[12px] font-semibold hover:bg-yellow-600 transition-colors"
+                    >
+                        ↻ Resend for Approval
+                    </button>
+                )}
+
+                <div className="flex justify-between items-center text-[12px] text-slate-500 mb-3">
+                    <p>Posted {job.created_at ? new Date(job.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    }) : (job.createdAt ? new Date(job.createdAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    }) : 'Just now')} <span className="mx-2">•</span> {job.applicants || 0} applicants</p>
+
+                    {/* Job Status Dropdown - Only for active/inactive/closed jobs */}
+                    {canToggleStatus && (
+                        <div className="relative" ref={dropdownRef}>
+                            <button
+                                onClick={() => setShowDropdown(!showDropdown)}
+                                className="flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 text-[10px] font-medium transition-colors"
+                                title="Change Job Status"
+                            >
+                                Job Status
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            {showDropdown && (
+                                <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20">
+                                    <button
+                                        onClick={() => {
+                                            onStatusChange(job, 'active');
+                                            setShowDropdown(false);
+                                        }}
+                                        disabled={job.status === 'active'}
+                                        className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${
+                                            job.status === 'active' ? 'text-green-600 font-semibold bg-green-50' : 'text-slate-700'
+                                        }`}
+                                    >
+                                        Active
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            onStatusChange(job, 'inactive');
+                                            setShowDropdown(false);
+                                        }}
+                                        disabled={job.status === 'inactive'}
+                                        className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${
+                                            job.status === 'inactive' ? 'text-gray-600 font-semibold bg-gray-50' : 'text-slate-700'
+                                        }`}
+                                    >
+                                        Deactive
+                                    </button>
+                                    {canClose && (
+                                        <>
+                                            <div className="border-t border-slate-100 my-1"></div>
+                                            <button
+                                                onClick={() => {
+                                                    onCloseJob(job);
+                                                    setShowDropdown(false);
+                                                }}
+                                                className="w-full text-left px-3 py-2 text-[11px] text-red-600 hover:bg-red-50 transition-colors"
+                                            >
+                                                Close
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    <button
+                        onClick={() => onViewDetails(job)}
+                        className="w-full py-2 rounded-xl text-blue-600 text-[14px] font-semibold hover:bg-blue-50 transition-colors"
+                    >
+                        View Details
+                    </button>
+                    <button
+                        onClick={() => onViewApplications(job)}
+                        className="w-full py-2 rounded-xl text-emerald-600 text-[14px] font-semibold hover:bg-emerald-50 transition-colors"
+                    >
+                        Applicants
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };
@@ -277,9 +281,78 @@ export default function JobListing({ auth }) {
     };
 
     const [selectedJob, setSelectedJob] = useState(null);
+    const [applicationsModalOpen, setApplicationsModalOpen] = useState(false);
+    const [applicationsJob, setApplicationsJob] = useState(null);
+    const [applicationsLoading, setApplicationsLoading] = useState(false);
+    const [applications, setApplications] = useState([]);
+    const [confirmAppDecisionOpen, setConfirmAppDecisionOpen] = useState(false);
+    const [decisionApp, setDecisionApp] = useState(null);
+    const [decisionAction, setDecisionAction] = useState(null);
 
     const handleViewDetails = (job) => {
         setSelectedJob(job);
+    };
+
+    const handleViewApplications = async (job) => {
+        setApplicationsJob(job);
+        setApplications([]);
+        setApplicationsModalOpen(true);
+        setApplicationsLoading(true);
+
+        try {
+            const response = await fetch(route('admin.api.jobs.applications', job.id), {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Accept': 'application/json',
+                },
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                errorAlert(data?.message || 'Failed to load applications.');
+                return;
+            }
+            setApplications(Array.isArray(data.data) ? data.data : []);
+        } catch (error) {
+            console.error('Error fetching applications:', error);
+            errorAlert('Failed to load applications.');
+        } finally {
+            setApplicationsLoading(false);
+        }
+    };
+
+    const openDecision = (app, action) => {
+        setDecisionApp(app);
+        setDecisionAction(action);
+        setConfirmAppDecisionOpen(true);
+    };
+
+    const confirmDecision = async () => {
+        if (!decisionApp || !decisionAction) return;
+        try {
+            const response = await fetch(route('admin.api.applications.decision', decisionApp.id), {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ action: decisionAction }),
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                errorAlert(data?.message || 'Failed to update application.');
+                return;
+            }
+            setApplications(prev => prev.map(a => (a.id === decisionApp.id ? { ...a, status: data.data.status } : a)));
+            successAlert('Application updated successfully!');
+        } catch (error) {
+            console.error('Error updating application:', error);
+            errorAlert('Failed to update application.');
+        } finally {
+            setConfirmAppDecisionOpen(false);
+            setDecisionApp(null);
+            setDecisionAction(null);
+        }
     };
 
     const handleEdit = (job) => {
@@ -356,30 +429,18 @@ export default function JobListing({ auth }) {
 
     const handleStatusChange = (job, newStatus) => {
         if (job.status === newStatus) return;
-
-        // Prevent admin from reactivating closed jobs
-        if (job.status === 'closed' && ['active', 'inactive'].includes(newStatus)) {
-            errorAlert('Closed jobs can only be reactivated by Super Admin. Please contact Super Admin.');
-            return;
-        }
-
         setConfirmToggleJob(job);
         setConfirmToggleStatus(newStatus);
         setConfirmToggleOpen(true);
     };
 
+    const handleCloseJob = (job) => {
+        setConfirmCloseJob(job);
+        setConfirmCloseOpen(true);
+    };
+
     const confirmToggle = async () => {
         if (!confirmToggleJob || !confirmToggleStatus) return;
-
-        // Determine action text based on new status
-        let actionText;
-        if (confirmToggleStatus === 'active') {
-            actionText = 'activate';
-        } else if (confirmToggleStatus === 'inactive') {
-            actionText = 'deactivate';
-        } else {
-            actionText = 'update';
-        }
 
         try {
             const response = await fetch(route('admin.api.jobs.toggle-status', confirmToggleJob.id), {
@@ -391,16 +452,18 @@ export default function JobListing({ auth }) {
                 },
                 body: JSON.stringify({ status: confirmToggleStatus }),
             });
-            const data = await response.json();
-            if (data.success) {
-                setJobs(jobs.map(j => j.id === confirmToggleJob.id ? { ...j, status: confirmToggleStatus } : j));
-                successAlert(`Job ${actionText}d successfully!`);
-            } else {
-                errorAlert(data.message || `Failed to ${actionText} job.`);
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                errorAlert(data?.message || 'Failed to update job status.');
+                return;
             }
+
+            setJobs(prev => prev.map(j => (j.id === confirmToggleJob.id ? data.data : j)));
+            successAlert('Job status updated successfully!');
         } catch (error) {
             console.error('Error changing job status:', error);
-            errorAlert(`Failed to ${actionText} job.`);
+            errorAlert('Failed to update job status.');
         } finally {
             setConfirmToggleOpen(false);
             setConfirmToggleJob(null);
@@ -408,32 +471,27 @@ export default function JobListing({ auth }) {
         }
     };
 
-    const handleCloseJob = (job) => {
-        if (job.status === 'closed') return;
-        setConfirmCloseJob(job);
-        setConfirmCloseOpen(true);
-    };
-
     const confirmClose = async () => {
         if (!confirmCloseJob) return;
 
         try {
-            const response = await fetch(route('admin.api.jobs.toggle-status', confirmCloseJob.id), {
+            const response = await fetch(route('admin.api.jobs.close', confirmCloseJob.id), {
                 method: 'PATCH',
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ status: 'closed' }),
             });
-            const data = await response.json();
-            if (data.success) {
-                setJobs(jobs.map(j => j.id === confirmCloseJob.id ? { ...j, status: 'closed' } : j));
-                successAlert('Job closed successfully! Contact Super Admin to reactivate.');
-            } else {
-                errorAlert(data.message || 'Failed to close job.');
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                errorAlert(data?.message || 'Failed to close job.');
+                return;
             }
+
+            setJobs(prev => prev.map(j => (j.id === confirmCloseJob.id ? data.data : j)));
+            successAlert('Job closed successfully!');
         } catch (error) {
             console.error('Error closing job:', error);
             errorAlert('Failed to close job.');
@@ -446,10 +504,10 @@ export default function JobListing({ auth }) {
     return (
         <AuthenticatedLayout user={auth.user}>
             <Head title="Job Listing" />
-            
-            <div className="min-h-screen bg-slate-100 p-4">
-                <h1 className="text-4xl font-bold text-slate-800 mb-6">Listed Jobs Posts</h1>
-                
+
+            <div className="min-h-screen bg-slate-100 dark:bg-gray-900 p-4">
+                <h1 className="text-4xl font-bold text-slate-800 dark:text-white mb-6">Listed Jobs Posts</h1>
+
                 {/* Search and Post New Job Row */}
                 <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
                     {/* Search Bar */}
@@ -464,7 +522,7 @@ export default function JobListing({ auth }) {
                             placeholder="Search by job title or company name..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm"
+                            className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm"
                         />
                         {searchQuery && (
                             <button
@@ -489,7 +547,7 @@ export default function JobListing({ auth }) {
                     </Link>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
                     {loading ? (
                         <div className="col-span-full flex items-center justify-center py-12">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -500,6 +558,7 @@ export default function JobListing({ auth }) {
                                 key={idx}
                                 job={job}
                                 onViewDetails={handleViewDetails}
+                                onViewApplications={handleViewApplications}
                                 onEdit={handleEdit}
                                 onDelete={handleDelete}
                                 onResend={handleResend}
@@ -518,12 +577,12 @@ export default function JobListing({ auth }) {
                                 >
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                                 </svg>
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                                     {searchQuery ? 'No Jobs Found' : 'No Job Listings Found'}
                                 </h3>
-                                <p className="text-gray-500">
-                                    {searchQuery 
-                                        ? `No jobs matching "${searchQuery}" found. Try a different search term.` 
+                                <p className="text-gray-500 dark:text-gray-400">
+                                    {searchQuery
+                                        ? `No jobs matching "${searchQuery}" found. Try a different search term.`
                                         : 'No job posts have been created yet.'}
                                 </p>
                                 {!searchQuery && (
@@ -540,21 +599,136 @@ export default function JobListing({ auth }) {
                 </div>
             </div>
 
+            {applicationsModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-hidden">
+                        <div className="px-6 py-4 border-b border-slate-200 dark:border-gray-700 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Job Applicants</h3>
+                                <p className="text-sm text-slate-500 dark:text-gray-400">{applicationsJob?.title || '-'}</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setApplicationsModalOpen(false);
+                                    setApplicationsJob(null);
+                                    setApplications([]);
+                                }}
+                                className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-gray-700"
+                            >
+                                <svg className="w-5 h-5 text-slate-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-auto max-h-[70vh]">
+                            {applicationsLoading ? (
+                                <div className="py-10 flex items-center justify-center">
+                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+                                </div>
+                            ) : applications.length > 0 ? (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full text-sm">
+                                        <thead>
+                                            <tr className="text-left text-slate-500 dark:text-gray-400 whitespace-nowrap">
+                                                <th className="py-2 pr-3 font-medium">Candidate</th>
+                                                <th className="py-2 pr-3 font-medium">Email</th>
+                                                <th className="py-2 pr-3 font-medium">Phone</th>
+                                                <th className="py-2 pr-3 font-medium">Status</th>
+                                                <th className="py-2 pr-3 font-medium">Resume</th>
+                                                <th className="py-2 font-medium">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-gray-700">
+                                            {applications.map((app) => (
+                                                <tr key={app.id} className="align-top">
+                                                    <td className="py-2 pr-3 text-slate-900 dark:text-white">{app.candidate_name || '-'}</td>
+                                                    <td className="py-2 pr-3">{app.candidate_email || '-'}</td>
+                                                    <td className="py-2 pr-3">{app.candidate_phone || '-'}</td>
+                                                    <td className="py-2 pr-3 capitalize">{app.status || '-'}</td>
+                                                    <td className="py-2 pr-3">
+                                                        {app.resume_url ? (
+                                                            <a
+                                                                href={String(app.resume_url).startsWith('/') ? app.resume_url : `/${app.resume_url}`}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="text-blue-600 hover:underline"
+                                                            >
+                                                                View
+                                                            </a>
+                                                        ) : (
+                                                            <span className="text-slate-400">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2">
+                                                        {app.status === 'pending' || app.status === 'reviewing' ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openDecision(app, 'approve')}
+                                                                    className="px-3 py-1 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700"
+                                                                >
+                                                                    Approve
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openDecision(app, 'reject')}
+                                                                    className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700"
+                                                                >
+                                                                    Reject
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-slate-400">—</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="text-sm text-slate-500">No applications found.</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <ConfirmDialog
+                isOpen={confirmAppDecisionOpen}
+                onClose={() => {
+                    setConfirmAppDecisionOpen(false);
+                    setDecisionApp(null);
+                    setDecisionAction(null);
+                }}
+                onConfirm={confirmDecision}
+                message={
+                    decisionApp
+                        ? `${decisionAction === 'approve' ? 'Approve' : 'Reject'} application of "${decisionApp.candidate_name}"?`
+                        : 'Are you sure?'
+                }
+                confirmText={decisionAction === 'approve' ? 'Yes, Approve' : 'Yes, Reject'}
+                cancelText="Cancel"
+                modalSpinnerMessage="Processing Please Wait...."
+            />
+
             {/* Job Details Modal */}
             {selectedJob && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="p-6">
                             <div className="flex justify-between items-start mb-6">
                                 <div className="flex gap-4">
-                                    <img 
-                                        src={selectedJob.company_image || selectedJob.companyImage} 
+                                    <img
+                                        src={selectedJob.company_image || selectedJob.companyImage}
                                         alt={selectedJob.company}
                                         className="w-16 h-16 rounded-xl object-cover"
                                     />
                                     <div>
-                                        <h2 className="text-2xl font-bold text-gray-900">{selectedJob.title}</h2>
-                                        <p className="text-lg text-gray-600">{selectedJob.company}</p>
+                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedJob.title}</h2>
+                                        <p className="text-lg text-gray-600 dark:text-gray-300">{selectedJob.company}</p>
                                         <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium capitalize ${
                                             selectedJob.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                             selectedJob.status === 'active' ? 'bg-green-100 text-green-800' :
@@ -567,7 +741,7 @@ export default function JobListing({ auth }) {
                                 </div>
                                 <button
                                     onClick={() => setSelectedJob(null)}
-                                    className="text-gray-400 hover:text-gray-600 text-2xl"
+                                    className="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
                                 >
                                     ×
                                 </button>
@@ -575,30 +749,30 @@ export default function JobListing({ auth }) {
 
                             <div className="grid grid-cols-2 gap-6 mb-6">
                                 <div>
-                                    <p className="text-sm text-gray-500 mb-1">Location</p>
-                                    <p className="font-medium">{selectedJob.location}</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Location</p>
+                                    <p className="font-medium text-gray-900 dark:text-white">{selectedJob.location}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-500 mb-1">Experience</p>
-                                    <p className="font-medium">{selectedJob.experience}</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Experience</p>
+                                    <p className="font-medium text-gray-900 dark:text-white">{selectedJob.experience}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-500 mb-1">Job Type</p>
-                                    <p className="font-medium">{selectedJob.job_type || selectedJob.type}</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Job Type</p>
+                                    <p className="font-medium text-gray-900 dark:text-white">{selectedJob.job_type || selectedJob.type}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-500 mb-1">Salary</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Salary</p>
                                     <p className="font-medium text-green-600">{selectedJob.salary}</p>
                                 </div>
                             </div>
 
                             <div className="mb-6">
-                                <h3 className="text-lg font-semibold mb-3">Skills Required</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Skills Required</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {selectedJob.skills.map((skill, index) => (
                                         <span
                                             key={index}
-                                            className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm"
+                                            className="px-3 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm"
                                         >
                                             {skill}
                                         </span>
@@ -606,15 +780,15 @@ export default function JobListing({ auth }) {
                                 </div>
                             </div>
 
-                            
+
 
                             <div className="mb-6">
-                                <h3 className="text-lg font-semibold mb-3">Perks & Benefits</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Perks & Benefits</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {selectedJob.perks.map((perk, index) => (
                                         <span
                                             key={index}
-                                            className="px-3 py-2 bg-green-50 text-green-700 rounded-lg text-sm"
+                                            className="px-3 py-2 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg text-sm"
                                         >
                                             {perk}
                                         </span>
@@ -623,7 +797,7 @@ export default function JobListing({ auth }) {
                             </div>
 
                             <div className="mb-6">
-                                <h3 className="text-lg font-semibold mb-3">Key Responsibilities</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Key Responsibilities</h3>
                                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
                                     <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
                                         {selectedJob.key_responsibilities || selectedJob.keyResponsibilities || 'No key responsibilities specified.'}
@@ -632,7 +806,7 @@ export default function JobListing({ auth }) {
                             </div>
 
                             <div className="mb-6">
-                                <h3 className="text-lg font-semibold mb-3">Qualifications</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Qualifications</h3>
                                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
                                     <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
                                         {selectedJob.qualifications || 'No qualifications specified.'}
@@ -641,7 +815,7 @@ export default function JobListing({ auth }) {
                             </div>
 
                             <div className="mb-6">
-                                <h3 className="text-lg font-semibold mb-3">Job Description</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Job Description</h3>
                                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
                                     <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
                                         {selectedJob.description || 'No description provided.'}
@@ -649,16 +823,16 @@ export default function JobListing({ auth }) {
                                 </div>
                             </div>
 
-                            <div className="flex justify-between items-center pt-4 border-t">
-                                <div className="text-sm text-gray-500">
-                                    <p>Posted: {selectedJob.created_at ? new Date(selectedJob.created_at).toLocaleDateString('en-US', { 
-                                        month: 'short', 
-                                        day: 'numeric', 
-                                        year: 'numeric' 
-                                    }) : (selectedJob.createdAt ? new Date(selectedJob.createdAt).toLocaleDateString('en-US', { 
-                                        month: 'short', 
-                                        day: 'numeric', 
-                                        year: 'numeric' 
+                            <div className="flex justify-between items-center pt-4 border-t dark:border-gray-700">
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                    <p>Posted: {selectedJob.created_at ? new Date(selectedJob.created_at).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                    }) : (selectedJob.createdAt ? new Date(selectedJob.createdAt).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
                                     }) : 'Just now')}</p>
                                     <p>Last Date to Apply: {selectedJob.last_date || selectedJob.lastDate || 'Not specified'}</p>
                                     <p>{selectedJob.applicants || 0} applicants</p>

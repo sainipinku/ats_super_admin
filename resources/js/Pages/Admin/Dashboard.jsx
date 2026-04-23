@@ -1,6 +1,8 @@
 import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
 import AuthenticatedLayout from "./Layouts/AuthenticatedLayout";
+import ConfirmDialog from "@/Components/ConfirmDialog";
+import { useAlerts } from "@/Components/Alerts";
 // import ActivityLogSectionAdmin from "@/Components/ActivityLogSectionAdmin";
 // import AdminPasswordLogSection from "@/Components/AdminPasswordLogSection";
 // import AdminCalendar from "@/Components/AdminCalendar";
@@ -27,9 +29,58 @@ export default function Dashboard({
     passwordLogs,
     checkCheckoutToday,
     checkCheckoutList,
+    jobStats,
 }) {
     const isAdmin = auth.guard == "admin";
     const [loading, setLoading] = useState(false);
+    const [recentApplications, setRecentApplications] = useState(
+        Array.isArray(jobStats?.recentApplications) ? jobStats.recentApplications : []
+    );
+    const [confirmAppDecisionOpen, setConfirmAppDecisionOpen] = useState(false);
+    const [decisionApp, setDecisionApp] = useState(null);
+    const [decisionAction, setDecisionAction] = useState(null);
+
+    const { successAlert, errorAlert } = useAlerts();
+
+    const openDecision = (app, action) => {
+        setDecisionApp(app);
+        setDecisionAction(action);
+        setConfirmAppDecisionOpen(true);
+    };
+
+    const confirmDecision = async () => {
+        if (!decisionApp || !decisionAction) return;
+        try {
+            const response = await fetch(
+                route("admin.api.applications.decision", decisionApp.id),
+                {
+                    method: "PATCH",
+                    headers: {
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.content,
+                        Accept: "application/json",
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ action: decisionAction }),
+                }
+            );
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                errorAlert(data?.message || "Failed to update application.");
+                return;
+            }
+
+            setRecentApplications((prev) =>
+                prev.map((a) => (a.id === decisionApp.id ? { ...a, status: data.data.status } : a))
+            );
+            successAlert("Application updated successfully!");
+        } catch (e) {
+            errorAlert("Failed to update application.");
+        } finally {
+            setConfirmAppDecisionOpen(false);
+            setDecisionApp(null);
+            setDecisionAction(null);
+        }
+    };
     const [filters, setFilters] = useState({
         year: initialFilters?.year || new Date().getFullYear(),
         month: initialFilters?.month || new Date().getMonth() + 1,
@@ -148,6 +199,119 @@ export default function Dashboard({
                             </div>
                         </div>
                     </div>
+
+                    <div className="cards border borderbx rounded-lg p-4 shadow-sm mt-[30px]">
+                        <div className="mb-[20px] py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-semibold mb-1 text-gray-900 dark:text-white">
+                                    Recent Job Applications
+                                </h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Applications for your job posts
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => router.visit(route("admin.job.posts.listing"))}
+                                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+                            >
+                                Go to Jobs
+                            </button>
+                        </div>
+
+                        {Array.isArray(recentApplications) && recentApplications.length > 0 ? (
+                            <div className="overflow-x-auto tablebxbg p-[15px] rounded-[15px]">
+                                <table className="min-w-full text-black rounded-2xl dark:text-white">
+                                    <thead>
+                                        <tr className="whitespace-nowrap text-left">
+                                            <th className="p-3">Candidate</th>
+                                            <th className="p-3">Email</th>
+                                            <th className="p-3">Job</th>
+                                            <th className="p-3">Status</th>
+                                            <th className="p-3">Action</th>
+                                            <th className="p-3">Applied</th>
+                                            <th className="p-3">Resume</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {recentApplications.map((app) => (
+                                            <tr key={app.id} className="hover:bg-gray-100 dark:hover:bg-[#0a0e25]">
+                                                <td className="p-3">{app.candidate_name || "-"}</td>
+                                                <td className="p-3">{app.candidate_email || "-"}</td>
+                                                <td className="p-3">{app.job?.title || "-"}</td>
+                                                <td className="p-3 capitalize">{app.status || "-"}</td>
+                                                <td className="p-3">
+                                                    {app.status === "pending" || app.status === "reviewing" ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openDecision(app, "approve")}
+                                                                className="px-3 py-1 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700"
+                                                            >
+                                                                Approve
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openDecision(app, "reject")}
+                                                                className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700"
+                                                            >
+                                                                Reject
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-gray-400">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-3">
+                                                    {app.created_at ? new Date(app.created_at).toLocaleString("en-US") : "-"}
+                                                </td>
+                                                <td className="p-3">
+                                                    {app.resume_url ? (
+                                                        <a
+                                                            href={String(app.resume_url).startsWith("/") ? app.resume_url : `/${app.resume_url}`}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="text-blue-600 hover:underline"
+                                                        >
+                                                            View
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-gray-400">—</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                                No recent job applications.
+                            </div>
+                        )}
+                    </div>
+
+                    <ConfirmDialog
+                        isOpen={confirmAppDecisionOpen}
+                        onClose={() => {
+                            setConfirmAppDecisionOpen(false);
+                            setDecisionApp(null);
+                            setDecisionAction(null);
+                        }}
+                        onConfirm={confirmDecision}
+                        message={
+                            decisionApp
+                                ? `${decisionAction === "approve" ? "Approve" : "Reject"} application of "${decisionApp.candidate_name}" for "${decisionApp.job?.title || "Job"}"?`
+                                : "Are you sure?"
+                        }
+                        confirmText={
+                            decisionAction === "approve"
+                                ? "Yes, Approve"
+                                : "Yes, Reject"
+                        }
+                        cancelText="Cancel"
+                        modalSpinnerMessage="Processing Please Wait...."
+                    />
 
                     {/* Commented out all other sections */}
                     {/*
@@ -522,6 +686,7 @@ export default function Dashboard({
                             </table>
                         </div>
                     </div>
+
                     <AdminCalendar />
                     {activityLogs && (
                         <ActivityLogSectionAdmin activityLogs={activityLogs} />

@@ -315,6 +315,45 @@ class JobRequestController extends Controller
         ]);
     }
 
+    public function applicationDecision(Request $request, JobApplication $application)
+    {
+        $validated = $request->validate([
+            'action' => 'required|in:approve,reject',
+            'admin_notes' => 'nullable|string|max:5000',
+        ]);
+
+        $newStatus = $validated['action'] === 'approve' ? 'shortlisted' : 'rejected';
+
+        if (!in_array($application->status, ['pending', 'reviewing', 'shortlisted', 'rejected', 'hired'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid application status.',
+            ], 400);
+        }
+
+        $application->update([
+            'status' => $newStatus,
+            'admin_notes' => $validated['admin_notes'] ?? $application->admin_notes,
+            'reviewed_at' => now(),
+            'reviewed_by' => null,
+        ]);
+
+        $application->load([
+            'job' => function ($q) {
+                $q->select('id', 'title', 'company', 'created_by');
+            },
+            'candidate' => function ($q) {
+                $q->select('id', 'name', 'email', 'phone');
+            },
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Application updated successfully.',
+            'data' => $application,
+        ]);
+    }
+
     /**
      * Get job statistics for dashboard
      */
