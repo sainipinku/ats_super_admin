@@ -199,7 +199,7 @@ export default function Index({ auth }) {
                     </div>
 
                     <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-6">
-                        <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                             <div className="md:col-span-2">
                                 <input
                                     value={filters.search}
@@ -253,7 +253,10 @@ export default function Index({ auth }) {
                                     ))}
                                 </select>
                             </div>
-                            <div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <div className="flex items-center gap-2 flex-1">
                                 <input
                                     type="date"
                                     value={filters.dateFrom}
@@ -263,10 +266,9 @@ export default function Index({ auth }) {
                                             dateFrom: e.target.value,
                                         }))
                                     }
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                                 />
-                            </div>
-                            <div>
+                                <span className="text-slate-400">to</span>
                                 <input
                                     type="date"
                                     value={filters.dateTo}
@@ -276,26 +278,25 @@ export default function Index({ auth }) {
                                             dateTo: e.target.value,
                                         }))
                                     }
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                                 />
                             </div>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap gap-2 justify-end">
-                            <button
-                                type="button"
-                                onClick={clearFilters}
-                                className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
-                            >
-                                Clear
-                            </button>
-                            <button
-                                type="button"
-                                onClick={applyFilters}
-                                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-                            >
-                                Apply Filters
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm"
+                                >
+                                    Clear
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={applyFilters}
+                                    className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm"
+                                >
+                                    Apply Filters
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -372,7 +373,7 @@ export default function Index({ auth }) {
                                                                     app.resume_url
                                                                 )
                                                             }
-                                                            className="text-blue-600 hover:underline font-medium"
+                                                            className="px-2 py-1 rounded text-blue-600 hover:bg-blue-50 font-medium text-sm"
                                                         >
                                                             Preview
                                                         </button>
@@ -394,7 +395,7 @@ export default function Index({ auth }) {
                                                                         "approve"
                                                                     )
                                                                 }
-                                                                className="px-3 py-1 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700"
+                                                                className="px-2 py-1 rounded bg-green-600 text-white text-xs font-semibold hover:bg-green-700"
                                                             >
                                                                 Approve
                                                             </button>
@@ -406,7 +407,7 @@ export default function Index({ auth }) {
                                                                         "reject"
                                                                     )
                                                                 }
-                                                                className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700"
+                                                                className="px-2 py-1 rounded bg-red-600 text-white text-xs font-semibold hover:bg-red-700"
                                                             >
                                                                 Reject
                                                             </button>
@@ -445,7 +446,7 @@ export default function Index({ auth }) {
                                             page: Math.max(1, prev.page - 1),
                                         }))
                                     }
-                                    className="px-3 py-2 rounded-lg border border-slate-300 disabled:opacity-50"
+                                    className="px-2 py-1 rounded border border-slate-300 disabled:opacity-50 text-sm"
                                 >
                                     Prev
                                 </button>
@@ -458,7 +459,7 @@ export default function Index({ auth }) {
                                             page: prev.page + 1,
                                         }))
                                     }
-                                    className="px-3 py-2 rounded-lg border border-slate-300 disabled:opacity-50"
+                                    className="px-2 py-1 rounded border border-slate-300 disabled:opacity-50 text-sm"
                                 >
                                     Next
                                 </button>
