@@ -402,34 +402,6 @@ export default function AuthenticatedLayout({ header, children }) {
                                                     </svg>
                                                     Job Applications
                                                 </NavLink>
-
-                                                {/* Your Version - All Job Applicants */}
-                                                <NavLink
-                                                    className=""
-                                                    href={route(
-                                                        "super.job.applicants"
-                                                    )}
-                                                    active={route().current(
-                                                        "super.job.applicants"
-                                                    )}
-                                                >
-                                                    <svg
-                                                        width="24"
-                                                        height="24"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                    >
-                                                        <path
-                                                            d="M17 20H22V18C22 16.3431 20.6569 15 19 15C18.0441 15 17.1931 15.4468 16.6448 16.1401M17 20H7M17 20V15C17 14.3437 16.8736 13.7132 16.6448 13.1271C16.9789 12.4228 17.3157 11.6903 17.6527 10.9388C18.16 9.82027 19.6877 9.82027 20.195 10.9388L20.8529 12.4676C21.093 13.0005 21.6408 13.3563 22.2555 13.3563C22.6737 13.3563 23 13.6826 23 14.1008V18.25C23 18.8023 22.5523 19.25 22 19.25H21.5M7 20H2V18C2 16.3431 3.34315 15 5 15C5.95587 15 6.80688 15.4468 7.35527 16.1401M7 20V15C7 14.3437 7.1264 13.7132 7.35527 13.1271C7.0211 12.4228 6.6843 11.6903 6.3473 10.9388C5.84002 9.82027 4.31235 9.82027 3.80507 10.9388L3.14715 12.4676C2.90705 13.0005 2.35925 13.3563 1.74458 13.3563C1.3264 13.3563 1 13.6826 1 14.1008V18.25C1 18.8023 1.44772 19.25 2 19.25H2.5M15 7C15 9.20914 13.2091 11 11 11C8.79086 11 7 9.20914 7 7C7 4.79086 8.79086 3 11 3C13.2091 3 15 4.79086 15 7ZM21 10C21 11.6569 19.6569 13 18 13C16.3431 13 15 11.6569 15 10C15 8.34315 16.3431 7 18 7C19.6569 7 21 8.34315 21 10ZM3 10C3 11.6569 4.34315 13 6 13C7.65685 13 9 11.6569 9 10C9 8.34315 7.65685 7 6 7C4.34315 7 3 8.34315 3 10Z"
-                                                            stroke="currentColor"
-                                                            strokeWidth="2"
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                        />
-                                                    </svg>
-                                                    All Job Applicants
-                                                </NavLink>
                                             </div>
                                         </div>
 
@@ -599,16 +571,6 @@ export default function AuthenticatedLayout({ header, children }) {
                                             )}
                                         >
                                             Job Applications
-                                        </ResponsiveNavLink>
-
-                                        {/* Your Version - All Job Applicants */}
-                                        <ResponsiveNavLink
-                                            href={route("super.job.applicants")}
-                                            active={route().current(
-                                                "super.job.applicants"
-                                            )}
-                                        >
-                                            All Job Applicants
                                         </ResponsiveNavLink>
                                     </div>
 
