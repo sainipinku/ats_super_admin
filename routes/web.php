@@ -100,11 +100,17 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::patch('/api/applications/{application}/decision', [JobRequestController::class, 'applicationDecision'])->name('api.applications.decision');
         });
 
-        // Job Applicants Routes (Super Admin - All Applicants)
+        // Job Applicants Routes (Super Admin - Your Version)
         Route::get('/job-applicants', [JobRequestController::class, 'applicants'])->name('job.applicants');
         Route::get('/api/job-applicants', [JobRequestController::class, 'getAllApplicants'])->name('api.job.applicants.list');
         Route::get('/api/job-applicants/{application}', [JobRequestController::class, 'getApplicantDetails'])->name('api.job.applicants.details');
         Route::patch('/api/job-applicants/{application}/status', [JobRequestController::class, 'updateApplicantStatus'])->name('api.job.applicants.status');
+
+        // Job Applications Routes (From Main Branch)
+        Route::group(['prefix' => 'job-applications', 'as' => 'job.applications.'], function () {
+            Route::get('/', [JobRequestController::class, 'applicationsIndex'])->name('index');
+            Route::get('/api/list', [JobRequestController::class, 'listApplications'])->name('api.list');
+        });
     });
 });
 /** SUPER ADMIN ROUTES END HERE **/
@@ -122,7 +128,7 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
 
     Route::post('/checkin', [App\Http\Controllers\Member\CheckInOutController::class, 'checkIn'])->name('admin.checkin');
     Route::post('/checkout', [App\Http\Controllers\Member\CheckInOutController::class, 'checkOut'])->name('admin.checkout');
-    
+
     Route::get('/resumes', [ResumeController::class, 'index'])->name('admin.resumes.index');
     Route::get('/resumes/create', [ResumeController::class, 'create'])->name('admin.resumes.create');
     Route::post('/resumes', [ResumeController::class, 'store'])->name('admin.resumes.store');
@@ -130,12 +136,17 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::get('/resumes/{resume}/edit', [ResumeController::class, 'edit'])->name('admin.resumes.edit');
     Route::post('/resumes/{resume}', [ResumeController::class, 'update'])->name('admin.resumes.update');
     Route::delete('/resumes/{resume}', [ResumeController::class, 'destroy'])->name('admin.resumes.destroy');
-    
+
     // Job Posts routes
     Route::get('/job-posts', [JobController::class, 'index'])->name('admin.job.posts.index');
     Route::get('/job-listing', [JobController::class, 'listing'])->name('admin.job.posts.listing');
+
+    // Job Applicants routes (Your Version)
     Route::get('/job-applicants', [JobController::class, 'applicants'])->name('admin.job.applicants');
-    
+
+    // Job Applications routes (From Main Branch)
+    Route::get('/job-applications', [JobController::class, 'applicationsIndex'])->name('admin.job.applications.index');
+
     // Job API routes
     Route::get('/api/jobs', [JobController::class, 'getAdminJobs'])->name('admin.api.jobs.list');
     Route::post('/api/jobs', [JobController::class, 'store'])->name('admin.api.jobs.store');
@@ -145,12 +156,15 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::patch('/api/jobs/{job}/toggle-status', [JobController::class, 'toggleStatus'])->name('admin.api.jobs.toggle-status');
     Route::get('/api/jobs/{job}/applications', [JobController::class, 'applications'])->name('admin.api.jobs.applications');
     Route::patch('/api/applications/{application}/decision', [JobController::class, 'applicationDecision'])->name('admin.api.applications.decision');
-    
-    // Job Applicants API routes
+
+    // Job Applicants API routes (Your Version)
     Route::get('/api/job-applicants', [JobController::class, 'getApplicants'])->name('admin.api.job.applicants.list');
     Route::get('/api/job-applicants/{application}', [JobController::class, 'getApplicantDetails'])->name('admin.api.job.applicants.details');
     Route::patch('/api/job-applicants/{application}/status', [JobController::class, 'updateApplicantStatus'])->name('admin.api.job.applicants.status');
-    
+
+    // Job Applications API route (From Main Branch)
+    Route::get('/api/applications', [JobController::class, 'listApplications'])->name('admin.api.applications.list');
+
     Route::post('/logout', [App\Http\Controllers\Admin\AdminController::class, 'logout'])->name('admin.logout');
     Route::get('/profile', [App\Http\Controllers\Admin\AdminController::class, 'userProfile'])->name('admin.profile');
     Route::post('/profile-update', [App\Http\Controllers\Admin\AdminController::class, 'userProfileUpdate'])->name('admin.profile.update');
@@ -180,6 +194,7 @@ Route::prefix('member')->middleware(['member'])->group(function () {
     Route::get('/jobs', [App\Http\Controllers\Member\CandidateJobController::class, 'index'])->name('member.jobs.index');
     Route::get('/jobs/{job}', [App\Http\Controllers\Member\CandidateJobController::class, 'show'])->name('member.jobs.show');
     Route::post('/jobs/{job}/apply', [App\Http\Controllers\Member\CandidateJobController::class, 'apply'])->name('member.jobs.apply');
+    Route::get('/api/profile-completion', [App\Http\Controllers\Member\CandidateJobController::class, 'profileCompletion'])->name('member.api.profile-completion');
     Route::get('/my-applications', [App\Http\Controllers\Member\CandidateJobController::class, 'myApplications'])->name('member.applications.index');
     Route::delete('/applications/{application}/withdraw', [App\Http\Controllers\Member\CandidateJobController::class, 'withdraw'])->name('member.applications.withdraw');
 });

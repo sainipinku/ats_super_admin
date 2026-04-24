@@ -39,6 +39,8 @@ export default function Dashboard({
     const [confirmAppDecisionOpen, setConfirmAppDecisionOpen] = useState(false);
     const [decisionApp, setDecisionApp] = useState(null);
     const [decisionAction, setDecisionAction] = useState(null);
+    const [resumePreviewOpen, setResumePreviewOpen] = useState(false);
+    const [resumePreviewUrl, setResumePreviewUrl] = useState(null);
 
     const { successAlert, errorAlert } = useAlerts();
 
@@ -79,6 +81,22 @@ export default function Dashboard({
             setConfirmAppDecisionOpen(false);
             setDecisionApp(null);
             setDecisionAction(null);
+        }
+    };
+
+    const isPreviewableResume = (url) => {
+        const u = String(url || "").toLowerCase();
+        return u.endsWith(".pdf") || u.endsWith(".html") || u.includes("generated-resumes");
+    };
+
+    const openResumePreview = (url) => {
+        if (!url) return;
+        const resolved = String(url).startsWith("/") ? url : `/${url}`;
+        if (isPreviewableResume(resolved)) {
+            setResumePreviewUrl(resolved);
+            setResumePreviewOpen(true);
+        } else {
+            window.open(resolved, "_blank");
         }
     };
     const [filters, setFilters] = useState({
@@ -212,10 +230,10 @@ export default function Dashboard({
                             </div>
                             <button
                                 type="button"
-                                onClick={() => router.visit(route("admin.job.posts.listing"))}
+                                onClick={() => router.visit(route("admin.job.applications.index"))}
                                 className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
                             >
-                                Go to Jobs
+                                View All
                             </button>
                         </div>
 
@@ -267,14 +285,13 @@ export default function Dashboard({
                                                 </td>
                                                 <td className="p-3">
                                                     {app.resume_url ? (
-                                                        <a
-                                                            href={String(app.resume_url).startsWith("/") ? app.resume_url : `/${app.resume_url}`}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="text-blue-600 hover:underline"
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openResumePreview(app.resume_url)}
+                                                            className="text-blue-600 hover:underline font-medium"
                                                         >
-                                                            View
-                                                        </a>
+                                                            Preview
+                                                        </button>
                                                     ) : (
                                                         <span className="text-gray-400">—</span>
                                                     )}
@@ -312,6 +329,47 @@ export default function Dashboard({
                         cancelText="Cancel"
                         modalSpinnerMessage="Processing Please Wait...."
                     />
+
+                    {resumePreviewOpen && resumePreviewUrl && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full overflow-hidden">
+                                <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+                                    <div className="font-semibold text-slate-900">
+                                        Resume Preview
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setResumePreviewOpen(false);
+                                            setResumePreviewUrl(null);
+                                        }}
+                                        className="p-2 rounded-full hover:bg-slate-100"
+                                    >
+                                        <svg
+                                            className="w-5 h-5 text-slate-600"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M6 18L18 6M6 6l12 12"
+                                            />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div className="h-[75vh]">
+                                    <iframe
+                                        src={resumePreviewUrl}
+                                        title="Resume Preview"
+                                        className="w-full h-full"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Commented out all other sections */}
                     {/*

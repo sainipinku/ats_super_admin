@@ -178,7 +178,8 @@ const Sidebar = ({ isOpen, onClose }) => {
                     <Link
                         href={route("admin.job.applicants")}
                         className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
-                            route().current('admin.job.applicants')
+                            route().current('admin.job.applicants') ||
+                            route().current('admin.job.applications.index')
                                 ? 'text-[#4F46E5] dark:text-[#4F46E5] bg-[#4F46E5]/10'
                                 : 'text-[#727272] hover:text-[#4F46E5] dark:hover:text-[#4F46E5]'
                         }`}

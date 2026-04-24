@@ -379,10 +379,63 @@ const JobDetailsModal = ({ job, isOpen, onClose, hasApplied, onApply }) => {
 };
 
 // Apply Modal
-const ApplyModal = ({ job, isOpen, onClose, onSubmit, isSubmitting }) => {
+const ApplyModal = ({ job, isOpen, onClose, onSubmit, isSubmitting, initialMode = 'resume', profileGate }) => {
     const [coverLetter, setCoverLetter] = useState('');
     const [resume, setResume] = useState(null);
     const [dragActive, setDragActive] = useState(false);
+    const [mode, setMode] = useState(initialMode);
+    const [details, setDetails] = useState({
+        isFresher: true,
+        experienceYears: '',
+        lastSalaryAmount: '',
+        lastSalaryUnit: 'lpa',
+        expectedSalaryAmount: '',
+        expectedSalaryUnit: 'lpa',
+        skills: '',
+        hobbies: '',
+        overview: '',
+        tenthPercentage: '',
+        twelfthPercentage: '',
+        degreeName: '',
+        collegeName: '',
+        cgpa: '',
+        projectTitle: '',
+        projectDescription: '',
+        projectLink: '',
+        linkedin: '',
+        github: '',
+        portfolio: '',
+    });
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setMode(initialMode);
+        setCoverLetter('');
+        setResume(null);
+        setDragActive(false);
+        setDetails({
+            isFresher: true,
+            experienceYears: '',
+            lastSalaryAmount: '',
+            lastSalaryUnit: 'lpa',
+            expectedSalaryAmount: '',
+            expectedSalaryUnit: 'lpa',
+            skills: '',
+            hobbies: '',
+            overview: '',
+            tenthPercentage: '',
+            twelfthPercentage: '',
+            degreeName: '',
+            collegeName: '',
+            cgpa: '',
+            projectTitle: '',
+            projectDescription: '',
+            projectLink: '',
+            linkedin: '',
+            github: '',
+            portfolio: '',
+        });
+    }, [isOpen, initialMode]);
 
     if (!isOpen || !job) return null;
 
@@ -413,7 +466,7 @@ const ApplyModal = ({ job, isOpen, onClose, onSubmit, isSubmitting }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSubmit({ coverLetter, resume });
+        onSubmit({ coverLetter, resume, mode, details });
     };
 
     return (
@@ -435,6 +488,49 @@ const ApplyModal = ({ job, isOpen, onClose, onSubmit, isSubmitting }) => {
                     </div>
 
                     <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                        {profileGate && profileGate.minRequired && profileGate.percentage < profileGate.minRequired && (
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div className="text-sm font-semibold text-amber-800">
+                                            Profile completion {profileGate.percentage}% (min {profileGate.minRequired}% required)
+                                        </div>
+                                        <div className="text-xs text-amber-700 mt-1">
+                                            Fill details to generate resume and complete your profile.
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => router.visit(route('member.profile'))}
+                                        className="px-3 py-1.5 rounded-lg bg-white border border-amber-200 text-amber-800 text-xs font-semibold hover:bg-amber-100"
+                                    >
+                                        Go to Profile
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-1 border border-slate-200">
+                            <button
+                                type="button"
+                                onClick={() => setMode('resume')}
+                                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold ${
+                                    mode === 'resume' ? 'bg-white shadow text-slate-900' : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                Upload Resume
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMode('details')}
+                                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold ${
+                                    mode === 'details' ? 'bg-white shadow text-slate-900' : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                Fill Details
+                            </button>
+                        </div>
+
                         {/* Cover Letter */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -450,55 +546,290 @@ const ApplyModal = ({ job, isOpen, onClose, onSubmit, isSubmitting }) => {
                             <p className="text-xs text-slate-500 mt-1">{coverLetter.length}/5000 characters</p>
                         </div>
 
-                        {/* Resume Upload */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Resume / CV <span className="text-slate-400">(Optional)</span>
-                            </label>
-                            <div
-                                onDragEnter={handleDrag}
-                                onDragLeave={handleDrag}
-                                onDragOver={handleDrag}
-                                onDrop={handleDrop}
-                                className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                                    dragActive ? 'border-blue-500 bg-blue-50' : 'border-slate-300'
-                                }`}
-                            >
-                                {resume ? (
-                                    <div className="flex items-center justify-center gap-2 text-slate-700">
-                                        <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <span className="font-medium">{resume.name}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setResume(null)}
-                                            className="text-red-500 hover:text-red-700 ml-2"
-                                        >
-                                            Remove
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <svg className="w-10 h-10 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                        </svg>
-                                        <p className="text-slate-600 mb-1">Drag & drop your resume here</p>
-                                        <p className="text-slate-400 text-sm">or</p>
-                                        <label className="mt-2 inline-block px-4 py-2 bg-blue-50 text-blue-600 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
-                                            Browse Files
-                                            <input
-                                                type="file"
-                                                accept=".pdf,.doc,.docx"
-                                                onChange={handleFileChange}
-                                                className="hidden"
-                                            />
-                                        </label>
-                                        <p className="text-xs text-slate-400 mt-2">PDF, DOC, DOCX up to 5MB</p>
-                                    </>
-                                )}
+                        {mode === 'resume' ? (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Resume / CV <span className="text-slate-400">(Required if you don’t fill details)</span>
+                                </label>
+                                <div
+                                    onDragEnter={handleDrag}
+                                    onDragLeave={handleDrag}
+                                    onDragOver={handleDrag}
+                                    onDrop={handleDrop}
+                                    className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                                        dragActive ? 'border-blue-500 bg-blue-50' : 'border-slate-300'
+                                    }`}
+                                >
+                                    {resume ? (
+                                        <div className="flex items-center justify-center gap-2 text-slate-700">
+                                            <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <span className="font-medium">{resume.name}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setResume(null)}
+                                                className="text-red-500 hover:text-red-700 ml-2"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <svg className="w-10 h-10 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                            <p className="text-slate-600 mb-1">Drag & drop your resume here</p>
+                                            <p className="text-slate-400 text-sm">or</p>
+                                            <label className="mt-2 inline-block px-4 py-2 bg-blue-50 text-blue-600 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+                                                Browse Files
+                                                <input
+                                                    type="file"
+                                                    accept=".pdf,.doc,.docx"
+                                                    onChange={handleFileChange}
+                                                    className="hidden"
+                                                />
+                                            </label>
+                                            <p className="text-xs text-slate-400 mt-2">PDF, DOC, DOCX up to 5MB</p>
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="space-y-5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Candidate Type
+                                        </label>
+                                        <select
+                                            value={details.isFresher ? 'fresher' : 'experienced'}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, isFresher: e.target.value === 'fresher' }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        >
+                                            <option value="fresher">Fresher</option>
+                                            <option value="experienced">Experienced</option>
+                                        </select>
+                                    </div>
+                                    {!details.isFresher && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                                                Total Experience (Years)
+                                            </label>
+                                            <input
+                                                value={details.experienceYears}
+                                                onChange={(e) => setDetails(prev => ({ ...prev, experienceYears: e.target.value }))}
+                                                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="e.g. 2"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {!details.isFresher && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-2">Last Salary</label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    value={details.lastSalaryAmount}
+                                                    onChange={(e) => setDetails(prev => ({ ...prev, lastSalaryAmount: e.target.value }))}
+                                                    className="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    placeholder="e.g. 6"
+                                                />
+                                                <select
+                                                    value={details.lastSalaryUnit}
+                                                    onChange={(e) => setDetails(prev => ({ ...prev, lastSalaryUnit: e.target.value }))}
+                                                    className="px-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                >
+                                                    <option value="lpa">LPA</option>
+                                                    <option value="month">Per Month</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-2">Expected Salary</label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    value={details.expectedSalaryAmount}
+                                                    onChange={(e) => setDetails(prev => ({ ...prev, expectedSalaryAmount: e.target.value }))}
+                                                    className="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    placeholder="e.g. 8"
+                                                />
+                                                <select
+                                                    value={details.expectedSalaryUnit}
+                                                    onChange={(e) => setDetails(prev => ({ ...prev, expectedSalaryUnit: e.target.value }))}
+                                                    className="px-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                >
+                                                    <option value="lpa">LPA</option>
+                                                    <option value="month">Per Month</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Skills (comma separated)
+                                        </label>
+                                        <input
+                                            value={details.skills}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, skills: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="e.g. React, Laravel, SQL"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Hobbies (comma separated)
+                                        </label>
+                                        <input
+                                            value={details.hobbies}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, hobbies: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="e.g. Reading, Cricket"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Overview <span className="text-red-500">*</span>
+                                    </label>
+                                    <textarea
+                                        value={details.overview}
+                                        onChange={(e) => setDetails(prev => ({ ...prev, overview: e.target.value }))}
+                                        rows={4}
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                        placeholder="Short summary about you..."
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">10th Percentage</label>
+                                        <input
+                                            value={details.tenthPercentage}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, tenthPercentage: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="e.g. 85%"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">12th Percentage</label>
+                                        <input
+                                            value={details.twelfthPercentage}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, twelfthPercentage: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="e.g. 78%"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                                            Degree <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            value={details.degreeName}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, degreeName: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="e.g. B.Tech CSE"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">College</label>
+                                        <input
+                                            value={details.collegeName}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, collegeName: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="College name"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">CGPA/GPA</label>
+                                        <input
+                                            value={details.cgpa}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, cgpa: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="e.g. 8.2"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">Portfolio</label>
+                                        <input
+                                            value={details.portfolio}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, portfolio: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="https://"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">LinkedIn</label>
+                                        <input
+                                            value={details.linkedin}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, linkedin: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="https://"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">GitHub</label>
+                                        <input
+                                            value={details.github}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, github: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="https://"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">Last Project Title</label>
+                                        <input
+                                            value={details.projectTitle}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, projectTitle: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="Project title"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">Project Link</label>
+                                        <input
+                                            value={details.projectLink}
+                                            onChange={(e) => setDetails(prev => ({ ...prev, projectLink: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="https://"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Project Description</label>
+                                    <textarea
+                                        value={details.projectDescription}
+                                        onChange={(e) => setDetails(prev => ({ ...prev, projectDescription: e.target.value }))}
+                                        rows={3}
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                        placeholder="What you built and tech used..."
+                                    />
+                                </div>
+
+                                <div className="text-xs text-slate-500">
+                                    Resume will be generated automatically (random theme) and shared with Admin/Super Admin.
+                                </div>
+                            </div>
+                        )}
 
                         {/* Actions */}
                         <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
@@ -550,6 +881,8 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [localAppliedIds, setLocalAppliedIds] = useState(appliedJobIds);
     const [notification, setNotification] = useState(null);
+    const [profileGate, setProfileGate] = useState(null);
+    const [applyInitialMode, setApplyInitialMode] = useState('resume');
 
     // Handle search with debounce
     useEffect(() => {
@@ -574,17 +907,96 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
 
     const handleApplyClick = (job) => {
         setSelectedJob(job);
-        setShowApplyModal(true);
         setShowDetailsModal(false);
+        setProfileGate(null);
+        setApplyInitialMode('resume');
+        fetch(route('member.api.profile-completion'), {
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+            },
+        })
+            .then(res => res.json().catch(() => null))
+            .then(data => {
+                if (data?.success) {
+                    const gate = {
+                        percentage: data.completion_percentage ?? 0,
+                        missingFields: Array.isArray(data.missing_fields) ? data.missing_fields : [],
+                        minRequired: data.min_required ?? 35,
+                        profileUrl: data.profile_url,
+                    };
+                    setProfileGate(gate);
+                    if (gate.percentage < gate.minRequired) {
+                        setApplyInitialMode('details');
+                        setNotification({
+                            type: 'error',
+                            message: `Profile completion ${gate.percentage}% (min ${gate.minRequired}% required). Fill details or update profile to apply.`,
+                        });
+                    }
+                }
+            })
+            .finally(() => {
+                setShowApplyModal(true);
+            });
     };
 
-    const handleApplySubmit = async ({ coverLetter, resume }) => {
+    const handleApplySubmit = async ({ coverLetter, resume, mode, details }) => {
         setIsSubmitting(true);
 
         const formData = new FormData();
         formData.append('cover_letter', coverLetter);
-        if (resume) {
+        if (mode === 'resume' && resume) {
             formData.append('resume', resume);
+        }
+        if (mode === 'details') {
+            const normalizeList = (value) =>
+                String(value || '')
+                    .split(',')
+                    .map(v => v.trim())
+                    .filter(Boolean);
+
+            const applicationProfile = {
+                is_fresher: !!details.isFresher,
+                skills: normalizeList(details.skills),
+                hobbies: normalizeList(details.hobbies),
+                overview: details.overview || '',
+                links: {
+                    linkedin: details.linkedin || null,
+                    github: details.github || null,
+                    portfolio: details.portfolio || null,
+                },
+                education: {
+                    tenth: { percentage: details.tenthPercentage || null },
+                    twelfth: { percentage: details.twelfthPercentage || null },
+                    degree: {
+                        name: details.degreeName || '',
+                        college: details.collegeName || null,
+                        cgpa: details.cgpa || null,
+                    },
+                },
+                experience: details.isFresher
+                    ? null
+                    : {
+                          total_years: details.experienceYears || null,
+                          last_salary: {
+                              amount: details.lastSalaryAmount || null,
+                              unit: details.lastSalaryUnit || null,
+                          },
+                          expected_salary: {
+                              amount: details.expectedSalaryAmount || null,
+                              unit: details.expectedSalaryUnit || null,
+                          },
+                      },
+                projects: [
+                    {
+                        title: details.projectTitle || null,
+                        description: details.projectDescription || null,
+                        link: details.projectLink || null,
+                    },
+                ],
+            };
+
+            formData.append('application_profile', JSON.stringify(applicationProfile));
         }
 
         try {
@@ -768,6 +1180,8 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
                 onClose={() => setShowApplyModal(false)}
                 onSubmit={handleApplySubmit}
                 isSubmitting={isSubmitting}
+                initialMode={applyInitialMode}
+                profileGate={profileGate}
             />
         </AuthenticatedLayout>
     );
