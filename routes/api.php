@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Route;
 
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::put('/profile', [ProfileController::class, 'update']);
+        Route::get('/profile/completion', [ProfileController::class, 'completion']);
 
         Route::get('/jobs', [JobController::class, 'index']);
         Route::get('/jobs/{job}', [JobController::class, 'show']);

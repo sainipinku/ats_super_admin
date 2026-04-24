@@ -37,6 +37,7 @@ class Member extends Authenticatable
         'gender',
         'phone_verify_at',
         'image',
+        'candidate_profile',
         'remember_token',
         'reset_password_token',
         'reset_password_token_expires_at',
@@ -51,6 +52,7 @@ class Member extends Authenticatable
         'phone_verify_at' => 'datetime',
         'reset_password_token_expires_at' => 'datetime',
         'password' => 'hashed',
+        'candidate_profile' => 'array',
     ];
     public function uniqueIds()
     {

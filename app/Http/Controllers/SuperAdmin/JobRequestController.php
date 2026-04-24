@@ -49,6 +49,62 @@ class JobRequestController extends Controller
         return Inertia::render('SuperAdmin/JobRequests/AllJobs');
     }
 
+    public function applicationsIndex()
+    {
+        return Inertia::render('SuperAdmin/JobApplications/Index');
+    }
+
+    public function listApplications(Request $request)
+    {
+        $perPage = max(1, min((int) $request->input('per_page', 15), 50));
+
+        $query = JobApplication::query()
+            ->with([
+                'job' => function ($q) {
+                    $q->select('id', 'title', 'company', 'created_by');
+                },
+                'candidate' => function ($q) {
+                    $q->select('id', 'name', 'email', 'phone', 'image');
+                },
+            ])
+            ->orderByDesc('created_at');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status')->toString());
+        }
+
+        if ($request->filled('job_id')) {
+            $query->where('job_id', (int) $request->input('job_id'));
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($q) use ($search) {
+                $q->where('candidate_name', 'like', "%{$search}%")
+                    ->orWhere('candidate_email', 'like', "%{$search}%")
+                    ->orWhere('candidate_phone', 'like', "%{$search}%")
+                    ->orWhereHas('job', function ($jq) use ($search) {
+                        $jq->where('title', 'like', "%{$search}%")
+                            ->orWhere('company', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->input('date_to'));
+        }
+
+        $applications = $query->paginate($perPage)->withQueryString();
+
+        return response()->json([
+            'success' => true,
+            'data' => $applications,
+        ]);
+    }
+
     /**
      * Get all job requests (pending, active, declined)
      */

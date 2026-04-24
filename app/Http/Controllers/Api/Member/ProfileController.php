@@ -9,6 +9,62 @@ use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
 {
+    private function getProfileCompletionData($member): array
+    {
+        $weights = [
+            'name' => 15,
+            'email' => 10,
+            'phone' => 10,
+            'username' => 5,
+            'image' => 10,
+            'dob' => 5,
+            'gender' => 5,
+            'skills' => 8,
+            'overview' => 8,
+            'education' => 8,
+            'projects' => 6,
+            'experience' => 10,
+        ];
+
+        $candidate = is_array($member->candidate_profile) ? $member->candidate_profile : [];
+
+        $checks = [
+            'name' => !empty($member->name),
+            'email' => !empty($member->email),
+            'phone' => !empty($member->phone),
+            'username' => !empty($member->username),
+            'image' => !empty($member->image),
+            'dob' => !empty($member->dob),
+            'gender' => !empty($member->gender),
+            'skills' => !empty($candidate['skills']),
+            'overview' => !empty($candidate['overview']),
+            'education' => !empty($candidate['education']),
+            'projects' => !empty($candidate['projects']),
+            'experience' => array_key_exists('is_fresher', $candidate)
+                ? ($candidate['is_fresher'] ? true : !empty($candidate['experience']))
+                : false,
+        ];
+
+        $totalWeight = array_sum($weights);
+        $score = 0;
+        $missing = [];
+
+        foreach ($weights as $key => $weight) {
+            if (!empty($checks[$key])) {
+                $score += $weight;
+            } else {
+                $missing[] = $key;
+            }
+        }
+
+        $percentage = $totalWeight > 0 ? (int) floor(($score / $totalWeight) * 100) : 0;
+
+        return [
+            'percentage' => $percentage,
+            'missing_fields' => $missing,
+        ];
+    }
+
     public function show(Request $request)
     {
         return response()->json([
@@ -45,6 +101,19 @@ class ProfileController extends Controller
         return response()->json([
             'success' => true,
             'member' => $member->fresh(),
+        ]);
+    }
+
+    public function completion(Request $request)
+    {
+        $member = $request->user();
+        $data = $this->getProfileCompletionData($member);
+
+        return response()->json([
+            'success' => true,
+            'completion_percentage' => $data['percentage'],
+            'missing_fields' => $data['missing_fields'],
+            'min_required' => 35,
         ]);
     }
 }
