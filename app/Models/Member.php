@@ -38,6 +38,11 @@ class Member extends Authenticatable
         'phone_verify_at',
         'image',
         'candidate_profile',
+        'resume_path',
+        'resume_original_name',
+        'resume_mime',
+        'resume_size',
+        'resume_uploaded_at',
         'remember_token',
         'reset_password_token',
         'reset_password_token_expires_at',
@@ -53,6 +58,8 @@ class Member extends Authenticatable
         'reset_password_token_expires_at' => 'datetime',
         'password' => 'hashed',
         'candidate_profile' => 'array',
+        'resume_uploaded_at' => 'datetime',
+        'resume_size' => 'integer',
     ];
     public function uniqueIds()
     {
@@ -68,6 +75,7 @@ class Member extends Authenticatable
 
     protected $appends = [
         'profile_photo_url',
+        'resume_url',
         'current_age',
         'department_names',
         'designation_names',
@@ -108,6 +116,50 @@ class Member extends Authenticatable
                 return asset('images/profileimg.png');
             }
     );
+    }
+
+    public function resumeUrl(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (empty($this->resume_path)) {
+                    return null;
+                }
+
+                if (filter_var($this->resume_path, FILTER_VALIDATE_URL)) {
+                    return $this->resume_path;
+                }
+
+                if (Storage::disk('public')->exists($this->resume_path)) {
+                    return Storage::disk('public')->url($this->resume_path);
+                }
+
+                return null;
+            }
+        );
+    }
+
+    public function skills(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                $candidate = is_array($this->candidate_profile) ? $this->candidate_profile : [];
+                $skills = $candidate['skills'] ?? null;
+
+                return is_array($skills) ? $skills : null;
+            }
+        );
+    }
+
+    public function experience(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                $candidate = is_array($this->candidate_profile) ? $this->candidate_profile : [];
+
+                return $candidate['experience'] ?? ($candidate['experience_label'] ?? null);
+            }
+        );
     }
    public function notify_tokens()
     {
