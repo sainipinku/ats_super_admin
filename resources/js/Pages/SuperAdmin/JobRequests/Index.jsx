@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Head, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "../Layouts/AuthenticatedLayout";
+import { useAlerts } from "../../../Components/Alerts";
 
 const JobRequestCard = ({ job, onView, onApprove, onReject }) => {
     const getStatusBadge = (status) => {
@@ -356,6 +357,8 @@ export default function JobRequests({ auth }) {
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [jobToReject, setJobToReject] = useState(null);
 
+    const { successAlert, errorAlert } = useAlerts();
+
     useEffect(() => {
         fetchJobs();
     }, []);
@@ -394,13 +397,13 @@ export default function JobRequests({ auth }) {
             const data = await response.json();
             if (data.success) {
                 setJobs(jobs.map((j) => (j.id === job.id ? data.data : j)));
-                alert("Job approved successfully!");
+                successAlert("Job approved successfully!");
             } else {
-                alert(data.message);
+                errorAlert(data.message || "Failed to approve job.");
             }
         } catch (error) {
             console.error("Error approving job:", error);
-            alert("Failed to approve job.");
+            errorAlert("Failed to approve job.");
         }
     };
 
@@ -432,13 +435,13 @@ export default function JobRequests({ auth }) {
                 setShowRejectModal(false);
                 setJobToReject(null);
                 setRejectionReason("");
-                alert("Job rejected successfully!");
+                successAlert("Job rejected successfully!");
             } else {
-                alert(data.message);
+                errorAlert(data.message || "Failed to reject job.");
             }
         } catch (error) {
             console.error("Error rejecting job:", error);
-            alert("Failed to reject job.");
+            errorAlert("Failed to reject job.");
         }
     };
 

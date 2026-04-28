@@ -185,11 +185,11 @@ export default function MyApplications({ auth, applications, statusCounts }) {
         <AuthenticatedLayout user={auth.user}>
             <Head title="My Applications" />
 
-            <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+            <div className="pt-20 pb-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-slate-900 mb-1">My Applications</h1>
-                    <p className="text-slate-600 text-sm">Track and manage your job applications</p>
+                    <h1 className="text-2xl font-bold text-slate-900 mb-2">My Applications</h1>
+                    <p className="text-slate-600 text-sm leading-relaxed">Track and manage your job applications</p>
                 </div>
 
                 {/* Filter Tabs */}
