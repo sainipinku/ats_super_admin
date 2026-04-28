@@ -100,12 +100,6 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::patch('/api/applications/{application}/decision', [JobRequestController::class, 'applicationDecision'])->name('api.applications.decision');
         });
 
-        // Job Applicants Routes (Super Admin - Your Version)
-        Route::get('/job-applicants', [JobRequestController::class, 'applicants'])->name('job.applicants');
-        Route::get('/api/job-applicants', [JobRequestController::class, 'getAllApplicants'])->name('api.job.applicants.list');
-        Route::get('/api/job-applicants/{application}', [JobRequestController::class, 'getApplicantDetails'])->name('api.job.applicants.details');
-        Route::patch('/api/job-applicants/{application}/status', [JobRequestController::class, 'updateApplicantStatus'])->name('api.job.applicants.status');
-
         // Job Applications Routes (From Main Branch)
         Route::group(['prefix' => 'job-applications', 'as' => 'job.applications.'], function () {
             Route::get('/', [JobRequestController::class, 'applicationsIndex'])->name('index');
