@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Member;
 use App\Http\Controllers\Controller;
 use App\Models\Job;
 use App\Models\JobApplication;
+use App\Models\SavedJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -241,10 +242,16 @@ class JobController extends Controller
 
     $member = $request->user();
     $appliedJobIds = [];
+    $savedJobIds = [];
     
     if ($member) { // Add null check for guest users
         $appliedJobIds = JobApplication::query()
             ->where('candidate_id', $member->id)
+            ->pluck('job_id')
+            ->toArray();
+
+        $savedJobIds = SavedJob::query()
+            ->where('member_id', $member->id)
             ->pluck('job_id')
             ->toArray();
     }
@@ -253,6 +260,7 @@ class JobController extends Controller
         'success' => true,
         'jobs' => $jobs,
         'applied_job_ids' => $appliedJobIds,
+        'saved_job_ids' => $savedJobIds,
         'total_jobs' => $jobs->total(), // Add total for debugging
     ]);
 }
@@ -276,11 +284,75 @@ class JobController extends Controller
             ->where('candidate_id', $member->id)
             ->first();
 
+        $isSaved = SavedJob::query()
+            ->where('member_id', $member->id)
+            ->where('job_id', $job->id)
+            ->exists();
+
         return response()->json([
             'success' => true,
             'job' => $job,
             'has_applied' => (bool) $application,
             'application' => $application,
+            'is_saved' => $isSaved,
+        ]);
+    }
+
+    public function save(Request $request, Job $job)
+    {
+        if ($job->status !== 'active') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This job is not available.',
+            ], 404);
+        }
+
+        $member = $request->user();
+
+        SavedJob::query()->firstOrCreate([
+            'member_id' => $member->id,
+            'job_id' => $job->id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Job saved.',
+            'is_saved' => true,
+        ]);
+    }
+
+    public function unsave(Request $request, Job $job)
+    {
+        $member = $request->user();
+
+        SavedJob::query()
+            ->where('member_id', $member->id)
+            ->where('job_id', $job->id)
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Job removed from saved.',
+            'is_saved' => false,
+        ]);
+    }
+
+    public function savedIndex(Request $request)
+    {
+        $member = $request->user();
+        $perPage = max(1, min((int) $request->input('per_page', 12), 50));
+
+        $saved = SavedJob::query()
+            ->with(['job' => function ($q) {
+                $q->select('id', 'title', 'company', 'location', 'job_type', 'salary', 'status', 'company_image', 'created_at');
+            }])
+            ->where('member_id', $member->id)
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'saved_jobs' => $saved,
         ]);
     }
 

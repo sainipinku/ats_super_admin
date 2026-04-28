@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Member;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
@@ -86,14 +87,60 @@ class ProfileController extends Controller
                 'max:255',
                 Rule::unique('members', 'email')->ignore($member->id),
             ],
+            'phone' => [
+                'sometimes',
+                'nullable',
+                'string',
+                'max:20',
+                Rule::unique('members', 'phone')->ignore($member->id),
+            ],
             'dob' => ['sometimes', 'nullable', 'date'],
             'gender' => ['sometimes', 'nullable', Rule::in(['male', 'female', 'other'])],
             'image' => ['sometimes', 'nullable', 'file', 'mimes:jpeg,png,jpg,webp', 'max:4096'],
+            'candidate_profile' => ['sometimes', 'array'],
+            'job_title' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'location' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'experience' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'overview' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'is_fresher' => ['sometimes', 'boolean'],
+            'skills' => ['sometimes', 'array'],
+            'skills.*' => ['string', 'max:50'],
         ]);
 
         if ($request->hasFile('image')) {
+            $this->deleteMemberImage($member->image);
             $path = Storage::disk('public')->putFile('members', $request->file('image'));
             $validated['image'] = $path;
+        }
+
+        $candidate = is_array($member->candidate_profile) ? $member->candidate_profile : [];
+
+        if (array_key_exists('candidate_profile', $validated) && is_array($validated['candidate_profile'])) {
+            $candidate = array_replace_recursive($candidate, $validated['candidate_profile']);
+        }
+        if (array_key_exists('skills', $validated)) {
+            $candidate['skills'] = $validated['skills'];
+        }
+        if (array_key_exists('overview', $validated)) {
+            $candidate['overview'] = $validated['overview'];
+        }
+        if (array_key_exists('is_fresher', $validated)) {
+            $candidate['is_fresher'] = (bool) $validated['is_fresher'];
+        }
+        if (array_key_exists('job_title', $validated)) {
+            $candidate['job_title'] = $validated['job_title'];
+        }
+        if (array_key_exists('location', $validated)) {
+            $candidate['location'] = $validated['location'];
+        }
+        if (array_key_exists('experience', $validated)) {
+            $candidate['experience_label'] = $validated['experience'];
+        }
+
+        $validated['candidate_profile'] = $candidate;
+
+        if (array_key_exists('phone', $validated) && $validated['phone'] !== $member->phone) {
+            $validated['phone_verify_at'] = null;
         }
 
         $member->fill($validated)->save();
@@ -101,6 +148,155 @@ class ProfileController extends Controller
         return response()->json([
             'success' => true,
             'member' => $member->fresh(),
+        ]);
+    }
+
+    public function updatePhoto(Request $request)
+    {
+        $member = $request->user();
+
+        $validated = $request->validate([
+            'photo' => ['required', 'file', 'mimes:jpeg,png,jpg,webp', 'max:4096'],
+        ]);
+
+        $this->deleteMemberImage($member->image);
+        $path = Storage::disk('public')->putFile('members', $validated['photo']);
+
+        $member->forceFill([
+            'image' => $path,
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'member' => $member->fresh(),
+        ]);
+    }
+
+    public function removePhoto(Request $request)
+    {
+        $member = $request->user();
+
+        $this->deleteMemberImage($member->image);
+
+        $member->forceFill([
+            'image' => null,
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'member' => $member->fresh(),
+        ]);
+    }
+
+    public function resume(Request $request)
+    {
+        $member = $request->user();
+        $hasResume = !empty($member->resume_path) && (
+            Storage::disk('public')->exists($member->resume_path) || Storage::disk('local')->exists($member->resume_path)
+        );
+
+        return response()->json([
+            'success' => true,
+            'has_resume' => $hasResume,
+            'resume' => $hasResume ? [
+                'original_name' => $member->resume_original_name,
+                'mime' => $member->resume_mime,
+                'size' => $member->resume_size,
+                'uploaded_at' => optional($member->resume_uploaded_at)->toISOString(),
+                'view_url' => $this->buildResumeViewUrl($request),
+                'path' => $member->resume_path,
+                'url' => $member->resume_url,
+            ] : null,
+        ]);
+    }
+
+    public function uploadResume(Request $request)
+    {
+        $member = $request->user();
+
+        $validated = $request->validate([
+            'resume' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
+        ]);
+
+        $this->deleteMemberResume($member->resume_path);
+
+        $file = $validated['resume'];
+        $extension = $file->getClientOriginalExtension() ?: 'pdf';
+        $path = 'member-resumes/' . $member->uuid . '/' . Str::uuid() . '.' . $extension;
+        Storage::disk('public')->putFileAs(dirname($path), $file, basename($path));
+
+        $member->forceFill([
+            'resume_path' => $path,
+            'resume_original_name' => $file->getClientOriginalName(),
+            'resume_mime' => $file->getClientMimeType(),
+            'resume_size' => $file->getSize(),
+            'resume_uploaded_at' => now(),
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Resume uploaded.',
+            'resume' => [
+                'original_name' => $member->resume_original_name,
+                'mime' => $member->resume_mime,
+                'size' => $member->resume_size,
+                'uploaded_at' => optional($member->resume_uploaded_at)->toISOString(),
+                'view_url' => $this->buildResumeViewUrl($request),
+                'path' => $member->resume_path,
+                'url' => $member->resume_url,
+            ],
+        ]);
+    }
+
+    public function deleteResume(Request $request)
+    {
+        $member = $request->user();
+
+        $this->deleteMemberResume($member->resume_path);
+
+        $member->forceFill([
+            'resume_path' => null,
+            'resume_original_name' => null,
+            'resume_mime' => null,
+            'resume_size' => null,
+            'resume_uploaded_at' => null,
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Resume deleted.',
+        ]);
+    }
+
+    public function viewResume(Request $request)
+    {
+        $member = $request->user();
+
+        if (empty($member->resume_path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Resume not found.',
+            ], 404);
+        }
+
+        if (Storage::disk('public')->exists($member->resume_path)) {
+            $fullPath = Storage::disk('public')->path($member->resume_path);
+        } elseif (Storage::disk('local')->exists($member->resume_path)) {
+            $fullPath = Storage::disk('local')->path($member->resume_path);
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Resume not found.',
+            ], 404);
+        }
+
+        $mime = $member->resume_mime ?: 'application/octet-stream';
+        $filename = $member->resume_original_name ?: 'resume';
+        $filename = str_replace(['"', "\n", "\r"], '', $filename);
+
+        return response()->file($fullPath, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
         ]);
     }
 
@@ -115,5 +311,47 @@ class ProfileController extends Controller
             'missing_fields' => $data['missing_fields'],
             'min_required' => 35,
         ]);
+    }
+
+    private function deleteMemberImage(?string $image): void
+    {
+        if (empty($image)) {
+            return;
+        }
+
+        if (filter_var($image, FILTER_VALIDATE_URL)) {
+            return;
+        }
+
+        $path = ltrim($image, '/');
+        if (str_starts_with($path, 'storage/')) {
+            $path = substr($path, strlen('storage/'));
+        }
+
+        if ($path !== '' && Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
+    }
+
+    private function deleteMemberResume(?string $resumePath): void
+    {
+        if (empty($resumePath)) {
+            return;
+        }
+
+        if (Storage::disk('public')->exists($resumePath)) {
+            Storage::disk('public')->delete($resumePath);
+        }
+
+        if (Storage::disk('local')->exists($resumePath)) {
+            Storage::disk('local')->delete($resumePath);
+        }
+    }
+
+    private function buildResumeViewUrl(Request $request): string
+    {
+        $base = rtrim($request->getSchemeAndHttpHost(), '/');
+
+        return $base . '/api/profile/resume/view';
     }
 }
