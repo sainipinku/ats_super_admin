@@ -174,31 +174,6 @@ const Sidebar = ({ isOpen, onClose }) => {
                     </Link>
                 </li>
 
-                <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
-                    <Link
-                        href={route("admin.job.applications.index")}
-                        className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
-                            route().current('admin.job.applications.index')
-                                ? 'text-[#4F46E5] dark:text-[#4F46E5] bg-[#4F46E5]/10'
-                                : 'text-[#727272] hover:text-[#4F46E5] dark:hover:text-[#4F46E5]'
-                        }`}
-                    >
-                        <svg
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <path
-                                d="M16 11C17.6569 11 19 9.65685 19 8C19 6.34315 17.6569 5 16 5C14.3431 5 13 6.34315 13 8C13 9.65685 14.3431 11 16 11ZM8 11C9.65685 11 11 9.65685 11 8C11 6.34315 9.65685 5 8 5C6.34315 5 5 6.34315 5 8C5 9.65685 6.34315 11 8 11ZM8 13C5.79086 13 4 14.7909 4 17V19H12V17C12 14.7909 10.2091 13 8 13ZM16 13C13.7909 13 12 14.7909 12 17V19H20V17C20 14.7909 18.2091 13 16 13Z"
-                                fill="currentColor"
-                            />
-                        </svg>
-                        Job Applicants
-                    </Link>
-                </li>
-
             </ul>
         </div>
     );

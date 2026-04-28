@@ -400,7 +400,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                                             fill="currentColor"
                                                         />
                                                     </svg>
-                                                    Job Applicants
+                                                    Job Applications
                                                 </NavLink>
                                             </div>
                                         </div>
@@ -570,7 +570,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                                 "super.job.applications.index"
                                             )}
                                         >
-                                            Job Applicants
+                                            Job Applications
                                         </ResponsiveNavLink>
                                     </div>
 

@@ -100,6 +100,7 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::patch('/api/applications/{application}/decision', [JobRequestController::class, 'applicationDecision'])->name('api.applications.decision');
         });
 
+        // Job Applications Routes (From Main Branch)
         Route::group(['prefix' => 'job-applications', 'as' => 'job.applications.'], function () {
             Route::get('/', [JobRequestController::class, 'applicationsIndex'])->name('index');
             Route::get('/api/list', [JobRequestController::class, 'listApplications'])->name('api.list');
@@ -133,6 +134,11 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     // Job Posts routes
     Route::get('/job-posts', [JobController::class, 'index'])->name('admin.job.posts.index');
     Route::get('/job-listing', [JobController::class, 'listing'])->name('admin.job.posts.listing');
+
+    // Job Applicants routes (Your Version)
+    Route::get('/job-applicants', [JobController::class, 'applicants'])->name('admin.job.applicants');
+
+    // Job Applications routes (From Main Branch)
     Route::get('/job-applications', [JobController::class, 'applicationsIndex'])->name('admin.job.applications.index');
 
     // Job API routes
@@ -144,6 +150,13 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::patch('/api/jobs/{job}/toggle-status', [JobController::class, 'toggleStatus'])->name('admin.api.jobs.toggle-status');
     Route::get('/api/jobs/{job}/applications', [JobController::class, 'applications'])->name('admin.api.jobs.applications');
     Route::patch('/api/applications/{application}/decision', [JobController::class, 'applicationDecision'])->name('admin.api.applications.decision');
+
+    // Job Applicants API routes (Your Version)
+    Route::get('/api/job-applicants', [JobController::class, 'getApplicants'])->name('admin.api.job.applicants.list');
+    Route::get('/api/job-applicants/{application}', [JobController::class, 'getApplicantDetails'])->name('admin.api.job.applicants.details');
+    Route::patch('/api/job-applicants/{application}/status', [JobController::class, 'updateApplicantStatus'])->name('admin.api.job.applicants.status');
+
+    // Job Applications API route (From Main Branch)
     Route::get('/api/applications', [JobController::class, 'listApplications'])->name('admin.api.applications.list');
 
     Route::post('/logout', [App\Http\Controllers\Admin\AdminController::class, 'logout'])->name('admin.logout');

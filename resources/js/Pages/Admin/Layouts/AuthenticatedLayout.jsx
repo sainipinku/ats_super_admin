@@ -146,7 +146,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                             href={route("admin.job.applications.index")}
                                             active={route().current("admin.job.applications.index")}
                                         >
-                                            Job Applicants
+                                            Job Applications
                                         </NavLink>
 
                                         <NavLink

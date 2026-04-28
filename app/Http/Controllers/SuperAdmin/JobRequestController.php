@@ -380,7 +380,7 @@ class JobRequestController extends Controller
 
         $newStatus = $validated['action'] === 'approve' ? 'shortlisted' : 'rejected';
 
-        if (!in_array($application->status, ['pending', 'reviewing', 'shortlisted', 'rejected', 'hired'], true)) {
+        if (!in_array($application->status, ['pending', 'shortlisted', 'waiting_list', 'hired', 'not_selected', 'rejected'], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid application status.',
@@ -425,6 +425,125 @@ class JobRequestController extends Controller
         return response()->json([
             'success' => true,
             'data' => $stats,
+        ]);
+    }
+
+    /**
+     * Display all job applicants page (Inertia) - Super Admin sees all
+     */
+    public function applicants()
+    {
+        return Inertia::render('SuperAdmin/JobRequests/JobApplicants');
+    }
+
+    /**
+     * Get all applicants for all jobs (Super Admin)
+     */
+    public function getAllApplicants(Request $request)
+    {
+        $query = JobApplication::with(['job' => function($q) {
+                $q->select('id', 'title', 'company', 'location', 'job_type', 'created_by');
+            }, 'candidate' => function($q) {
+                $q->select('id', 'name', 'email', 'phone', 'image');
+            }, 'reviewer' => function($q) {
+                $q->select('id', 'name');
+            }])
+            ->orderBy('created_at', 'desc');
+
+        // Filter by status
+        if ($request->has('status') && $request->status) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by job
+        if ($request->has('job_id') && $request->job_id) {
+            $query->where('job_id', $request->job_id);
+        }
+
+        // Filter by admin/creator
+        if ($request->has('admin_id') && $request->admin_id) {
+            $query->whereHas('job', function($q) use ($request) {
+                $q->where('created_by', $request->admin_id);
+            });
+        }
+
+        // Search by candidate name, email, or job title
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('candidate_name', 'like', "%{$search}%")
+                  ->orWhere('candidate_email', 'like', "%{$search}%")
+                  ->orWhereHas('job', function($jq) use ($search) {
+                      $jq->where('title', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $applications = $query->paginate(12)->withQueryString();
+
+        // Get all jobs for filter dropdown
+        $jobs = Job::select('id', 'title', 'company')
+            ->orderBy('title')
+            ->get();
+
+        // Status counts
+        $statusCounts = [
+            'pending' => JobApplication::where('status', 'pending')->count(),
+            'shortlisted' => JobApplication::where('status', 'shortlisted')->count(),
+            'waiting_list' => JobApplication::where('status', 'waiting_list')->count(),
+            'hired' => JobApplication::where('status', 'hired')->count(),
+            'not_selected' => JobApplication::where('status', 'not_selected')->count(),
+            'rejected' => JobApplication::where('status', 'rejected')->count(),
+            'total' => JobApplication::count(),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $applications,
+            'jobs' => $jobs,
+            'statusCounts' => $statusCounts,
+            'filters' => [
+                'status' => $request->status ?? '',
+                'job_id' => $request->job_id ?? '',
+                'search' => $request->search ?? '',
+            ],
+        ]);
+    }
+
+    /**
+     * Get single applicant details (Super Admin)
+     */
+    public function getApplicantDetails(JobApplication $application)
+    {
+        $application->load(['job', 'candidate', 'reviewer']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $application,
+        ]);
+    }
+
+    /**
+     * Update applicant status (Super Admin)
+     */
+    public function updateApplicantStatus(Request $request, JobApplication $application)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:pending,shortlisted,waiting_list,hired,not_selected,rejected',
+            'admin_notes' => 'nullable|string|max:5000',
+        ]);
+
+        $application->update([
+            'status' => $validated['status'],
+            'admin_notes' => $validated['admin_notes'] ?? $application->admin_notes,
+            'reviewed_at' => now(),
+            'reviewed_by' => Auth::guard('superadmin')->id(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Application status updated successfully.',
+            'data' => $application->fresh(),
         ]);
     }
 }

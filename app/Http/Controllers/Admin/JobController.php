@@ -426,4 +426,141 @@ class JobController extends Controller
             'data' => $job,
         ]);
     }
+
+    /**
+     * Display job applicants listing page (Inertia)
+     */
+    public function applicants()
+    {
+        return Inertia::render('Admin/JobPosts/JobApplicants');
+    }
+
+    /**
+     * Get all applicants for jobs created by the authenticated admin
+     */
+    public function getApplicants(Request $request)
+    {
+        $adminId = Auth::guard('admin')->id();
+
+        // Get all job IDs created by this admin
+        $jobIds = Job::where('created_by', $adminId)->pluck('id');
+
+        $query = JobApplication::with(['job' => function($q) {
+                $q->select('id', 'title', 'company', 'location', 'job_type');
+            }, 'candidate' => function($q) {
+                $q->select('id', 'name', 'email', 'phone', 'image');
+            }])
+            ->whereIn('job_id', $jobIds)
+            ->orderBy('created_at', 'desc');
+
+        // Filter by status
+        if ($request->has('status') && $request->status) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by job
+        if ($request->has('job_id') && $request->job_id) {
+            $query->where('job_id', $request->job_id);
+        }
+
+        // Search by candidate name or email
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('candidate_name', 'like', "%{$search}%")
+                  ->orWhere('candidate_email', 'like', "%{$search}%")
+                  ->orWhereHas('job', function($jq) use ($search) {
+                      $jq->where('title', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $applications = $query->paginate(12)->withQueryString();
+
+        // Get all jobs for filter dropdown
+        $jobs = Job::where('created_by', $adminId)
+            ->select('id', 'title', 'company')
+            ->orderBy('title')
+            ->get();
+
+        // Status counts
+        $statusCounts = [
+            'pending' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'pending')->count(),
+            'shortlisted' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'shortlisted')->count(),
+            'waiting_list' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'waiting_list')->count(),
+            'hired' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'hired')->count(),
+            'not_selected' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'not_selected')->count(),
+            'rejected' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'rejected')->count(),
+            'total' => JobApplication::whereIn('job_id', $jobIds)->count(),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $applications,
+            'jobs' => $jobs,
+            'statusCounts' => $statusCounts,
+            'filters' => [
+                'status' => $request->status ?? '',
+                'job_id' => $request->job_id ?? '',
+                'search' => $request->search ?? '',
+            ],
+        ]);
+    }
+
+    /**
+     * Get single applicant details
+     */
+    public function getApplicantDetails(JobApplication $application)
+    {
+        $adminId = Auth::guard('admin')->id();
+
+        // Check if the application belongs to a job created by this admin
+        if ($application->job->created_by !== $adminId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to view this application.',
+            ], 403);
+        }
+
+        $application->load(['job', 'candidate', 'reviewer']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $application,
+        ]);
+    }
+
+    /**
+     * Update applicant status
+     */
+    public function updateApplicantStatus(Request $request, JobApplication $application)
+    {
+        $adminId = Auth::guard('admin')->id();
+
+        // Check if the application belongs to a job created by this admin
+        if ($application->job->created_by !== $adminId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to update this application.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|in:pending,shortlisted,waiting_list,hired,not_selected,rejected',
+            'admin_notes' => 'nullable|string|max:5000',
+        ]);
+
+        $application->update([
+            'status' => $validated['status'],
+            'admin_notes' => $validated['admin_notes'] ?? $application->admin_notes,
+            'reviewed_at' => now(),
+            'reviewed_by' => $adminId,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Application status updated successfully.',
+            'data' => $application->fresh(),
+        ]);
+    }
 }
