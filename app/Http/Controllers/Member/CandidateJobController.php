@@ -93,10 +93,6 @@ class CandidateJobController extends Controller
                 $q->select('id', 'name', 'email');
             }])
             ->where('status', 'active')
-            ->where(function($q) {
-                $q->whereNull('last_date')
-                  ->orWhere('last_date', '>=', now()->format('Y-m-d'));
-            })
             ->orderBy('created_at', 'desc');
 
         // Search by title or company
@@ -512,10 +508,11 @@ class CandidateJobController extends Controller
         // Application status counts
         $statusCounts = [
             'pending' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'pending')->count(),
-            'reviewing' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'reviewing')->count(),
             'shortlisted' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'shortlisted')->count(),
-            'rejected' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'rejected')->count(),
+            'waiting_list' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'waiting_list')->count(),
             'hired' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'hired')->count(),
+            'not_selected' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'not_selected')->count(),
+            'rejected' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'rejected')->count(),
         ];
 
         return Inertia::render('Member/MyApplications', [
@@ -538,7 +535,7 @@ class CandidateJobController extends Controller
             ], 403);
         }
 
-        if (!in_array($application->status, ['pending', 'reviewing'])) {
+        if (!in_array($application->status, ['pending'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Cannot withdraw application at this stage.',

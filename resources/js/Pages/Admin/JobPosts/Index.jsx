@@ -45,7 +45,7 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
                         <p className="text-slate-500 text-[12px]">{job.company}</p>
                     </div>
                 </div>
-                <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-medium">
+                <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-medium whitespace-nowrap">
                     {job.type}
                 </span>
             </div>
@@ -234,6 +234,17 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
+
+        // Only allow numeric values for salary fields
+        if (name === 'minSalary' || name === 'maxSalary') {
+            const numericValue = value.replace(/[^0-9]/g, '');
+            setFormData(prev => ({
+                ...prev,
+                [name]: numericValue
+            }));
+            return;
+        }
+
         setFormData(prev => ({
             ...prev,
             [name]: value
@@ -596,14 +607,15 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                                     ₹
                                                 </span>
                                                 <input
-                                                    type="number"
+                                                    type="text"
                                                     id="minSalary"
                                                     name="minSalary"
                                                     value={formData.minSalary}
                                                     onChange={handleInputChange}
                                                     required
-                                                    min="0"
                                                     placeholder="Minimum"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
                                                     className="w-full pl-8 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
                                                 />
                                             </div>
@@ -614,14 +626,15 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                                     ₹
                                                 </span>
                                                 <input
-                                                    type="number"
+                                                    type="text"
                                                     id="maxSalary"
                                                     name="maxSalary"
                                                     value={formData.maxSalary}
                                                     onChange={handleInputChange}
                                                     required
-                                                    min="0"
                                                     placeholder="Maximum"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
                                                     className="w-full pl-8 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
                                                 />
                                             </div>

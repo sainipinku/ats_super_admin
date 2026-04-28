@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { Head, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "../Layouts/AuthenticatedLayout";
+import { useAlerts } from "../../../Components/Alerts";
 
 const JobRequestCard = ({ job, onView, onApprove, onReject }) => {
     const getStatusBadge = (status) => {
         const badges = {
-            pending: "bg-yellow-100 text-yellow-800",
-            active: "bg-green-100 text-green-800",
-            declined: "bg-red-100 text-red-800",
+            pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+            active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+            declined: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
         };
-        return badges[status] || "bg-gray-100 text-gray-800";
+        return badges[status] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200 max-w-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700 max-w-sm">
             <div className="flex items-start justify-between mb-3">
                 <div className="flex gap-3">
                     {job.company_image ? (
@@ -23,9 +24,9 @@ const JobRequestCard = ({ job, onView, onApprove, onReject }) => {
                             className="w-12 h-12 rounded-xl object-cover"
                         />
                     ) : (
-                        <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                             <svg
-                                className="w-6 h-6 text-gray-400"
+                                className="w-6 h-6 text-gray-400 dark:text-gray-500"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -40,10 +41,10 @@ const JobRequestCard = ({ job, onView, onApprove, onReject }) => {
                         </div>
                     )}
                     <div>
-                        <h3 className="text-[16px] font-semibold text-slate-900 line-clamp-1">
+                        <h3 className="text-[16px] font-semibold text-slate-900 dark:text-white line-clamp-1">
                             {job.title}
                         </h3>
-                        <p className="text-slate-500 text-[12px]">{job.company}</p>
+                        <p className="text-slate-500 dark:text-gray-400 text-[12px]">{job.company}</p>
                     </div>
                 </div>
                 <span
@@ -55,21 +56,21 @@ const JobRequestCard = ({ job, onView, onApprove, onReject }) => {
                 </span>
             </div>
 
-            <div className="space-y-1 text-slate-600 text-[12px] mb-3">
+            <div className="space-y-1 text-slate-600 dark:text-gray-400 text-[12px] mb-3">
                 <div className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">Location:</span>
+                    <span className="font-semibold text-slate-700 dark:text-gray-300">Location:</span>
                     <span>{job.location}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">Type:</span>
+                    <span className="font-semibold text-slate-700 dark:text-gray-300">Type:</span>
                     <span>{job.job_type}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">Created By:</span>
+                    <span className="font-semibold text-slate-700 dark:text-gray-300">Created By:</span>
                     <span>{job.creator?.name || "Unknown"}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">Created:</span>
+                    <span className="font-semibold text-slate-700 dark:text-gray-300">Created:</span>
                     <span>
                         {new Date(job.created_at).toLocaleDateString("en-US", {
                             month: "short",
@@ -100,7 +101,7 @@ const JobRequestCard = ({ job, onView, onApprove, onReject }) => {
 
             <button
                 onClick={() => onView(job)}
-                className="w-full mt-2 py-2 rounded-lg text-blue-600 text-[12px] font-medium hover:bg-blue-50 transition-colors border border-blue-200"
+                className="w-full mt-2 py-2 rounded-lg text-blue-600 dark:text-blue-400 text-[12px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors border border-blue-200 dark:border-blue-800"
             >
                 View Details
             </button>
@@ -113,11 +114,11 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
 
     const getStatusBadge = (status) => {
         const badges = {
-            pending: "bg-yellow-100 text-yellow-800",
-            active: "bg-green-100 text-green-800",
-            declined: "bg-red-100 text-red-800",
+            pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+            active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+            declined: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
         };
-        return badges[status] || "bg-gray-100 text-gray-800";
+        return badges[status] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
     };
 
     return (
@@ -134,9 +135,9 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-700">
                                     <svg
-                                        className="w-8 h-8 text-gray-400"
+                                        className="w-8 h-8 text-gray-400 dark:text-gray-500"
                                         fill="none"
                                         stroke="currentColor"
                                         viewBox="0 0 24 24"
@@ -192,32 +193,32 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
                     {/* Basic Info */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Location</p>
-                            <p className="font-medium text-gray-900">{job.location}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Location</p>
+                            <p className="font-medium text-gray-900 dark:text-white">{job.location}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Job Type</p>
-                            <p className="font-medium text-gray-900">{job.job_type}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Job Type</p>
+                            <p className="font-medium text-gray-900 dark:text-white">{job.job_type}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Experience</p>
-                            <p className="font-medium text-gray-900">{job.experience || "Not specified"}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Experience</p>
+                            <p className="font-medium text-gray-900 dark:text-white">{job.experience || "Not specified"}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Salary</p>
-                            <p className="font-medium text-green-600">{job.salary || "Not specified"}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Salary</p>
+                            <p className="font-medium text-green-600 dark:text-green-400">{job.salary || "Not specified"}</p>
                         </div>
                     </div>
 
                     {/* Skills */}
                     {job.skills && job.skills.length > 0 && (
                         <div>
-                            <p className="text-xs text-gray-500 mb-2">Skills Required</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Skills Required</p>
                             <div className="flex flex-wrap gap-2">
                                 {job.skills.map((skill, index) => (
                                     <span
                                         key={index}
-                                        className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm"
+                                        className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg text-sm"
                                     >
                                         {skill}
                                     </span>
@@ -229,8 +230,8 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
                     {/* Description */}
                     {job.description && (
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Description</p>
-                            <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Description</p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
                                 {job.description}
                             </p>
                         </div>
@@ -239,8 +240,8 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
                     {/* Key Responsibilities */}
                     {job.key_responsibilities && (
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Key Responsibilities</p>
-                            <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Key Responsibilities</p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
                                 {job.key_responsibilities}
                             </p>
                         </div>
@@ -249,8 +250,8 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
                     {/* Qualifications */}
                     {job.qualifications && (
                         <div>
-                            <p className="text-xs text-gray-500 mb-1">Qualifications</p>
-                            <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Qualifications</p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
                                 {job.qualifications}
                             </p>
                         </div>
@@ -259,12 +260,12 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
                     {/* Perks */}
                     {job.perks && job.perks.length > 0 && (
                         <div>
-                            <p className="text-xs text-gray-500 mb-2">Perks & Benefits</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Perks & Benefits</p>
                             <div className="flex flex-wrap gap-2">
                                 {job.perks.map((perk, index) => (
                                     <span
                                         key={index}
-                                        className="px-3 py-1 bg-green-50 text-green-700 rounded-lg text-sm flex items-center gap-1"
+                                        className="px-3 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg text-sm flex items-center gap-1"
                                     >
                                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                             <path
@@ -356,6 +357,8 @@ export default function JobRequests({ auth }) {
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [jobToReject, setJobToReject] = useState(null);
 
+    const { successAlert, errorAlert } = useAlerts();
+
     useEffect(() => {
         fetchJobs();
     }, []);
@@ -394,13 +397,13 @@ export default function JobRequests({ auth }) {
             const data = await response.json();
             if (data.success) {
                 setJobs(jobs.map((j) => (j.id === job.id ? data.data : j)));
-                alert("Job approved successfully!");
+                successAlert("Job approved successfully!");
             } else {
-                alert(data.message);
+                errorAlert(data.message || "Failed to approve job.");
             }
         } catch (error) {
             console.error("Error approving job:", error);
-            alert("Failed to approve job.");
+            errorAlert("Failed to approve job.");
         }
     };
 
@@ -432,13 +435,13 @@ export default function JobRequests({ auth }) {
                 setShowRejectModal(false);
                 setJobToReject(null);
                 setRejectionReason("");
-                alert("Job rejected successfully!");
+                successAlert("Job rejected successfully!");
             } else {
-                alert(data.message);
+                errorAlert(data.message || "Failed to reject job.");
             }
         } catch (error) {
             console.error("Error rejecting job:", error);
-            alert("Failed to reject job.");
+            errorAlert("Failed to reject job.");
         }
     };
 
@@ -462,14 +465,14 @@ export default function JobRequests({ auth }) {
         <AuthenticatedLayout>
             <Head title="Job Requests" />
 
-            <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
+            <div className="min-h-screen bg-slate-100 dark:bg-gray-900 p-4 sm:p-6">
                 <div className="max-w-7xl mx-auto">
                     {/* Header */}
                     <div className="mb-6">
-                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-white">
                             Job Requests
                         </h1>
-                        <p className="text-slate-500 mt-1">
+                        <p className="text-slate-500 dark:text-gray-400 mt-1">
                             Manage job approval requests from admins
                         </p>
                     </div>
@@ -488,11 +491,11 @@ export default function JobRequests({ auth }) {
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                                     filter === tab.key
                                         ? "bg-[#5146E6] text-white"
-                                        : "bg-white text-slate-600 hover:bg-slate-50"
+                                        : "bg-white dark:bg-gray-800 text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-700"
                                 }`}
                             >
                                 {tab.label}
-                                <span className="ml-2 px-2 py-0.5 bg-slate-200 text-slate-700 rounded-full text-xs">
+                                <span className="ml-2 px-2 py-0.5 bg-slate-200 dark:bg-gray-600 text-slate-700 dark:text-gray-300 rounded-full text-xs">
                                     {tab.count}
                                 </span>
                             </button>
@@ -505,9 +508,9 @@ export default function JobRequests({ auth }) {
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5146E6]"></div>
                         </div>
                     ) : filteredJobs.length === 0 ? (
-                        <div className="text-center py-12 bg-white rounded-xl">
+                        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">
                             <svg
-                                className="w-16 h-16 mx-auto text-gray-300 mb-4"
+                                className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -519,10 +522,10 @@ export default function JobRequests({ auth }) {
                                     d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                                 />
                             </svg>
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                                 No Job Requests Found
                             </h3>
-                            <p className="text-gray-500">
+                            <p className="text-gray-500 dark:text-gray-400">
                                 {filter === "all"
                                     ? "No job requests have been submitted yet."
                                     : `No ${filter} job requests found.`}
@@ -559,18 +562,18 @@ export default function JobRequests({ auth }) {
             {/* Rejection Reason Modal */}
             {showRejectModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl max-w-md w-full p-6">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
                             Reject Job Request
                         </h3>
-                        <p className="text-sm text-gray-600 mb-4">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                             Please provide a reason for rejecting "{jobToReject?.title}"
                         </p>
                         <textarea
                             value={rejectionReason}
                             onChange={(e) => setRejectionReason(e.target.value)}
                             placeholder="Enter rejection reason..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 mb-4"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 mb-4 dark:bg-gray-700 dark:text-white"
                             rows={4}
                         />
                         <div className="flex gap-3">
@@ -580,7 +583,7 @@ export default function JobRequests({ auth }) {
                                     setJobToReject(null);
                                     setRejectionReason("");
                                 }}
-                                className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                                className="flex-1 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                             >
                                 Cancel
                             </button>

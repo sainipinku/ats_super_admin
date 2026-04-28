@@ -281,7 +281,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                                 fill="currentColor"
                             />
                         </svg>
-                        Job Applicants
+                        Job Applications
                     </a>
                 </li>
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
