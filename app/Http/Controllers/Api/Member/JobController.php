@@ -446,10 +446,11 @@ class JobController extends Controller
 
         $statusCounts = [
             'pending' => JobApplication::where('candidate_id', $member->id)->where('status', 'pending')->count(),
-            'reviewing' => JobApplication::where('candidate_id', $member->id)->where('status', 'reviewing')->count(),
             'shortlisted' => JobApplication::where('candidate_id', $member->id)->where('status', 'shortlisted')->count(),
-            'rejected' => JobApplication::where('candidate_id', $member->id)->where('status', 'rejected')->count(),
+            'waiting_list' => JobApplication::where('candidate_id', $member->id)->where('status', 'waiting_list')->count(),
             'hired' => JobApplication::where('candidate_id', $member->id)->where('status', 'hired')->count(),
+            'not_selected' => JobApplication::where('candidate_id', $member->id)->where('status', 'not_selected')->count(),
+            'rejected' => JobApplication::where('candidate_id', $member->id)->where('status', 'rejected')->count(),
         ];
 
         return response()->json([

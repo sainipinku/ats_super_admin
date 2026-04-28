@@ -486,10 +486,11 @@ class JobController extends Controller
         // Status counts
         $statusCounts = [
             'pending' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'pending')->count(),
-            'reviewing' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'reviewing')->count(),
             'shortlisted' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'shortlisted')->count(),
-            'rejected' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'rejected')->count(),
+            'waiting_list' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'waiting_list')->count(),
             'hired' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'hired')->count(),
+            'not_selected' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'not_selected')->count(),
+            'rejected' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'rejected')->count(),
             'total' => JobApplication::whereIn('job_id', $jobIds)->count(),
         ];
 
@@ -545,7 +546,7 @@ class JobController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => 'required|in:pending,reviewing,shortlisted,rejected,hired',
+            'status' => 'required|in:pending,shortlisted,waiting_list,hired,not_selected,rejected',
             'admin_notes' => 'nullable|string|max:5000',
         ]);
 

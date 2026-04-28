@@ -10,10 +10,11 @@ const ApplicantCard = ({ application, onViewDetails }) => {
     const getStatusBadge = (status) => {
         const badges = {
             pending: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
-            reviewing: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
             shortlisted: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
-            rejected: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+            waiting_list: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
             hired: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+            not_selected: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+            rejected: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
         };
         return badges[status] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
     };
@@ -153,10 +154,11 @@ export default function JobApplicants({ auth }) {
     const [jobs, setJobs] = useState([]);
     const [statusCounts, setStatusCounts] = useState({
         pending: 0,
-        reviewing: 0,
         shortlisted: 0,
-        rejected: 0,
+        waiting_list: 0,
         hired: 0,
+        not_selected: 0,
+        rejected: 0,
         total: 0,
     });
     const [loading, setLoading] = useState(true);
@@ -261,10 +263,11 @@ export default function JobApplicants({ auth }) {
     const getStatusColor = (status) => {
         const colors = {
             pending: 'yellow',
-            reviewing: 'blue',
             shortlisted: 'green',
-            rejected: 'red',
+            waiting_list: 'blue',
             hired: 'purple',
+            not_selected: 'orange',
+            rejected: 'red',
         };
         return colors[status] || 'gray';
     };
@@ -294,10 +297,10 @@ export default function JobApplicants({ auth }) {
                             color="yellow"
                         />
                         <StatusFilter
-                            label="Reviewing"
-                            count={statusCounts.reviewing}
-                            active={selectedStatus === 'reviewing'}
-                            onClick={() => setSelectedStatus('reviewing')}
+                            label="Waiting List"
+                            count={statusCounts.waiting_list}
+                            active={selectedStatus === 'waiting_list'}
+                            onClick={() => setSelectedStatus('waiting_list')}
                             color="blue"
                         />
                         <StatusFilter
@@ -313,6 +316,13 @@ export default function JobApplicants({ auth }) {
                             active={selectedStatus === 'hired'}
                             onClick={() => setSelectedStatus('hired')}
                             color="purple"
+                        />
+                        <StatusFilter
+                            label="Not Selected"
+                            count={statusCounts.not_selected}
+                            active={selectedStatus === 'not_selected'}
+                            onClick={() => setSelectedStatus('not_selected')}
+                            color="orange"
                         />
                         <StatusFilter
                             label="Rejected"
@@ -566,7 +576,7 @@ export default function JobApplicants({ auth }) {
                                 <div className="border-t border-slate-200 dark:border-gray-700 pt-4">
                                     <p className="text-sm font-medium text-slate-700 dark:text-gray-300 mb-3">Update Status</p>
                                     <div className="flex flex-wrap gap-2 mb-4">
-                                        {['pending', 'reviewing', 'shortlisted', 'hired', 'rejected'].map((status) => (
+                                        {['pending', 'shortlisted', 'waiting_list', 'hired', 'not_selected', 'rejected'].map((status) => (
                                             <button
                                                 key={status}
                                                 onClick={() => handleStatusChange(status)}
@@ -575,9 +585,10 @@ export default function JobApplicants({ auth }) {
                                                     selectedApplication.status === status
                                                         ? 'bg-slate-100 dark:bg-gray-700 text-slate-400 dark:text-gray-500 cursor-not-allowed'
                                                         : status === 'pending' ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-900/30' :
-                                                          status === 'reviewing' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30' :
                                                           status === 'shortlisted' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30' :
+                                                          status === 'waiting_list' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30' :
                                                           status === 'hired' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30' :
+                                                          status === 'not_selected' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30' :
                                                           'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30'
                                                 }`}
                                             >

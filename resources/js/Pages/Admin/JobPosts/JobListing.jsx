@@ -373,6 +373,45 @@ export default function JobListing({ auth }) {
         }
     };
 
+    const [updatingStatusId, setUpdatingStatusId] = useState(null);
+
+    const handleStatusChangeDirectly = async (app, newStatus) => {
+        if (app.status === newStatus) return;
+        setUpdatingStatusId(app.id);
+        try {
+            const response = await fetch(route('admin.api.job.applicants.status', app.id), {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                errorAlert(data?.message || 'Failed to update status.');
+                return;
+            }
+            setApplications(prev => prev.map(a => (a.id === app.id ? { ...a, status: newStatus } : a)));
+            successAlert('Status updated successfully!');
+        } catch (error) {
+            console.error('Error updating status:', error);
+            errorAlert('Failed to update status.');
+        } finally {
+            setUpdatingStatusId(null);
+        }
+    };
+
+    const statusOptions = [
+        { value: 'pending', label: 'Pending' },
+        { value: 'shortlisted', label: 'Shortlisted' },
+        { value: 'waiting_list', label: 'Waiting List' },
+        { value: 'hired', label: 'Hired' },
+        { value: 'not_selected', label: 'Not Selected' },
+        { value: 'rejected', label: 'Rejected' },
+    ];
+
     const handleEdit = (job) => {
         // Navigate to job post form with full job data for editing
         router.visit(route('admin.job.posts.index'), {
@@ -664,7 +703,34 @@ export default function JobListing({ auth }) {
                                                     <td className="py-2 pr-3 text-slate-900 dark:text-white">{app.candidate_name || '-'}</td>
                                                     <td className="py-2 pr-3">{app.candidate_email || '-'}</td>
                                                     <td className="py-2 pr-3">{app.candidate_phone || '-'}</td>
-                                                    <td className="py-2 pr-3 capitalize">{app.status || '-'}</td>
+                                                    <td className="py-2 pr-3">
+                                                        {updatingStatusId === app.id ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                                                <span className="text-xs text-slate-500">Updating...</span>
+                                                            </div>
+                                                        ) : (
+                                                            <select
+                                                                value={app.status}
+                                                                onChange={(e) => handleStatusChangeDirectly(app, e.target.value)}
+                                                                className={`w-full px-2 py-1.5 text-xs font-medium rounded-full border cursor-pointer outline-none ${
+                                                                    app.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                                                                    app.status === 'shortlisted' ? 'bg-green-100 text-green-800 border-green-300' :
+                                                                    app.status === 'waiting_list' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                                                                    app.status === 'hired' ? 'bg-purple-100 text-purple-800 border-purple-300' :
+                                                                    app.status === 'not_selected' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                                                                    app.status === 'rejected' ? 'bg-red-100 text-red-800 border-red-300' :
+                                                                    'bg-gray-100 text-gray-800 border-gray-300'
+                                                                }`}
+                                                            >
+                                                                {statusOptions.map(opt => (
+                                                                    <option key={opt.value} value={opt.value}>
+                                                                        {opt.label}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        )}
+                                                    </td>
                                                     <td className="py-2 pr-3">
                                                         {app.resume_url ? (
                                                             <button
@@ -679,7 +745,7 @@ export default function JobListing({ auth }) {
                                                         )}
                                                     </td>
                                                     <td className="py-2">
-                                                        {app.status === 'pending' || app.status === 'reviewing' ? (
+                                                        {app.status === 'pending' ? (
                                                             <div className="flex items-center gap-2">
                                                                 <button
                                                                     type="button"

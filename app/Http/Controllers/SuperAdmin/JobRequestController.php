@@ -380,7 +380,7 @@ class JobRequestController extends Controller
 
         $newStatus = $validated['action'] === 'approve' ? 'shortlisted' : 'rejected';
 
-        if (!in_array($application->status, ['pending', 'reviewing', 'shortlisted', 'rejected', 'hired'], true)) {
+        if (!in_array($application->status, ['pending', 'shortlisted', 'waiting_list', 'hired', 'not_selected', 'rejected'], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid application status.',
@@ -489,10 +489,11 @@ class JobRequestController extends Controller
         // Status counts
         $statusCounts = [
             'pending' => JobApplication::where('status', 'pending')->count(),
-            'reviewing' => JobApplication::where('status', 'reviewing')->count(),
             'shortlisted' => JobApplication::where('status', 'shortlisted')->count(),
-            'rejected' => JobApplication::where('status', 'rejected')->count(),
+            'waiting_list' => JobApplication::where('status', 'waiting_list')->count(),
             'hired' => JobApplication::where('status', 'hired')->count(),
+            'not_selected' => JobApplication::where('status', 'not_selected')->count(),
+            'rejected' => JobApplication::where('status', 'rejected')->count(),
             'total' => JobApplication::count(),
         ];
 
@@ -528,7 +529,7 @@ class JobRequestController extends Controller
     public function updateApplicantStatus(Request $request, JobApplication $application)
     {
         $validated = $request->validate([
-            'status' => 'required|in:pending,reviewing,shortlisted,rejected,hired',
+            'status' => 'required|in:pending,shortlisted,waiting_list,hired,not_selected,rejected',
             'admin_notes' => 'nullable|string|max:5000',
         ]);
 

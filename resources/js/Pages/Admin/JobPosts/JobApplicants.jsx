@@ -10,10 +10,11 @@ const ApplicantCard = ({ application, onViewDetails, onStatusChange }) => {
     const getStatusBadge = (status) => {
         const badges = {
             pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-            reviewing: 'bg-blue-100 text-blue-800 border-blue-200',
             shortlisted: 'bg-green-100 text-green-800 border-green-200',
-            rejected: 'bg-red-100 text-red-800 border-red-200',
+            waiting_list: 'bg-blue-100 text-blue-800 border-blue-200',
             hired: 'bg-purple-100 text-purple-800 border-purple-200',
+            not_selected: 'bg-orange-100 text-orange-800 border-orange-200',
+            rejected: 'bg-red-100 text-red-800 border-red-200',
         };
         return badges[status] || 'bg-gray-100 text-gray-800 border-gray-200';
     };
@@ -153,10 +154,11 @@ export default function JobApplicants({ auth }) {
     const [jobs, setJobs] = useState([]);
     const [statusCounts, setStatusCounts] = useState({
         pending: 0,
-        reviewing: 0,
         shortlisted: 0,
-        rejected: 0,
+        waiting_list: 0,
         hired: 0,
+        not_selected: 0,
+        rejected: 0,
         total: 0,
     });
     const [loading, setLoading] = useState(true);
@@ -261,10 +263,11 @@ export default function JobApplicants({ auth }) {
     const getStatusColor = (status) => {
         const colors = {
             pending: 'yellow',
-            reviewing: 'blue',
             shortlisted: 'green',
-            rejected: 'red',
+            waiting_list: 'blue',
             hired: 'purple',
+            not_selected: 'orange',
+            rejected: 'red',
         };
         return colors[status] || 'gray';
     };
@@ -294,10 +297,10 @@ export default function JobApplicants({ auth }) {
                             color="yellow"
                         />
                         <StatusFilter
-                            label="Reviewing"
-                            count={statusCounts.reviewing}
-                            active={selectedStatus === 'reviewing'}
-                            onClick={() => setSelectedStatus('reviewing')}
+                            label="Waiting List"
+                            count={statusCounts.waiting_list}
+                            active={selectedStatus === 'waiting_list'}
+                            onClick={() => setSelectedStatus('waiting_list')}
                             color="blue"
                         />
                         <StatusFilter
@@ -313,6 +316,13 @@ export default function JobApplicants({ auth }) {
                             active={selectedStatus === 'hired'}
                             onClick={() => setSelectedStatus('hired')}
                             color="purple"
+                        />
+                        <StatusFilter
+                            label="Not Selected"
+                            count={statusCounts.not_selected}
+                            active={selectedStatus === 'not_selected'}
+                            onClick={() => setSelectedStatus('not_selected')}
+                            color="orange"
                         />
                         <StatusFilter
                             label="Rejected"
@@ -566,7 +576,7 @@ export default function JobApplicants({ auth }) {
                                 <div className="border-t border-slate-200 dark:border-gray-700 pt-4">
                                     <p className="text-sm font-medium text-slate-700 dark:text-gray-300 mb-3">Update Status</p>
                                     <div className="flex flex-wrap gap-2 mb-4">
-                                        {['pending', 'reviewing', 'shortlisted', 'hired', 'rejected'].map((status) => (
+                                        {['pending', 'shortlisted', 'waiting_list', 'hired', 'not_selected', 'rejected'].map((status) => (
                                             <button
                                                 key={status}
                                                 onClick={() => handleStatusChange(status)}
@@ -575,9 +585,10 @@ export default function JobApplicants({ auth }) {
                                                     selectedApplication.status === status
                                                         ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                                         : status === 'pending' ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' :
-                                                          status === 'reviewing' ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' :
                                                           status === 'shortlisted' ? 'bg-green-50 text-green-700 hover:bg-green-100' :
+                                                          status === 'waiting_list' ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' :
                                                           status === 'hired' ? 'bg-purple-50 text-purple-700 hover:bg-purple-100' :
+                                                          status === 'not_selected' ? 'bg-orange-50 text-orange-700 hover:bg-orange-100' :
                                                           'bg-red-50 text-red-700 hover:bg-red-100'
                                                 }`}
                                             >
