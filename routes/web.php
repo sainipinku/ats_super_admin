@@ -196,6 +196,8 @@ Route::prefix('member')->middleware(['member'])->group(function () {
 
 /** PUBLIC ROUTES START HERE **/
 Route::get('/', [HomeController::class, 'authShowPage'])->name('home');
+Route::get('/homepage', [HomeController::class, 'showHomepage'])->name('homepage');
+Route::get('/public/jobs', [App\Http\Controllers\Public\JobController::class, 'index'])->name('public.jobs.homepage');
 Route::get('/login', [AdminAuthController::class, 'login'])->name('login');
 Route::post('/verify', [AdminAuthController::class, 'verify'])->name('auth.login');
 Route::redirect('/admin/login', '/login')->name('admin.login');

@@ -27,7 +27,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     />
                 </div>
 
-                <button onClick={onClose} className="absolute right-[5px] top-[16px] flex xl:hidden  items-center justify-center bg-white  dark:bg-[#61CC681A] w-[48px] h-[38px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[8px]  transition md:flex text-[#000] dark:text-[#fff] focus:outline-none" > <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" > <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /> </svg> </button>
+                <button onClick={onClose} className="absolute right-[5px] top-[16px] flex xl:hidden  items-center justify-center bg-white  dark:bg-[#61CC681A] w-[48px] h-[38px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[8px]  transition md:flex text-[#000] dark:text-[#fff] focus:outline-none" > <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" > <path d="M6 18L18 6M6 6l12 12" /> </svg> </button>
             </div>
             <ul className="px-[5px] py-[8px]">
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a]">
@@ -58,15 +58,15 @@ const Sidebar = ({ isOpen, onClose }) => {
                 {/* Job Portal - Browse Jobs */}
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a]">
                     <Link
-                        href={route("member.jobs.index")}
+                        href="/member/jobs"
                         className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
-                            route().current('member.jobs.index')
+                            window.location.pathname === '/member/jobs'
                                 ? 'text-[#4F46E5] dark:text-[#4F46E5] bg-[#4F46E5]/10'
                                 : 'text-[#727272] hover:text-[#4F46E5] dark:hover:text-[#4F46E5]'
                         }`}
                     >
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke="currentColor" strokeWidth="2"/>
                         </svg>
                         Browse Jobs
                     </Link>

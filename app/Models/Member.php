@@ -85,12 +85,7 @@ class Member extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
-
     ];
-    public function roles()
-    {
-        return $this->HashMany(Role::class);
-    }
 
     public function dob(): Attribute
     {
