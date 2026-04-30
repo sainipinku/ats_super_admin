@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, ArrowRight, Briefcase, X, CheckCircle2, Calendar, Users, MapPin, DollarSign } from 'lucide-react';
+import { Clock, ArrowRight, Briefcase, X, CheckCircle2, Calendar, Users, MapPin, DollarSign, Bookmark, BookmarkCheck } from 'lucide-react';
 
 // Job Card Component (Copy from Member/JobListings)
-const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply, isDark }) => {
+const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply, isDark, isAuthenticated, onSaveJob, savedJobs }) => {
     const getJobTypeBadge = (type) => {
         const badges = {
             'full-time': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
@@ -36,6 +36,16 @@ const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply, isDark }) =
     const textPrimary = isDark ? 'text-white' : 'text-slate-900';
     const textSecondary = isDark ? 'text-gray-300' : 'text-slate-600';
     const textMuted = isDark ? 'text-gray-400' : 'text-slate-500';
+    
+    const isSaved = savedJobs?.includes(job.id);
+    const handleSaveJob = () => {
+        if (!isAuthenticated) {
+            // Redirect to login when trying to save without authentication
+            window.location.href = '/login';
+            return;
+        }
+        onSaveJob(job.id);
+    };
 
     return (
         <div className={`${cardBg} rounded-2xl shadow-sm border ${hoverBorder} transition-all duration-300 overflow-hidden flex flex-col h-full`}>
@@ -63,6 +73,21 @@ const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply, isDark }) =
                         </h3>
                         <p className={`${textSecondary} text-sm font-medium`}>{job.company}</p>
                     </div>
+                    
+                    {/* Save/Bookmark Button - Top Right */}
+                    <button
+                        onClick={handleSaveJob}
+                        className={`p-2 rounded-lg transition-all duration-300 flex-shrink-0 ${
+                            isSaved 
+                                ? 'bg-emerald-100 text-emerald-600 border border-emerald-200 hover:bg-emerald-200' 
+                                : isDark 
+                                    ? 'bg-gray-700 text-gray-300 border border-gray-600 hover:bg-gray-600 hover:text-white'
+                                    : 'bg-white text-gray-600 border border-slate-300 hover:bg-slate-50 hover:text-slate-700'
+                        }`}
+                        title={isSaved ? 'Remove from saved jobs' : isAuthenticated ? 'Save job' : 'Sign in to save jobs'}
+                    >
+                        {isSaved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                    </button>
                 </div>
 
                 {/* Job Meta */}
@@ -91,14 +116,14 @@ const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply, isDark }) =
                 {job.skills && job.skills.length > 0 && (
                     <div className="mt-4">
                         <div className="flex flex-wrap gap-1.5">
-                            {job.skills.slice(0, 4).map((skill, idx) => (
+                            {job.skills.slice(0, 3).map((skill, idx) => (
                                 <span key={idx} className={`px-2 py-0.5 text-xs rounded-md border ${isDark ? 'bg-gray-700 text-gray-300 border-gray-600' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
                                     {skill}
                                 </span>
                             ))}
-                            {job.skills.length > 4 && (
+                            {job.skills.length > 3 && (
                                 <span className={`px-2 py-0.5 text-xs rounded-md ${isDark ? 'bg-gray-700 text-gray-400' : 'bg-slate-50 text-slate-500'}`}>
-                                    +{job.skills.length - 4} more
+                                    +{job.skills.length - 3} more
                                 </span>
                             )}
                         </div>
@@ -372,6 +397,8 @@ export default function PublicJobListings({ auth, jobs }) {
     const [selectedType, setSelectedType] = useState('');
     const [selectedLocation, setSelectedLocation] = useState('');
     const [filteredJobs, setFilteredJobs] = useState(jobs || []);
+    const isAuthenticated = !!auth?.user;
+    const [savedJobs, setSavedJobs] = useState([]);
 
     // Filter jobs based on search and filters
     useEffect(() => {
@@ -423,6 +450,14 @@ export default function PublicJobListings({ auth, jobs }) {
     const handleCloseModal = () => {
         setShowDetailsModal(false);
         setSelectedJob(null);
+    };
+    
+    const handleSaveJob = (jobId) => {
+        if (savedJobs.includes(jobId)) {
+            setSavedJobs(savedJobs.filter(id => id !== jobId));
+        } else {
+            setSavedJobs([...savedJobs, jobId]);
+        }
     };
 
     const bgColor = isDark ? 'bg-[#0f172a]' : 'bg-gray-50';
@@ -582,6 +617,9 @@ export default function PublicJobListings({ auth, jobs }) {
                                     onViewDetails={handleViewDetails}
                                     onApply={handleApply}
                                     isDark={isDark}
+                                    isAuthenticated={isAuthenticated}
+                                    onSaveJob={handleSaveJob}
+                                    savedJobs={savedJobs}
                                 />
                             ))}
                         </div>

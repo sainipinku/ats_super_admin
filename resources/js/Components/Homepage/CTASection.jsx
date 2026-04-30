@@ -40,7 +40,7 @@ export default function CTASection() {
                             href="/register"
                             className="px-8 py-3 rounded-lg font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors flex items-center gap-2"
                         >
-                            Get Started
+                            Sign Up
                             <ArrowRight className="w-5 h-5" />
                         </Link>
                         <Link

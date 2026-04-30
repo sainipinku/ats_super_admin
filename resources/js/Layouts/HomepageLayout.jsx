@@ -33,8 +33,8 @@ export default function HomepageLayout({ children }) {
     const navLinks = [
         { name: 'Home', href: '/homepage', icon: Home },
         { name: 'Browse Jobs', href: '/public/jobs', icon: Briefcase },
-        { name: 'Companies', href: '/companies', icon: Building2 },
-        { name: 'Preview', href: '/', icon: Sparkles },
+        // { name: 'Companies', href: '/companies', icon: Building2 },
+        // { name: 'Preview', href: '/', icon: Sparkles },
     ];
 
     if (isAuthenticated) {
@@ -111,7 +111,7 @@ export default function HomepageLayout({ children }) {
                                 ) : (
                                     <>
                                         <Link
-                                            href="/login"
+                                            href="/UserLogin"
                                             className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                                                 isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
                                             }`}
@@ -122,7 +122,7 @@ export default function HomepageLayout({ children }) {
                                             href="/register"
                                             className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors"
                                         >
-                                            Get Started
+                                            Sign Up
                                         </Link>
                                     </>
                                 )}
@@ -188,7 +188,7 @@ export default function HomepageLayout({ children }) {
                                     ) : (
                                         <>
                                             <Link
-                                                href="/login"
+                                                href="/UserLogin"
                                                 className={`block w-full text-center px-4 py-3 rounded-xl text-sm font-medium ${
                                                     isDark 
                                                         ? 'text-slate-300 hover:text-white' 

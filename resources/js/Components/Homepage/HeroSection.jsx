@@ -58,7 +58,7 @@ export default function HeroSection() {
                 <div className={`absolute bottom-0 right-1/4 w-80 h-80 rounded-full blur-3xl ${isDark ? 'bg-purple-500/20' : 'bg-purple-400/20'}`} />
             </div>
 
-            <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
+            <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-20">
                 <motion.div
                     variants={containerVariants}
                     initial="hidden"
@@ -92,104 +92,111 @@ export default function HeroSection() {
                             Connect with top employers worldwide. Discover opportunities that match your skills and experience.
                         </motion.p>
 
-                        {/* Premium Pill-Shaped Search Bar */}
-                        <motion.div
-                            variants={itemVariants}
-                            className="w-full max-w-5xl mx-auto mb-8"
-                        >
-                            <div className={`relative flex flex-col md:flex-row items-center gap-0 px-5 py-2.5
-${isDark ? 'bg-gray-800/80' : 'bg-white/90'} 
-backdrop-blur-sm rounded-full shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden`}>
+                      <motion.div
+  variants={itemVariants}
+  className="w-full max-w-5xl mx-auto mb-8 px-3 sm:px-4"
+>
+  <div
+    className={`relative flex flex-col md:flex-row items-stretch md:items-center 
+    gap-2 md:gap-0 px-3 sm:px-5 py-2 md:py-2.5
+    ${isDark ? 'bg-gray-800/80' : 'bg-white/90'} 
+    backdrop-blur-sm rounded-2xl md:rounded-full shadow-lg hover:shadow-xl transition-all duration-300`}
+  >
 
-                                {/* Job Title Input */}
-                                <div className="flex items-center gap-3 flex-1 w-full md:w-auto px-3 h-full
-    [&_input]:border-0 [&_input]:outline-none [&_input]:ring-0 
-    [&_input]:focus:!outline-none [&_input]:focus:!ring-0">
+    {/* Job Title Input */}
+    <div className="flex items-center gap-3 flex-1 w-full md:w-auto px-3 py-2 md:py-0 h-full
+      [&_input]:border-0 [&_input]:outline-none [&_input]:ring-0 
+      [&_input]:focus:!outline-none [&_input]:focus:!ring-0">
 
-                                    <Search className="w-5 h-5 text-gray-400 flex-shrink-0" />
+      <Search className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
 
-                                    <input
-                                        type="text"
-                                        placeholder="Job title, keywords, or company"
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="flex-1 w-full h-full bg-transparent text-base text-slate-700 placeholder:text-slate-400"
-                                    />
-                                </div>
+      <input
+        type="text"
+        placeholder="Job title, keywords, or company"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="flex-1 w-full h-full bg-transparent text-sm sm:text-base text-slate-700 placeholder:text-slate-400"
+      />
+    </div>
 
-                                {/* Location Input */}
-                                <div className="flex items-center gap-3 flex-1 w-full md:w-auto px-3 h-full
-    [&_*]:border-0 [&_*]:outline-none [&_*]:ring-0 [&_*]:shadow-none
-    [&_input]:focus:!outline-none [&_input]:focus:!ring-0 [&_input]:focus-visible:!outline-none">
+    {/* Location Input */}
+    <div className="flex items-center gap-3 flex-1 w-full md:w-auto px-3 py-2 md:py-0 h-full
+      [&_*]:border-0 [&_*]:outline-none [&_*]:ring-0 [&_*]:shadow-none
+      [&_input]:focus:!outline-none [&_input]:focus:!ring-0 [&_input]:focus-visible:!outline-none">
 
-                                    <MapPin className="w-5 h-5 text-gray-400 flex-shrink-0" />
+      <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
 
-                                    <div className="flex items-center gap-3 flex-1 w-full md:w-auto px-3 h-full
-[&_input]:!border-0
-[&_input]:!outline-none
-[&_input]:!ring-0
-[&_input]:focus:!outline-none
-[&_input]:focus:!ring-0
-[&_input]:focus-visible:!outline-none
-[&_input]:focus-visible:!ring-0
-[&_input]:!shadow-none">
-                                        <LocationInput
-                                            value={location}
-                                            onChange={setLocation}
-                                            placeholder="City, state"
-                                            variant="pill"
-                                            className="w-full h-full bg-transparent 
-                !border-0 !outline-none !ring-0 !shadow-none 
-                text-sm text-slate-600 placeholder:text-slate-400
-                focus:!outline-none focus:!ring-0"
-                                        />
-                                    </div>
-                                </div>
+      <div className="flex items-center gap-3 flex-1 w-full md:w-auto px-3 h-full
+        [&_input]:!border-0
+        [&_input]:!outline-none
+        [&_input]:!ring-0
+        [&_input]:focus:!outline-none
+        [&_input]:focus:!ring-0
+        [&_input]:focus-visible:!outline-none
+        [&_input]:focus-visible:!ring-0
+        [&_input]:!shadow-none">
 
-                                <button
-                                    onClick={() => {
-                                        const params = new URLSearchParams();
-                                        if (searchQuery) params.append('title', searchQuery);
-                                        if (location) params.append('location', location);
-                                        window.location.href = `/jobs${params.toString() ? '?' + params.toString() : ''}`;
-                                    }}
-                                    className="h-full min-h-[52px] px-8 flex items-center justify-center 
-    bg-blue-600 hover:bg-blue-700 text-white font-medium 
-    rounded-full shadow-md hover:shadow-lg 
-    transition-all duration-200 whitespace-nowrap ml-2 md:ml-4"
-                                >
-                                    Find jobs
-                                </button>
+        <LocationInput
+          value={location}
+          onChange={setLocation}
+          placeholder="City, state"
+          variant="pill"
+          className="w-full h-full bg-transparent 
+          !border-0 !outline-none !ring-0 !shadow-none 
+          text-sm sm:text-base text-slate-600 placeholder:text-slate-400
+          focus:!outline-none focus:!ring-0"
+        />
+      </div>
+    </div>
 
-                            </div>
+    {/* Button */}
+    <button
+      onClick={() => {
+        const params = new URLSearchParams();
+        if (searchQuery) params.append('title', searchQuery);
+        if (location) params.append('location', location);
+        window.location.href = `/jobs${params.toString() ? '?' + params.toString() : ''}`;
+      }}
+      className="w-full md:w-auto mt-2 md:mt-0 md:ml-2 
+      min-h-[48px] md:min-h-[52px] px-6 md:px-8 
+      flex items-center justify-center 
+      bg-blue-600 hover:bg-blue-700 text-white font-medium 
+      rounded-full shadow-md hover:shadow-lg 
+      transition-all duration-200 whitespace-nowrap"
+    >
+      Find jobs
+    </button>
 
-                            {/* Quick Links */}
-                            <div className="flex items-center justify-between mt-4 px-2">
-                                <div className="flex flex-wrap gap-2">
-                                    <span className="text-sm text-gray-500">Popular:</span>
-                                    {['React Developer', 'Data Scientist', 'Remote', 'Entry Level'].map((tag) => (
-                                        <button
-                                            key={tag}
-                                            onClick={() => setSearchQuery(tag)}
-                                            className="text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-                                        >
-                                            {tag}
-                                        </button>
-                                    ))}
-                                </div>
-                                <Link
-                                    href="/jobs"
-                                    className="text-sm text-gray-600 hover:text-gray-900 hover:underline transition-colors"
-                                >
-                                    Advanced search →
-                                </Link>
-                            </div>
-                        </motion.div>
+  </div>
+
+  {/* Quick Links */}
+  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-4 px-2">
+    <div className="flex flex-wrap gap-2">
+      <span className="text-xs sm:text-sm text-gray-500">Popular:</span>
+      {['React Developer', 'Data Scientist', 'Remote', 'Entry Level'].map((tag) => (
+        <button
+          key={tag}
+          onClick={() => setSearchQuery(tag)}
+          className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+        >
+          {tag}
+        </button>
+      ))}
+    </div>
+
+    {/* <Link
+      href="/jobs"
+      className="text-xs sm:text-sm text-gray-600 hover:text-gray-900 hover:underline transition-colors"
+    >
+      Advanced search →
+    </Link> */}
+  </div>
+</motion.div>
 
 
                         {/* Trust Indicators */}
-                        <motion.div variants={itemVariants} className="flex items-center justify-center lg:justify-start gap-4">
-                            <div className="flex -space-x-2">
+                        {/* <motion.div variants={itemVariants} className="flex items-center justify-center lg:justify-start gap-4"> */}
+                            {/* <div className="flex -space-x-2">
                                 {[1, 2, 3, 4].map((i) => (
                                     <div
                                         key={i}
@@ -199,8 +206,8 @@ backdrop-blur-sm rounded-full shadow-lg hover:shadow-xl transition-all duration-
                                         {String.fromCharCode(64 + i)}
                                     </div>
                                 ))}
-                            </div>
-                            <div className="text-left">
+                            </div> */}
+                            {/* <div className="text-left">
                                 <div className="flex items-center gap-1">
                                     {[1, 2, 3, 4, 5].map((i) => (
                                         <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
@@ -209,8 +216,8 @@ backdrop-blur-sm rounded-full shadow-lg hover:shadow-xl transition-all duration-
                                 <p className={`text-sm ${subTextColor}`}>
                                     Trusted by <span className="font-semibold text-blue-500">50K+</span> job seekers
                                 </p>
-                            </div>
-                        </motion.div>
+                            </div> */}
+                        {/* </motion.div> */}
                     </div>
 
                     {/* Right Content - Floating Cards */}

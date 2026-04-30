@@ -5,6 +5,22 @@ const LocationInput = ({ value, onChange, placeholder = "Enter location...", var
     const [showSuggestions, setShowSuggestions] = useState(false);
     const inputRef = useRef(null);
 
+    // Popular Indian locations for quick access
+    const popularLocations = [
+        { display_name: "Mumbai, Maharashtra", type: "city" },
+        { display_name: "Bangalore, Karnataka", type: "city" },
+        { display_name: "Delhi, Delhi", type: "city" },
+        { display_name: "Pune, Maharashtra", type: "city" },
+        { display_name: "Hyderabad, Telangana", type: "city" },
+        { display_name: "Chennai, Tamil Nadu", type: "city" },
+        { display_name: "Kolkata, West Bengal", type: "city" },
+        { display_name: "Jaipur, Rajasthan", type: "city" },
+        { display_name: "Ahmedabad, Gujarat", type: "city" },
+        { display_name: "Noida, Uttar Pradesh", type: "city" },
+        { display_name: "Gurgaon, Haryana", type: "city" },
+        { display_name: "Remote", type: "remote" }
+    ];
+
     // Custom India locations (commented out for free API)
     /*
     const commonLocations = [
@@ -16,8 +32,9 @@ const LocationInput = ({ value, onChange, placeholder = "Enter location...", var
     // Load OpenStreetMap Nominatim API (free)
     const getFreeLocationSuggestions = async (input) => {
         if (input.length < 2) {
-            setSuggestions([]);
-            setShowSuggestions(false);
+            // Show popular locations when input is minimal
+            setSuggestions(popularLocations);
+            setShowSuggestions(true);
             return;
         }
 
@@ -73,9 +90,8 @@ const LocationInput = ({ value, onChange, placeholder = "Enter location...", var
     };
 
     const handleFocus = () => {
-        if (value.length > 1) {
-            getFreeLocationSuggestions(value);
-        }
+        // Always show suggestions on focus - popular locations if empty, API results if has value
+        getFreeLocationSuggestions(value);
     };
 
     const handleGetCurrentLocation = () => {
@@ -148,26 +164,35 @@ const LocationInput = ({ value, onChange, placeholder = "Enter location...", var
 
             {/* Suggestions Dropdown */}
             {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute z-[100] left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-2xl max-h-60 overflow-y-auto">
-                    <ul className="py-2">
+                <div className="absolute z-[9999] left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-2xl max-h-60 overflow-y-auto backdrop-blur-sm min-w-[280px]">
+                    <div className="py-1">
                         {suggestions.map((suggestion, index) => (
-                            <li key={index}>
-                                <button
-                                    type="button"
-                                    onClick={() => handleSuggestionClick(suggestion)}
-                                    className="w-full px-4 py-3 text-left hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-                                >
-                                    <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                            <button
+                                key={index}
+                                type="button"
+                                onClick={() => handleSuggestionClick(suggestion)}
+                                className="w-full px-4 py-3 text-left hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                            >
+                                <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <div className="flex-1 min-w-0">
+                                    <span className="text-sm text-gray-700 dark:text-gray-300 block truncate">
                                         {suggestion.display_name}
                                     </span>
-                                </button>
-                            </li>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        {suggestion.type}
+                                    </span>
+                                </div>
+                            </button>
                         ))}
-                    </ul>
+                    </div>
+                    <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Powered by OpenStreetMap
+                        </p>
+                    </div>
                 </div>
             )}
         </div>

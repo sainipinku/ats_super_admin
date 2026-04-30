@@ -75,7 +75,7 @@ export default function StatsSection({ stats = {} }) {
                             key={stat.label}
                             variants={itemVariants}
                             whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                            className={`p-6 rounded-xl border ${cardBg}`}
+                            className={`p-4 rounded-xl border ${cardBg}`}
                         >
                             <div className={`w-12 h-12 rounded-lg ${stat.color} flex items-center justify-center mb-4`}>
                                 <stat.icon className="w-6 h-6 text-white" />
