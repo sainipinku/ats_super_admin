@@ -102,6 +102,16 @@ class Member extends Authenticatable
         });
     }
 
+    /**
+     * Scope to filter members by role slug
+     */
+    public function scopeHasRoleBySlug($query, $slug)
+    {
+        return $query->whereHas('roles', function($q) use ($slug) {
+            $q->where('slug', $slug);
+        });
+    }
+
     public function dob(): Attribute
     {
         return Attribute::make(

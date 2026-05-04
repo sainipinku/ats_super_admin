@@ -19,15 +19,6 @@ class AdminAuthController extends Controller
     public function login()
     {
         return Inertia::render('SuperAdmin/Auth/Login');
-        if (Auth::guard('superadmin')->check()) {
-            return redirect()->route('super.dashboard');
-        }
-        if (Auth::guard('admin')->check()) {
-            return redirect()->route('admin.dashboard');
-        }
-        if (Auth::guard('member')->check()) {
-            return redirect()->route('member.dashboard');
-        }
     }
 
 
@@ -37,83 +28,6 @@ class AdminAuthController extends Controller
 
 
 
-    /**
-     * Member Login from UserLogin page
-     * @param Request $request
-     * @return mixed
-     */
-
-    public function memberVerify(Request $request)
-    {
-        $request->validate([
-            'identifier' => 'required|string',
-            'password' => 'required|string',
-            'remember' => 'sometimes|boolean',
-        ]);
-
-        $field = $this->determineLoginField($request->identifier);
-
-        // Check if it's a SuperAdmin trying to login from UserLogin page
-        $superAdmin = SuperAdmin::where($field, $request->identifier)->first();
-        if ($superAdmin) {
-            return back()->withErrors([
-                'login' => 'Please use admin and superadmin login page for admin access.',
-            ]);
-        }
-
-        // Check if it's an Admin trying to login from UserLogin page
-        $admin = Member::where($field, $request->identifier)->whereJsonContains('roles', 1)->first();
-        if ($admin) {
-            return back()->withErrors([
-                'login' => 'Please use admin and superadmin login page for admin access.',
-            ]);
-        }
-
-        // Only check for member login (non-admin)
-        $member = Member::where($field, $request->identifier)->whereJsonDoesntContain('roles', 1)->first();
-        if (!$member) {
-            return back()->withErrors([
-                'login' => 'The provided credentials do not match our records.',
-            ]);
-        }
-
-        if ((int)($member->status ?? 1) === 0) {
-            return back()->withErrors([
-                'login' => 'Your account is inactive. Please contact admin to activate your account.',
-            ]);
-        }
-
-        // Only use member guard for authentication
-        if (!Auth::guard('member')->attempt([
-            $field => $request->identifier,
-            'password' => $request->password,
-            'status' => 1,
-        ], (bool)$request->remember)) {
-            return back()->withErrors([
-                'login' => 'The provided credentials do not match our records.',
-            ]);
-        }
-
-        $authenticatedUser = Auth::guard('member')->user();
-        $request->session()->regenerate();
-
-        if ($authenticatedUser) {
-            ActivityLog::create([
-                'user_id'     => $authenticatedUser->id,
-                'user_role'   => $authenticatedUser->user_role ?? 'doer',
-                'action_type' => ActionTypeEnum::LOGIN,
-                'description' => 'Member logged in via member guard',
-                'ip_address'  => $request->ip(),
-                'user_agent'  => $request->userAgent(),
-                'action_time' => now(),
-            ]);
-        }
-
-        // Always redirect to member dashboard
-        return redirect()->route('member.dashboard');
-    }
-
-    
     /**
      * Super Amdin Login
      * @param Request $request

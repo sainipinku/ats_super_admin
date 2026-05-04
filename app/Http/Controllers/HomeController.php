@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Inertia\Inertia;
-use App\Models\Role;
 use App\Models\Job;
 use App\Models\Member;
 use App\Models\JobApplication;
@@ -239,16 +238,12 @@ class HomeController extends Controller
      */
     public function showHomepage(Request $request)
     {
-        // Get candidate role ID from database
-        $candidateRole = Role::where('slug', 'candidate')->first();
-        $candidateRoleId = $candidateRole?->id ?? 3;
-        
         // Get stats for the homepage
         $stats = [
             'activeJobs' => Job::where('status', 'active')->count(),
             'companies' => Job::distinct('company')->count('company'),
             'jobSeekers' => Member::where('status', 1)
-                ->hasRole($candidateRoleId)
+                ->hasRoleBySlug('candidate')
                 ->count(),
             'successRate' => 94,
         ];
