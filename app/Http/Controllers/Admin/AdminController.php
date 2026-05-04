@@ -272,7 +272,7 @@ if ($activeMembers->count() > 0) {
             return redirect(route('admin.login'))->with('success', 'Logout Succesfull');
         } else {
             Auth::guard('member')->logout();
-            return redirect(route('doer.login'))->with('success', 'Logout Succesfull');
+            return redirect('/UserLogin')->with('success', 'Logout Succesfull');
         }
         // $request->session()->invalidate();
         // $request->session()->regenerateToken();

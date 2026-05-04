@@ -55,11 +55,6 @@ class User extends Authenticatable
         ];
     }
 
-    protected $appends = [
-        'profile_photo_url',
-        'received_at',
-    ];
-
     public function receivedAt(): Attribute
     {
         return Attribute::make(

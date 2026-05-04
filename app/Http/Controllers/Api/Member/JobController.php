@@ -237,6 +237,7 @@ class JobController extends Controller
         $query->where('location', 'like', "%{$location}%");
     }
 
+    
     $perPage = max(1, min((int)$request->input('per_page', 12), 50));
     $jobs = $query->paginate($perPage)->withQueryString();
 

@@ -4,7 +4,6 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Member\JobController;
 use App\Http\Controllers\Api\Member\ProfileController;
 use App\Http\Controllers\Api\Member\TaskController;
-use App\Http\Controllers\Api\PublicJobController;
 use Illuminate\Support\Facades\Route;
 
     Route::get('/', function () {
@@ -23,6 +22,7 @@ use Illuminate\Support\Facades\Route;
         Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
     });
 
+    
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
 
@@ -51,8 +51,3 @@ use Illuminate\Support\Facades\Route;
         Route::post('/tasks/{task}/notes', [TaskController::class, 'notesStore']);
         Route::delete('/notes/{note}', [TaskController::class, 'notesDestroy']);
     });
-
-    // Public API routes (no auth required)
-    Route::get('/active-jobs', [PublicJobController::class, 'index']);
-    Route::get('/jobs', [PublicJobController::class, 'index']);
-    Route::get('/jobs/{job}', [PublicJobController::class, 'show']);

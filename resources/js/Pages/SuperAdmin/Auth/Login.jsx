@@ -25,7 +25,7 @@ export default function Login({ status, errors: serverErrors }) {
 
    const submit = (e) => {
     e.preventDefault();
-    post(route("super.verify"), {
+    post(route("auth.login"), {
         onFinish: () => reset("password"),
         onError: (errors) => {
             if (errors.identifier || errors.password || errors.login) {
@@ -84,9 +84,9 @@ export default function Login({ status, errors: serverErrors }) {
                     />
                     <div className="absolute inset-0 z-20 flex flex-col justify-center items-center text-white p-12">
                         <div className="max-w-md text-center">
-                            <h1 className="text-4xl font-bold mb-6">Welcome Back</h1>
+                            <h1 className="text-4xl font-bold mb-6">Member Login</h1>
                             <p className="text-lg opacity-90 mb-8">
-                                Sign in to continue to your dashboard.
+                                Sign in to access your member dashboard and browse jobs.
                             </p>
                             <div className="flex justify-center space-x-3">
                                 {/* <span className="w-3 h-3 rounded-full bg-white opacity-50"></span>
@@ -102,8 +102,8 @@ export default function Login({ status, errors: serverErrors }) {
                     <div className="w-full max-w-md">
                         <div className="flex justify-between items-center mb-8">
                             <div>
-                                <h2 className="text-3xl font-bold dark:text-white text-gray-800">Login</h2>
-                                <p className="text-sm mt-2 dark:text-gray-400 text-gray-600">Welcome back! Please enter your details.</p>
+                                <h2 className="text-3xl font-bold dark:text-white text-gray-800">Member Login</h2>
+                                <p className="text-sm mt-2 dark:text-gray-400 text-gray-600">Enter your email, username or phone to sign in.</p>
                             </div>
 
                             {/* Dark/Light Toggle */}

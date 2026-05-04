@@ -87,6 +87,11 @@ class Member extends Authenticatable
         'remember_token',
     ];
 
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class, 'member_roles', 'member_id', 'role_id');
+    }
+
     public function dob(): Attribute
     {
         return Attribute::make(

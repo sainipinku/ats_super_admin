@@ -111,7 +111,7 @@ export default function HomepageLayout({ children }) {
                                 ) : (
                                     <>
                                         <Link
-                                            href="/UserLogin"
+                                            href="/login"
                                             className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                                                 isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
                                             }`}
@@ -188,7 +188,7 @@ export default function HomepageLayout({ children }) {
                                     ) : (
                                         <>
                                             <Link
-                                                href="/UserLogin"
+                                                href="/login"
                                                 className={`block w-full text-center px-4 py-3 rounded-xl text-sm font-medium ${
                                                     isDark 
                                                         ? 'text-slate-300 hover:text-white' 

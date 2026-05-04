@@ -200,12 +200,12 @@ Route::prefix('member')->middleware(['member'])->group(function () {
 /** PUBLIC ROUTES START HERE **/
 Route::get('/', [HomeController::class, 'authShowPage'])->name('home');
 Route::get('/homepage', [HomeController::class, 'showHomepage'])->name('homepage');
-Route::get('/public/jobs', [App\Http\Controllers\Public\JobController::class, 'index'])->name('public.jobs.homepage');
 Route::get('/register', function() {
     return Inertia::render('Register');
 })->name('register');
 Route::get('/login', [AdminAuthController::class, 'login'])->name('login');
 Route::post('/verify', [AdminAuthController::class, 'verify'])->name('auth.login');
+Route::post('/member-verify', [AdminAuthController::class, 'memberVerify'])->name('member.verify');
 Route::redirect('/admin/login', '/login')->name('admin.login');
 Route::redirect('/member/login', '/login')->name('doer.login');
 
@@ -240,10 +240,5 @@ Route::get('/clear', function () {
     Artisan::call('optimize:clear');
     return 'Application cache has been cleared';
 });
-
-// User Login Route
-Route::get('/UserLogin', function () {
-    return Inertia::render('UserLogin');
-})->name('user.login');
 
 /** UTILITY ROUTES END HERE **/

@@ -101,6 +101,8 @@ class JobController extends Controller
             'qualifications' => 'nullable|string',
             'last_date' => 'nullable|date',
             'company_image' => 'nullable|image|max:5120',
+            'latitude' => 'nullable|decimal:8,6|between:-90,90',
+            'longitude' => 'nullable|decimal:9,6|between:-180,180',
         ]);
 
         // Convert JSON strings to arrays
@@ -285,6 +287,8 @@ class JobController extends Controller
             'qualifications' => 'nullable|string',
             'last_date' => 'nullable|date',
             'company_image' => 'nullable|image|max:5120',
+            'latitude' => 'nullable|decimal:8,6|between:-90,90',
+            'longitude' => 'nullable|decimal:9,6|between:-180,180',
         ]);
 
         // Convert JSON strings to arrays

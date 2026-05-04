@@ -234,26 +234,34 @@ class HomeController extends Controller
         ]);
     }
 
+    /**
+     * Display the public homepage with stats and featured jobs
+     */
     public function showHomepage(Request $request)
     {
+        // Get candidate role ID
+        $candidateRoleId = Role::where('slug', 'candidate')->value('id') ?? 3;
+        
         // Get stats for the homepage
         $stats = [
             'activeJobs' => Job::where('status', 'active')->count(),
             'companies' => Job::distinct('company')->count('company'),
-            'jobSeekers' => Member::whereRaw("JSON_CONTAINS(roles, '3')")
-                ->orWhereRaw("JSON_CONTAINS(roles, '\"3\"')")
-                ->orWhereRaw("roles LIKE '%3%'")
+            'jobSeekers' => Member::where('status', 1)
+                ->where(function($query) use ($candidateRoleId) {
+                    $query->whereRaw("JSON_CONTAINS(roles, ?)", ['"' . $candidateRoleId . '"'])
+                          ->orWhereRaw("roles LIKE ?", ['%' . $candidateRoleId . '%']);
+                })
                 ->count(),
             'successRate' => 94,
         ];
-        
+
         // Get featured jobs for homepage (limit to 6)
         $featuredJobs = Job::with(['creator'])
             ->where('status', 'active')
             ->orderBy('created_at', 'desc')
             ->take(6)
             ->get();
-        
+
         return Inertia::render('Homepage', [
             'stats' => $stats,
             'jobs' => $featuredJobs,
