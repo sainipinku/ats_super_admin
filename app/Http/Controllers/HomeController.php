@@ -239,18 +239,16 @@ class HomeController extends Controller
      */
     public function showHomepage(Request $request)
     {
-        // Get candidate role ID
-        $candidateRoleId = Role::where('slug', 'candidate')->value('id') ?? 3;
+        // Get candidate role ID from database
+        $candidateRole = Role::where('slug', 'candidate')->first();
+        $candidateRoleId = $candidateRole?->id ?? 3;
         
         // Get stats for the homepage
         $stats = [
             'activeJobs' => Job::where('status', 'active')->count(),
             'companies' => Job::distinct('company')->count('company'),
             'jobSeekers' => Member::where('status', 1)
-                ->where(function($query) use ($candidateRoleId) {
-                    $query->whereRaw("JSON_CONTAINS(roles, ?)", ['"' . $candidateRoleId . '"'])
-                          ->orWhereRaw("roles LIKE ?", ['%' . $candidateRoleId . '%']);
-                })
+                ->hasRole($candidateRoleId)
                 ->count(),
             'successRate' => 94,
         ];

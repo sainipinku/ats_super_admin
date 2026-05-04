@@ -92,6 +92,16 @@ class Member extends Authenticatable
         return $this->belongsToMany(Role::class, 'member_roles', 'member_id', 'role_id');
     }
 
+    /**
+     * Scope to filter members by role ID
+     */
+    public function scopeHasRole($query, $roleId)
+    {
+        return $query->where(function($q) use ($roleId) {
+            $q->whereJsonContains('roles', (string) $roleId);
+        });
+    }
+
     public function dob(): Attribute
     {
         return Attribute::make(
