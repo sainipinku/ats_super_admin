@@ -19,6 +19,15 @@ class AdminAuthController extends Controller
     public function login()
     {
         return Inertia::render('SuperAdmin/Auth/Login');
+         if (Auth::guard('superadmin')->check()) {
+            return redirect()->route('super.dashboard');
+        }
+        if (Auth::guard('admin')->check()) {
+            return redirect()->route('admin.dashboard');
+        }
+        if (Auth::guard('member')->check()) {
+            return redirect()->route('member.dashboard');
+        }
     }
 
 
