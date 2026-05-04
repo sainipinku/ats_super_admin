@@ -287,4 +287,6 @@ class Member extends Authenticatable
             $this->reset_password_token_expires_at &&
             $this->reset_password_token_expires_at->isFuture();
     }
+
+    
 }
