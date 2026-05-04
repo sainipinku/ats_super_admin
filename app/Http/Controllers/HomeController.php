@@ -225,12 +225,9 @@ class HomeController extends Controller
         if (Auth::guard('superadmin')->check()) {
             return Redirect::route('super.dashboard');
         }
-        
-        // Default: Show Welcome page (Coming Soon)
-        return Inertia::render('Welcome', [
-            'laravelVersion' => \Illuminate\Foundation\Application::VERSION,
-            'phpVersion' => PHP_VERSION,
-        ]);
+
+        // Default: Redirect to public homepage
+        return Redirect::route('homepage');
     }
 
     /**

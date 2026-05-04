@@ -3,13 +3,13 @@ import { Head, Link } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/Contexts/ThemeContext';
 import { ThemeProvider } from '@/Contexts/ThemeContext';
-import { 
-    User, 
-    Mail, 
-    Lock, 
-    Eye, 
-    EyeOff, 
-    Building2, 
+import {
+    User,
+    Mail,
+    Lock,
+    Eye,
+    EyeOff,
+    Building2,
     ArrowRight,
     CheckCircle,
     Sparkles,
@@ -21,7 +21,9 @@ import {
     Users,
     Briefcase,
     TrendingUp,
-    X
+    X,
+    Phone,
+    MapPin
 } from 'lucide-react';
 
 const containerVariants = {
@@ -222,7 +224,7 @@ function RegisterContent() {
                 
                 // Redirect to login page after 3 seconds
                 setTimeout(() => {
-                    window.location.href = '/UserLogin';
+                    window.location.href = '/login';
                 }, 3000);
             } else {
                 setErrors({ verification_code: 'Invalid verification code. Please try again.' });
@@ -247,12 +249,11 @@ function RegisterContent() {
                                 Full Name
                             </label>
                             <div className="relative">
-                                <motion.div
-                                    whileHover={{ scale: 1.2 }}
-                                    className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${subTextColor}`}
-                                >
-                                    <User className="w-4 h-4" />
-                                </motion.div>
+                                <div className={`absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center justify-center ${subTextColor}`}>
+                                    <motion.div whileHover={{ scale: 1.2 }}>
+                                        <User className="w-4 h-4" />
+                                    </motion.div>
+                                </div>
                                 <motion.input
                                     whileFocus={{ scale: 1.02 }}
                                     type="text"
@@ -319,12 +320,11 @@ function RegisterContent() {
                                 Email Address
                             </label>
                             <div className="relative">
-                                <motion.div
-                                    whileHover={{ scale: 1.2 }}
-                                    className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 ${subTextColor}`}
-                                >
-                                    <Mail className="w-5 h-5" />
-                                </motion.div>
+                                <div className={`absolute left-4 top-1/2 transform -translate-y-1/2 flex items-center justify-center ${subTextColor}`}>
+                                    <motion.div whileHover={{ scale: 1.2 }}>
+                                        <Mail className="w-5 h-5" />
+                                    </motion.div>
+                                </div>
                                 <motion.input
                                     whileFocus={{ scale: 1.02 }}
                                     type="email"
@@ -356,12 +356,11 @@ function RegisterContent() {
                                 Phone Number
                             </label>
                             <div className="relative">
-                                <motion.div
-                                    whileHover={{ scale: 1.2 }}
-                                    className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 ${subTextColor}`}
-                                >
-                                    <Mail className="w-5 h-5" />
-                                </motion.div>
+                                <div className={`absolute left-4 top-1/2 transform -translate-y-1/2 flex items-center justify-center ${subTextColor}`}>
+                                    <motion.div whileHover={{ scale: 1.2 }}>
+                                        <Phone className="w-5 h-5" />
+                                    </motion.div>
+                                </div>
                                 <motion.input
                                     whileFocus={{ scale: 1.02 }}
                                     type="tel"
@@ -404,12 +403,11 @@ function RegisterContent() {
                                 Company <span className={`text-xs ${subTextColor}`}>(Optional)</span>
                             </label>
                             <div className="relative">
-                                <motion.div
-                                    whileHover={{ scale: 1.2 }}
-                                    className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 ${subTextColor}`}
-                                >
-                                    <Building2 className="w-5 h-5" />
-                                </motion.div>
+                                <div className={`absolute left-4 top-1/2 transform -translate-y-1/2 flex items-center justify-center ${subTextColor}`}>
+                                    <motion.div whileHover={{ scale: 1.2 }}>
+                                        <Building2 className="w-5 h-5" />
+                                    </motion.div>
+                                </div>
                                 <motion.input
                                     whileFocus={{ scale: 1.02 }}
                                     type="text"
@@ -441,12 +439,11 @@ function RegisterContent() {
                                 Location
                             </label>
                             <div className="relative">
-                                <motion.div
-                                    whileHover={{ scale: 1.2 }}
-                                    className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 ${subTextColor}`}
-                                >
-                                    <Building2 className="w-5 h-5" />
-                                </motion.div>
+                                <div className={`absolute left-4 top-1/2 transform -translate-y-1/2 flex items-center justify-center ${subTextColor}`}>
+                                    <motion.div whileHover={{ scale: 1.2 }}>
+                                        <MapPin className="w-5 h-5" />
+                                    </motion.div>
+                                </div>
                                 <motion.input
                                     whileFocus={{ scale: 1.02 }}
                                     type="text"
@@ -489,12 +486,11 @@ function RegisterContent() {
                                 Password
                             </label>
                             <div className="relative">
-                                <motion.div
-                                    whileHover={{ scale: 1.2 }}
-                                    className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 ${subTextColor}`}
-                                >
-                                    <Lock className="w-5 h-5" />
-                                </motion.div>
+                                <div className={`absolute left-4 top-1/2 transform -translate-y-1/2 flex items-center justify-center ${subTextColor}`}>
+                                    <motion.div whileHover={{ scale: 1.2 }}>
+                                        <Lock className="w-5 h-5" />
+                                    </motion.div>
+                                </div>
                                 <motion.input
                                     whileFocus={{ scale: 1.02 }}
                                     type={showPassword ? 'text' : 'password'}
@@ -535,12 +531,11 @@ function RegisterContent() {
                                 Confirm Password
                             </label>
                             <div className="relative">
-                                <motion.div
-                                    whileHover={{ scale: 1.2 }}
-                                    className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 ${subTextColor}`}
-                                >
-                                    <Lock className="w-5 h-5" />
-                                </motion.div>
+                                <div className={`absolute left-4 top-1/2 transform -translate-y-1/2 flex items-center justify-center ${subTextColor}`}>
+                                    <motion.div whileHover={{ scale: 1.2 }}>
+                                        <Lock className="w-5 h-5" />
+                                    </motion.div>
+                                </div>
                                 <motion.input
                                     whileFocus={{ scale: 1.02 }}
                                     type={showConfirmPassword ? 'text' : 'password'}
@@ -605,12 +600,11 @@ function RegisterContent() {
                                 Verification Code
                             </label>
                             <div className="relative">
-                                <motion.div
-                                    whileHover={{ scale: 1.2 }}
-                                    className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${subTextColor}`}
-                                >
-                                    <CheckCircle className="w-4 h-4" />
-                                </motion.div>
+                                <div className={`absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center justify-center ${subTextColor}`}>
+                                    <motion.div whileHover={{ scale: 1.2 }}>
+                                        <CheckCircle className="w-4 h-4" />
+                                    </motion.div>
+                                </div>
                                 <motion.input
                                     whileFocus={{ scale: 1.02 }}
                                     type="text"
@@ -773,8 +767,8 @@ function RegisterContent() {
                                     <p className={`text-sm font-medium ${subTextColor}`}>
                                         Already have an account?
                                     </p>
-                                    <Link 
-                                        href="/UserLogin" 
+                                    <Link
+                                        href={route('login')}
                                         className="text-blue-500 hover:text-blue-600 font-bold transition-colors flex items-center gap-1"
                                     >
                                         Sign in
