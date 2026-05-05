@@ -96,8 +96,8 @@ export default function AuthenticatedLayout({ header, children }) {
         setIsMenuOpen((prev) => !prev);
     };
     const toggleSidebar = () => setSidebarOpen((prev) => !prev);
-        const dropdownRef = useRef(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
     useEffect(() => {
         function handleClickOutside(event) {
             if (
@@ -111,10 +111,10 @@ export default function AuthenticatedLayout({ header, children }) {
         return () =>
             document.removeEventListener("mousedown", handleClickOutside);
     }, []);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const closeSidebar = () => setSidebarOpen(false);
-const [settings, setSettings] = useState(null);
+    const [settings, setSettings] = useState(null);
     const [loading, setLoading] = useState(true);
 
     const isInitialMount = useRef(true);
@@ -158,9 +158,6 @@ const [settings, setSettings] = useState(null);
                                                 xmlns="http://www.w3.org/2000/svg"
                                             >
                                                 <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
                                                     d="M4 6h16M4 12h16M4 18h16"
                                                 />{" "}
                                             </svg>
@@ -178,8 +175,8 @@ const [settings, setSettings] = useState(null);
                                     Dashboard
                                 </NavLink>
                                 <NavLink
-                                    href={route("member.jobs.index")}
-                                    active={route().current("member.jobs.index")}
+                                    href="/member/jobs"
+                                    active={window.location.pathname === '/member/jobs'}
                                 >
                                     Browse Jobs
                                 </NavLink>
@@ -299,8 +296,8 @@ const [settings, setSettings] = useState(null);
                 >
                     <div className="space-y-1 pb-3 pt-2">
                         <ResponsiveNavLink
-                            href={route("super.dashboard")}
-                            active={route().current("super.dashboard")}
+                            href={route("member.dashboard")}
+                            active={route().current("member.dashboard")}
                         >
                             Dashboard
                         </ResponsiveNavLink>

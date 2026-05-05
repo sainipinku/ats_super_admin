@@ -93,7 +93,7 @@ export default function AuthenticatedLayout({ header, children }) {
 
             <div className="min-h-screen mainbg">
                 <nav className="headerbg fixed top-0 left-0 right-0 z-50 py-[15px] px-[15px] rounded-[10px] print:hidden">
-                    <div className="navbg rounded-[10px] border border-[1px] borderbx">
+                    <div className="navbg rounded-[10px]  border-[1px] borderbx">
                         <div className="mx-auto max-w-full px-[8px] py-[0]">
                             <div className="flex h-16 justify-between items-center border-gray-200 dark:border-gray-700">
                                 

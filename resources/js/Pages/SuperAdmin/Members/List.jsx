@@ -2132,7 +2132,7 @@ const getRoleBadgeColor = (roleId) => {
                                     name="new_password"
                                     value={passwordForm.new_password}
                                     onChange={handlePasswordFormChange}
-                                    className={`w-full px-3 py-2 selectbg border rounded-md px-[15px] py-[12px] focus:outline-none box-shadow-none text-[12px] md:text-[13px]  ${
+                                    className={`w-full  selectbg border rounded-md px-[15px] py-[12px] focus:outline-none box-shadow-none text-[12px] md:text-[13px]  ${
                                         errors.new_password ||
                                         (passwordForm.new_password.length > 0 &&
                                             passwordForm.new_password.length <
@@ -2167,7 +2167,7 @@ const getRoleBadgeColor = (roleId) => {
                                         passwordForm.new_password_confirmation
                                     }
                                     onChange={handlePasswordFormChange}
-                                    className={`w-full px-3 py-2 selectbg border rounded-md px-[15px] py-[12px] focus:outline-none box-shadow-none text-[12px] md:text-[13px]  ${
+                                    className={`w-full  selectbg border rounded-md px-[15px] py-[12px] focus:outline-none box-shadow-none text-[12px] md:text-[13px]  ${
                                         errors.new_password_confirmation ||
                                         (passwordForm.new_password_confirmation
                                             .length > 0 &&

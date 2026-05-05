@@ -875,6 +875,7 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
     const [searchQuery, setSearchQuery] = useState(filters.search || '');
     const [selectedType, setSelectedType] = useState(filters.job_type || '');
     const [selectedLocation, setSelectedLocation] = useState(filters.location || '');
+    const [selectedDistance, setSelectedDistance] = useState(filters.distance || 20);
     const [selectedJob, setSelectedJob] = useState(null);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showApplyModal, setShowApplyModal] = useState(false);
@@ -891,6 +892,7 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
                 search: searchQuery,
                 job_type: selectedType,
                 location: selectedLocation,
+                distance: selectedDistance,
             }, {
                 preserveState: true,
                 preserveScroll: true,
@@ -898,7 +900,7 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
         }, 500);
 
         return () => clearTimeout(timeout);
-    }, [searchQuery, selectedType, selectedLocation]);
+    }, [searchQuery, selectedType, selectedLocation, selectedDistance]);
 
     const handleViewDetails = (job) => {
         setSelectedJob(job);
@@ -1066,7 +1068,7 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
 
                 {/* Search & Filters */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-8">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         {/* Search */}
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1113,6 +1115,32 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
                                 className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
                         </div>
+
+                        {/* Distance Filter */}
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                </svg>
+                            </div>
+                            <select
+                                value={selectedDistance}
+                                onChange={(e) => setSelectedDistance(Number(e.target.value))}
+                                className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+                            >
+                                <option value={5}>5 km</option>
+                                <option value={10}>10 km</option>
+                                <option value={20}>20 km</option>
+                                <option value={30}>30 km</option>
+                                <option value={50}>50 km</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="mt-3 text-sm text-slate-500">
+                        <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Distance filter shows jobs within {selectedDistance}km from your location. Update your profile location to enable distance-based filtering.
                     </div>
                 </div>
 

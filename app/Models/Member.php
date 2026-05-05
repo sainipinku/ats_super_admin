@@ -85,11 +85,31 @@ class Member extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
-
     ];
+
     public function roles()
     {
-        return $this->HashMany(Role::class);
+        return $this->belongsToMany(Role::class, 'member_roles', 'member_id', 'role_id');
+    }
+
+    /**
+     * Scope to filter members by role ID
+     */
+    public function scopeHasRole($query, $roleId)
+    {
+        return $query->where(function($q) use ($roleId) {
+            $q->whereJsonContains('roles', (string) $roleId);
+        });
+    }
+
+    /**
+     * Scope to filter members by role slug
+     */
+    public function scopeHasRoleBySlug($query, $slug)
+    {
+        return $query->whereHas('roles', function($q) use ($slug) {
+            $q->where('slug', $slug);
+        });
     }
 
     public function dob(): Attribute
@@ -277,4 +297,6 @@ class Member extends Authenticatable
             $this->reset_password_token_expires_at &&
             $this->reset_password_token_expires_at->isFuture();
     }
+
+    
 }

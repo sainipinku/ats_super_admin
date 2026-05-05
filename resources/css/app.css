@@ -7,6 +7,65 @@
 @layer base{*{@apply border-border;}
 body{@apply bg-background text-foreground;font-family:"Inter",sans-serif;}
 }
+
+/* Brand Color Utilities */
+.bg-brand-50 { background-color: #eff6ff; }
+.bg-brand-100 { background-color: #dbeafe; }
+.bg-brand-200 { background-color: #bfdbfe; }
+.bg-brand-300 { background-color: #93c5fd; }
+.bg-brand-400 { background-color: #60a5fa; }
+.bg-brand-500 { background-color: #3b82f6; }
+.bg-brand-600 { background-color: #2563eb; }
+.bg-brand-700 { background-color: #1d4ed8; }
+.bg-brand-800 { background-color: #1e40af; }
+.bg-brand-900 { background-color: #1e3a8a; }
+.bg-brand-950 { background-color: #172554; }
+
+.text-brand-400 { color: #60a5fa; }
+.text-brand-500 { color: #3b82f6; }
+.text-brand-600 { color: #2563eb; }
+.text-brand-700 { color: #1d4ed8; }
+
+.border-brand-200 { border-color: #bfdbfe; }
+.border-brand-500 { border-color: #3b82f6; }
+
+/* Accent Colors */
+.text-accent-purple { color: #8b5cf6; }
+.text-accent-pink { color: #ec4899; }
+.bg-accent-purple\/10 { background-color: rgba(139, 92, 246, 0.1); }
+.bg-accent-purple\/20 { background-color: rgba(139, 92, 246, 0.2); }
+.border-accent-purple\/20 { border-color: rgba(139, 92, 246, 0.2); }
+
+/* Gradient Text */
+.text-gradient {
+    background: linear-gradient(to right, #60a5fa, #3b82f6, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Glass Effect */
+.glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-dark {
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(30, 41, 59, 1);
+}
+
+/* Hover Lift Effect */
+.hover-lift {
+    transition: all 0.3s ease;
+}
+.hover-lift:hover {
+    transform: translateY(-4px);
+}
 body[data-scroll-locked]{padding-right:15px !important;/* instead of --removed-body-scroll-bar-size */
 }
 @layer utilities{.custom-scrollbar::-webkit-scrollbar{width:5px;height:3px;}

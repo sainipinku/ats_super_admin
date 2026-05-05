@@ -105,6 +105,8 @@ class ProfileController extends Controller
             'is_fresher' => ['sometimes', 'boolean'],
             'skills' => ['sometimes', 'array'],
             'skills.*' => ['string', 'max:50'],
+            'latitude' => ['sometimes', 'nullable', 'decimal:8,6', 'between:-90,90'],
+            'longitude' => ['sometimes', 'nullable', 'decimal:9,6', 'between:-180,180'],
         ]);
 
         if ($request->hasFile('image')) {

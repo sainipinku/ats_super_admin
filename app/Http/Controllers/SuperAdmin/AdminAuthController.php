@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use Inertia\Response;
 use App\Models\SuperAdmin;
 use App\Models\Member;
 use App\Models\ActivityLog;
@@ -18,7 +19,7 @@ class AdminAuthController extends Controller
     public function login()
     {
         return Inertia::render('SuperAdmin/Auth/Login');
-        if (Auth::guard('superadmin')->check()) {
+         if (Auth::guard('superadmin')->check()) {
             return redirect()->route('super.dashboard');
         }
         if (Auth::guard('admin')->check()) {

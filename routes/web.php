@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\HomeController;
+
+// Include auth routes
+require __DIR__.'/auth.php';
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SuperAdmin\AdminAuthController;
 use App\Http\Controllers\SuperAdmin\AdminDashboardController;
@@ -196,8 +199,13 @@ Route::prefix('member')->middleware(['member'])->group(function () {
 
 /** PUBLIC ROUTES START HERE **/
 Route::get('/', [HomeController::class, 'authShowPage'])->name('home');
+Route::get('/homepage', [HomeController::class, 'showHomepage'])->name('homepage');
+Route::get('/register', function() {
+    return Inertia::render('Register');
+})->name('register');
 Route::get('/login', [AdminAuthController::class, 'login'])->name('login');
 Route::post('/verify', [AdminAuthController::class, 'verify'])->name('auth.login');
+Route::post('/member-verify', [AdminAuthController::class, 'memberVerify'])->name('member.verify');
 Route::redirect('/admin/login', '/login')->name('admin.login');
 Route::redirect('/member/login', '/login')->name('doer.login');
 
@@ -232,4 +240,5 @@ Route::get('/clear', function () {
     Artisan::call('optimize:clear');
     return 'Application cache has been cleared';
 });
+
 /** UTILITY ROUTES END HERE **/

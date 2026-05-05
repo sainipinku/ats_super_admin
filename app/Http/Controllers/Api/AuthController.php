@@ -223,3 +223,4 @@ class AuthController extends Controller
         return $value;
     }
 }
+

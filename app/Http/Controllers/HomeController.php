@@ -5,10 +5,11 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Inertia\Inertia;
-use App\Models\Role;
+use App\Models\Job;
+use App\Models\Member;
+use App\Models\JobApplication;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
-use App\Models\Member;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use App\Jobs\SendPasswordResetEmail;
@@ -224,7 +225,37 @@ class HomeController extends Controller
         if (Auth::guard('superadmin')->check()) {
             return Redirect::route('super.dashboard');
         }
-        return Inertia::render('Welcome', []);
+
+        // Default: Redirect to public homepage
+        return Redirect::route('homepage');
+    }
+
+    /**
+     * Display the public homepage with stats and featured jobs
+     */
+    public function showHomepage(Request $request)
+    {
+        // Get stats for the homepage
+        $stats = [
+            'activeJobs' => Job::where('status', 'active')->count(),
+            'companies' => Job::distinct('company')->count('company'),
+            'jobSeekers' => Member::where('status', 1)
+                ->hasRoleBySlug('candidate')
+                ->count(),
+            'successRate' => 94,
+        ];
+
+        // Get featured jobs for homepage (limit to 6)
+        $featuredJobs = Job::with(['creator'])
+            ->where('status', 'active')
+            ->orderBy('created_at', 'desc')
+            ->take(6)
+            ->get();
+
+        return Inertia::render('Homepage', [
+            'stats' => $stats,
+            'jobs' => $featuredJobs,
+        ]);
     }
 
     public function emailDetails(Request $request, $name)

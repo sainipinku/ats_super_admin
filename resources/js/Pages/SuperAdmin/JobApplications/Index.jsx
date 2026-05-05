@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Head } from "@inertiajs/react";
 import AuthenticatedLayout from "../Layouts/AuthenticatedLayout";
 import ConfirmDialog from "../../../Components/ConfirmDialog";
@@ -21,6 +21,11 @@ export default function Index({ auth }) {
         perPage: 15,
         page: 1,
     });
+
+    const [jobSearch, setJobSearch] = useState("");
+    const [showJobDropdown, setShowJobDropdown] = useState(false);
+    const [selectedJob, setSelectedJob] = useState(null);
+    const jobSearchRef = useRef(null);
 
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmAction, setConfirmAction] = useState(null);
@@ -115,8 +120,46 @@ export default function Index({ auth }) {
             perPage: 15,
             page: 1,
         });
+        setJobSearch("");
+        setSelectedJob(null);
         setTimeout(loadApplications, 0);
     };
+
+    const filteredJobs = useMemo(() => {
+        if (!jobSearch.trim()) return [];
+        const searchLower = jobSearch.toLowerCase();
+        return jobs.filter(j =>
+            j.title?.toLowerCase().includes(searchLower) ||
+            j.company?.toLowerCase().includes(searchLower)
+        ).slice(0, 10);
+    }, [jobSearch, jobs]);
+
+    const handleJobSelect = (job) => {
+        setFilters(prev => ({ ...prev, jobId: String(job.id) }));
+        setSelectedJob(job);
+        setJobSearch(`${job.title} — ${job.company}`);
+        setShowJobDropdown(false);
+    };
+
+    const handleJobSearchChange = (e) => {
+        const value = e.target.value;
+        setJobSearch(value);
+        if (!value.trim()) {
+            setFilters(prev => ({ ...prev, jobId: "" }));
+            setSelectedJob(null);
+        }
+        setShowJobDropdown(true);
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (jobSearchRef.current && !jobSearchRef.current.contains(e.target)) {
+                setShowJobDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const openDecision = (app, action) => {
         setConfirmApp(app);
@@ -275,27 +318,36 @@ export default function Index({ auth }) {
                                     ))}
                                 </select>
                             </div>
-                            <div className="md:col-span-2">
-                                <select
-                                    value={filters.jobId}
-                                    onChange={(e) =>
-                                        setFilters((prev) => ({
-                                            ...prev,
-                                            jobId: e.target.value,
-                                        }))
-                                    }
+                            <div ref={jobSearchRef} className="md:col-span-2 relative">
+                                <input
+                                    type="text"
+                                    value={jobSearch}
+                                    onChange={handleJobSearchChange}
+                                    onFocus={() => setShowJobDropdown(true)}
+                                    placeholder={jobsLoading ? "Loading jobs..." : "Search job by title or company..."}
                                     className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     disabled={jobsLoading}
-                                >
-                                    <option value="">
-                                        {jobsLoading ? "Loading jobs..." : "All Jobs"}
-                                    </option>
-                                    {jobs.map((j) => (
-                                        <option key={j.id} value={j.id}>
-                                            {j.title} — {j.company}
-                                        </option>
-                                    ))}
-                                </select>
+                                />
+                                {showJobDropdown && filteredJobs.length > 0 && (
+                                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+                                        {filteredJobs.map((j) => (
+                                            <button
+                                                key={j.id}
+                                                type="button"
+                                                onClick={() => handleJobSelect(j)}
+                                                className="w-full px-4 py-2 text-left hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
+                                            >
+                                                <div className="font-medium">{j.title}</div>
+                                                <div className="text-sm text-slate-500">{j.company}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {showJobDropdown && jobSearch.trim() && filteredJobs.length === 0 && (
+                                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg px-4 py-2 text-slate-500">
+                                        No jobs found
+                                    </div>
+                                )}
                             </div>
                         </div>
 

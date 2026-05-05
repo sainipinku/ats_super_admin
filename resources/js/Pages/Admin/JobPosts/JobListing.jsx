@@ -961,15 +961,7 @@ export default function JobListing({ auth }) {
                                     <p>Last Date to Apply: {selectedJob.last_date || selectedJob.lastDate || 'Not specified'}</p>
                                     <p>{selectedJob.applicants || 0} applicants</p>
                                 </div>
-                                <div className="flex gap-3">
-                                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                                        Apply Job
-                                    </button>
-                                    <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
-                                        Save Job
-                                    </button>
-                                </div>
-                            </div>
+                                                            </div>
                         </div>
                     </div>
                 </div>

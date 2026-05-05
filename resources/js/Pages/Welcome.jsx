@@ -1,7 +1,7 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import GuestLayout from "@/Layouts/GuestLayout";
 import { useState, useEffect, useMemo } from "react";
-import { FaChartLine, FaUsers, FaFileAlt, FaClock } from "react-icons/fa";
+import { FaChartLine, FaUsers, FaFileAlt, FaClock, FaHome } from "react-icons/fa";
 
 export default function Welcome({ auth, laravelVersion, phpVersion }) {
     const [timeLeft, setTimeLeft] = useState({
@@ -103,6 +103,17 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                                 Be the first to know when we launch. No spam, ever.
                             </p>
+                        </div>
+                        
+                        {/* View Homepage Button */}
+                        <div className="text-center mt-8">
+                            <Link 
+                                href="/homepage"
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                            >
+                                <FaHome className="w-5 h-5" />
+                                View Homepage
+                            </Link>
                         </div>
                     </div>
 
