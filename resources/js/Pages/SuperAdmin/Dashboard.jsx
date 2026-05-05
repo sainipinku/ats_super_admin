@@ -12,7 +12,6 @@ import {
     FaCalendarAlt,
     FaCheckCircle,
     FaExclamationTriangle,
-    FaChartLine,
     FaChartPie,
     FaChartBar,
     FaFileExport,
@@ -22,17 +21,10 @@ import {
     FaBuilding,
 } from "react-icons/fa";
 import {
-    LineChart,
-    Line,
-    BarChart,
-    Bar,
     PieChart,
     Pie,
     Cell,
     ResponsiveContainer,
-    XAxis,
-    YAxis,
-    CartesianGrid,
     Tooltip,
     Legend,
 } from "recharts";
@@ -84,13 +76,6 @@ const chartTheme = {
 const TASK_TYPE_COLORS = {
     one_time: CHART_COLORS.primary,
     recurring: CHART_COLORS.success,
-};
-
-const TASK_STATUS_COLORS = {
-    pending: CHART_COLORS.warning,
-    completed: CHART_COLORS.success,
-    overdue: CHART_COLORS.danger,
-    in_progress: CHART_COLORS.info,
 };
 
 export default function Dashboard({
@@ -293,14 +278,6 @@ export default function Dashboard({
             color: TASK_TYPE_COLORS[name],
         })
     );
-    const taskStatusData = Object.entries(stats.tasks.statuses || {}).map(
-        ([name, value]) => ({
-            name:
-                name.charAt(0).toUpperCase() + name.slice(1).replace("_", " "),
-            value,
-            color: TASK_STATUS_COLORS[name],
-        })
-    );
     const exportRef = useRef();
     const handleExport = (type = "print") => {
         const selectedYear =
@@ -349,14 +326,14 @@ export default function Dashboard({
             </div>
 
             <div class="stats-grid">
-                <div class="stat-card">
-                    <h4>Total Tasks</h4>
-                    <p>${stats.tasks.total || "No Data Available"}</p>
-                </div>
-                <div class="stat-card">
-                    <h4>Closed Tasks</h4>
-                    <p>${stats.tasks.completed || "No Data Available"}</p>
-                </div>
+                // <div class="stat-card">
+                //     <h4>Total Tasks</h4>
+                //     <p>${stats.tasks.total || "No Data Available"}</p>
+                // </div>
+                // <div class="stat-card">
+                //     <h4>Closed Tasks</h4>
+                //     <p>${stats.tasks.completed || "No Data Available"}</p>
+                // </div>
                 <div class="stat-card">
                     <h4>Active Staff</h4>
                     <p>${stats.staff.count || "No Data Available"}</p>
@@ -365,69 +342,13 @@ export default function Dashboard({
                     <h4>Departments</h4>
                     <p>${stats.departments.count || "No Data Available"}</p>
                 </div>
-                <div class="stat-card">
-                    <h4>Overdue Tasks</h4>
-                    <p>${stats.tasks.overdue || "No Data Available"}</p>
-                </div>
+                // <div class="stat-card">
+                //     <h4>Overdue Tasks</h4>
+                //     <p>${stats.tasks.overdue || "No Data Available"}</p>
+                // </div>
             </div>
 
-            <div class="charts-grid">
-                <div class="chart-section">
-                    <div class="chart-title">Task Type Distribution</div>
-                    <div class="chart-container">
-                        <canvas id="typeChart"></canvas>
-                    </div>
-                    <p>One Time: ${
-                        taskTypeData.find((d) => d.name === "One Time")
-                            ?.value || 0
-                    } tasks</p>
-                    <p>Recurring: ${
-                        taskTypeData.find((d) => d.name === "Recurring")
-                            ?.value || 0
-                    } tasks</p>
-                </div>
 
-                <div class="chart-section">
-                    <div class="chart-title">Task Status Distribution</div>
-                    <div class="chart-container">
-                        <canvas id="statusChart"></canvas>
-                    </div>
-                    ${taskStatusData
-                        .map(
-                            (status) =>
-                                `<p>${status.name}: ${status.value} tasks</p>`
-                        )
-                        .join("")}
-                </div>
-
-                <div class="chart-section">
-                    <div class="chart-title">Task Completion Trend</div>
-                    <div class="chart-container">
-                        <canvas id="trendChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="chart-section">
-                    <div class="chart-title">Creation vs Completion</div>
-                    <div class="chart-container">
-                        <canvas id="comparisonChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <div class="chart-section">
-                <div class="chart-title">Monthly Trends Data</div>
-                ${
-                    stats.tasks.trend
-                        ? stats.tasks.trend
-                              .map(
-                                  (month) =>
-                                      `<p>${month.month}: Created - ${month.total}, Completed - ${month.completed}</p>`
-                              )
-                              .join("")
-                        : "<p>No trend data available</p>"
-                }
-            </div>
 
             <div class="footer">
                 <p>Report generated from Task Management System</p>
@@ -468,139 +389,6 @@ export default function Dashboard({
                                 title: {
                                     display: true,
                                     text: 'Task Type Distribution'
-                                }
-                            }
-                        }
-                    });
-                    const statusCtx = document.getElementById('statusChart').getContext('2d');
-                    new Chart(statusCtx, {
-                        type: 'pie',
-                        data: {
-                            labels: ${JSON.stringify(
-                                taskStatusData.map((d) => d.name)
-                            )},
-                            datasets: [{
-                                data: ${JSON.stringify(
-                                    taskStatusData.map((d) => d.value)
-                                )},
-                                backgroundColor: ${JSON.stringify(
-                                    taskStatusData.map((d) => d.color)
-                                )},
-                                borderWidth: 1
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom'
-                                },
-                                title: {
-                                    display: true,
-                                    text: 'Task Status Distribution'
-                                }
-                            }
-                        }
-                    });
-                    const trendCtx = document.getElementById('trendChart').getContext('2d');
-                    new Chart(trendCtx, {
-                        type: 'line',
-                        data: {
-                            labels: ${JSON.stringify(
-                                stats.tasks.trend
-                                    ? stats.tasks.trend.map((d) => d.month)
-                                    : []
-                            )},
-                            datasets: [{
-                                label: 'Completed Tasks',
-                                data: ${JSON.stringify(
-                                    stats.tasks.trend
-                                        ? stats.tasks.trend.map(
-                                              (d) => d.completed
-                                          )
-                                        : []
-                                )},
-                                backgroundColor: '${CHART_COLORS.success}',
-                                borderColor: '${CHART_COLORS.success}',
-                                borderWidth: 2,
-                                fill: false
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom'
-                                },
-                                title: {
-                                    display: true,
-                                    text: 'Completion Trend'
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true
-                                }
-                            }
-                        }
-                    });
-                    const comparisonCtx = document.getElementById('comparisonChart').getContext('2d');
-                    new Chart(comparisonCtx, {
-                        type: 'line',
-                        data: {
-                            labels: ${JSON.stringify(
-                                stats.tasks.trend
-                                    ? stats.tasks.trend.map((d) => d.month)
-                                    : []
-                            )},
-                            datasets: [
-                                {
-                                    label: 'Created Tasks',
-                                    data: ${JSON.stringify(
-                                        stats.tasks.trend
-                                            ? stats.tasks.trend.map(
-                                                  (d) => d.total
-                                              )
-                                            : []
-                                    )},
-                                    backgroundColor: '${CHART_COLORS.primary}',
-                                    borderColor: '${CHART_COLORS.primary}',
-                                    borderWidth: 2,
-                                    fill: false
-                                },
-                                {
-                                    label: 'Completed Tasks',
-                                    data: ${JSON.stringify(
-                                        stats.tasks.trend
-                                            ? stats.tasks.trend.map(
-                                                  (d) => d.completed
-                                              )
-                                            : []
-                                    )},
-                                    backgroundColor: '${CHART_COLORS.success}',
-                                    borderColor: '${CHART_COLORS.success}',
-                                    borderWidth: 2,
-                                    fill: false
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom'
-                                },
-                                title: {
-                                    display: true,
-                                    text: 'Creation vs Completion'
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true
                                 }
                             }
                         }
@@ -1239,7 +1027,7 @@ export default function Dashboard({
                     <div className="cards border borderbx rounded-lg p-4 shadow-sm">
                         <GlobalFilters />
                         {/* Main Charts Section */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                        <div className="grid grid-cols-1 gap-6 mb-6">
                             {/* Task Type Distribution */}
                             <div className="cards border borderbx rounded-lg p-4 shadow-sm">
                                 <ChartHeader
@@ -1299,324 +1087,6 @@ export default function Dashboard({
                                                 }
                                             />
                                         </PieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-
-                            {/* Task Status Distribution */}
-                            <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                                <ChartHeader
-                                    title="Task Status"
-                                    icon={
-                                        <div className="taskpending px-[13px] py-[10px] rounded-lg border">
-                                            <FaChartPie className="text-[#FFBA26]" />
-                                        </div>
-                                    }
-                                />
-                                <div className="h-64">
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <PieChart>
-                                            <Pie
-                                                data={taskStatusData}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                                label={({ name, percent }) =>
-                                                    `${name}\n${(
-                                                        percent * 100
-                                                    ).toFixed(0)}%`
-                                                }
-                                                labelLine={false}
-                                            >
-                                                {taskStatusData.map(
-                                                    (entry, index) => (
-                                                        <Cell
-                                                            key={`cell-${index}`}
-                                                            fill={entry.color}
-                                                        />
-                                                    )
-                                                )}
-                                            </Pie>
-                                            <Tooltip
-                                                formatter={(value) => [
-                                                    `${value} tasks`,
-                                                    "Count",
-                                                ]}
-                                                contentStyle={
-                                                    chartTheme.tooltip
-                                                }
-                                            />
-                                            <Legend
-                                                layout="horizontal"
-                                                verticalAlign="bottom"
-                                                align="center"
-                                                wrapperStyle={
-                                                    chartTheme.legend
-                                                        .wrapperStyle
-                                                }
-                                            />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-
-                            {/* Task Completion Trend */}
-                            <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                                <ChartHeader
-                                    title="Completion Trend"
-                                    icon={
-                                        <div className="taskdone px-[13px] py-[10px] rounded-lg border">
-                                            <FaChartBar className="text-green-500 dark:text-green-400" />
-                                        </div>
-                                    }
-                                />
-                                <div className="h-64">
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <BarChart
-                                            data={stats.tasks.trend}
-                                            margin={{
-                                                top: 5,
-                                                right: 5,
-                                                left: 5,
-                                                bottom: 5,
-                                            }}
-                                        >
-                                            <CartesianGrid
-                                                strokeDasharray={
-                                                    chartTheme.grid
-                                                        .strokeDasharray
-                                                }
-                                                stroke={chartTheme.grid.stroke}
-                                                vertical={false}
-                                            />
-                                            <XAxis
-                                                dataKey="month"
-                                                tick={{
-                                                    fill: chartTheme.colors
-                                                        .gray,
-                                                }}
-                                                tickLine={false}
-                                            />
-                                            <YAxis
-                                                tick={{
-                                                    fill: chartTheme.colors
-                                                        .gray,
-                                                }}
-                                                tickLine={false}
-                                            />
-                                            <Tooltip
-                                                contentStyle={
-                                                    chartTheme.tooltip
-                                                }
-                                            />
-                                            <Legend
-                                                wrapperStyle={
-                                                    chartTheme.legend
-                                                        .wrapperStyle
-                                                }
-                                            />
-                                            <Bar
-                                                dataKey="total"
-                                                name="Created"
-                                                fill={CHART_COLORS.primary}
-                                                radius={[4, 4, 0, 0]}
-                                            />
-                                            <Bar
-                                                dataKey="completed"
-                                                name="Completed"
-                                                fill={CHART_COLORS.success}
-                                                radius={[4, 4, 0, 0]}
-                                            />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                                <ChartHeader
-                                    title="Completion Rate"
-                                    icon={
-                                        <div className="taskdone px-[13px] py-[10px] rounded-lg border">
-                                            <FaChartLine className="text-green-500 dark:text-green-400" />
-                                        </div>
-                                    }
-                                />
-                                <div className="h-64">
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <LineChart
-                                            data={stats.tasks.trend || []}
-                                            margin={{
-                                                top: 15,
-                                                right: 15,
-                                                left: 15,
-                                                bottom: 15,
-                                            }}
-                                        >
-                                            <CartesianGrid
-                                                strokeDasharray="3 3"
-                                                stroke="#e5e7eb"
-                                                vertical={false}
-                                            />
-                                            <XAxis
-                                                dataKey="month"
-                                                tick={{
-                                                    fill: "#6b7280",
-                                                    fontSize: 11,
-                                                }}
-                                                tickLine={false}
-                                                axisLine={{ stroke: "#e5e7eb" }}
-                                            />
-                                            <YAxis
-                                                tick={{
-                                                    fill: "#6b7280",
-                                                    fontSize: 11,
-                                                }}
-                                                tickLine={false}
-                                                axisLine={{ stroke: "#e5e7eb" }}
-                                                domain={[
-                                                    "dataMin - 5",
-                                                    "dataMax + 5",
-                                                ]}
-                                                tickCount={6}
-                                            />
-                                            <Tooltip
-                                                contentStyle={{
-                                                    backgroundColor: "white",
-                                                    border: "none",
-                                                    borderRadius: "6px",
-                                                    boxShadow:
-                                                        "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                                                    fontSize: "12px",
-                                                }}
-                                                formatter={(value) => [
-                                                    `${value} tasks`,
-                                                    "Completed",
-                                                ]}
-                                                labelFormatter={(label) =>
-                                                    `Month: ${label}`
-                                                }
-                                            />
-                                            <Legend
-                                                wrapperStyle={{
-                                                    paddingTop: "10px",
-                                                    fontSize: "12px",
-                                                }}
-                                            />
-                                            <Line
-                                                type="monotone"
-                                                dataKey="completed"
-                                                name="Completed Tasks"
-                                                stroke="#10b981"
-                                                strokeWidth={3}
-                                                dot={{
-                                                    r: 5,
-                                                    fill: "#10b981",
-                                                    stroke: "#059669",
-                                                    strokeWidth: 2,
-                                                }}
-                                                activeDot={{
-                                                    r: 7,
-                                                    fill: "#059669",
-                                                    stroke: "#10b981",
-                                                    strokeWidth: 2,
-                                                }}
-                                                connectNulls={true}
-                                            />
-                                        </LineChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-
-                            {/* Task Creation vs Completion */}
-                            <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                                <ChartHeader
-                                    title="Creation vs Completion"
-                                    icon={
-                                        <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
-                                            <FaChartLine className="text-[#5146E6]" />
-                                        </div>
-                                    }
-                                />
-                                <div className="h-64">
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <LineChart
-                                            data={stats.tasks.trend}
-                                            margin={{
-                                                top: 5,
-                                                right: 5,
-                                                left: 5,
-                                                bottom: 5,
-                                            }}
-                                        >
-                                            <CartesianGrid
-                                                strokeDasharray={
-                                                    chartTheme.grid
-                                                        .strokeDasharray
-                                                }
-                                                stroke={chartTheme.grid.stroke}
-                                                vertical={false}
-                                            />
-                                            <XAxis
-                                                dataKey="month"
-                                                tick={{
-                                                    fill: chartTheme.colors
-                                                        .gray,
-                                                }}
-                                                tickLine={false}
-                                            />
-                                            <YAxis
-                                                tick={{
-                                                    fill: chartTheme.colors
-                                                        .gray,
-                                                }}
-                                                tickLine={false}
-                                            />
-                                            <Tooltip
-                                                contentStyle={
-                                                    chartTheme.tooltip
-                                                }
-                                            />
-                                            <Legend
-                                                wrapperStyle={
-                                                    chartTheme.legend
-                                                        .wrapperStyle
-                                                }
-                                            />
-                                            <Line
-                                                type="monotone"
-                                                dataKey="total"
-                                                name="Created"
-                                                stroke={CHART_COLORS.primary}
-                                                strokeWidth={2}
-                                                dot={{ r: 4 }}
-                                                activeDot={{ r: 6 }}
-                                            />
-                                            <Line
-                                                type="monotone"
-                                                dataKey="completed"
-                                                name="Completed"
-                                                stroke={CHART_COLORS.success}
-                                                strokeWidth={2}
-                                                dot={{ r: 4 }}
-                                                activeDot={{ r: 6 }}
-                                            />
-                                        </LineChart>
                                     </ResponsiveContainer>
                                 </div>
                             </div>

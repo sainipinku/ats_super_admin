@@ -503,35 +503,44 @@ class JobController extends Controller
         ]);
     }
 
-    public function myApplications(Request $request)
-    {
-        $member = $request->user();
-
-        $perPage = (int) ($request->input('per_page', 10));
-
-        $applications = JobApplication::query()
-            ->with(['job' => function ($q) {
-                $q->select('id', 'title', 'company', 'location', 'job_type', 'salary', 'status as job_status');
-            }])
-            ->where('candidate_id', $member->id)
-            ->orderByDesc('created_at')
-            ->paginate(max(1, min($perPage, 50)));
-
-        $statusCounts = [
-            'pending' => JobApplication::where('candidate_id', $member->id)->where('status', 'pending')->count(),
-            'shortlisted' => JobApplication::where('candidate_id', $member->id)->where('status', 'shortlisted')->count(),
-            'waiting_list' => JobApplication::where('candidate_id', $member->id)->where('status', 'waiting_list')->count(),
-            'hired' => JobApplication::where('candidate_id', $member->id)->where('status', 'hired')->count(),
-            'not_selected' => JobApplication::where('candidate_id', $member->id)->where('status', 'not_selected')->count(),
-            'rejected' => JobApplication::where('candidate_id', $member->id)->where('status', 'rejected')->count(),
-        ];
-
-        return response()->json([
-            'success' => true,
-            'applications' => $applications,
-            'status_counts' => $statusCounts,
-        ]);
+   public function myApplications(Request $request)
+{
+    $member = $request->user();
+    
+    $perPage = (int) ($request->input('per_page', 10));
+    $status = $request->input('status'); // Get status filter from request
+    
+    $query = JobApplication::query()
+        ->with(['job' => function ($q) {
+            $q->select('id', 'title', 'company', 'location', 'job_type', 'salary', 'status as job_status');
+        }])
+        ->where('candidate_id', $member->id);
+    
+    // Apply status filter if provided
+    if ($status && in_array($status, ['pending', 'shortlisted', 'waiting_list', 'hired', 'not_selected', 'rejected'])) {
+        $query->where('status', $status);
     }
+    
+    $applications = $query
+        ->orderByDesc('created_at')
+        ->paginate(max(1, min($perPage, 50)));
+    
+    $statusCounts = [
+        'pending' => JobApplication::where('candidate_id', $member->id)->where('status', 'pending')->count(),
+        'shortlisted' => JobApplication::where('candidate_id', $member->id)->where('status', 'shortlisted')->count(),
+        'waiting_list' => JobApplication::where('candidate_id', $member->id)->where('status', 'waiting_list')->count(),
+        'hired' => JobApplication::where('candidate_id', $member->id)->where('status', 'hired')->count(),
+        'not_selected' => JobApplication::where('candidate_id', $member->id)->where('status', 'not_selected')->count(),
+        'rejected' => JobApplication::where('candidate_id', $member->id)->where('status', 'rejected')->count(),
+    ];
+    
+    return response()->json([
+        'success' => true,
+        'applications' => $applications,
+        'status_counts' => $statusCounts,
+        'filtered_status' => $status, // Optional: return the current filter
+    ]);
+}
 
     public function withdraw(Request $request, JobApplication $application)
     {
