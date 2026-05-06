@@ -179,6 +179,37 @@ const Sidebar = ({ isOpen, onClose }) => {
                         Members
                     </a>
                 </li>
+                <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a]">
+                    <a
+                        href={route("super.contact.messages.index")}
+                        className={`flex items-center gap-1.5 px-2.5 py-2.5 text-[15px] rounded ${
+                            route().current("super.contact.messages.index")
+                                ? "text-white bg-[#5146E6]"
+                                : "text-[#727272] hover:text-white hover:bg-[#5146E6]"
+                        }`}
+                    >
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M4 4H20V20H4V4Z"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                            />
+                            <path
+                                d="M4 7L12 13L20 7"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                        Contact Messages
+                    </a>
+                </li>
                 {false && (
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
                     {/* <a

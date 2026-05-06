@@ -432,7 +432,7 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
             return;
         }
 
-        window.location.href = '/admin/job-listing';
+        window.location.href = route('admin.job.posts.listing');
     };
 
     const handleViewDetails = (job) => {

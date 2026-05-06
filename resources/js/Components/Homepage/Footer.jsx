@@ -11,10 +11,10 @@ export default function Footer() {
     const subTextColor = isDark ? 'text-gray-400' : 'text-gray-600';
 
     const links = [
-        { name: 'Browse Jobs', href: '/jobs' },
-        { name: 'Companies', href: '/companies' },
-        { name: 'About Us', href: '/about' },
-        { name: 'Contact', href: '/contact' },
+        { name: 'Browse Jobs', href: route('member.jobs.index') },
+        { name: 'Companies', href: route('companies.index') },
+        { name: 'About Us', href: route('about') },
+        { name: 'Contact', href: route('contact.show') },
     ];
 
     const socialLinks = [
@@ -30,7 +30,7 @@ export default function Footer() {
                 <div className="grid md:grid-cols-4 gap-8">
                     {/* Brand */}
                     <div className="md:col-span-2">
-                        <Link href="/" className="flex items-center gap-2 mb-4">
+                        <Link href={route('home')} className="flex items-center gap-2 mb-4">
                             <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center">
                                 <Building2 className="w-6 h-6 text-white" />
                             </div>

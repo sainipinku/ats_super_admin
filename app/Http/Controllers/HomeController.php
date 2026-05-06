@@ -8,9 +8,11 @@ use Inertia\Inertia;
 use App\Models\Job;
 use App\Models\Member;
 use App\Models\JobApplication;
+use App\Models\ContactMessage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Jobs\SendPasswordResetEmail;
 use App\Jobs\SuperSendPasswordResetEmail;
@@ -257,6 +259,55 @@ class HomeController extends Controller
             'jobs' => $featuredJobs,
         ]);
     }
+
+    public function companies(Request $request)
+    {
+        $companies = Job::query()
+            ->whereNotNull('company')
+            ->where('company', '!=', '')
+            ->where('status', 'active')
+            ->select([
+                'company',
+                DB::raw('COUNT(*) as jobs_count'),
+                DB::raw('MAX(company_image) as company_image'),
+            ])
+            ->groupBy('company')
+            ->orderBy('company')
+            ->get();
+
+        return Inertia::render('Public/Companies', [
+            'companies' => $companies,
+        ]);
+    }
+
+    public function about(Request $request)
+    {
+        return Inertia::render('Public/About');
+    }
+
+    public function contact(Request $request)
+    {
+        return Inertia::render('Public/Contact');
+    }
+
+    public function submitContact(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+            'subject' => ['nullable', 'string', 'max:255'],
+            'message' => ['required', 'string', 'max:5000'],
+        ]);
+
+        ContactMessage::create([
+            ...$validated,
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        return back()->with('success', 'Message submitted successfully.');
+    }
+
 
     public function emailDetails(Request $request, $name)
     {

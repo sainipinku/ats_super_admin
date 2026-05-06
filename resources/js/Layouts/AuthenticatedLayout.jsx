@@ -33,8 +33,16 @@ import {
 
 export default function AuthenticatedLayout({ header, children }) {
     const { hasPermissionLike, hasPermission, hasAnyPermission } = useHelpers();
-    const user = usePage().props.auth.user;
-    const permissions = usePage().props.auth?.permissions ?? [];
+    const { auth } = usePage().props;
+    const user = auth.user;
+    const permissions = auth?.permissions ?? [];
+    const dashboardRouteName =
+        ({
+            superadmin: 'super.dashboard',
+            admin: 'admin.dashboard',
+            member: 'member.dashboard',
+        })[auth?.guard] ?? 'home';
+    const dashboardHref = route(dashboardRouteName);
 
     const { successAlert, errorAlert, warningAlert, infoAlert } = useAlerts();
 
@@ -137,7 +145,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                     </button>
 
                                     <div className="flex shrink-0 items-center">
-                                        <Link href="/dashboard">
+                                        <Link href={dashboardHref}>
                                             <ApplicationLogo className="block w-auto fill-current text-gray-800 dark:text-gray-200" />
                                         </Link>
                                     </div>

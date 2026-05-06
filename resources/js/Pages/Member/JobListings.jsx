@@ -888,7 +888,7 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
     // Handle search with debounce
     useEffect(() => {
         const timeout = setTimeout(() => {
-            router.get('/member/jobs', {
+            router.get(route('member.jobs.index'), {
                 search: searchQuery,
                 job_type: selectedType,
                 location: selectedLocation,

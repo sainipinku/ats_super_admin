@@ -257,7 +257,7 @@ export default function MyApplications({ auth, applications, statusCounts }) {
                         </p>
                         {filter === 'all' && (
                             <Link
-                                href="/member/jobs"
+                                href={route('member.jobs.index')}
                                 className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
                             >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

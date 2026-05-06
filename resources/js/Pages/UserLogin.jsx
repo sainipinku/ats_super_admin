@@ -1,14 +1,14 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/Contexts/ThemeContext';
 import { ThemeProvider } from '@/Contexts/ThemeContext';
-import { 
-    User, 
-    Mail, 
-    Lock, 
-    Eye, 
-    EyeOff, 
+import {
+    User,
+    Mail,
+    Lock,
+    Eye,
+    EyeOff,
     ArrowRight,
     CheckCircle,
     Sparkles,
@@ -53,7 +53,7 @@ function UserLoginContent() {
     const [errors, setErrors] = useState({});
     const [showNotification, setShowNotification] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
-    
+
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -71,7 +71,7 @@ function UserLoginContent() {
             ...prev,
             [name]: type === 'checkbox' ? checked : value
         }));
-        
+
         // Clear error for this field when user starts typing
         if (errors[name]) {
             setErrors(prev => ({
@@ -83,30 +83,30 @@ function UserLoginContent() {
 
     const validateForm = () => {
         const newErrors = {};
-        
+
         if (!formData.email.trim()) {
             newErrors.email = 'Email address is required';
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
             newErrors.email = 'Please enter a valid email address';
         }
-        
+
         if (!formData.password) {
             newErrors.password = 'Password is required';
         } else if (formData.password.length < 6) {
             newErrors.password = 'Password must be at least 6 characters';
         }
-        
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        
+
         if (!validateForm()) {
             return;
         }
-        
+
         setIsLoading(true);
         setErrors({});
 
@@ -116,10 +116,10 @@ function UserLoginContent() {
             setNotificationMessage('Login successful! Welcome back to our professional community!');
             setShowNotification(true);
             setIsLoading(false);
-            
+
             // Redirect to homepage after 3 seconds
             setTimeout(() => {
-                window.location.href = '/homepage';
+                window.location.href = route('homepage');
             }, 3000);
         }, 2000);
     };
@@ -138,7 +138,7 @@ function UserLoginContent() {
     return (
         <>
             <Head title="Sign In - ATS" />
-            
+
             <div className={`min-h-screen flex items-center justify-center ${bgColor} relative overflow-hidden`}>
                 {/* Background Elements */}
                 <div className="absolute inset-0 overflow-hidden">
@@ -160,7 +160,7 @@ function UserLoginContent() {
                         >
                             {/* Badge */}
                             <motion.div variants={itemVariants} className="mb-4">
-                                <motion.div 
+                                <motion.div
                                     variants={glowVariants}
                                     initial="initial"
                                     animate="animate"
@@ -182,7 +182,7 @@ function UserLoginContent() {
                                 className={`text-3xl sm:text-4xl lg:text-5xl font-black leading-tight mb-4 ${textColor}`}
                             >
                                 Sign In to{' '}
-                                <motion.span 
+                                <motion.span
                                     className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 font-black"
                                     whileHover={{ scale: 1.05 }}
                                     transition={{ duration: 0.3 }}
@@ -229,7 +229,7 @@ function UserLoginContent() {
                             variants={itemVariants}
                             className="w-full max-w-md mx-auto lg:mx-0"
                         >
-                            <motion.div 
+                            <motion.div
                                 whileHover={{ y: -5, scale: 1.01 }}
                                 transition={{ duration: 0.3 }}
                                 className={`${isDark ? 'bg-gray-800/90' : 'bg-white/90'} rounded-2xl shadow-xl border p-6 backdrop-blur-xl relative overflow-hidden`}
@@ -238,10 +238,10 @@ function UserLoginContent() {
                                 <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-blue-500/30 to-purple-500/30 rounded-full blur-3xl animate-pulse" />
                                 <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-green-500/30 to-blue-500/30 rounded-full blur-2xl animate-pulse" />
                                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-r from-pink-500/10 to-purple-500/10 rounded-full blur-3xl animate-pulse" />
-                                
+
                                 {/* Form Header */}
                                 <div className="text-center mb-6 relative z-10">
-                                    <motion.div 
+                                    <motion.div
                                         whileHover={{ scale: 1.1, rotate: 360 }}
                                         transition={{ duration: 0.5, type: "spring" }}
                                         className={`w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center text-white text-2xl font-black mx-auto mb-3 shadow-xl border-2 border-white/20`}
@@ -352,8 +352,8 @@ function UserLoginContent() {
                                             />
                                             <span className={`text-xs font-medium ${subTextColor}`}>Remember me</span>
                                         </label>
-                                        <Link 
-                                            href="/forgot-password" 
+                                        <Link
+                                            href={route('password.request')}
                                             className={`text-xs text-blue-500 hover:text-blue-600 font-bold transition-colors hover:underline`}
                                         >
                                             Forgot password?
@@ -392,8 +392,8 @@ function UserLoginContent() {
                                         <p className={`text-xs font-medium ${subTextColor}`}>
                                             Don't have an account?
                                         </p>
-                                        <Link 
-                                            href="/register" 
+                                        <Link
+                                            href={route('register')}
                                             className="text-blue-500 hover:text-blue-600 font-bold transition-colors hover:underline text-sm"
                                         >
                                             Sign Up

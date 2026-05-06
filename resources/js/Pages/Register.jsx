@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/Contexts/ThemeContext';
@@ -224,7 +224,7 @@ function RegisterContent() {
                 
                 // Redirect to login page after 3 seconds
                 setTimeout(() => {
-                    window.location.href = '/login';
+                    window.location.href = route('login');
                 }, 3000);
             } else {
                 setErrors({ verification_code: 'Invalid verification code. Please try again.' });
