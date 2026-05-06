@@ -218,7 +218,7 @@ function RegisterContent() {
             
             // Simulate verification code validation
             if (formData.verification_code === '123456') {
-                setNotificationMessage('Email verified successfully! Account created. Welcome to our professional community!');
+                setNotificationMessage('Email verified successfully!. Welcome to our professional community!');
                 setShowNotification(true);
                 setIsLoading(false);
                 
