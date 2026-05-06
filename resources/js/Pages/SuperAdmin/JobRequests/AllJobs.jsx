@@ -226,6 +226,7 @@ export default function AllJobs({ auth }) {
     const [activeTab, setActiveTab] = useState('all');
     const [selectedJob, setSelectedJob] = useState(null);
     const [detailsLoading, setDetailsLoading] = useState(false);
+    const modalRef = useRef(null);
     const [editingJob, setEditingJob] = useState(null);
     const [editForm, setEditForm] = useState(null);
     const [editSaving, setEditSaving] = useState(false);
@@ -450,6 +451,21 @@ export default function AllJobs({ auth }) {
         }
     };
 
+    // Close modal when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (modalRef.current && !modalRef.current.contains(event.target)) {
+                setSelectedJob(null);
+                setDetailsLoading(false);
+            }
+        };
+        
+        if (selectedJob) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [selectedJob]);
+
     const handleDelete = async (job) => {
         setConfirmDeleteJob(job);
         setConfirmDeleteOpen(true);
@@ -572,9 +588,9 @@ export default function AllJobs({ auth }) {
 
     // Filter jobs based on search query and active tab
     const filteredJobs = jobs.filter((job) => {
-        // Search filter
+        // Search filter: only filter when 3+ characters, show all when less than 3
         const matchesSearch =
-            searchQuery === '' ||
+            searchQuery.length < 3 ||
             job.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             job.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             job.creator?.name?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -723,35 +739,33 @@ export default function AllJobs({ auth }) {
 
                     {(selectedJob || detailsLoading) && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                            <button
+                                onClick={() => {
+                                    setSelectedJob(null);
+                                    setDetailsLoading(false);
+                                }}
+                                className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                            <div ref={modalRef} className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                                 <div className="p-6">
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="flex gap-3">
-                                            {selectedJob ? (
-                                                <img
-                                                    src={selectedJob.company_image || selectedJob.companyImage}
-                                                    alt={selectedJob.title}
-                                                    className="w-12 h-12 rounded-xl object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-gray-700" />
-                                            )}
-                                            <div>
-                                                <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{selectedJob?.title || 'Loading...'}</h2>
-                                                <p className="text-slate-500 dark:text-gray-400">{selectedJob?.company || ''}</p>
-                                            </div>
+                                    <div className="flex gap-3 mb-4">
+                                        {selectedJob ? (
+                                            <img
+                                                src={selectedJob.company_image || selectedJob.companyImage}
+                                                alt={selectedJob.title}
+                                                className="w-12 h-12 rounded-xl object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-gray-700" />
+                                        )}
+                                        <div>
+                                            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{selectedJob?.title || 'Loading...'}</h2>
+                                            <p className="text-slate-500 dark:text-gray-400">{selectedJob?.company || ''}</p>
                                         </div>
-                                        <button
-                                            onClick={() => {
-                                                setSelectedJob(null);
-                                                setDetailsLoading(false);
-                                            }}
-                                            className="p-2 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                                        >
-                                            <svg className="w-5 h-5 text-slate-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
                                     </div>
 
                                     {detailsLoading && !selectedJob ? (
@@ -935,25 +949,24 @@ export default function AllJobs({ auth }) {
 
                     {editingJob && editForm && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                            <button
+                                onClick={() => {
+                                    setEditingJob(null);
+                                    setEditForm(null);
+                                }}
+                                className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                            <div ref={modalRef} className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
                                 <form onSubmit={handleEditSubmit} className="p-6">
-                                    <div className="flex items-start justify-between mb-5">
+                                    <div className="flex gap-3 mb-5">
                                         <div>
                                             <h2 className="text-xl font-semibold text-slate-900">Edit Job</h2>
                                             <p className="text-slate-500 text-sm">{editingJob.title}</p>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setEditingJob(null);
-                                                setEditForm(null);
-                                            }}
-                                            className="p-2 hover:bg-slate-100 rounded-full transition-colors"
-                                        >
-                                            <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

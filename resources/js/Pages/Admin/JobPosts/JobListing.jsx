@@ -282,6 +282,10 @@ export default function JobListing({ auth }) {
 
     const [selectedJob, setSelectedJob] = useState(null);
     const [applicationsModalOpen, setApplicationsModalOpen] = useState(false);
+    const modalRef = useRef(null);
+    const [editingJob, setEditingJob] = useState(null);
+    const [editForm, setEditForm] = useState(null);
+    const [editSaving, setEditSaving] = useState(false);
     const [applicationsJob, setApplicationsJob] = useState(null);
     const [applicationsLoading, setApplicationsLoading] = useState(false);
     const [applications, setApplications] = useState([]);
@@ -294,7 +298,25 @@ export default function JobListing({ auth }) {
     const handleViewDetails = (job) => {
         setSelectedJob(job);
     };
+// Close modal when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (modalRef.current && !modalRef.current.contains(event.target)) {
+                setSelectedJob(null);
+            }
+            if (modalRef.current && !modalRef.current.contains(event.target) && editingJob) {
+                setEditingJob(null);
+                setEditForm(null);
+            }
+        };
+        
+        if (selectedJob || editingJob) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [selectedJob, editingJob]);
 
+    
     const handleViewApplications = async (job) => {
         setApplicationsJob(job);
         setApplications([]);
@@ -413,10 +435,66 @@ export default function JobListing({ auth }) {
     ];
 
     const handleEdit = (job) => {
-        // Navigate to job post form with full job data for editing
-        router.visit(route('admin.job.posts.index'), {
-            data: { edit: job.id },
-            preserveState: true,
+        setEditingJob(job);
+        setEditForm({
+            title: job.title || '',
+            company: job.company || '',
+            location: job.location || '',
+            job_type: job.job_type || job.type || 'Full Time',
+            experience: job.experience || '',
+            salary: job.salary || '',
+            last_date: job.last_date || '',
+            description: job.description || '',
+            key_responsibilities: job.key_responsibilities || '',
+            qualifications: job.qualifications || '',
+            skills: Array.isArray(job.skills) ? job.skills.join(', ') : (job.skills || ''),
+            perks: Array.isArray(job.perks) ? job.perks.join(', ') : (job.perks || ''),
+            company_image: null,
+            company_image_preview: job.company_image || job.companyImage || '',
+        });
+    };
+
+    const handleEditSubmit = (e) => {
+        e.preventDefault();
+        if (!editingJob || !editForm) return;
+        setEditSaving(true);
+
+        const formData = new FormData();
+        formData.append('title', editForm.title);
+        formData.append('company', editForm.company);
+        formData.append('location', editForm.location);
+        formData.append('job_type', editForm.job_type);
+        formData.append('experience', editForm.experience);
+        formData.append('salary', editForm.salary);
+        formData.append('last_date', editForm.last_date);
+        formData.append('description', editForm.description);
+        formData.append('key_responsibilities', editForm.key_responsibilities);
+        formData.append('qualifications', editForm.qualifications);
+        formData.append('skills', editForm.skills);
+        formData.append('perks', editForm.perks);
+        
+        if (editForm.company_image) {
+            formData.append('company_image', editForm.company_image);
+        }
+
+        formData.append('_method', 'PUT');
+
+        router.post(route('admin.jobs.update', editingJob.id), formData, {
+            onSuccess: (page) => {
+                successAlert('Job updated successfully!');
+                setEditingJob(null);
+                setEditForm(null);
+                // Update local state with response data
+                if (page.props.job) {
+                    setJobs(prev => prev.map(j => (j.id === editingJob.id ? page.props.job : j)));
+                }
+            },
+            onError: (errors) => {
+                errorAlert(errors.message || 'Failed to update job');
+            },
+            onFinish: () => {
+                setEditSaving(false);
+            }
         });
     };
 
@@ -841,34 +919,34 @@ export default function JobListing({ auth }) {
             {/* Job Details Modal */}
             {selectedJob && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <button
+                        onClick={() => setSelectedJob(null)}
+                        className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                    <div ref={modalRef} className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="p-6">
-                            <div className="flex justify-between items-start mb-6">
-                                <div className="flex gap-4">
-                                    <img
-                                        src={selectedJob.company_image || selectedJob.companyImage}
-                                        alt={selectedJob.company}
-                                        className="w-16 h-16 rounded-xl object-cover"
-                                    />
-                                    <div>
-                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedJob.title}</h2>
-                                        <p className="text-lg text-gray-600 dark:text-gray-300">{selectedJob.company}</p>
-                                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium capitalize ${
-                                            selectedJob.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                            selectedJob.status === 'active' ? 'bg-green-100 text-green-800' :
-                                            selectedJob.status === 'declined' ? 'bg-red-100 text-red-800' :
-                                            'bg-gray-100 text-gray-800'
-                                        }`}>
-                                            {selectedJob.status}
-                                        </span>
-                                    </div>
+                            <div className="flex gap-4 mb-6">
+                                <img
+                                    src={selectedJob.company_image || selectedJob.companyImage}
+                                    alt={selectedJob.company}
+                                    className="w-16 h-16 rounded-xl object-cover"
+                                />
+                                <div>
+                                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedJob.title}</h2>
+                                    <p className="text-lg text-gray-600 dark:text-gray-300">{selectedJob.company}</p>
+                                    <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-medium capitalize ${
+                                        selectedJob.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                        selectedJob.status === 'active' ? 'bg-green-100 text-green-800' :
+                                        selectedJob.status === 'declined' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
+                                    }`}>
+                                        {selectedJob.status}
+                                    </span>
                                 </div>
-                                <button
-                                    onClick={() => setSelectedJob(null)}
-                                    className="text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
-                                >
-                                    ×
-                                </button>
                             </div>
 
                             <div className="grid grid-cols-2 gap-6 mb-6">
@@ -958,8 +1036,15 @@ export default function JobListing({ auth }) {
                                         day: 'numeric',
                                         year: 'numeric'
                                     }) : 'Just now')}</p>
-                                    <p>Last Date to Apply: {selectedJob.last_date || selectedJob.lastDate || 'Not specified'}</p>
-                                    <p>{selectedJob.applicants || 0} applicants</p>
+                                    <p>Last Date to Apply: {selectedJob.last_date ? new Date(selectedJob.last_date).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                    }) : selectedJob.lastDate ? new Date(selectedJob.lastDate).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                    }) : 'Not specified'}</p>
                                 </div>
                                                             </div>
                         </div>
@@ -1036,6 +1121,190 @@ export default function JobListing({ auth }) {
                 icon="info"
                 modalSpinnerMessage="Resending Please Wait...."
             />
+            {/* Edit Job Modal */}
+            {editingJob && editForm && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <button
+                        onClick={() => {
+                            setEditingJob(null);
+                            setEditForm(null);
+                        }}
+                        className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                    <div ref={modalRef} className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                        <form onSubmit={handleEditSubmit} className="p-6">
+                            <div className="flex gap-3 mb-5">
+                                <div>
+                                    <h2 className="text-xl font-semibold text-slate-900">Edit Job</h2>
+                                    <p className="text-slate-500 text-sm">{editingJob.title}</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Job Title</label>
+                                    <input
+                                        value={editForm.title}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Company</label>
+                                    <input
+                                        value={editForm.company}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, company: e.target.value }))}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
+                                    <input
+                                        value={editForm.location}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, location: e.target.value }))}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Job Type</label>
+                                    <select
+                                        value={editForm.job_type}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, job_type: e.target.value }))}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                        required
+                                    >
+                                        <option>Full Time</option>
+                                        <option>Part Time</option>
+                                        <option>Contract</option>
+                                        <option>Internship</option>
+                                        <option>Freelance</option>
+                                        <option>Remote</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Experience</label>
+                                    <input
+                                        value={editForm.experience}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, experience: e.target.value }))}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Salary</label>
+                                    <input
+                                        value={editForm.salary}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, salary: e.target.value }))}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Last Date</label>
+                                    <input
+                                        type="date"
+                                        value={editForm.last_date}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, last_date: e.target.value }))}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Company Logo</label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0] || null;
+                                            setEditForm((p) => ({
+                                                ...p,
+                                                company_image: file,
+                                                company_image_preview: file ? URL.createObjectURL(file) : p.company_image_preview,
+                                            }));
+                                        }}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3"
+                                    />
+                                    {editForm.company_image_preview ? (
+                                        <img
+                                            src={editForm.company_image_preview}
+                                            alt="Company"
+                                            className="mt-2 w-20 h-20 rounded-xl object-cover border border-slate-200"
+                                        />
+                                    ) : null}
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Skills (comma separated)</label>
+                                    <input
+                                        value={editForm.skills}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, skills: e.target.value }))}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Perks (comma separated)</label>
+                                    <input
+                                        value={editForm.perks}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, perks: e.target.value }))}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Job Description</label>
+                                    <textarea
+                                        value={editForm.description}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))}
+                                        rows={4}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Key Responsibilities</label>
+                                    <textarea
+                                        value={editForm.key_responsibilities}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, key_responsibilities: e.target.value }))}
+                                        rows={3}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Qualifications</label>
+                                    <textarea
+                                        value={editForm.qualifications}
+                                        onChange={(e) => setEditForm((p) => ({ ...p, qualifications: e.target.value }))}
+                                        rows={3}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="mt-6 flex items-center justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditingJob(null);
+                                        setEditForm(null);
+                                    }}
+                                    className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50"
+                                    disabled={editSaving}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2.5 rounded-xl bg-[#5146E6] text-white hover:bg-[#4338CA] disabled:opacity-60"
+                                    disabled={editSaving}
+                                >
+                                    {editSaving ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </AuthenticatedLayout>
     );
 }
