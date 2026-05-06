@@ -175,8 +175,8 @@ export default function AuthenticatedLayout({ header, children }) {
                                     Dashboard
                                 </NavLink>
                                 <NavLink
-                                    href="/member/jobs"
-                                    active={window.location.pathname === '/member/jobs'}
+                                    href={route('member.jobs.index')}
+                                    active={route().current('member.jobs.index')}
                                 >
                                     Browse Jobs
                                 </NavLink>

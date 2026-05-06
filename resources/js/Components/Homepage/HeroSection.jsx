@@ -155,7 +155,8 @@ export default function HeroSection() {
         const params = new URLSearchParams();
         if (searchQuery) params.append('title', searchQuery);
         if (location) params.append('location', location);
-        window.location.href = `/jobs${params.toString() ? '?' + params.toString() : ''}`;
+        const jobsUrl = route('member.jobs.index');
+        window.location.href = `${jobsUrl}${params.toString() ? '?' + params.toString() : ''}`;
       }}
       className="w-full md:w-auto mt-2 md:mt-0 md:ml-2 
       min-h-[48px] md:min-h-[52px] px-6 md:px-8 

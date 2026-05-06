@@ -58,9 +58,9 @@ const Sidebar = ({ isOpen, onClose }) => {
                 {/* Job Portal - Browse Jobs */}
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a]">
                     <Link
-                        href="/member/jobs"
+                        href={route('member.jobs.index')}
                         className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
-                            window.location.pathname === '/member/jobs'
+                            route().current('member.jobs.index')
                                 ? 'text-[#4F46E5] dark:text-[#4F46E5] bg-[#4F46E5]/10'
                                 : 'text-[#727272] hover:text-[#4F46E5] dark:hover:text-[#4F46E5]'
                         }`}

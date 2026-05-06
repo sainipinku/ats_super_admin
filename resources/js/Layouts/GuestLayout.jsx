@@ -48,7 +48,7 @@ export default function GuestLayout({ children }) {
                 <div className="w-full absolute top-0 left-0 flex items-center justify-between p-3 bg-white dark:bg-gray-800 shadow sm:px-8 border-b-2 dark:border-gray-600">
 
                     {/* Logo */}
-                    <Link href="/">
+                    <Link href={route('home')}>
                         <ApplicationLogo className="h-12 w-12 sm:h-16 sm:w-16 fill-current text-gray-500" />
                     </Link>
 

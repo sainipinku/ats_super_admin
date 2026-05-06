@@ -42,7 +42,7 @@ const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply, isDark, isA
         const today = new Date();
         const diffTime = date - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
+
         if (diffDays < 0) return 'Expired';
         if (diffDays === 0) return 'Closing today';
         if (diffDays === 1) return 'Closes tomorrow';
@@ -56,12 +56,12 @@ const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply, isDark, isA
     const textPrimary = isDark ? 'text-white' : 'text-slate-900';
     const textSecondary = isDark ? 'text-gray-300' : 'text-slate-600';
     const textMuted = isDark ? 'text-gray-400' : 'text-slate-500';
-    
+
     const isSaved = savedJobs?.includes(job.id);
     const handleSaveJob = () => {
         if (!isAuthenticated) {
             // Redirect to login when trying to save without authentication
-            window.location.href = '/login';
+            window.location.href = route('login');
             return;
         }
         onSaveJob(job.id);
@@ -74,8 +74,8 @@ const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply, isDark, isA
                 <div className="flex items-start gap-4">
                     <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold flex-shrink-0 overflow-hidden">
                         {job.company_image ? (
-                            <img 
-                                src={job.company_image} 
+                            <img
+                                src={job.company_image}
                                 alt={job.company}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
@@ -93,14 +93,14 @@ const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply, isDark, isA
                         </h3>
                         <p className={`${textSecondary} text-sm font-medium`}>{job.company}</p>
                     </div>
-                    
+
                     {/* Save/Bookmark Button - Top Right */}
                     <button
                         onClick={handleSaveJob}
                         className={`p-2 rounded-lg transition-all duration-300 flex-shrink-0 ${
-                            isSaved 
-                                ? 'bg-emerald-100 text-emerald-600 border border-emerald-200 hover:bg-emerald-200' 
-                                : isDark 
+                            isSaved
+                                ? 'bg-emerald-100 text-emerald-600 border border-emerald-200 hover:bg-emerald-200'
+                                : isDark
                                     ? 'bg-gray-700 text-gray-300 border border-gray-600 hover:bg-gray-600 hover:text-white'
                                     : 'bg-white text-gray-600 border border-slate-300 hover:bg-slate-50 hover:text-slate-700'
                         }`}
@@ -163,7 +163,7 @@ const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply, isDark, isA
                             {job.applicants || 0} applicants
                         </div>
                     </div>
-                    
+
                     <div className="flex gap-2">
                         <button
                             onClick={() => onViewDetails(job)}
@@ -187,7 +187,7 @@ const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply, isDark, isA
 function SkeletonCard({ isDark }) {
     const bg = isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-200';
     const pulse = isDark ? 'bg-gray-700' : 'bg-gray-200';
-    
+
     return (
         <div className={`${bg} rounded-2xl border animate-pulse`}>
             <div className="p-5">
@@ -218,7 +218,7 @@ function SkeletonCard({ isDark }) {
 // Job Details Modal (Exact Copy from Member/JobListings)
 const JobDetailsModal = ({ job, isOpen, onClose, hasApplied, onApply }) => {
     const [activeTab, setActiveTab] = useState('overview');
-    
+
     if (!isOpen || !job) return null;
 
     return (
@@ -239,12 +239,12 @@ const JobDetailsModal = ({ job, isOpen, onClose, hasApplied, onApply }) => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
-                        
+
                         <div className="flex items-start gap-4">
                             <div className="w-16 h-16 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
                                 {job.company_image ? (
-                                    <img 
-                                        src={job.company_image} 
+                                    <img
+                                        src={job.company_image}
                                         alt={job.company}
                                         className="w-full h-full object-cover"
                                         onError={(e) => {
@@ -335,8 +335,8 @@ const JobDetailsModal = ({ job, isOpen, onClose, hasApplied, onApply }) => {
                                         <h4 className="text-lg font-semibold text-slate-900 mb-3">Perks & Benefits</h4>
                                         <div className="flex flex-wrap gap-2">
                                             {job.perks.map((perk, idx) => (
-                                                <span 
-                                                    key={idx} 
+                                                <span
+                                                    key={idx}
                                                     className="px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium border border-emerald-100 flex items-center gap-1.5"
                                                 >
                                                     <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -384,10 +384,10 @@ const JobDetailsModal = ({ job, isOpen, onClose, hasApplied, onApply }) => {
                                 <div className="p-4 bg-slate-50 rounded-xl">
                                     <p className="text-slate-500 text-sm mb-1">Posted on</p>
                                     <p className="text-lg font-semibold text-slate-900">
-                                        {new Date(job.created_at).toLocaleDateString('en-IN', { 
-                                            year: 'numeric', 
-                                            month: 'long', 
-                                            day: 'numeric' 
+                                        {new Date(job.created_at).toLocaleDateString('en-IN', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric'
                                         })}
                                     </p>
                                 </div>
@@ -395,10 +395,10 @@ const JobDetailsModal = ({ job, isOpen, onClose, hasApplied, onApply }) => {
                                     <div className="p-4 bg-slate-50 rounded-xl">
                                         <p className="text-slate-500 text-sm mb-1">Application Deadline</p>
                                         <p className="text-lg font-semibold text-slate-900">
-                                            {new Date(job.last_date).toLocaleDateString('en-IN', { 
-                                                year: 'numeric', 
-                                                month: 'long', 
-                                                day: 'numeric' 
+                                            {new Date(job.last_date).toLocaleDateString('en-IN', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric'
                                             })}
                                         </p>
                                     </div>
@@ -474,7 +474,7 @@ export default function FeaturedJobsSection({ jobs: featuredJobs }) {
         setIsModalOpen(false);
         setSelectedJob(null);
     };
-    
+
     const handleSaveJob = (jobId) => {
         if (savedJobs.includes(jobId)) {
             setSavedJobs(savedJobs.filter(id => id !== jobId));
@@ -517,7 +517,7 @@ export default function FeaturedJobsSection({ jobs: featuredJobs }) {
                         <h3 className={`text-xl font-semibold mb-2 ${textColor}`}>No jobs available</h3>
                         <p className={`mb-6 ${subTextColor}`}>Check back later for new opportunities</p>
                         <Link
-                            href="/member/jobs"
+                            href={route('member.jobs.index')}
                             className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg font-medium ${
                                 isDark ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                             }`}
@@ -564,7 +564,7 @@ export default function FeaturedJobsSection({ jobs: featuredJobs }) {
                     className="text-center mt-12"
                 >
                     <Link
-                        href="/public/jobs"
+                        href={route('member.jobs.index')}
                         className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/25"
                     >
                         Explore All Opportunities

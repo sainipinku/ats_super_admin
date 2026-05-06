@@ -37,14 +37,14 @@ export default function CTASection() {
 
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <Link
-                            href="/register"
+                            href={route('register')}
                             className="px-8 py-3 rounded-lg font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors flex items-center gap-2"
                         >
                             Sign Up
                             <ArrowRight className="w-5 h-5" />
                         </Link>
                         <Link
-                            href="/public/jobs"
+                            href={route('member.jobs.index')}
                             className={`px-8 py-3 rounded-lg font-semibold flex items-center gap-2 ${
                                 isDark ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-white text-gray-700 hover:bg-gray-100'
                             }`}

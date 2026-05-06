@@ -13,6 +13,7 @@ use App\Http\Controllers\SuperAdmin\MemberController;
 use App\Http\Controllers\SuperAdmin\RolesController;
 use App\Http\Controllers\SuperAdmin\ResumeController as SuperResumeController;
 use App\Http\Controllers\SuperAdmin\JobRequestController;
+use App\Http\Controllers\SuperAdmin\ContactMessageController;
 use App\Http\Controllers\Admin\ResumeController;
 use App\Http\Controllers\Admin\JobController;
 use Illuminate\Support\Facades\Artisan;
@@ -108,6 +109,12 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::get('/', [JobRequestController::class, 'applicationsIndex'])->name('index');
             Route::get('/api/list', [JobRequestController::class, 'listApplications'])->name('api.list');
         });
+
+        Route::group(['prefix' => 'contact-messages', 'as' => 'contact.messages.'], function () {
+            Route::get('/', [ContactMessageController::class, 'index'])->name('index');
+            Route::patch('/{message}/toggle-read', [ContactMessageController::class, 'toggleRead'])->name('toggle-read');
+            Route::delete('/{message}', [ContactMessageController::class, 'destroy'])->name('destroy');
+        });
     });
 });
 /** SUPER ADMIN ROUTES END HERE **/
@@ -200,6 +207,10 @@ Route::prefix('member')->middleware(['member'])->group(function () {
 /** PUBLIC ROUTES START HERE **/
 Route::get('/', [HomeController::class, 'authShowPage'])->name('home');
 Route::get('/homepage', [HomeController::class, 'showHomepage'])->name('homepage');
+Route::get('/companies', [HomeController::class, 'companies'])->name('companies.index');
+Route::get('/about', [HomeController::class, 'about'])->name('about');
+Route::get('/contact', [HomeController::class, 'contact'])->name('contact.show');
+Route::post('/contact', [HomeController::class, 'submitContact'])->name('contact.submit');
 Route::get('/register', function() {
     return Inertia::render('Register');
 })->name('register');

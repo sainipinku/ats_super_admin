@@ -108,7 +108,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                         {/* View Homepage Button */}
                         <div className="text-center mt-8">
                             <Link 
-                                href="/homepage"
+                                href={route('homepage')}
                                 className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
                             >
                                 <FaHome className="w-5 h-5" />
