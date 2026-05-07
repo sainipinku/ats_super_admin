@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('users')) {
+            return;
+        }
+
         Schema::table('users', function (Blueprint $table) {
             $table->decimal('latitude', 10, 8)->nullable()->after('whatsapp_phone')->comment('User location latitude');
             $table->decimal('longitude', 11, 8)->nullable()->after('latitude')->comment('User location longitude');

@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Models\Holiday;
 use App\Models\Job;
 use App\Models\JobApplication;
+use App\Models\Notification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 class AdminDashboardController extends Controller
@@ -386,6 +387,97 @@ class AdminDashboardController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Password updated successfully.');
+    }
+
+    public function notificationsUnreadCount(Request $request)
+    {
+        $superAdmin = Auth::guard('superadmin')->user();
+
+        return response()->json([
+            'success' => true,
+            'unread' => $superAdmin->unreadNotificationsCount(),
+        ]);
+    }
+
+    public function notificationsList(Request $request)
+    {
+        $superAdmin = Auth::guard('superadmin')->user();
+        $perPage = max(1, min((int) $request->input('per_page', 15), 50));
+
+        $query = $superAdmin->notifications()
+            ->with(['job:id,uuid,title,company,status,created_by'])
+            ->orderByDesc('created_at');
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->string('type')->toString());
+        }
+
+        $notifications = $query->paginate($perPage)->withQueryString();
+
+        return response()->json([
+            'success' => true,
+            'data' => $notifications,
+            'unread' => $superAdmin->unreadNotificationsCount(),
+        ]);
+    }
+
+    public function notificationsMarkRead(Request $request, Notification $notification)
+    {
+        $superAdminId = Auth::guard('superadmin')->id();
+
+        if ($notification->model !== 'superadmin' || (int) $notification->listing_id !== (int) $superAdminId) {
+            abort(404);
+        }
+
+        $notification->update([
+            'status' => 'read',
+            'viewed_at' => $notification->viewed_at ?? now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'unread' => Auth::guard('superadmin')->user()->unreadNotificationsCount(),
+        ]);
+    }
+
+    public function notificationsMarkAllRead(Request $request)
+    {
+        $superAdmin = Auth::guard('superadmin')->user();
+        $updated = $superAdmin->markAllNotificationsAsRead();
+
+        return response()->json([
+            'success' => true,
+            'updated' => $updated,
+            'unread' => $superAdmin->unreadNotificationsCount(),
+        ]);
+    }
+
+    public function notificationsDelete(Request $request, Notification $notification)
+    {
+        $superAdminId = Auth::guard('superadmin')->id();
+
+        if ($notification->model !== 'superadmin' || (int) $notification->listing_id !== (int) $superAdminId) {
+            abort(404);
+        }
+
+        $notification->delete();
+
+        return response()->json([
+            'success' => true,
+            'unread' => Auth::guard('superadmin')->user()->unreadNotificationsCount(),
+        ]);
+    }
+
+    public function notificationsDeleteAll(Request $request)
+    {
+        $superAdmin = Auth::guard('superadmin')->user();
+        $deleted = $superAdmin->deleteAllNotifications();
+
+        return response()->json([
+            'success' => true,
+            'deleted' => $deleted,
+            'unread' => 0,
+        ]);
     }
 
     public function exportDashboardData(Request $request)

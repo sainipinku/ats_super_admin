@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Notifications\Notifiable;
@@ -275,6 +276,64 @@ class Member extends Authenticatable
         }
         return '';
     }
+
+    public function appNotifications(string $model = 'member'): HasMany
+    {
+        return $this->hasMany(Notification::class, 'listing_id')
+            ->where('model', $model);
+    }
+
+    public function unreadAppNotifications(string $model = 'member'): HasMany
+    {
+        return $this->appNotifications($model)
+            ->where('status', 'unread')
+            ->whereNull('viewed_at');
+    }
+
+    public function unreadAppNotificationsCount(string $model = 'member'): int
+    {
+        return $this->unreadAppNotifications($model)->count();
+    }
+
+    public function markAppNotificationAsRead(string $uuid, string $model = 'member'): bool
+    {
+        $notification = $this->appNotifications($model)->where('uuid', $uuid)->first();
+        if (!$notification) {
+            return false;
+        }
+
+        $notification->update([
+            'status' => 'read',
+            'viewed_at' => $notification->viewed_at ?? now(),
+        ]);
+
+        return true;
+    }
+
+    public function markAllAppNotificationsAsRead(string $model = 'member'): int
+    {
+        return $this->unreadAppNotifications($model)->update([
+            'status' => 'read',
+            'viewed_at' => now(),
+        ]);
+    }
+
+    public function deleteAppNotification(string $uuid, string $model = 'member'): bool
+    {
+        $notification = $this->appNotifications($model)->where('uuid', $uuid)->first();
+        if (!$notification) {
+            return false;
+        }
+
+        $notification->delete();
+        return true;
+    }
+
+    public function deleteAllAppNotifications(string $model = 'member'): int
+    {
+        return $this->appNotifications($model)->delete();
+    }
+
     public function generatePasswordResetToken()
     {
         $this->reset_password_token = Str::random(60);
@@ -298,5 +357,5 @@ class Member extends Authenticatable
             $this->reset_password_token_expires_at->isFuture();
     }
 
-    
+
 }

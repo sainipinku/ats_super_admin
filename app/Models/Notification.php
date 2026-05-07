@@ -4,35 +4,41 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Notification extends Model
 {
-    use HasUuids;
+    use HasUuids, SoftDeletes;
+
     protected $fillable = [
-        'user_id',
-        'from_id',
+        'uuid',
+        'model',
+        'listing_id',
+        'job_id',
         'type',
-        'source_type',
-        'source_id',
-        'title',
-        'content',
-        'firebase',
-        'extra',
-        'read_at'
+        'status',
+        'viewed_at',
+        'data',
     ];
 
-    /**
-     * Get the user that owns the notification.
-     */
-
     protected $casts = [
-        'firebase' => 'array',
-        'extra' => 'array',
-        'read_at' => 'datetime',
+        'data' => 'array',
+        'viewed_at' => 'datetime',
     ];
 
     public function uniqueIds()
     {
         return ['uuid'];
+    }
+
+    public function getRouteKeyName()
+    {
+        return 'uuid';
+    }
+
+    public function job(): BelongsTo
+    {
+        return $this->belongsTo(Job::class, 'job_id');
     }
 }

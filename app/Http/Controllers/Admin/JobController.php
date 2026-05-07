@@ -307,7 +307,7 @@ class JobController extends Controller
             if (!empty($oldPath)) {
                 Storage::disk('public')->delete($oldPath);
             }
-            
+
             $path = $request->file('company_image')->store('job-images', 'public');
             $validated['company_image'] = $path;
         }

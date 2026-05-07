@@ -34,6 +34,8 @@ export default function Index({ auth }) {
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
 
+    const lastSearchRef = useRef({ mode: "all", value: "" });
+
     const statusOptions = useMemo(
         () => [
             { value: "", label: "All Status" },
@@ -66,18 +68,19 @@ export default function Index({ auth }) {
         }
     };
 
-    const loadApplications = async () => {
+    const loadApplications = async (nextFilters = filters) => {
         setLoading(true);
         try {
             const params = new URLSearchParams();
             // Only send search parameter if 3+ chars
-            if (filters.search.length >= 3) params.set("search", filters.search);
-            if (filters.status) params.set("status", filters.status);
-            if (filters.jobId) params.set("job_id", filters.jobId);
-            if (filters.dateFrom) params.set("date_from", filters.dateFrom);
-            if (filters.dateTo) params.set("date_to", filters.dateTo);
-            params.set("per_page", String(filters.perPage));
-            params.set("page", String(filters.page));
+            const search = String(nextFilters.search || "").trim();
+            if (search.length >= 3) params.set("search", search);
+            if (nextFilters.status) params.set("status", nextFilters.status);
+            if (nextFilters.jobId) params.set("job_id", nextFilters.jobId);
+            if (nextFilters.dateFrom) params.set("date_from", nextFilters.dateFrom);
+            if (nextFilters.dateTo) params.set("date_to", nextFilters.dateTo);
+            params.set("per_page", String(nextFilters.perPage));
+            params.set("page", String(nextFilters.page));
 
             const res = await fetch(
                 `${route("admin.api.applications.list")}?${params.toString()}`,
@@ -109,13 +112,34 @@ export default function Index({ auth }) {
     // Auto-search: filter when search has 3+ chars and show all when less than 3
     useEffect(() => {
         const debounceTimer = setTimeout(() => {
-            if (filters.search.length >= 3) {
-                // 3+ chars: filter records
-                loadApplications();
-            } else {
-                // 0-2 chars: show all records
-                loadApplications();
+            const search = String(filters.search || "").trim();
+            const mode = search.length >= 3 ? "filtered" : "all";
+
+            if (mode === "filtered") {
+                if (filters.page !== 1) {
+                    setFilters((prev) => ({ ...prev, page: 1 }));
+                    return;
+                }
+                if (
+                    lastSearchRef.current.mode === "filtered" &&
+                    lastSearchRef.current.value === search
+                ) {
+                    return;
+                }
+                lastSearchRef.current = { mode: "filtered", value: search };
+                loadApplications({ ...filters, page: 1, search });
+                return;
             }
+
+            if (filters.page !== 1) {
+                setFilters((prev) => ({ ...prev, page: 1 }));
+                return;
+            }
+            if (lastSearchRef.current.mode === "all") {
+                return;
+            }
+            lastSearchRef.current = { mode: "all", value: "" };
+            loadApplications({ ...filters, page: 1, search: "" });
         }, 500);
 
         return () => clearTimeout(debounceTimer);
@@ -672,4 +696,3 @@ export default function Index({ auth }) {
         </AuthenticatedLayout>
     );
 }
-

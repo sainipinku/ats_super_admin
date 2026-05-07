@@ -7,6 +7,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Ramsey\Uuid\Uuid;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
 class SuperAdmin extends Authenticatable
@@ -134,5 +135,62 @@ class SuperAdmin extends Authenticatable
         return $this->reset_password_token &&
             $this->reset_password_token_expires_at &&
             $this->reset_password_token_expires_at->isFuture();
+    }
+
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(Notification::class, 'listing_id')
+            ->where('model', 'superadmin');
+    }
+
+    public function unreadNotifications(): HasMany
+    {
+        return $this->notifications()
+            ->where('status', 'unread')
+            ->whereNull('viewed_at');
+    }
+
+    public function unreadNotificationsCount(): int
+    {
+        return $this->unreadNotifications()->count();
+    }
+
+    public function markNotificationAsRead(string $uuid): bool
+    {
+        $notification = $this->notifications()->where('uuid', $uuid)->first();
+        if (!$notification) {
+            return false;
+        }
+
+        $notification->update([
+            'status' => 'read',
+            'viewed_at' => $notification->viewed_at ?? now(),
+        ]);
+
+        return true;
+    }
+
+    public function markAllNotificationsAsRead(): int
+    {
+        return $this->unreadNotifications()->update([
+            'status' => 'read',
+            'viewed_at' => now(),
+        ]);
+    }
+
+    public function deleteNotification(string $uuid): bool
+    {
+        $notification = $this->notifications()->where('uuid', $uuid)->first();
+        if (!$notification) {
+            return false;
+        }
+
+        $notification->delete();
+        return true;
+    }
+
+    public function deleteAllNotifications(): int
+    {
+        return $this->notifications()->delete();
     }
 }

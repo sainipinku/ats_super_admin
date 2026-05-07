@@ -40,6 +40,15 @@ Route::prefix('super')->name('super.')->group(function () {
         Route::post('/profile/photo/remove', [AdminDashboardController::class, 'userProfilePhotoRemove'])->name('profile.photo.remove');
         Route::post('/profile/password/update', [AdminDashboardController::class, 'userProfilePasswordUpdate'])->name('profile.password.update');
 
+        Route::group(['prefix' => 'notifications', 'as' => 'notifications.'], function () {
+            Route::get('/api/unread-count', [AdminDashboardController::class, 'notificationsUnreadCount'])->name('api.unread_count');
+            Route::get('/api/list', [AdminDashboardController::class, 'notificationsList'])->name('api.list');
+            Route::patch('/api/{notification}/read', [AdminDashboardController::class, 'notificationsMarkRead'])->name('api.read');
+            Route::patch('/api/read-all', [AdminDashboardController::class, 'notificationsMarkAllRead'])->name('api.read_all');
+            Route::delete('/api/{notification}', [AdminDashboardController::class, 'notificationsDelete'])->name('api.delete');
+            Route::delete('/api/delete-all', [AdminDashboardController::class, 'notificationsDeleteAll'])->name('api.delete_all');
+        });
+
         // Resume Builder routes
         Route::get('/resumes', [SuperResumeController::class, 'index'])->name('resumes.index');
         Route::get('/resumes/create', [SuperResumeController::class, 'create'])->name('resumes.create');
@@ -169,6 +178,13 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     // Job Applications API route (From Main Branch)
     Route::get('/api/applications', [JobController::class, 'listApplications'])->name('admin.api.applications.list');
 
+    Route::get('/api/notifications/unread-count', [App\Http\Controllers\Admin\AdminController::class, 'notificationsUnreadCount'])->name('admin.api.notifications.unread_count');
+    Route::get('/api/notifications/list', [App\Http\Controllers\Admin\AdminController::class, 'notificationsList'])->name('admin.api.notifications.list');
+    Route::patch('/api/notifications/{notification}/read', [App\Http\Controllers\Admin\AdminController::class, 'notificationsMarkRead'])->name('admin.api.notifications.read');
+    Route::patch('/api/notifications/read-all', [App\Http\Controllers\Admin\AdminController::class, 'notificationsMarkAllRead'])->name('admin.api.notifications.read_all');
+    Route::delete('/api/notifications/{notification}', [App\Http\Controllers\Admin\AdminController::class, 'notificationsDelete'])->name('admin.api.notifications.delete');
+    Route::delete('/api/notifications/delete-all', [App\Http\Controllers\Admin\AdminController::class, 'notificationsDeleteAll'])->name('admin.api.notifications.delete_all');
+
     Route::post('/logout', [App\Http\Controllers\Admin\AdminController::class, 'logout'])->name('admin.logout');
     Route::get('/profile', [App\Http\Controllers\Admin\AdminController::class, 'userProfile'])->name('admin.profile');
     Route::post('/profile-update', [App\Http\Controllers\Admin\AdminController::class, 'userProfileUpdate'])->name('admin.profile.update');
@@ -201,6 +217,13 @@ Route::prefix('member')->middleware(['member'])->group(function () {
     Route::get('/api/profile-completion', [App\Http\Controllers\Member\CandidateJobController::class, 'profileCompletion'])->name('member.api.profile-completion');
     Route::get('/my-applications', [App\Http\Controllers\Member\CandidateJobController::class, 'myApplications'])->name('member.applications.index');
     Route::delete('/applications/{application}/withdraw', [App\Http\Controllers\Member\CandidateJobController::class, 'withdraw'])->name('member.applications.withdraw');
+
+    Route::get('/api/notifications/unread-count', [App\Http\Controllers\Admin\AdminController::class, 'notificationsUnreadCount'])->name('member.api.notifications.unread_count');
+    Route::get('/api/notifications/list', [App\Http\Controllers\Admin\AdminController::class, 'notificationsList'])->name('member.api.notifications.list');
+    Route::patch('/api/notifications/{notification}/read', [App\Http\Controllers\Admin\AdminController::class, 'notificationsMarkRead'])->name('member.api.notifications.read');
+    Route::patch('/api/notifications/read-all', [App\Http\Controllers\Admin\AdminController::class, 'notificationsMarkAllRead'])->name('member.api.notifications.read_all');
+    Route::delete('/api/notifications/{notification}', [App\Http\Controllers\Admin\AdminController::class, 'notificationsDelete'])->name('member.api.notifications.delete');
+    Route::delete('/api/notifications/delete-all', [App\Http\Controllers\Admin\AdminController::class, 'notificationsDeleteAll'])->name('member.api.notifications.delete_all');
 });
 /** MEMBER ROUTES END HERE **/
 

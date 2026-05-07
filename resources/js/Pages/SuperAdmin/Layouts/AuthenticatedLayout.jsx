@@ -128,6 +128,139 @@ export default function AuthenticatedLayout({ header, children }) {
 
     const isInitialMount = useRef(true);
 
+    const [bellOpen, setBellOpen] = useState(false);
+    const [notificationsLoading, setNotificationsLoading] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [notifications, setNotifications] = useState([]);
+
+    const superPrefix = (() => {
+        if (typeof window === "undefined") return "";
+        const path = window.location.pathname || "";
+        const idx = path.indexOf("/super/");
+        return idx >= 0 ? path.slice(0, idx) : "";
+    })();
+
+    const withSuperPrefix = (path) => `${superPrefix}${path}`;
+
+    const getCsrfToken = () => {
+        const token = document
+            ?.querySelector('meta[name="csrf-token"]')
+            ?.getAttribute("content");
+        return token || "";
+    };
+
+    const fetchUnreadCount = async () => {
+        try {
+            const res = await fetch(withSuperPrefix("/super/notifications/api/unread-count"), {
+                method: "GET",
+                credentials: "same-origin",
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            });
+            const payload = await res.json();
+            if (payload?.success) {
+                setUnreadCount(Number(payload.unread ?? 0));
+            }
+        } catch (e) {}
+    };
+
+    const fetchNotifications = async () => {
+        setNotificationsLoading(true);
+        try {
+            const res = await fetch(
+                withSuperPrefix("/super/notifications/api/list") + "?per_page=10",
+                {
+                method: "GET",
+                credentials: "same-origin",
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                }
+            );
+            const payload = await res.json();
+            if (payload?.success) {
+                const page = payload.data;
+                const items = Array.isArray(page?.data) ? page.data : [];
+                setNotifications(items);
+                setUnreadCount(Number(payload.unread ?? 0));
+            }
+        } catch (e) {
+            setNotifications([]);
+        } finally {
+            setNotificationsLoading(false);
+        }
+    };
+
+    const markNotificationRead = async (notificationUuid) => {
+        try {
+            await fetch(withSuperPrefix(`/super/notifications/api/${notificationUuid}/read`), {
+                method: "PATCH",
+                credentials: "same-origin",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                },
+            });
+        } catch (e) {}
+    };
+
+    const markAllRead = async () => {
+        try {
+            const res = await fetch(withSuperPrefix("/super/notifications/api/read-all"), {
+                method: "PATCH",
+                credentials: "same-origin",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                },
+            });
+            const payload = await res.json();
+            if (payload?.success) {
+                setUnreadCount(Number(payload.unread ?? 0));
+                setNotifications((prev) =>
+                    prev.map((n) => ({
+                        ...n,
+                        status: "read",
+                        viewed_at: n.viewed_at ?? new Date().toISOString(),
+                    }))
+                );
+            }
+        } catch (e) {}
+    };
+
+    const notificationText = (n) => {
+        const title = n?.job?.title || n?.data?.title || n?.data?.job_title || "Job";
+        switch (n?.type) {
+            case "job_created":
+                return `New job created: ${title}`;
+            case "job_resubmitted":
+                return `Job resubmitted: ${title}`;
+            case "job_pending":
+                return `Job pending: ${title}`;
+            default:
+                return title;
+        }
+    };
+
+    useEffect(() => {
+        fetchUnreadCount();
+        const id = setInterval(() => fetchUnreadCount(), 30000);
+        return () => clearInterval(id);
+    }, []);
+
+    useEffect(() => {
+        if (bellOpen) {
+            fetchNotifications();
+        }
+    }, [bellOpen]);
+
     // useEffect(() => {
     //     const fetchSettings = async () => {
     //         try {
@@ -406,6 +539,106 @@ export default function AuthenticatedLayout({ header, children }) {
                                         </div>
 
                                         <div className="flex items-center gap-2 relative">
+                                            <DropdownMenu open={bellOpen} onOpenChange={setBellOpen}>
+                                                <DropdownMenuTrigger asChild>
+                                                    <button
+                                                        type="button"
+                                                        className="relative flex items-center justify-center bg-white dark:bg-[#61CC681A] w-[48px] h-[38px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[8px] transition text-[currentColor] dark:text-[currentColor]"
+                                                    >
+                                                        <FaBell size={18} />
+                                                        {unreadCount > 0 && (
+                                                            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[11px] leading-[18px] text-center">
+                                                                {unreadCount > 99 ? "99+" : unreadCount}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-[360px] p-0">
+                                                    <DropdownMenuLabel className="flex items-center justify-between">
+                                                        <span>Notifications</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                markAllRead();
+                                                            }}
+                                                            className="text-xs text-blue-600 hover:underline"
+                                                        >
+                                                            Mark all read
+                                                        </button>
+                                                    </DropdownMenuLabel>
+                                                    <DropdownMenuSeparator />
+
+                                                    {notificationsLoading ? (
+                                                        <div className="p-4 text-sm text-gray-500">Loading...</div>
+                                                    ) : notifications.length === 0 ? (
+                                                        <div className="p-4 text-sm text-gray-500">
+                                                            No notifications
+                                                        </div>
+                                                    ) : (
+                                                        <div className="max-h-[420px] overflow-auto">
+                                                            {notifications.map((n) => (
+                                                                <DropdownMenuItem
+                                                                    key={n.uuid}
+                                                                    className="flex flex-col items-start gap-1 py-3 cursor-pointer"
+                                                                    onSelect={async (e) => {
+                                                                        e.preventDefault();
+                                                                        await markNotificationRead(n.uuid);
+                                                                        setUnreadCount((prev) =>
+                                                                            Math.max(
+                                                                                0,
+                                                                                prev -
+                                                                                    (n.status === "unread" &&
+                                                                                    !n.viewed_at
+                                                                                        ? 1
+                                                                                        : 0)
+                                                                            )
+                                                                        );
+                                                                        setNotifications((prev) =>
+                                                                            prev.map((x) =>
+                                                                                x.uuid === n.uuid
+                                                                                    ? {
+                                                                                          ...x,
+                                                                                          status: "read",
+                                                                                          viewed_at:
+                                                                                              x.viewed_at ??
+                                                                                              new Date().toISOString(),
+                                                                                      }
+                                                                                    : x
+                                                                            )
+                                                                        );
+                                                                        window.location.href = withSuperPrefix(
+                                                                            "/super/job-requests/all-jobs"
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    <div className="w-full flex items-start justify-between gap-2">
+                                                                        <div
+                                                                            className={
+                                                                                "text-sm " +
+                                                                                (n.status === "unread" &&
+                                                                                !n.viewed_at
+                                                                                    ? "font-semibold"
+                                                                                    : "font-normal")
+                                                                            }
+                                                                        >
+                                                                            {notificationText(n)}
+                                                                        </div>
+                                                                        {n.status === "unread" && !n.viewed_at && (
+                                                                            <span className="mt-[6px] w-2 h-2 rounded-full bg-blue-600" />
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-500">
+                                                                        {n.created_at}
+                                                                    </div>
+                                                                </DropdownMenuItem>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+
                                             <button
                                                 onClick={() =>
                                                     setDarkMode(!darkMode)
