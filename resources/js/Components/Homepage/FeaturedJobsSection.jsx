@@ -231,15 +231,6 @@ const JobDetailsModal = ({ job, isOpen, onClose, hasApplied, onApply }) => {
                 <div className="inline-block w-full max-w-4xl my-8 text-left align-middle transition-all transform bg-white shadow-2xl rounded-2xl sm:align-middle">
                     {/* Header */}
                     <div className="relative bg-gradient-to-r from-blue-600 to-purple-700 px-8 py-6 rounded-t-2xl">
-                        <button
-                            onClick={onClose}
-                            className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"
-                        >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-
                         <div className="flex items-start gap-4">
                             <div className="w-16 h-16 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
                                 {job.company_image ? (

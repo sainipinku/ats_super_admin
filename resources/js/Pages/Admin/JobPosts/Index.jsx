@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import LocationInput from '../../../Components/LocationInput';
@@ -231,6 +231,7 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
     const [selectedJob, setSelectedJob] = useState(null);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [jobs, setJobs] = useState(initialJobs || []);
+    const modalRef = useRef(null);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -305,6 +306,20 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
     const handleClosePreview = () => {
         setShowPreview(false);
     };
+
+    // Close modal when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (modalRef.current && !modalRef.current.contains(event.target)) {
+                setShowPreview(false);
+            }
+        };
+        
+        if (showPreview) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [showPreview]);
 
     const performSubmit = async () => {
         const normalizeList = (value) => {
@@ -852,20 +867,12 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
             {/* Preview Modal */}
             {showPreview && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <div ref={modalRef} className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="p-6">
-                            <div className="flex justify-between items-start mb-6">
+                            <div className="mb-6">
                                 <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                                     Job Post Preview
                                 </h3>
-                                <button
-                                    onClick={handleClosePreview}
-                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                                >
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
                             </div>
 
                             <div className="space-y-4">

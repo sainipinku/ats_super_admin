@@ -16,7 +16,7 @@ const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onR
     const isPending = job.status === 'pending';
     const isClosed = job.status === 'closed';
 
-    // Close dropdown when clicking outside
+    // Close dropdown when clicking outside 
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -29,7 +29,7 @@ const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onR
 
 
     const getStatusBadge = (status) => {
-        const badges = {
+        const badges = { 
             pending: 'bg-yellow-100 text-yellow-800',
             active: 'bg-green-100 text-green-800',
             inactive: 'bg-gray-100 text-gray-800',
