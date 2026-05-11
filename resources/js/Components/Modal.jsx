@@ -68,15 +68,13 @@ export default function Modal({
                         className={`max-h-[100%] overflow-y-auto bg-white dark:bg-[#080626] rounded-lg overflow-hidden shadow-xl transform transition-all w-full sm:mx-auto ${maxWidthClass} ${className}`}
                     >
                         {topCloseButton && (
-                            <div className="relative">
-                                <button
-                                    type="button"
-                                    className="absolute top-3 right-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white p-1 rounded-full transition-colors"
-                                    onClick={handleTopClose}
-                                >
-                                    <IoCloseSharp className="text-2xl" />
-                                </button>
-                            </div>
+                            <button
+                                type="button"
+                                className="fixed top-4 right-4 z-[60] w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                onClick={handleTopClose}
+                            >
+                                <IoCloseSharp className="text-xl text-gray-600 dark:text-gray-400" />
+                            </button>
                         )}
 
                         <div className="p-[10px] md:p-[15px] dark:text-gray-100">

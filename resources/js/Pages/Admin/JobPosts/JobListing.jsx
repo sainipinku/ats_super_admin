@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import LocationInput from '../../../Components/LocationInput';
 import ConfirmDialog from '../../../Components/ConfirmDialog';
@@ -16,7 +16,7 @@ const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onR
     const isPending = job.status === 'pending';
     const isClosed = job.status === 'closed';
 
-    // Close dropdown when clicking outside 
+    // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -29,7 +29,7 @@ const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onR
 
 
     const getStatusBadge = (status) => {
-        const badges = { 
+        const badges = {
             pending: 'bg-yellow-100 text-yellow-800',
             active: 'bg-green-100 text-green-800',
             inactive: 'bg-gray-100 text-gray-800',
@@ -286,9 +286,6 @@ export default function JobListing({ auth }) {
     const [editingJob, setEditingJob] = useState(null);
     const [editForm, setEditForm] = useState(null);
     const [editSaving, setEditSaving] = useState(false);
-    const [createJobOpen, setCreateJobOpen] = useState(false);
-    const [createForm, setCreateForm] = useState(null);
-    const [createSaving, setCreateSaving] = useState(false);
     const [applicationsJob, setApplicationsJob] = useState(null);
     const [applicationsLoading, setApplicationsLoading] = useState(false);
     const [applications, setApplications] = useState([]);
@@ -312,14 +309,14 @@ export default function JobListing({ auth }) {
                 setEditForm(null);
             }
         };
-
+        
         if (selectedJob || editingJob) {
             document.addEventListener('mousedown', handleClickOutside);
             return () => document.removeEventListener('mousedown', handleClickOutside);
         }
     }, [selectedJob, editingJob]);
 
-
+    
     const handleViewApplications = async (job) => {
         setApplicationsJob(job);
         setApplications([]);
@@ -437,19 +434,6 @@ export default function JobListing({ auth }) {
         { value: 'rejected', label: 'Rejected' },
     ];
 
-    const toDateInputValue = (value) => {
-        if (!value) return "";
-        const str = String(value);
-        const match = str.match(/^(\d{4}-\d{2}-\d{2})/);
-        if (match) return match[1];
-        const d = new Date(str);
-        if (Number.isNaN(d.getTime())) return "";
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        return `${yyyy}-${mm}-${dd}`;
-    };
-
     const handleEdit = (job) => {
         setEditingJob(job);
         setEditForm({
@@ -459,7 +443,7 @@ export default function JobListing({ auth }) {
             job_type: job.job_type || job.type || 'Full Time',
             experience: job.experience || '',
             salary: job.salary || '',
-            last_date: toDateInputValue(job.last_date || job.lastDate),
+            last_date: job.last_date || '',
             description: job.description || '',
             key_responsibilities: job.key_responsibilities || '',
             qualifications: job.qualifications || '',
@@ -470,148 +454,48 @@ export default function JobListing({ auth }) {
         });
     };
 
-    const openCreateJob = () => {
-        setCreateForm({
-            title: "",
-            company: "",
-            location: "",
-            job_type: "Full Time",
-            experience: "",
-            salary: "",
-            last_date: "",
-            description: "",
-            key_responsibilities: "",
-            qualifications: "",
-            skills: "",
-            perks: "",
-            company_image: null,
-            company_image_preview: "",
-        });
-        setCreateJobOpen(true);
-    };
-
-    const handleCreateSubmit = (e) => {
-        e.preventDefault();
-        if (!createForm) return;
-        if (createSaving) return;
-
-        setCreateSaving(true);
-
-        const normalizeList = (value) => {
-            const str = String(value || "");
-            return str
-                .split(",")
-                .map((v) => v.trim())
-                .filter(Boolean);
-        };
-
-        const formData = new FormData();
-        formData.append("title", createForm.title);
-        formData.append("company", createForm.company);
-        formData.append("location", createForm.location);
-        formData.append("job_type", createForm.job_type || "Full Time");
-        formData.append("experience", createForm.experience || "");
-        formData.append("salary", createForm.salary || "");
-        formData.append("last_date", createForm.last_date || "");
-        formData.append("description", createForm.description || "");
-        formData.append("key_responsibilities", createForm.key_responsibilities || "");
-        formData.append("qualifications", createForm.qualifications || "");
-        formData.append("skills", JSON.stringify(normalizeList(createForm.skills)));
-        formData.append("perks", JSON.stringify(normalizeList(createForm.perks)));
-
-        if (createForm.company_image) {
-            formData.append("company_image", createForm.company_image);
-        }
-
-        fetch(route("admin.api.jobs.store"), {
-            method: "POST",
-            headers: {
-                "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.content,
-                Accept: "application/json",
-            },
-            body: formData,
-        })
-            .then((res) => res.json().catch(() => null).then((data) => ({ res, data })))
-            .then(({ res, data }) => {
-                if (!res.ok || !data?.success) {
-                    const firstKey = data?.errors ? Object.keys(data.errors)[0] : null;
-                    const firstMessage = firstKey ? (data.errors[firstKey]?.[0] || data.message) : data?.message;
-                    errorAlert(firstMessage || "Failed to create job.");
-                    return;
-                }
-
-                setJobs((prev) => [data.data, ...prev]);
-                setCreateJobOpen(false);
-                setCreateForm(null);
-                successAlert(data.message || "Job post created successfully and sent for approval!");
-            })
-            .catch(() => {
-                errorAlert("Failed to create job.");
-            })
-            .finally(() => {
-                setCreateSaving(false);
-            });
-    };
-
     const handleEditSubmit = (e) => {
         e.preventDefault();
         if (!editingJob || !editForm) return;
         setEditSaving(true);
-
-        const normalizeList = (value) => {
-            const str = String(value || "");
-            return str
-                .split(",")
-                .map((v) => v.trim())
-                .filter(Boolean);
-        };
 
         const formData = new FormData();
         formData.append('title', editForm.title);
         formData.append('company', editForm.company);
         formData.append('location', editForm.location);
         formData.append('job_type', editForm.job_type);
-        formData.append('experience', editForm.experience || "");
-        formData.append('salary', editForm.salary || "");
-        formData.append('last_date', editForm.last_date || "");
-        formData.append('description', editForm.description || "");
-        formData.append('key_responsibilities', editForm.key_responsibilities || "");
-        formData.append('qualifications', editForm.qualifications || "");
-        formData.append('skills', JSON.stringify(normalizeList(editForm.skills)));
-        formData.append('perks', JSON.stringify(normalizeList(editForm.perks)));
-
+        formData.append('experience', editForm.experience);
+        formData.append('salary', editForm.salary);
+        formData.append('last_date', editForm.last_date);
+        formData.append('description', editForm.description);
+        formData.append('key_responsibilities', editForm.key_responsibilities);
+        formData.append('qualifications', editForm.qualifications);
+        formData.append('skills', editForm.skills);
+        formData.append('perks', editForm.perks);
+        
         if (editForm.company_image) {
             formData.append('company_image', editForm.company_image);
         }
 
-        fetch(route('admin.api.jobs.update', editingJob.id), {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                'Accept': 'application/json',
-            },
-            body: formData,
-        })
-            .then((res) => res.json().catch(() => null).then((data) => ({ res, data })))
-            .then(({ res, data }) => {
-                if (!res.ok || !data?.success) {
-                    const firstKey = data?.errors ? Object.keys(data.errors)[0] : null;
-                    const firstMessage = firstKey ? (data.errors[firstKey]?.[0] || data.message) : data?.message;
-                    errorAlert(firstMessage || 'Failed to update job.');
-                    return;
-                }
+        formData.append('_method', 'PUT');
 
-                successAlert(data.message || 'Job updated successfully!');
-                setJobs((prev) => prev.map((j) => (j.id === editingJob.id ? data.data : j)));
+        router.post(route('admin.jobs.update', editingJob.id), formData, {
+            onSuccess: (page) => {
+                successAlert('Job updated successfully!');
                 setEditingJob(null);
                 setEditForm(null);
-            })
-            .catch(() => {
-                errorAlert('Failed to update job.');
-            })
-            .finally(() => {
+                // Update local state with response data
+                if (page.props.job) {
+                    setJobs(prev => prev.map(j => (j.id === editingJob.id ? page.props.job : j)));
+                }
+            },
+            onError: (errors) => {
+                errorAlert(errors.message || 'Failed to update job');
+            },
+            onFinish: () => {
                 setEditSaving(false);
-            });
+            }
+        });
     };
 
     const handleDelete = (job) => {
@@ -787,16 +671,15 @@ export default function JobListing({ auth }) {
                         )}
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={openCreateJob}
+                    <Link
+                        href={route("admin.job.posts.index")}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-md whitespace-nowrap"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
                         Post New Job
-                    </button>
+                    </Link>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
@@ -838,13 +721,12 @@ export default function JobListing({ auth }) {
                                         : 'No job posts have been created yet.'}
                                 </p>
                                 {!searchQuery && (
-                                    <button
-                                        type="button"
-                                        onClick={openCreateJob}
+                                    <Link
+                                        href={route("admin.job.posts.index")}
                                         className="inline-flex items-center px-4 py-2 mt-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                                     >
                                         Create First Job Post
-                                    </button>
+                                    </Link>
                                 )}
                             </div>
                         </div>
@@ -1037,18 +919,16 @@ export default function JobListing({ auth }) {
             {/* Job Details Modal */}
             {selectedJob && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div ref={modalRef} className="relative bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <button
-                            type="button"
-                            onClick={() => setSelectedJob(null)}
-                            className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            aria-label="Close"
-                        >
-                            <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                        <div className="p-6 pr-14">
+                    <button
+                        onClick={() => setSelectedJob(null)}
+                        className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                    <div ref={modalRef} className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6">
                             <div className="flex gap-4 mb-6">
                                 <img
                                     src={selectedJob.company_image || selectedJob.companyImage}
@@ -1241,210 +1121,22 @@ export default function JobListing({ auth }) {
                 icon="info"
                 modalSpinnerMessage="Resending Please Wait...."
             />
-            {createJobOpen && createForm && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div ref={modalRef} className="relative bg-white dark:bg-gray-800 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (createSaving) return;
-                                setCreateJobOpen(false);
-                                setCreateForm(null);
-                            }}
-                            className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            aria-label="Close"
-                        >
-                            <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                        <form onSubmit={handleCreateSubmit} className="p-6 pr-14">
-                            <div className="flex gap-3 mb-5">
-                                <div>
-                                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Create Job</h2>
-                                    <p className="text-slate-500 dark:text-gray-400 text-sm">Create a new job post</p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Job Title</label>
-                                    <input
-                                        value={createForm.title}
-                                        onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
-                                        className="w-full border border-slate-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Company</label>
-                                    <input
-                                        value={createForm.company}
-                                        onChange={(e) => setCreateForm((p) => ({ ...p, company: e.target.value }))}
-                                        className="w-full border border-slate-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Location</label>
-                                    <LocationInput
-                                        value={createForm.location}
-                                        onChange={(value) => setCreateForm((p) => ({ ...p, location: value }))}
-                                        placeholder="Enter job location"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Job Type</label>
-                                    <select
-                                        value={createForm.job_type}
-                                        onChange={(e) => setCreateForm((p) => ({ ...p, job_type: e.target.value }))}
-                                        className="w-full border border-slate-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                        required
-                                    >
-                                        <option>Full Time</option>
-                                        <option>Part Time</option>
-                                        <option>Contract</option>
-                                        <option>Internship</option>
-                                        <option>Freelance</option>
-                                        <option>Remote</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Experience</label>
-                                    <input
-                                        value={createForm.experience}
-                                        onChange={(e) => setCreateForm((p) => ({ ...p, experience: e.target.value }))}
-                                        className="w-full border border-slate-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Salary</label>
-                                    <input
-                                        value={createForm.salary}
-                                        onChange={(e) => setCreateForm((p) => ({ ...p, salary: e.target.value }))}
-                                        className="w-full border border-slate-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Last Date</label>
-                                    <input
-                                        type="date"
-                                        value={createForm.last_date}
-                                        onChange={(e) => setCreateForm((p) => ({ ...p, last_date: e.target.value }))}
-                                        className="w-full border border-slate-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Company Logo</label>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0] || null;
-                                            setCreateForm((p) => ({
-                                                ...p,
-                                                company_image: file,
-                                                company_image_preview: file ? URL.createObjectURL(file) : p.company_image_preview,
-                                            }));
-                                        }}
-                                        className="w-full border border-slate-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-3"
-                                    />
-                                    {createForm.company_image_preview ? (
-                                        <img
-                                            src={createForm.company_image_preview}
-                                            alt="Company"
-                                            className="mt-2 w-20 h-20 rounded-xl object-cover border border-slate-200 dark:border-gray-600"
-                                        />
-                                    ) : null}
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Skills (comma separated)</label>
-                                    <input
-                                        value={createForm.skills}
-                                        onChange={(e) => setCreateForm((p) => ({ ...p, skills: e.target.value }))}
-                                        className="w-full border border-slate-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                    />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Perks (comma separated)</label>
-                                    <input
-                                        value={createForm.perks}
-                                        onChange={(e) => setCreateForm((p) => ({ ...p, perks: e.target.value }))}
-                                        className="w-full border border-slate-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                    />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Job Description</label>
-                                    <textarea
-                                        value={createForm.description}
-                                        onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
-                                        rows={4}
-                                        className="w-full border border-slate-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                    />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Key Responsibilities</label>
-                                    <textarea
-                                        value={createForm.key_responsibilities}
-                                        onChange={(e) => setCreateForm((p) => ({ ...p, key_responsibilities: e.target.value }))}
-                                        rows={3}
-                                        className="w-full border border-slate-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                    />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Qualifications</label>
-                                    <textarea
-                                        value={createForm.qualifications}
-                                        onChange={(e) => setCreateForm((p) => ({ ...p, qualifications: e.target.value }))}
-                                        rows={3}
-                                        className="w-full border border-slate-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="mt-6 flex items-center justify-end gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (createSaving) return;
-                                        setCreateJobOpen(false);
-                                        setCreateForm(null);
-                                    }}
-                                    className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-gray-600 text-slate-700 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-gray-700"
-                                    disabled={createSaving}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-5 py-2.5 rounded-xl bg-[#5146E6] text-white hover:bg-[#4338CA] disabled:opacity-60"
-                                    disabled={createSaving}
-                                >
-                                    {createSaving ? "Saving..." : "Create Job"}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
             {/* Edit Job Modal */}
             {editingJob && editForm && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div ref={modalRef} className="relative bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setEditingJob(null);
-                                setEditForm(null);
-                            }}
-                            className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            aria-label="Close"
-                        >
-                            <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                        <form onSubmit={handleEditSubmit} className="p-6 pr-14">
+                    <button
+                        onClick={() => {
+                            setEditingJob(null);
+                            setEditForm(null);
+                        }}
+                        className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                    <div ref={modalRef} className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                        <form onSubmit={handleEditSubmit} className="p-6">
                             <div className="flex gap-3 mb-5">
                                 <div>
                                     <h2 className="text-xl font-semibold text-slate-900">Edit Job</h2>
