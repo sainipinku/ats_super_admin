@@ -122,8 +122,8 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="relative h-32 bg-gradient-to-r from-blue-500 to-purple-600 p-6">
                     <div className="absolute top-3 left-3">
@@ -153,13 +153,13 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
                             )}
                         </div>
                     </div>
-                    <div className="absolute top-2 right-3">
+                    <div className="fixed top-4 right-4 z-50">
                         <button
                             onClick={onClose}
-                            className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors"
+                            className="w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                         >
                             <svg
-                                className="w-5 h-5 text-gray-600"
+                                className="w-4 h-4 text-gray-600 dark:text-gray-400"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -483,7 +483,7 @@ export default function JobRequests({ auth }) {
                             { key: "all", label: "All", count: counts.all },
                             { key: "pending", label: "Pending", count: counts.pending },
                             { key: "active", label: "Active", count: counts.active },
-                            { key: "declined", label: "Declined", count: counts.declined },
+                            { key: "declined", label: "Rejected", count: counts.declined },
                         ].map((tab) => (
                             <button
                                 key={tab.key}

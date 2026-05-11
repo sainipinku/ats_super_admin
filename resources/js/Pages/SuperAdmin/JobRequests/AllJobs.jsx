@@ -601,6 +601,9 @@ export default function AllJobs({ auth }) {
 
     // Filter jobs based on search query and active tab
     const filteredJobs = jobs.filter((job) => {
+        // Exclude pending jobs from All Jobs section
+        if (job.status === 'pending') return false;
+        
         // Search filter: only filter when 3+ characters, show all when less than 3
         const matchesSearch =
             searchQuery.length < 3 ||
@@ -618,8 +621,9 @@ export default function AllJobs({ auth }) {
     });
 
     const getJobCounts = () => {
+        const nonPendingJobs = jobs.filter(j => j.status !== 'pending');
         return {
-            all: jobs.length,
+            all: nonPendingJobs.length,
             active: jobs.filter((j) => j.status === 'active').length,
             inactive: jobs.filter((j) => j.status === 'inactive').length,
             pending: jobs.filter((j) => j.status === 'pending').length,
@@ -633,9 +637,8 @@ export default function AllJobs({ auth }) {
     const tabs = [
         { key: 'all', label: 'All Jobs', count: counts.all },
         { key: 'active', label: 'Active', count: counts.active },
-        { key: 'inactive', label: 'Inactive', count: counts.inactive },
-        { key: 'pending', label: 'Pending', count: counts.pending },
-        { key: 'declined', label: 'Declined', count: counts.declined },
+        { key: 'declined', label: 'Rejected', count: counts.declined },
+        { key: 'inactive', label: 'Deactivated', count: counts.inactive },
         { key: 'closed', label: 'Closed', count: counts.closed },
     ];
 
@@ -759,7 +762,7 @@ export default function AllJobs({ auth }) {
                                         setSelectedJob(null);
                                         setDetailsLoading(false);
                                     }}
-                                    className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    className="fixed top-4 right-4 z-50 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                                     aria-label="Close"
                                 >
                                     <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
