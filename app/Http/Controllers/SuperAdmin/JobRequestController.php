@@ -267,7 +267,7 @@ class JobRequestController extends Controller
         ]);
 
         $superAdminId = Auth::guard('superadmin')->id();
-        
+
         // Add log entry for change request
         $logs = $job->approval_logs ?? [];
         $logs[] = [
@@ -324,7 +324,7 @@ class JobRequestController extends Controller
         }
 
         $superAdminId = Auth::guard('superadmin')->id();
-        
+
         // Add log entry for closing
         $logs = $job->approval_logs ?? [];
         $logs[] = [

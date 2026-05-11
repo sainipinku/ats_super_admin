@@ -83,6 +83,93 @@ class Job extends Model
                 $job->uuid = (string) Str::uuid();
             }
         });
+
+        static::created(function (Job $job) {
+            if (empty($job->created_by)) {
+                return;
+            }
+
+            $superAdminIds = SuperAdmin::query()->pluck('id');
+            foreach ($superAdminIds as $superAdminId) {
+                Notification::create([
+                    'model' => 'superadmin',
+                    'listing_id' => $superAdminId,
+                    'job_id' => $job->id,
+                    'type' => 'job_created',
+                    'status' => 'unread',
+                    'data' => [
+                        'job_uuid' => $job->uuid,
+                        'title' => $job->title,
+                        'created_by' => $job->created_by,
+                    ],
+                ]);
+            }
+        });
+
+        static::updated(function (Job $job) {
+            if (!$job->wasChanged('status')) {
+                return;
+            }
+
+            $oldStatus = $job->getOriginal('status');
+            $newStatus = $job->status;
+
+            if ($newStatus === 'active') {
+                Notification::create([
+                    'model' => 'admin',
+                    'listing_id' => $job->created_by,
+                    'job_id' => $job->id,
+                    'type' => 'job_approved',
+                    'status' => 'unread',
+                    'data' => [
+                        'job_uuid' => $job->uuid,
+                        'title' => $job->title,
+                        'approved_by' => $job->approved_by,
+                        'approved_at' => optional($job->approved_at)->toDateTimeString(),
+                    ],
+                ]);
+
+                return;
+            }
+
+            if ($newStatus === 'declined') {
+                Notification::create([
+                    'model' => 'admin',
+                    'listing_id' => $job->created_by,
+                    'job_id' => $job->id,
+                    'type' => 'job_rejected',
+                    'status' => 'unread',
+                    'data' => [
+                        'job_uuid' => $job->uuid,
+                        'title' => $job->title,
+                        'rejection_reason' => $job->rejection_reason,
+                        'approved_by' => $job->approved_by,
+                    ],
+                ]);
+
+                return;
+            }
+
+            if ($newStatus === 'pending') {
+                $type = $oldStatus === 'declined' ? 'job_resubmitted' : 'job_pending';
+                $superAdminIds = SuperAdmin::query()->pluck('id');
+                foreach ($superAdminIds as $superAdminId) {
+                    Notification::create([
+                        'model' => 'superadmin',
+                        'listing_id' => $superAdminId,
+                        'job_id' => $job->id,
+                        'type' => $type,
+                        'status' => 'unread',
+                        'data' => [
+                            'job_uuid' => $job->uuid,
+                            'title' => $job->title,
+                            'created_by' => $job->created_by,
+                            'resubmitted_at' => optional($job->resubmitted_at)->toDateTimeString(),
+                        ],
+                    ]);
+                }
+            }
+        });
     }
 
     /**

@@ -509,6 +509,19 @@ export default function AllJobs({ auth }) {
         return value.filter(Boolean).join(', ');
     };
 
+    const toDateInputValue = (value) => {
+        if (!value) return "";
+        const str = String(value);
+        const match = str.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (match) return match[1];
+        const d = new Date(str);
+        if (Number.isNaN(d.getTime())) return "";
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+    };
+
     const handleEdit = async (job) => {
         setEditingJob(job);
         setEditForm({
@@ -518,7 +531,7 @@ export default function AllJobs({ auth }) {
             job_type: job.job_type || job.type || 'Full Time',
             experience: job.experience || '',
             salary: job.salary || '',
-            last_date: job.last_date || '',
+            last_date: toDateInputValue(job.last_date || job.lastDate),
             description: job.description || '',
             key_responsibilities: job.key_responsibilities || '',
             qualifications: job.qualifications || '',
@@ -739,19 +752,21 @@ export default function AllJobs({ auth }) {
 
                     {(selectedJob || detailsLoading) && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                            <button
-                                onClick={() => {
-                                    setSelectedJob(null);
-                                    setDetailsLoading(false);
-                                }}
-                                className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            >
-                                <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                            <div ref={modalRef} className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                                <div className="p-6">
+                            <div ref={modalRef} className="relative bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedJob(null);
+                                        setDetailsLoading(false);
+                                    }}
+                                    className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    aria-label="Close"
+                                >
+                                    <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                                <div className="p-6 pr-14">
                                     <div className="flex gap-3 mb-4">
                                         {selectedJob ? (
                                             <img
@@ -949,19 +964,21 @@ export default function AllJobs({ auth }) {
 
                     {editingJob && editForm && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                            <button
-                                onClick={() => {
-                                    setEditingJob(null);
-                                    setEditForm(null);
-                                }}
-                                className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            >
-                                <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                            <div ref={modalRef} className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-                                <form onSubmit={handleEditSubmit} className="p-6">
+                            <div ref={modalRef} className="relative bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditingJob(null);
+                                        setEditForm(null);
+                                    }}
+                                    className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    aria-label="Close"
+                                >
+                                    <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                                <form onSubmit={handleEditSubmit} className="p-6 pr-14">
                                     <div className="flex gap-3 mb-5">
                                         <div>
                                             <h2 className="text-xl font-semibold text-slate-900">Edit Job</h2>

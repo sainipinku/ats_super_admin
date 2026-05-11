@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Head, Link } from '@inertiajs/react';
+import React, { useState , useEffect , useRef  } from 'react';
+import { Head, Link , router } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import LocationInput from '../../../Components/LocationInput';
 import ConfirmDialog from '../../../Components/ConfirmDialog';
@@ -418,6 +418,10 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
         }
 
         successAlert(editingJobId ? 'Job post updated successfully!' : 'Job post created successfully and sent for approval!');
+
+        if (!editingJobId) {
+            router.visit(route('admin.job.posts.listing'), { replace: true });
+        }
     };
 
     const handleSubmit = (e) => {

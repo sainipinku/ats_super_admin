@@ -71,5 +71,34 @@ class JobApplication extends Model
                 $application->uuid = (string) \Illuminate\Support\Str::uuid();
             }
         });
+
+        static::created(function (JobApplication $application) {
+            $job = Job::query()
+                ->select('id', 'uuid', 'title', 'created_by')
+                ->where('id', $application->job_id)
+                ->first();
+
+            if (!$job || empty($job->created_by)) {
+                return;
+            }
+
+            Notification::create([
+                'model' => 'admin',
+                'listing_id' => $job->created_by,
+                'job_id' => $job->id,
+                'type' => 'job_applied',
+                'status' => 'unread',
+                'data' => [
+                    'job_uuid' => $job->uuid,
+                    'job_title' => $job->title,
+                    'application_id' => $application->id,
+                    'application_uuid' => $application->uuid,
+                    'candidate_id' => $application->candidate_id,
+                    'candidate_name' => $application->candidate_name,
+                    'candidate_email' => $application->candidate_email,
+                    'candidate_phone' => $application->candidate_phone,
+                ],
+            ]);
+        });
     }
 }

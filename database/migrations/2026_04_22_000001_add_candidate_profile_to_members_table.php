@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('members', 'candidate_profile')) {
+            return;
+        }
+
         Schema::table('members', function (Blueprint $table) {
             $table->json('candidate_profile')->nullable()->after('image');
         });
@@ -20,4 +24,3 @@ return new class extends Migration
         });
     }
 };
-

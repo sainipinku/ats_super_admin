@@ -174,17 +174,19 @@ export default function JobApplicants({ auth }) {
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [updatingStatus, setUpdatingStatus] = useState(false);
     const [adminNotes, setAdminNotes] = useState('');
+    const lastSearchRef = useRef({ mode: "all", value: "" });
 
     const { successAlert, errorAlert } = useAlerts();
 
     const fetchApplicants = async (page = 1) => {
         setLoading(true);
         try {
+            const trimmedSearch = String(searchQuery || "").trim();
             const params = {
                 page,
                 ...(selectedStatus && { status: selectedStatus }),
                 ...(selectedJob && { job_id: selectedJob }),
-                ...(searchQuery && { search: searchQuery }),
+                ...(trimmedSearch.length >= 3 && { search: trimmedSearch }),
             };
 
             const response = await axios.get(route('admin.api.job.applicants.list'), { params });
@@ -213,6 +215,25 @@ export default function JobApplicants({ auth }) {
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {
+            const search = String(searchQuery || "").trim();
+            const mode = search.length >= 3 ? "filtered" : "all";
+
+            if (mode === "filtered") {
+                if (
+                    lastSearchRef.current.mode === "filtered" &&
+                    lastSearchRef.current.value === search
+                ) {
+                    return;
+                }
+                lastSearchRef.current = { mode: "filtered", value: search };
+                fetchApplicants(1);
+                return;
+            }
+
+            if (lastSearchRef.current.mode === "all") {
+                return;
+            }
+            lastSearchRef.current = { mode: "all", value: "" };
             fetchApplicants(1);
         }, 500);
         return () => clearTimeout(timeoutId);

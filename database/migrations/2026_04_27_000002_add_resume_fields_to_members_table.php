@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('members', 'resume_path')) {
+            return;
+        }
+
         Schema::table('members', function (Blueprint $table) {
             $table->string('resume_path')->nullable()->after('candidate_profile');
             $table->string('resume_original_name')->nullable()->after('resume_path');
@@ -30,4 +34,3 @@ return new class extends Migration
         });
     }
 };
-
