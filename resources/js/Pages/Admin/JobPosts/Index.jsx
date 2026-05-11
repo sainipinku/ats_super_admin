@@ -852,20 +852,22 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
             {/* Preview Modal */}
             {showPreview && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="relative bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={handleClosePreview}
+                            className="absolute top-4 right-4 z-20 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        >
+                            <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="max-h-[90vh] overflow-y-auto">
                         <div className="p-6">
-                            <div className="flex justify-between items-start mb-6">
+                            <div className="mb-6 pr-14">
                                 <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                                     Job Post Preview
                                 </h3>
-                                <button
-                                    onClick={handleClosePreview}
-                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                                >
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
                             </div>
 
                             <div className="space-y-4">
@@ -943,6 +945,7 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                 </button>
                             </div>
                         </div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -950,7 +953,17 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
             {/* Job Details Modal */}
             {showDetailsModal && selectedJob && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                    <div className="relative bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+                        <button
+                            type="button"
+                            onClick={handleCloseDetailsModal}
+                            className="absolute top-4 right-4 z-20 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-lg"
+                        >
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="max-h-[90vh] overflow-y-auto">
                         {/* Modal Header */}
                         <div className="relative h-40 bg-gradient-to-r from-blue-500 to-purple-600 p-6">
                             <div className="absolute top-6 left-6">
@@ -969,16 +982,6 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                         </div>
                                     )}
                                 </div>
-                            </div>
-                            <div className="absolute top-6 right-6">
-                                <button
-                                    onClick={handleCloseDetailsModal}
-                                    className="w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-lg"
-                                >
-                                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
                             </div>
                             <div className="absolute bottom-6 left-6 right-6">
                                 <h2 className="text-white font-bold text-2xl line-clamp-1 mb-2">{selectedJob.title}</h2>
@@ -1129,6 +1132,7 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                     </button>
                                 </div>
                             </div>
+                        </div>
                         </div>
                     </div>
                 </div>

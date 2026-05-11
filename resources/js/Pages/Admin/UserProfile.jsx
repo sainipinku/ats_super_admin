@@ -345,19 +345,18 @@ export default function Dashboard() {
                         {/* Image Editor Modal */}
                         {isImageEditorOpen && (
                             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-                                <div className="w-full max-w-2xl bg-white dark:bg-[#080626] rounded-xl shadow-xl overflow-hidden mx-4">
-                                    <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                                <div className="relative w-full max-w-2xl bg-white dark:bg-[#080626] rounded-xl shadow-xl overflow-hidden mx-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsImageEditorOpen(false)}
+                                        className="absolute top-4 right-4 z-20 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                    >
+                                        <FiX size={20} />
+                                    </button>
+                                    <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 pr-14">
                                         <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
                                             Edit Profile Image
                                         </h3>
-                                        <button
-                                            onClick={() =>
-                                                setIsImageEditorOpen(false)
-                                            }
-                                            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                                        >
-                                            <FiX size={24} />
-                                        </button>
                                     </div>
                                     <div className="p-6">
                                         <div className="flex flex-col items-center">
@@ -591,17 +590,18 @@ export default function Dashboard() {
                 {/* Password Change Modal */}
                 {isModalOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-                        <div className="w-full max-w-md bg-white dark:bg-[#080626] rounded-xl shadow-xl overflow-hidden mx-4">
-                            <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                        <div className="relative w-full max-w-md bg-white dark:bg-[#080626] rounded-xl shadow-xl overflow-hidden mx-4">
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="absolute top-4 right-4 z-20 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            >
+                                <FiX size={20} />
+                            </button>
+                            <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 pr-14">
                                 <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
                                     Change Password
                                 </h3>
-                                <button
-                                    onClick={() => setIsModalOpen(false)}
-                                    className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                                >
-                                    <FiX size={24} />
-                                </button>
                             </div>
                             <div className="p-6">
                                 <form

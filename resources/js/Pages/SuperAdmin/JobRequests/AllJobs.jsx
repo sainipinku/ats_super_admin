@@ -459,7 +459,7 @@ export default function AllJobs({ auth }) {
                 setDetailsLoading(false);
             }
         };
-        
+
         if (selectedJob) {
             document.addEventListener('mousedown', handleClickOutside);
             return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -603,7 +603,7 @@ export default function AllJobs({ auth }) {
     const filteredJobs = jobs.filter((job) => {
         // Exclude pending jobs from All Jobs section
         if (job.status === 'pending') return false;
-        
+
         // Search filter: only filter when 3+ characters, show all when less than 3
         const matchesSearch =
             searchQuery.length < 3 ||
@@ -755,20 +755,21 @@ export default function AllJobs({ auth }) {
 
                     {(selectedJob || detailsLoading) && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                            <div ref={modalRef} className="relative bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                            <div ref={modalRef} className="relative bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setSelectedJob(null);
                                         setDetailsLoading(false);
                                     }}
-                                    className="fixed top-4 right-4 z-50 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    className="absolute top-4 right-4 z-20 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                                     aria-label="Close"
                                 >
                                     <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                 </button>
+                                <div className="max-h-[90vh] overflow-y-auto">
                                 <div className="p-6 pr-14">
                                     <div className="flex gap-3 mb-4">
                                         {selectedJob ? (
@@ -961,26 +962,28 @@ export default function AllJobs({ auth }) {
                                         </>
                                     )}
                                 </div>
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {editingJob && editForm && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                            <div ref={modalRef} className="relative bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                            <div ref={modalRef} className="relative bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setEditingJob(null);
                                         setEditForm(null);
                                     }}
-                                    className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    className="absolute top-4 right-4 z-20 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                                     aria-label="Close"
                                 >
                                     <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                 </button>
+                                <div className="max-h-[90vh] overflow-y-auto">
                                 <form onSubmit={handleEditSubmit} className="p-6 pr-14">
                                     <div className="flex gap-3 mb-5">
                                         <div>
@@ -1147,6 +1150,7 @@ export default function AllJobs({ auth }) {
                                         </button>
                                     </div>
                                 </form>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1214,27 +1218,27 @@ export default function AllJobs({ auth }) {
 
                     {rejectOpen && rejectJob && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-2xl max-w-md w-full shadow-xl">
+                            <div className="relative bg-white rounded-2xl max-w-md w-full shadow-xl">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (rejectSubmitting) return;
+                                        setRejectOpen(false);
+                                        setRejectJob(null);
+                                        setRejectionReason('');
+                                    }}
+                                    className="absolute top-4 right-4 z-20 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-slate-100 transition-colors"
+                                >
+                                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
                                 <div className="p-6">
-                                    <div className="flex items-start justify-between mb-4">
+                                    <div className="mb-4 pr-14">
                                         <div>
                                             <h3 className="text-lg font-semibold text-slate-900">Reject Job</h3>
                                             <p className="text-sm text-slate-500">{rejectJob.title}</p>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (rejectSubmitting) return;
-                                                setRejectOpen(false);
-                                                setRejectJob(null);
-                                                setRejectionReason('');
-                                            }}
-                                            className="p-2 hover:bg-slate-100 rounded-full transition-colors"
-                                        >
-                                            <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
                                     </div>
 
                                     <label className="block text-sm font-medium text-slate-700 mb-2">Rejection Reason (optional)</label>

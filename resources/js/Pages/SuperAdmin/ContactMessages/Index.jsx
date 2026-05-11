@@ -206,8 +206,18 @@ export default function Index({ messages, filters, counts }) {
 
             {preview && (
                 <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm px-4 py-8 overflow-y-auto">
-                    <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl">
-                        <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-4">
+                    <div className="relative max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl max-h-[90vh] overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={() => setPreview(null)}
+                            className="absolute top-4 right-4 z-20 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        >
+                            <svg className="w-4 h-4 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="max-h-[90vh] overflow-y-auto">
+                        <div className="p-5 pr-14 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-4">
                             <div>
                                 <div className="text-lg font-bold text-gray-900 dark:text-white">
                                     {preview.subject || "Contact Message"}
@@ -216,13 +226,6 @@ export default function Index({ messages, filters, counts }) {
                                     {preview.name} • {preview.email}
                                 </div>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setPreview(null)}
-                                className="px-3 py-2 rounded-lg text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                            >
-                                Close
-                            </button>
                         </div>
                         <div className="p-5">
                             <div className="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
@@ -245,6 +248,7 @@ export default function Index({ messages, filters, counts }) {
                                 </button>
                             </div>
                         </div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -263,4 +267,3 @@ export default function Index({ messages, filters, counts }) {
         </AuthenticatedLayout>
     );
 }
-

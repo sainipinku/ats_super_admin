@@ -115,36 +115,38 @@ class Job extends Model
             $newStatus = $job->status;
 
             if ($newStatus === 'active') {
-                Notification::create([
-                    'model' => 'admin',
-                    'listing_id' => $job->created_by,
-                    'job_id' => $job->id,
-                    'type' => 'job_approved',
-                    'status' => 'unread',
-                    'data' => [
-                        'job_uuid' => $job->uuid,
-                        'title' => $job->title,
-                        'approved_by' => $job->approved_by,
-                        'approved_at' => optional($job->approved_at)->toDateTimeString(),
-                    ],
+                $job->notifyAdmin('job_approved', [
+                    'job_uuid' => $job->uuid,
+                    'title' => $job->title,
+                    'approved_by' => $job->approved_by,
+                    'approved_at' => optional($job->approved_at)->toDateTimeString(),
+                    'old_status' => $oldStatus,
+                    'new_status' => $newStatus,
                 ]);
 
                 return;
             }
 
             if ($newStatus === 'declined') {
-                Notification::create([
-                    'model' => 'admin',
-                    'listing_id' => $job->created_by,
-                    'job_id' => $job->id,
-                    'type' => 'job_rejected',
-                    'status' => 'unread',
-                    'data' => [
-                        'job_uuid' => $job->uuid,
-                        'title' => $job->title,
-                        'rejection_reason' => $job->rejection_reason,
-                        'approved_by' => $job->approved_by,
-                    ],
+                $job->notifyAdmin('job_rejected', [
+                    'job_uuid' => $job->uuid,
+                    'title' => $job->title,
+                    'rejection_reason' => $job->rejection_reason,
+                    'approved_by' => $job->approved_by,
+                    'old_status' => $oldStatus,
+                    'new_status' => $newStatus,
+                ]);
+
+                return;
+            }
+
+            if ($newStatus === 'inactive') {
+                $job->notifyAdmin('job_deactivated', [
+                    'job_uuid' => $job->uuid,
+                    'title' => $job->title,
+                    'approved_by' => $job->approved_by,
+                    'old_status' => $oldStatus,
+                    'new_status' => $newStatus,
                 ]);
 
                 return;
@@ -300,5 +302,21 @@ class Job extends Model
         ];
 
         $this->update(['approval_logs' => $logs]);
+    }
+
+    private function notifyAdmin(string $type, array $data): void
+    {
+        if (empty($this->created_by)) {
+            return;
+        }
+
+        Notification::create([
+            'model' => 'admin',
+            'listing_id' => $this->created_by,
+            'job_id' => $this->id,
+            'type' => $type,
+            'status' => 'unread',
+            'data' => $data,
+        ]);
     }
 }

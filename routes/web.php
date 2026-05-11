@@ -136,8 +136,10 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::get('/tasks/tasklist', [App\Http\Controllers\Admin\AdminController::class, 'dashboard'])->name('admin.task.tasklist');
 
     Route::get('/members/dashboard', [App\Http\Controllers\Admin\AdminMemberController::class, 'dashboard'])->name('admin.members.dashboard');
+    Route::post('/members/store', [App\Http\Controllers\Admin\AdminMemberController::class, 'store'])->name('admin.members.store');
     Route::post('/members/{member}/update-status', [App\Http\Controllers\Admin\AdminMemberController::class, 'updateStatus'])->name('admin.members.update-status');
     Route::get('/members/{uuid}/details', [App\Http\Controllers\Admin\AdminMemberController::class, 'memberDetails'])->name('admin.members.details');
+    Route::get('/designations/by-departments', [App\Http\Controllers\Admin\AdminMemberController::class, 'getByDepartments'])->name('admin.designations.by_departments');
 
     Route::post('/checkin', [App\Http\Controllers\Member\CheckInOutController::class, 'checkIn'])->name('admin.checkin');
     Route::post('/checkout', [App\Http\Controllers\Member\CheckInOutController::class, 'checkOut'])->name('admin.checkout');

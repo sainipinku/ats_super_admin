@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import LocationInput from '../../../Components/LocationInput';
 import ConfirmDialog from '../../../Components/ConfirmDialog';
@@ -13,8 +13,6 @@ const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onR
 
     const canToggleStatus = ['active', 'inactive', 'closed'].includes(job.status);
     const canClose = ['active', 'inactive'].includes(job.status);
-    const isPending = job.status === 'pending';
-    const isClosed = job.status === 'closed';
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -226,6 +224,60 @@ const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onR
     );
 };
 
+const defaultCreateForm = {
+    title: '',
+    company: '',
+    location: '',
+    job_type: 'Full Time',
+    experience: '',
+    min_salary: '',
+    max_salary: '',
+    salary_period: 'year',
+    last_date: '',
+    description: '',
+    key_responsibilities: '',
+    qualifications: '',
+    skills: '',
+    perks: '',
+    company_image: null,
+    company_image_preview: '',
+};
+
+const parseSalaryRange = (salary) => {
+    if (!salary) {
+        return { min: '', max: '', period: 'year' };
+    }
+
+    const match = String(salary).replace(/\s+/g, ' ').trim()
+        .match(/₹?\s*([\d,]+)\s*-\s*₹?\s*([\d,]+)\s*\/\s*(year|month)/i);
+
+    if (!match) {
+        return { min: '', max: '', period: 'year' };
+    }
+
+    return {
+        min: match[1].replace(/,/g, ''),
+        max: match[2].replace(/,/g, ''),
+        period: match[3].toLowerCase(),
+    };
+};
+
+const splitCommaList = (value) =>
+    String(value || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+const mapApiJobToCard = (job) => ({
+    ...job,
+    companyImage: job.company_image || job.companyImage || null,
+    type: job.job_type || job.type || '',
+    keyResponsibilities: job.key_responsibilities || job.keyResponsibilities || '',
+    lastDate: job.last_date || job.lastDate || '',
+    active: job.status === 'active',
+    applicants: job.applicants || 0,
+});
+
 export default function JobListing({ auth }) {
     const [jobs, setJobs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -286,6 +338,9 @@ export default function JobListing({ auth }) {
     const [editingJob, setEditingJob] = useState(null);
     const [editForm, setEditForm] = useState(null);
     const [editSaving, setEditSaving] = useState(false);
+    const [createJobOpen, setCreateJobOpen] = useState(false);
+    const [createJobForm, setCreateJobForm] = useState(defaultCreateForm);
+    const [createSaving, setCreateSaving] = useState(false);
     const [applicationsJob, setApplicationsJob] = useState(null);
     const [applicationsLoading, setApplicationsLoading] = useState(false);
     const [applications, setApplications] = useState([]);
@@ -298,6 +353,17 @@ export default function JobListing({ auth }) {
     const handleViewDetails = (job) => {
         setSelectedJob(job);
     };
+
+    const openCreateModal = () => {
+        setCreateJobForm({ ...defaultCreateForm });
+        setCreateJobOpen(true);
+    };
+
+    const closeCreateModal = () => {
+        if (createSaving) return;
+        setCreateJobOpen(false);
+        setCreateJobForm({ ...defaultCreateForm });
+    };
 // Close modal when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -308,15 +374,18 @@ export default function JobListing({ auth }) {
                 setEditingJob(null);
                 setEditForm(null);
             }
+            if (modalRef.current && !modalRef.current.contains(event.target) && createJobOpen && !createSaving) {
+                closeCreateModal();
+            }
         };
-        
-        if (selectedJob || editingJob) {
+
+        if (selectedJob || editingJob || createJobOpen) {
             document.addEventListener('mousedown', handleClickOutside);
             return () => document.removeEventListener('mousedown', handleClickOutside);
         }
-    }, [selectedJob, editingJob]);
+    }, [selectedJob, editingJob, createJobOpen, createSaving]);
 
-    
+
     const handleViewApplications = async (job) => {
         setApplicationsJob(job);
         setApplications([]);
@@ -435,6 +504,7 @@ export default function JobListing({ auth }) {
     ];
 
     const handleEdit = (job) => {
+        const salary = parseSalaryRange(job.salary);
         setEditingJob(job);
         setEditForm({
             title: job.title || '',
@@ -442,7 +512,9 @@ export default function JobListing({ auth }) {
             location: job.location || '',
             job_type: job.job_type || job.type || 'Full Time',
             experience: job.experience || '',
-            salary: job.salary || '',
+            min_salary: salary.min,
+            max_salary: salary.max,
+            salary_period: salary.period,
             last_date: job.last_date || '',
             description: job.description || '',
             key_responsibilities: job.key_responsibilities || '',
@@ -454,7 +526,7 @@ export default function JobListing({ auth }) {
         });
     };
 
-    const handleEditSubmit = (e) => {
+    const handleEditSubmit = async (e) => {
         e.preventDefault();
         if (!editingJob || !editForm) return;
         setEditSaving(true);
@@ -465,37 +537,94 @@ export default function JobListing({ auth }) {
         formData.append('location', editForm.location);
         formData.append('job_type', editForm.job_type);
         formData.append('experience', editForm.experience);
-        formData.append('salary', editForm.salary);
+        formData.append('salary', `₹${editForm.min_salary || 0} - ₹${editForm.max_salary || 0}/${editForm.salary_period || 'year'}`);
         formData.append('last_date', editForm.last_date);
         formData.append('description', editForm.description);
         formData.append('key_responsibilities', editForm.key_responsibilities);
         formData.append('qualifications', editForm.qualifications);
-        formData.append('skills', editForm.skills);
-        formData.append('perks', editForm.perks);
-        
+        formData.append('skills', JSON.stringify(splitCommaList(editForm.skills)));
+        formData.append('perks', JSON.stringify(splitCommaList(editForm.perks)));
+
         if (editForm.company_image) {
             formData.append('company_image', editForm.company_image);
         }
 
-        formData.append('_method', 'PUT');
+        try {
+            const response = await fetch(route('admin.api.jobs.update', editingJob.id), {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Accept': 'application/json',
+                },
+                body: formData,
+            });
 
-        router.post(route('admin.jobs.update', editingJob.id), formData, {
-            onSuccess: (page) => {
-                successAlert('Job updated successfully!');
-                setEditingJob(null);
-                setEditForm(null);
-                // Update local state with response data
-                if (page.props.job) {
-                    setJobs(prev => prev.map(j => (j.id === editingJob.id ? page.props.job : j)));
-                }
-            },
-            onError: (errors) => {
-                errorAlert(errors.message || 'Failed to update job');
-            },
-            onFinish: () => {
-                setEditSaving(false);
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                errorAlert(data?.message || 'Failed to update job');
+                return;
             }
-        });
+
+            setJobs(prev => prev.map(j => (j.id === editingJob.id ? mapApiJobToCard(data.data) : j)));
+            successAlert('Job updated successfully!');
+            setEditingJob(null);
+            setEditForm(null);
+        } catch (error) {
+            console.error('Error updating job:', error);
+            errorAlert('Failed to update job');
+        } finally {
+            setEditSaving(false);
+        }
+    };
+
+    const handleCreateSubmit = async (e) => {
+        e.preventDefault();
+        setCreateSaving(true);
+
+        const formData = new FormData();
+        formData.append('title', createJobForm.title);
+        formData.append('company', createJobForm.company);
+        formData.append('location', createJobForm.location);
+        formData.append('job_type', createJobForm.job_type);
+        formData.append('experience', createJobForm.experience);
+        formData.append('salary', `₹${createJobForm.min_salary || 0} - ₹${createJobForm.max_salary || 0}/${createJobForm.salary_period || 'year'}`);
+        formData.append('last_date', createJobForm.last_date);
+        formData.append('description', createJobForm.description);
+        formData.append('key_responsibilities', createJobForm.key_responsibilities);
+        formData.append('qualifications', createJobForm.qualifications);
+        formData.append('skills', JSON.stringify(splitCommaList(createJobForm.skills)));
+        formData.append('perks', JSON.stringify(splitCommaList(createJobForm.perks)));
+
+        if (createJobForm.company_image) {
+            formData.append('company_image', createJobForm.company_image);
+        }
+
+        try {
+            const response = await fetch(route('admin.api.jobs.store'), {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Accept': 'application/json',
+                },
+                body: formData,
+            });
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                const firstError = data?.errors ? Object.values(data.errors)[0]?.[0] : null;
+                errorAlert(firstError || data?.message || 'Failed to create job post.');
+                return;
+            }
+
+            setJobs(prev => [mapApiJobToCard(data.data), ...prev]);
+            successAlert('Job post created successfully and sent for approval!');
+            closeCreateModal();
+        } catch (error) {
+            console.error('Error creating job:', error);
+            errorAlert('Failed to create job post.');
+        } finally {
+            setCreateSaving(false);
+        }
     };
 
     const handleDelete = (job) => {
@@ -671,15 +800,16 @@ export default function JobListing({ auth }) {
                         )}
                     </div>
 
-                    <Link
-                        href={route("admin.job.posts.index")}
+                    <button
+                        type="button"
+                        onClick={openCreateModal}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-md whitespace-nowrap"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
                         Post New Job
-                    </Link>
+                    </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
@@ -721,12 +851,13 @@ export default function JobListing({ auth }) {
                                         : 'No job posts have been created yet.'}
                                 </p>
                                 {!searchQuery && (
-                                    <Link
-                                        href={route("admin.job.posts.index")}
+                                    <button
+                                        type="button"
+                                        onClick={openCreateModal}
                                         className="inline-flex items-center px-4 py-2 mt-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                                     >
                                         Create First Job Post
-                                    </Link>
+                                    </button>
                                 )}
                             </div>
                         </div>
@@ -736,25 +867,25 @@ export default function JobListing({ auth }) {
 
             {applicationsModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-200 dark:border-gray-700 flex items-center justify-between">
+                    <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setApplicationsModalOpen(false);
+                                setApplicationsJob(null);
+                                setApplications([]);
+                            }}
+                            className="absolute top-4 right-4 z-20 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
+                        >
+                            <svg className="w-5 h-5 text-slate-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="px-6 py-4 pr-14 border-b border-slate-200 dark:border-gray-700">
                             <div>
                                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Job Applicants</h3>
                                 <p className="text-sm text-slate-500 dark:text-gray-400">{applicationsJob?.title || '-'}</p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setApplicationsModalOpen(false);
-                                    setApplicationsJob(null);
-                                    setApplications([]);
-                                }}
-                                className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-gray-700"
-                            >
-                                <svg className="w-5 h-5 text-slate-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
                         </div>
 
                         <div className="p-6 overflow-auto max-h-[70vh]">
@@ -875,35 +1006,245 @@ export default function JobListing({ auth }) {
                 modalSpinnerMessage="Processing Please Wait...."
             />
 
+            {createJobOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div ref={modalRef} className="relative bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={closeCreateModal}
+                            className="absolute top-4 right-4 z-20 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        >
+                            <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="max-h-[90vh] overflow-y-auto">
+                        <form onSubmit={handleCreateSubmit} className="p-6 pr-14">
+                            <div className="mb-5">
+                                <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Create New Job Post</h2>
+                                <p className="text-sm text-slate-500 dark:text-gray-400">Manage new job posting directly from this modal.</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Job Title</label>
+                                    <input
+                                        value={createJobForm.title}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, title: e.target.value }))}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Company</label>
+                                    <input
+                                        value={createJobForm.company}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, company: e.target.value }))}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Location</label>
+                                    <LocationInput
+                                        value={createJobForm.location}
+                                        onChange={(value) => setCreateJobForm((prev) => ({ ...prev, location: value }))}
+                                        placeholder="Enter job location"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Job Type</label>
+                                    <select
+                                        value={createJobForm.job_type}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, job_type: e.target.value }))}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option value="Full Time">Full Time</option>
+                                        <option value="Part Time">Part Time</option>
+                                        <option value="Contract">Contract</option>
+                                        <option value="Internship">Internship</option>
+                                        <option value="Remote">Remote</option>
+                                        <option value="Hybrid">Hybrid</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Experience</label>
+                                    <select
+                                        value={createJobForm.experience}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, experience: e.target.value }))}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                        required
+                                    >
+                                        <option value="">Select Experience</option>
+                                        <option value="0-1 Year">0-1 Year</option>
+                                        <option value="1-2 Years">1-2 Years</option>
+                                        <option value="2-3 Years">2-3 Years</option>
+                                        <option value="3-4 Years">3-4 Years</option>
+                                        <option value="4+ Years">4+ Years</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Last Date</label>
+                                    <input
+                                        type="date"
+                                        value={createJobForm.last_date}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, last_date: e.target.value }))}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Minimum Salary</label>
+                                    <input
+                                        value={createJobForm.min_salary}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, min_salary: e.target.value.replace(/[^0-9]/g, '') }))}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                        inputMode="numeric"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Maximum Salary</label>
+                                    <input
+                                        value={createJobForm.max_salary}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, max_salary: e.target.value.replace(/[^0-9]/g, '') }))}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                        inputMode="numeric"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Salary Period</label>
+                                    <select
+                                        value={createJobForm.salary_period}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, salary_period: e.target.value }))}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option value="year">Year</option>
+                                        <option value="month">Month</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Company Logo</label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0] || null;
+                                            setCreateJobForm((prev) => ({
+                                                ...prev,
+                                                company_image: file,
+                                                company_image_preview: file ? URL.createObjectURL(file) : '',
+                                            }));
+                                        }}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                    />
+                                    {createJobForm.company_image_preview ? (
+                                        <img
+                                            src={createJobForm.company_image_preview}
+                                            alt="Preview"
+                                            className="mt-2 w-20 h-20 rounded-xl object-cover border border-slate-200"
+                                        />
+                                    ) : null}
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Skills</label>
+                                    <input
+                                        value={createJobForm.skills}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, skills: e.target.value }))}
+                                        placeholder="React, Laravel, MySQL"
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Perks</label>
+                                    <input
+                                        value={createJobForm.perks}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, perks: e.target.value }))}
+                                        placeholder="Health insurance, Flexible hours"
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Job Description</label>
+                                    <textarea
+                                        value={createJobForm.description}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, description: e.target.value }))}
+                                        rows={4}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Key Responsibilities</label>
+                                    <textarea
+                                        value={createJobForm.key_responsibilities}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, key_responsibilities: e.target.value }))}
+                                        rows={3}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Qualifications</label>
+                                    <textarea
+                                        value={createJobForm.qualifications}
+                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, qualifications: e.target.value }))}
+                                        rows={3}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="mt-6 flex items-center justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={closeCreateModal}
+                                    className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-700"
+                                    disabled={createSaving}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2.5 rounded-xl bg-[#5146E6] text-white hover:bg-[#4338CA] disabled:opacity-60"
+                                    disabled={createSaving}
+                                >
+                                    {createSaving ? 'Submitting...' : 'Submit Job Post'}
+                                </button>
+                            </div>
+                        </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {resumePreviewOpen && resumePreviewUrl && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full overflow-hidden">
-                        <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+                    <div className="relative bg-white rounded-2xl shadow-xl max-w-5xl w-full overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setResumePreviewOpen(false);
+                                setResumePreviewUrl(null);
+                            }}
+                            className="absolute top-4 right-4 z-20 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-slate-100 transition-colors"
+                        >
+                            <svg
+                                className="w-5 h-5 text-slate-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                />
+                            </svg>
+                        </button>
+                        <div className="px-5 py-3 pr-14 border-b border-slate-200">
                             <div className="font-semibold text-slate-900">
                                 Resume Preview
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setResumePreviewOpen(false);
-                                    setResumePreviewUrl(null);
-                                }}
-                                className="p-2 rounded-full hover:bg-slate-100"
-                            >
-                                <svg
-                                    className="w-5 h-5 text-slate-600"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M6 18L18 6M6 6l12 12"
-                                    />
-                                </svg>
-                            </button>
                         </div>
                         <div className="h-[75vh]">
                             <iframe
@@ -919,16 +1260,17 @@ export default function JobListing({ auth }) {
             {/* Job Details Modal */}
             {selectedJob && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <button
-                        onClick={() => setSelectedJob(null)}
-                        className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
-                        <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                    <div ref={modalRef} className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-6">
+                    <div ref={modalRef} className="relative bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+                        <button
+                            onClick={() => setSelectedJob(null)}
+                            className="absolute top-4 right-4 z-20 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        >
+                            <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 pr-14">
                             <div className="flex gap-4 mb-6">
                                 <img
                                     src={selectedJob.company_image || selectedJob.companyImage}
@@ -1048,6 +1390,7 @@ export default function JobListing({ auth }) {
                                 </div>
                                                             </div>
                         </div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -1124,19 +1467,20 @@ export default function JobListing({ auth }) {
             {/* Edit Job Modal */}
             {editingJob && editForm && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <button
-                        onClick={() => {
-                            setEditingJob(null);
-                            setEditForm(null);
-                        }}
-                        className="absolute top-4 right-4 z-10 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
-                        <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                    <div ref={modalRef} className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-                        <form onSubmit={handleEditSubmit} className="p-6">
+                    <div ref={modalRef} className="relative bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+                        <button
+                            onClick={() => {
+                                setEditingJob(null);
+                                setEditForm(null);
+                            }}
+                            className="absolute top-4 right-4 z-20 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        >
+                            <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div className="max-h-[90vh] overflow-y-auto">
+                        <form onSubmit={handleEditSubmit} className="p-6 pr-14">
                             <div className="flex gap-3 mb-5">
                                 <div>
                                     <h2 className="text-xl font-semibold text-slate-900">Edit Job</h2>
@@ -1198,11 +1542,28 @@ export default function JobListing({ auth }) {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Salary</label>
-                                    <input
-                                        value={editForm.salary}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, salary: e.target.value }))}
-                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                    />
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <input
+                                            value={editForm.min_salary}
+                                            onChange={(e) => setEditForm((p) => ({ ...p, min_salary: e.target.value.replace(/[^0-9]/g, '') }))}
+                                            placeholder="Minimum"
+                                            className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                        />
+                                        <input
+                                            value={editForm.max_salary}
+                                            onChange={(e) => setEditForm((p) => ({ ...p, max_salary: e.target.value.replace(/[^0-9]/g, '') }))}
+                                            placeholder="Maximum"
+                                            className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                        />
+                                        <select
+                                            value={editForm.salary_period}
+                                            onChange={(e) => setEditForm((p) => ({ ...p, salary_period: e.target.value }))}
+                                            className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                        >
+                                            <option value="year">Year</option>
+                                            <option value="month">Month</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Last Date</label>
@@ -1302,6 +1663,7 @@ export default function JobListing({ auth }) {
                                 </button>
                             </div>
                         </form>
+                        </div>
                     </div>
                 </div>
             )}

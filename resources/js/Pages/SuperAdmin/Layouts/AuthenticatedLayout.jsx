@@ -133,6 +133,38 @@ export default function AuthenticatedLayout({ header, children }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [notifications, setNotifications] = useState([]);
 
+    const formatRelativeTime = (value) => {
+        if (!value) return "";
+
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return value;
+        }
+
+        const diffInSeconds = Math.floor((date.getTime() - Date.now()) / 1000);
+        const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+        const units = [
+            { unit: "year", seconds: 60 * 60 * 24 * 365 },
+            { unit: "month", seconds: 60 * 60 * 24 * 30 },
+            { unit: "week", seconds: 60 * 60 * 24 * 7 },
+            { unit: "day", seconds: 60 * 60 * 24 },
+            { unit: "hour", seconds: 60 * 60 },
+            { unit: "minute", seconds: 60 },
+        ];
+
+        for (const { unit, seconds } of units) {
+            if (Math.abs(diffInSeconds) >= seconds) {
+                return rtf.format(
+                    Math.round(diffInSeconds / seconds),
+                    unit
+                );
+            }
+        }
+
+        return rtf.format(diffInSeconds, "second");
+    };
+
     const superPrefix = (() => {
         if (typeof window === "undefined") return "";
         const path = window.location.pathname || "";
@@ -528,7 +560,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                                                         )}
                                                                     </div>
                                                                     <div className="text-xs text-gray-500">
-                                                                        {n.created_at}
+                                                                        {formatRelativeTime(n.created_at)}
                                                                     </div>
                                                                 </DropdownMenuItem>
                                                             ))}

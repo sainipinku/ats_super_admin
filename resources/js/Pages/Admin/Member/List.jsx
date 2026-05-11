@@ -1,15 +1,27 @@
-import { Head, usePage, router } from "@inertiajs/react";
+import { Head, router } from "@inertiajs/react";
+import axios from "axios";
 import { useState, useEffect } from "react";
 import AuthenticatedLayout from "../Layouts/AuthenticatedLayout";
 import Modal from "@/Components/Modal";
 import NoData from "@/Components/NoData";
-import { FaEdit, FaRedo, FaTrash, FaHistory } from "react-icons/fa";
 import ConfirmDialog from "@/Components/ConfirmDialog";
 import ShowUserProfile from "@/Components/ShowUserProfile";
-import { format } from "date-fns";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/20/solid";
 
-export default function MembersList({ members, auth, filters }) {
+const getDefaultCreateForm = () => ({
+    name: "",
+    phone: "",
+    email: "",
+    dob: "",
+    gender: "male",
+    status: "1",
+    password: "",
+    confirm_password: "",
+    departments: [],
+    designations: [],
+});
+
+export default function MembersList({ members, filters, departments }) {
     const [searchTerm, setSearchTerm] = useState(filters.search || "");
     const [statusFilter, setStatusFilter] = useState(filters.status || "");
     const [perPage, setPerPage] = useState(filters.per_page || 10);
@@ -17,6 +29,11 @@ export default function MembersList({ members, auth, filters }) {
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [memberToUpdate, setMemberToUpdate] = useState(null);
     const [newStatus, setNewStatus] = useState(null);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [createForm, setCreateForm] = useState(getDefaultCreateForm);
+    const [designations, setDesignations] = useState([]);
+    const [createErrors, setCreateErrors] = useState({});
+    const [isCreating, setIsCreating] = useState(false);
 
     const updateUrl = (newPage = 1) => {
         const params = {
@@ -82,22 +99,136 @@ export default function MembersList({ members, auth, filters }) {
             }
         );
     };
-const getRoleName = (roleId) => {
-  const roleMap = {
-    "1": "Admin",
-    "2": "Super Admin",
-    "3": "Doer",
-  };
-  return roleMap[roleId] || `Role ${roleId}`;
-};
-const getRoleBadgeColor = (roleId) => {
-  const colorMap = {
-    "1": "bg-blue-600 text-white",
-    "2": "bg-purple-600 text-white",
-    "3": "bg-green-600 text-white",
-  };
-  return colorMap[roleId] || "bg-gray-600 text-white";
-};
+    const getRoleName = (roleId) => {
+        const roleMap = {
+            "1": "Admin",
+            "2": "Super Admin",
+            "3": "Doer",
+        };
+        return roleMap[roleId] || `Role ${roleId}`;
+    };
+
+    const getRoleBadgeColor = (roleId) => {
+        const colorMap = {
+            "1": "bg-blue-600 text-white",
+            "2": "bg-purple-600 text-white",
+            "3": "bg-green-600 text-white",
+        };
+        return colorMap[roleId] || "bg-gray-600 text-white";
+    };
+
+    const fetchDesignations = async (departmentIds) => {
+        if (!departmentIds.length) {
+            setDesignations([]);
+            return;
+        }
+
+        try {
+            const response = await axios.get(
+                route("admin.designations.by_departments"),
+                {
+                    params: {
+                        department_ids: departmentIds,
+                    },
+                }
+            );
+            setDesignations(response.data || []);
+        } catch (error) {
+            setDesignations([]);
+        }
+    };
+
+    useEffect(() => {
+        if (!isCreateModalOpen) {
+            return;
+        }
+
+        if (createForm.departments.length > 0) {
+            fetchDesignations(createForm.departments);
+            return;
+        }
+
+        setDesignations([]);
+        setCreateForm((prev) =>
+            prev.designations.length > 0
+                ? { ...prev, designations: [] }
+                : prev
+        );
+    }, [isCreateModalOpen, createForm.departments]);
+
+    const handleCreateOpen = () => {
+        setCreateErrors({});
+        setCreateForm(getDefaultCreateForm());
+        setDesignations([]);
+        setIsCreateModalOpen(true);
+    };
+
+    const handleCreateClose = () => {
+        setIsCreateModalOpen(false);
+        setCreateErrors({});
+        setCreateForm(getDefaultCreateForm());
+        setDesignations([]);
+        setIsCreating(false);
+    };
+
+    const handleCreateChange = (e) => {
+        const { name, value } = e.target;
+
+        if (name === "phone" && (!/^\d*$/.test(value) || value.length > 10)) {
+            return;
+        }
+
+        setCreateForm((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+    };
+
+    const toggleCreateSelection = (field, value) => {
+        setCreateForm((prev) => {
+            const currentValues = prev[field];
+            const nextValues = currentValues.includes(value)
+                ? currentValues.filter((item) => item !== value)
+                : [...currentValues, value];
+
+            return {
+                ...prev,
+                [field]: nextValues,
+                ...(field === "departments" ? { designations: [] } : {}),
+            };
+        });
+    };
+
+    const handleCreateSubmit = (e) => {
+        e.preventDefault();
+        setIsCreating(true);
+
+        const data = new FormData();
+        Object.entries(createForm).forEach(([key, value]) => {
+            if (Array.isArray(value)) {
+                value.forEach((item) => data.append(`${key}[]`, item));
+                return;
+            }
+
+            data.append(key, value);
+        });
+
+        router.post(route("admin.members.store"), data, {
+            preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => {
+                handleCreateClose();
+                updateUrl(members.current_page);
+            },
+            onError: (errors) => {
+                setCreateErrors(errors);
+            },
+            onFinish: () => {
+                setIsCreating(false);
+            },
+        });
+    };
+
     const getStatusDisplay = (status) => {
         const statusMap = {
             1: {
@@ -139,9 +270,31 @@ const getRoleBadgeColor = (roleId) => {
                                 onChange={handleSearchChange}
                             />
                         </div>
+
+                        <div className="mt-[10px] md:mt-0">
+                            <button
+                                type="button"
+                                onClick={handleCreateOpen}
+                                className="flex items-center gap-[5px] px-[20px] py-[12px] text-[15px] text-white rounded-[10px] bluebtbg"
+                            >
+                                <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 16 16"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                >
+                                    <path
+                                        d="M11.9997 8.66671H8.66634V12C8.66634 12.3667 8.36634 12.6667 7.99968 12.6667C7.63301 12.6667 7.33301 12.3667 7.33301 12V8.66671H3.99967C3.63301 8.66671 3.33301 8.36671 3.33301 8.00004C3.33301 7.63338 3.63301 7.33337 3.99967 7.33337H7.33301V4.00004C7.33301 3.63337 7.63301 3.33337 7.99968 3.33337C8.36634 3.33337 8.66634 3.63337 8.66634 4.00004V7.33337H11.9997C12.3663 7.33337 12.6663 7.63338 12.6663 8.00004C12.6663 8.36671 12.3663 8.66671 11.9997 8.66671Z"
+                                        fill="white"
+                                    />
+                                </svg>
+                                Create Member
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="p-[15px]">
+                    <div className="p-[15px]">
                         <div className="overflow-x-auto tablebxbg p-[15px] rounded-[15px]">
                             <table className="min-w-full text-black rounded-2xl dark:text-white">
                                 <thead className="bg-gray-100 dark:bg-gray-800">
@@ -474,6 +627,224 @@ const getRoleBadgeColor = (roleId) => {
                 confirmText="Confirm"
                 cancelText="Cancel"
             />
+
+            <Modal
+                show={isCreateModalOpen}
+                onClose={handleCreateClose}
+                maxWidth="4xl"
+                topCloseButton={true}
+                handleTopClose={handleCreateClose}
+            >
+                <div className="p-6">
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">
+                        Create New Member
+                    </h2>
+
+                    <form onSubmit={handleCreateSubmit}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Name <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={createForm.name}
+                                    onChange={handleCreateChange}
+                                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white"
+                                />
+                                {createErrors.name && (
+                                    <p className="mt-1 text-sm text-red-600">{createErrors.name}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Phone <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    name="phone"
+                                    value={createForm.phone}
+                                    onChange={handleCreateChange}
+                                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white"
+                                />
+                                {createErrors.phone && (
+                                    <p className="mt-1 text-sm text-red-600">{createErrors.phone}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Email
+                                </label>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={createForm.email}
+                                    onChange={handleCreateChange}
+                                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white"
+                                />
+                                {createErrors.email && (
+                                    <p className="mt-1 text-sm text-red-600">{createErrors.email}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Date of Birth
+                                </label>
+                                <input
+                                    type="date"
+                                    name="dob"
+                                    value={createForm.dob}
+                                    onChange={handleCreateChange}
+                                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Gender
+                                </label>
+                                <select
+                                    name="gender"
+                                    value={createForm.gender}
+                                    onChange={handleCreateChange}
+                                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white"
+                                >
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Status
+                                </label>
+                                <select
+                                    name="status"
+                                    value={createForm.status}
+                                    onChange={handleCreateChange}
+                                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white"
+                                >
+                                    <option value="1">Active</option>
+                                    <option value="0">Inactive</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Password <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="password"
+                                    name="password"
+                                    value={createForm.password}
+                                    onChange={handleCreateChange}
+                                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white"
+                                />
+                                {createErrors.password && (
+                                    <p className="mt-1 text-sm text-red-600">{createErrors.password}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Confirm Password <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="password"
+                                    name="confirm_password"
+                                    value={createForm.confirm_password}
+                                    onChange={handleCreateChange}
+                                    className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white"
+                                />
+                                {createErrors.confirm_password && (
+                                    <p className="mt-1 text-sm text-red-600">{createErrors.confirm_password}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="mb-6">
+                            <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">
+                                Departments <span className="text-red-500">*</span>
+                            </h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                {departments.map((department) => (
+                                    <label
+                                        key={department.id}
+                                        className="flex items-center gap-2 rounded-md border px-3 py-2 dark:border-gray-700"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={createForm.departments.includes(String(department.id))}
+                                            onChange={() =>
+                                                toggleCreateSelection("departments", String(department.id))
+                                            }
+                                        />
+                                        <span className="text-sm dark:text-white">{department.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                            {createErrors.departments && (
+                                <p className="mt-1 text-sm text-red-600">{createErrors.departments}</p>
+                            )}
+                        </div>
+
+                        <div className="mb-6">
+                            <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">
+                                Designations <span className="text-red-500">*</span>
+                            </h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                {designations.length > 0 ? (
+                                    designations.map((designation) => (
+                                        <label
+                                            key={designation.id}
+                                            className="flex items-center gap-2 rounded-md border px-3 py-2 dark:border-gray-700"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={createForm.designations.includes(String(designation.id))}
+                                                onChange={() =>
+                                                    toggleCreateSelection("designations", String(designation.id))
+                                                }
+                                            />
+                                            <span className="text-sm dark:text-white">{designation.name}</span>
+                                        </label>
+                                    ))
+                                ) : (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                        Select department first to load designations.
+                                    </p>
+                                )}
+                            </div>
+                            {createErrors.designations && (
+                                <p className="mt-1 text-sm text-red-600">{createErrors.designations}</p>
+                            )}
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={handleCreateClose}
+                                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isCreating}
+                                className={`px-4 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 ${
+                                    isCreating ? "opacity-70 cursor-not-allowed" : ""
+                                }`}
+                            >
+                                {isCreating ? "Creating..." : "Create Member"}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }

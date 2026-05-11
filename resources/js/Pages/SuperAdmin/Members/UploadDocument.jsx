@@ -190,17 +190,18 @@ const UploadDocument = ({ isOpenModal, setIsOpenModal, member }) => {
         >
             <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
             <div className="fixed inset-0 flex items-center justify-center">
-                <Dialog.Panel className="w-[96%] max-w-[600px] rounded-[10px] md:rounded-2xl bg-white p-2 md:p-6 shadow-xl">
-                    <div className="flex justify-between items-center pb-[15px] mb-[15px] border-b border-[#f2f2f2]">
+                <Dialog.Panel className="relative w-[96%] max-w-[600px] rounded-[10px] md:rounded-2xl bg-white p-2 md:p-6 shadow-xl">
+                    <button
+                        type="button"
+                        onClick={() => setIsOpenModal(false)}
+                        className="absolute top-4 right-4 z-20 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                    <div className="pb-[15px] mb-[15px] border-b border-[#f2f2f2] pr-14">
                         <Dialog.Title className="text-[18px] font-[500] text-[#151547]">
                             Upload Documents {member && `for: ${member.name}`}
                         </Dialog.Title>
-                        <button
-                            onClick={() => setIsOpenModal(false)}
-                            className="p-1 rounded-full hover:bg-gray-100"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
                     </div>
 
                     {/* Upload box */}

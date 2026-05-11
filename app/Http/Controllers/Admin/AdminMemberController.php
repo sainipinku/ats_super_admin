@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Admin;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 use App\Models\Department;
 use App\Models\Member;
+use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskInstance;
 use App\Models\TaskActivityLog;
@@ -17,6 +19,7 @@ use App\Models\TaskComment;
 use App\Models\WhatsappLog;
 use App\Services\InteraktServices;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -54,10 +57,107 @@ class AdminMemberController extends Controller
             $member->designations_data = Designation::whereIn('id', $member->designation ?? [])->get();
             return $member;
         });
+
+        $departments = Department::whereIn('id', $requiredDepartments)
+            ->where('status', 1)
+            ->get(['id', 'name']);
+
         return Inertia::render('Admin/Member/List', [
             'filters' => $request->only(['search', 'status', 'created_by', 'per_page']),
             'members' => $members,
+            'departments' => $departments,
         ]);
+    }
+
+    public function store(Request $request)
+    {
+        $authUser = Auth::guard('admin')->user();
+        $allowedDepartmentIds = collect($authUser->departments ?? [])
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => [
+                'required',
+                'string',
+                Rule::unique('members')->whereNull('deleted_at'),
+            ],
+            'email' => [
+                'nullable',
+                'email',
+                Rule::unique('members')->whereNull('deleted_at'),
+            ],
+            'departments' => ['required', 'array', 'min:1'],
+            'departments.*' => ['required', Rule::in($allowedDepartmentIds)],
+            'designations' => ['required', 'array', 'min:1'],
+            'designations.*' => ['required', 'integer'],
+            'gender' => ['nullable', 'in:male,female,other'],
+            'dob' => ['nullable', 'date'],
+            'password' => ['required', 'string', 'min:6', 'same:confirm_password'],
+            'confirm_password' => ['required', 'string', 'min:6'],
+            'status' => ['nullable', 'in:0,1'],
+        ], [
+            'departments.*.in' => 'You can only assign members to your own departments.',
+        ]);
+
+        $designationCount = Designation::query()
+            ->whereIn('id', $validated['designations'])
+            ->whereIn('department_id', $validated['departments'])
+            ->count();
+
+        if ($designationCount !== count($validated['designations'])) {
+            return back()
+                ->withErrors(['designations' => 'Selected designations must belong to the selected departments.'])
+                ->withInput();
+        }
+
+        Member::create([
+            'name' => $validated['name'],
+            'phone' => $validated['phone'],
+            'email' => $validated['email'] ?? null,
+            'departments' => $validated['departments'],
+            'designation' => $validated['designations'],
+            'roles' => ['3'],
+            'status' => (int) ($validated['status'] ?? 1),
+            'password' => Hash::make($validated['password']),
+            'gender' => $validated['gender'] ?? null,
+            'dob' => $validated['dob'] ?? null,
+            'created_by' => $authUser->id,
+            'username' => $this->generateUsername($validated['name']),
+            'slug' => Str::slug($validated['name'] . '-' . Str::random(4)),
+        ]);
+
+        return redirect()->back()->with('success', 'Member created successfully!');
+    }
+
+    public function getByDepartments(Request $request)
+    {
+        $authUser = Auth::guard('admin')->user();
+        $allowedDepartmentIds = collect($authUser->departments ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $departmentIds = collect($request->input('department_ids', []))
+            ->flatten()
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => in_array($id, $allowedDepartmentIds, true))
+            ->values()
+            ->all();
+
+        if (empty($departmentIds)) {
+            return response()->json([]);
+        }
+
+        $designations = Designation::query()
+            ->whereIn('department_id', $departmentIds)
+            ->where('status', 1)
+            ->orderBy('name')
+            ->get(['id', 'name', 'department_id']);
+
+        return response()->json($designations);
     }
 
     public function updateStatus(Member $member, Request $request)
@@ -183,5 +283,22 @@ class AdminMemberController extends Controller
             }
             return $task;
         });
+    }
+
+    protected function generateUsername(string $name): string
+    {
+        $cleanName = Str::lower(preg_replace('/[^a-z0-9]/', '', $name));
+        $base = $cleanName ?: 'member';
+        $counter = 0;
+
+        do {
+            $username = $base . ($counter > 0 ? $counter : '');
+            $exists = Member::where('username', $username)
+                ->whereNull('deleted_at')
+                ->exists();
+            $counter++;
+        } while ($exists);
+
+        return $username;
     }
 }

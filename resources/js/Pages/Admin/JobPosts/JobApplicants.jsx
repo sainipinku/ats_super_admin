@@ -481,9 +481,18 @@ export default function JobApplicants({ auth }) {
 
                         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
-                        <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                        <div className="relative inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                            <button
+                                type="button"
+                                onClick={() => setShowDetailsModal(false)}
+                                className="absolute top-4 right-4 z-20 w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg text-slate-400 hover:text-slate-600 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
                             <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-start mb-4 pr-14">
                                     <div className="flex items-center gap-4">
                                         <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
                                             {selectedApplication.candidate_name?.charAt(0).toUpperCase() || '?'}
@@ -495,14 +504,6 @@ export default function JobApplicants({ auth }) {
                                             <p className="text-slate-600 dark:text-gray-300">{selectedApplication.candidate_email}</p>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => setShowDetailsModal(false)}
-                                        className="text-slate-400 hover:text-slate-600 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-                                    >
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
                                 </div>
 
                                 {/* Job Info */}
