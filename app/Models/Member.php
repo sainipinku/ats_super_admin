@@ -22,6 +22,7 @@ class Member extends Authenticatable
     protected $fillable = [
         'uuid',
         'created_by',
+        'assigned_admin_id',
         'name',
         'username',
         'email',
@@ -71,6 +72,11 @@ class Member extends Authenticatable
     public function creator()
     {
         return $this->belongsTo(Member::class, 'created_by');
+    }
+
+    public function assignedAdmin()
+    {
+        return $this->belongsTo(Member::class, 'assigned_admin_id');
     }
 
 

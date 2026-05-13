@@ -89,6 +89,7 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::get('/list', [MemberController::class, 'index'])->name('list');
             Route::post('/store', [MemberController::class, 'store'])->name('store');
             Route::put('/update/{id}', [MemberController::class, 'store'])->name('update');
+            Route::post('/{member}/assign-admin', [MemberController::class, 'assignAdmin'])->name('assign-admin');
             Route::delete('/{uuid}', [MemberController::class, 'destroy'])->name('destroy');
             Route::post('/update-status/{uuid}', [MemberController::class, 'updateStatus'])->name('status');
             Route::put('/{member}/password', [MemberController::class, 'updatePassword'])->name('password');

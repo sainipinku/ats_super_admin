@@ -33,11 +33,10 @@ class AdminMemberController extends Controller
         $authUser = Auth::guard('admin')->user();
         $requiredDepartments = $authUser->departments ?? [];
         $query = Member::where('id', '!=', $authUser->id)
-            ->where(function ($query) use ($requiredDepartments) {
-                foreach ($requiredDepartments as $deptId) {
-                    $query->orWhereJsonContains('departments', (string)$deptId);
-                }
-            })->whereJsonDoesntContain('roles', '2');
+            ->where('assigned_admin_id', $authUser->id)
+            ->whereJsonContains('roles', '3')
+            ->whereJsonDoesntContain('roles', '1')
+            ->whereJsonDoesntContain('roles', '2');
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -125,6 +124,7 @@ class AdminMemberController extends Controller
             'gender' => $validated['gender'] ?? null,
             'dob' => $validated['dob'] ?? null,
             'created_by' => $authUser->id,
+            'assigned_admin_id' => $authUser->id,
             'username' => $this->generateUsername($validated['name']),
             'slug' => Str::slug($validated['name'] . '-' . Str::random(4)),
         ]);
@@ -165,6 +165,7 @@ class AdminMemberController extends Controller
         $request->validate([
             'status' => 'required|boolean',
         ]);
+        abort_unless((int) $member->assigned_admin_id === (int) Auth::guard('admin')->id(), 403);
         try {
             $member->update(['status' => $request->status]);
 
@@ -208,7 +209,10 @@ class AdminMemberController extends Controller
 
     public function memberDetails(Request $request, $uuid)
     {
-        $member = Member::where('uuid', $uuid)->firstOrFail();
+        $member = Member::where('uuid', $uuid)
+            ->where('assigned_admin_id', Auth::guard('admin')->id())
+            ->whereJsonContains('roles', '3')
+            ->firstOrFail();
         $tasks = $this->getMemberTasks($member, $request);
         $taskStats = $this->getTaskStats($member);
         $taskInstanceStats = $this->getTaskInstanceStats($member);

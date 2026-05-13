@@ -9,14 +9,11 @@ import { FaEdit } from "react-icons/fa";
 import ConfirmDialog from "@/Components/ConfirmDialog";
 import { TbLockPassword } from "react-icons/tb";
 import Select from "react-select";
-import makeAnimated from "react-select/animated";
 import qs from "qs";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/20/solid";
 import Loading from "@/Components/Loading";
 import EmailLogModal from "./EmailLogModal";
 import UploadDocument from "./UploadDocument";
-
-const animatedComponents = makeAnimated();
 
 export default function Members({
     members,
@@ -24,6 +21,7 @@ export default function Members({
     filters,
     departments,
     roles,
+    admins = [],
 }) {
     const [selectedFile, setSelectedFile] = useState(null);
     const [showImageModal, setShowImageModal] = useState(false);
@@ -54,6 +52,12 @@ export default function Members({
     const [isUpdateLoading, setIsUpdateLoading] = useState(false);
     const [isPasswordLoading, setIsPasswordLoading] = useState(false);
     const [selectedMemberForEmailLogs, setSelectedMemberForEmailLogs] = useState(null);
+    const [showAssignAdminModal, setShowAssignAdminModal] = useState(false);
+    const [memberForAdminAssign, setMemberForAdminAssign] = useState(null);
+    const [selectedAdminId, setSelectedAdminId] = useState("");
+    const [adminSearch, setAdminSearch] = useState("");
+    const [assignAdminErrors, setAssignAdminErrors] = useState({});
+    const [isAssigningAdmin, setIsAssigningAdmin] = useState(false);
     const [formData, setFormData] = useState({
         name: "",
         phone: "",
@@ -80,6 +84,17 @@ export default function Members({
         value: String(designation.id),
         label: designation.name,
     }));
+    const filteredAdmins = admins.filter((admin) => {
+        const keyword = adminSearch.trim().toLowerCase();
+
+        if (!keyword) {
+            return true;
+        }
+
+        return [admin.name, admin.email, admin.phone]
+            .filter(Boolean)
+            .some((value) => value.toLowerCase().includes(keyword));
+    });
 
     const fetchDesignations = async (departmentIds) => {
         if (!Array.isArray(departmentIds)) {
@@ -251,10 +266,8 @@ const getRoleBadgeColor = (roleId) => {
         setShowImageModal(!showImageModal);
     };
 
-    const handleDepartmentChange = (selectedOptions) => {
-        const selectedValues = selectedOptions
-            ? selectedOptions.map((option) => option.value)
-            : [];
+    const handleDepartmentChange = (selectedOption) => {
+        const selectedValues = selectedOption ? [selectedOption.value] : [];
         setFormData((prev) => ({
             ...prev,
             departments: selectedValues,
@@ -267,10 +280,8 @@ const getRoleBadgeColor = (roleId) => {
         }
     };
 
-    const handleDesignationChange = (selectedOptions) => {
-        const selectedValues = selectedOptions
-            ? selectedOptions.map((option) => option.value)
-            : [];
+    const handleDesignationChange = (selectedOption) => {
+        const selectedValues = selectedOption ? [selectedOption.value] : [];
         setFormData((prev) => ({
             ...prev,
             designations: selectedValues,
@@ -408,6 +419,53 @@ const getRoleBadgeColor = (roleId) => {
             new_password_confirmation: "",
         });
         setErrors({});
+    };
+
+    const handleAssignAdminOpen = (member) => {
+        setMemberForAdminAssign(member);
+        setSelectedAdminId(
+            member?.assigned_admin_id ? String(member.assigned_admin_id) : ""
+        );
+        setAssignAdminErrors({});
+        setAdminSearch("");
+        setShowAssignAdminModal(true);
+    };
+
+    const handleAssignAdminClose = () => {
+        setShowAssignAdminModal(false);
+        setMemberForAdminAssign(null);
+        setSelectedAdminId("");
+        setAssignAdminErrors({});
+        setAdminSearch("");
+        setIsAssigningAdmin(false);
+    };
+
+    const handleAssignAdminSubmit = () => {
+        if (!memberForAdminAssign) {
+            return;
+        }
+
+        setIsAssigningAdmin(true);
+        setAssignAdminErrors({});
+
+        router.post(
+            route("super.members.assign-admin", memberForAdminAssign.id),
+            {
+                admin_id: selectedAdminId,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    handleAssignAdminClose();
+                },
+                onError: (assignmentErrors) => {
+                    setAssignAdminErrors(assignmentErrors);
+                },
+                onFinish: () => {
+                    setIsAssigningAdmin(false);
+                },
+            }
+        );
     };
 
     const getStatusDisplay = (status) => {
@@ -751,6 +809,12 @@ const getRoleBadgeColor = (roleId) => {
             </>
         );
     };
+
+    const canAssignMemberToAdmin = (member) =>
+        member?.roles?.includes("3") &&
+        !member?.roles?.includes("1") &&
+        !member?.roles?.includes("2");
+
     return (
         <AuthenticatedLayout user={auth.user}>
             <Head title="Members" />
@@ -1015,7 +1079,24 @@ const getRoleBadgeColor = (roleId) => {
                                                     </span>
                                                 </td>
                                                 <td className="p-3">
-                                                     <button
+                                                    {canAssignMemberToAdmin(
+                                                        member
+                                                    ) && (
+                                                        <button
+                                                            onClick={() =>
+                                                                handleAssignAdminOpen(
+                                                                    member
+                                                                )
+                                                            }
+                                                            className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-600 text-white hover:bg-blue-700"
+                                                            title="Assign to admin"
+                                                        >
+                                                            <span className="text-lg leading-none">
+                                                                +
+                                                            </span>
+                                                        </button>
+                                                    )}
+                                                    <button
                                                         onClick={() => {
                                                             setIsOpenModal(
                                                                 true
@@ -1028,6 +1109,14 @@ const getRoleBadgeColor = (roleId) => {
                                                     >
                                                         Upload/View Document
                                                     </button>
+                                                    {member.assigned_admin_name && (
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                                            Assigned:{" "}
+                                                            {
+                                                                member.assigned_admin_name
+                                                            }
+                                                        </div>
+                                                    )}
                                                     <DownMenuItem
                                                         taskItem={member}
                                                                                                                 index={index}
@@ -1206,6 +1295,100 @@ const getRoleBadgeColor = (roleId) => {
                 setIsOpenModal={setIsOpenModal}
                 member={currentMember}
             />
+                    <Modal
+                        show={showAssignAdminModal}
+                        onClose={handleAssignAdminClose}
+                        maxWidth="md"
+                        topCloseButton={true}
+                        handleTopClose={handleAssignAdminClose}
+                    >
+                        <div className="p-6">
+                            <h2 className="text-xl font-bold mb-4 dark:text-white pr-[80px]">
+                                Assign Member to Admin
+                            </h2>
+                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                                {memberForAdminAssign?.name || "Selected member"}
+                            </p>
+
+                            <div className="mb-4">
+                                <input
+                                    type="text"
+                                    placeholder="Search admin..."
+                                    value={adminSearch}
+                                    onChange={(e) =>
+                                        setAdminSearch(e.target.value)
+                                    }
+                                    className="w-full px-3 py-2 border border-[#f2f2f2] rounded-lg dark:bg-[#0a0e25] dark:text-white dark:border-gray-700"
+                                />
+                            </div>
+
+                            <div className="max-h-[50vh] overflow-y-auto border rounded-lg dark:border-gray-700">
+                                {filteredAdmins.length > 0 ? (
+                                    filteredAdmins.map((admin) => (
+                                        <label
+                                            key={admin.id}
+                                            className="flex items-center gap-3 p-3 border-b last:border-b-0 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 dark:border-gray-700"
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="admin_id"
+                                                value={String(admin.id)}
+                                                checked={
+                                                    selectedAdminId ===
+                                                    String(admin.id)
+                                                }
+                                                onChange={(e) =>
+                                                    setSelectedAdminId(
+                                                        e.target.value
+                                                    )
+                                                }
+                                            />
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                                    {admin.name}
+                                                </p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {admin.email || admin.phone}
+                                                </p>
+                                            </div>
+                                        </label>
+                                    ))
+                                ) : (
+                                    <div className="p-6">
+                                        <NoData message="No admin found" />
+                                    </div>
+                                )}
+                            </div>
+
+                            {assignAdminErrors.admin_id && (
+                                <p className="mt-2 text-sm text-red-600">
+                                    {assignAdminErrors.admin_id}
+                                </p>
+                            )}
+
+                            <div className="mt-4 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={handleAssignAdminClose}
+                                    className="px-4 py-2 canclebtn rounded-[7px]"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleAssignAdminSubmit}
+                                    disabled={
+                                        isAssigningAdmin || !selectedAdminId
+                                    }
+                                    className="flex items-center gap-[5px] px-[20px] py-[10px] text-[15px] text-white rounded-[8px] bluebtbg disabled:opacity-60"
+                                >
+                                    {isAssigningAdmin
+                                        ? "Assigning..."
+                                        : "Assign Admin"}
+                                </button>
+                            </div>
+                        </div>
+                    </Modal>
                     <Modal
                         show={isOpen}
                         onClose={handleClose}
@@ -1486,22 +1669,19 @@ const getRoleBadgeColor = (roleId) => {
                                                 </span>
                                             </label>
                                             <Select
-                                                isMulti
-                                                components={animatedComponents}
                                                 options={departmentOptions}
-                                                value={departmentOptions.filter(
+                                                value={departmentOptions.find(
                                                     (option) =>
-                                                        formData.departments.includes(
-                                                            option.value
-                                                        )
-                                                )}
+                                                        option.value ===
+                                                        formData.departments[0]
+                                                ) || null}
                                                 onChange={
                                                     handleDepartmentChange
                                                 }
-                                                placeholder="Select Departments"
+                                                placeholder="Select Department"
                                                 className="react-select-container"
                                                 classNamePrefix="react-select"
-                                                closeMenuOnSelect={false}
+                                                isClearable
                                                 noOptionsMessage={() =>
                                                     "No Department Found"
                                                 }
@@ -1746,15 +1926,12 @@ const getRoleBadgeColor = (roleId) => {
                                                 </span>
                                             </label>
                                             <Select
-                                                isMulti
-                                                components={animatedComponents}
                                                 options={designationOptions}
-                                                value={designationOptions.filter(
+                                                value={designationOptions.find(
                                                     (option) =>
-                                                        formData.designations.includes(
-                                                            option.value
-                                                        )
-                                                )}
+                                                        option.value ===
+                                                        formData.designations[0]
+                                                ) || null}
                                                 onChange={
                                                     handleDesignationChange
                                                 }
@@ -1767,7 +1944,7 @@ const getRoleBadgeColor = (roleId) => {
                                                         : designationOptions.length ==
                                                           0
                                                         ? "No designations available"
-                                                        : "Select designations"
+                                                        : "Select designation"
                                                 }
                                                 isDisabled={
                                                     formData.departments
@@ -1777,7 +1954,7 @@ const getRoleBadgeColor = (roleId) => {
                                                 isLoading={loadingDesignations}
                                                 className="react-select-container"
                                                 classNamePrefix="react-select"
-                                                closeMenuOnSelect={false}
+                                                isClearable
                                                 styles={{
                                                     control: (
                                                         base,
