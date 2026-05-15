@@ -17,7 +17,7 @@ export default function Companies({ companies }) {
                             </p>
                         </div>
                         <Link
-                            href={route('member.jobs.index')}
+                            href={route('jobs.index')}
                             className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors"
                         >
                             Browse Jobs
@@ -28,7 +28,7 @@ export default function Companies({ companies }) {
                         {(companies ?? []).map((company) => {
                             const params = new URLSearchParams();
                             params.set('search', company.company);
-                            const jobsHref = `${route('member.jobs.index')}?${params.toString()}`;
+                            const jobsHref = `${route('jobs.index')}?${params.toString()}`;
 
                             return (
                                 <div
@@ -85,4 +85,3 @@ export default function Companies({ companies }) {
         </ThemeProvider>
     );
 }
-

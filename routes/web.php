@@ -233,6 +233,7 @@ Route::prefix('member')->middleware(['member'])->group(function () {
 /** PUBLIC ROUTES START HERE **/
 Route::get('/', [HomeController::class, 'authShowPage'])->name('home');
 Route::get('/homepage', [HomeController::class, 'showHomepage'])->name('homepage');
+Route::get('/jobs', [HomeController::class, 'jobs'])->name('jobs.index');
 Route::get('/companies', [HomeController::class, 'companies'])->name('companies.index');
 Route::get('/about', [HomeController::class, 'about'])->name('about');
 Route::get('/contact', [HomeController::class, 'contact'])->name('contact.show');

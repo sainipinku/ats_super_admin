@@ -6,8 +6,11 @@ import {
     Menu,
     X,
     Building2,
+    Briefcase,
     LayoutDashboard,
     Home,
+    Sparkles,
+    Mail,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,10 +32,10 @@ export default function HomepageLayout({ children }) {
 
     const navLinks = [
         { name: 'Home', href: route('homepage'), icon: Home },
-        // { name: 'Browse Jobs', href: route('member.jobs.index'), icon: Briefcase },
-        // { name: 'Companies', href: route('companies.index'), icon: Building2 },
-        // { name: 'About', href: route('about'), icon: Sparkles },
-        // { name: 'Contact', href: route('contact.show'), icon: Mail },
+        { name: 'Browse Jobs', href: route('jobs.index'), icon: Briefcase },
+        { name: 'Companies', href: route('companies.index'), icon: Building2 },
+        { name: 'About', href: route('about'), icon: Sparkles },
+        { name: 'Contact', href: route('contact.show'), icon: Mail },
     ];
 
     if (isAuthenticated) {

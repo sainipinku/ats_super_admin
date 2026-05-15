@@ -260,6 +260,42 @@ class HomeController extends Controller
         ]);
     }
 
+    public function jobs(Request $request)
+    {
+        $query = Job::with(['creator' => function ($q) {
+                $q->select('id', 'name', 'email');
+            }])
+            ->where('status', 'active')
+            ->orderBy('created_at', 'desc');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('company', 'like', "%{$search}%")
+                    ->orWhere('location', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('job_type')) {
+            $query->where('job_type', $request->job_type);
+        }
+
+        if ($request->filled('location')) {
+            $query->where('location', 'like', "%{$request->location}%");
+        }
+
+        return Inertia::render('Public/JobListings', [
+            'jobs' => $query->get(),
+            'filters' => [
+                'search' => $request->search ?? '',
+                'job_type' => $request->job_type ?? '',
+                'location' => $request->location ?? '',
+            ],
+        ]);
+    }
+
     public function companies(Request $request)
     {
         $companies = Job::query()

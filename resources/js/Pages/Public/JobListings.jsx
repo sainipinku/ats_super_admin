@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, ArrowRight, Briefcase, X, CheckCircle2, Calendar, Users, MapPin, DollarSign, Bookmark, BookmarkCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Head, Link } from '@inertiajs/react';
+import { Briefcase, ArrowRight, Clock, MapPin, DollarSign, Bookmark, BookmarkCheck } from 'lucide-react';
+import { ThemeProvider } from '@/Contexts/ThemeContext';
+import { useTheme } from '@/Contexts/ThemeContext';
+import HomepageLayout from '@/Layouts/HomepageLayout';
+import Footer from '@/Components/Homepage/Footer';
 
 // Job Card Component (Copy from Member/JobListings)
-const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply, isDark, isAuthenticated, onSaveJob, savedJobs }) => {
+const CandidateJobCard = ({ job, onViewDetails, onApply, isDark, isAuthenticated, onSaveJob, savedJobs }) => {
     const getJobTypeBadge = (type) => {
         const badges = {
             'full-time': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
@@ -389,16 +392,22 @@ const JobDetailsModal = ({ job, isOpen, onClose, hasApplied, onApply }) => {
     );
 };
 
-export default function PublicJobListings({ auth, jobs }) {
+function PublicJobListingsContent({ auth, jobs, filters = {} }) {
     const [selectedJob, setSelectedJob] = useState(null);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
-    const [isDark, setIsDark] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedType, setSelectedType] = useState('');
-    const [selectedLocation, setSelectedLocation] = useState('');
+    const { isDark } = useTheme();
+    const [searchQuery, setSearchQuery] = useState(filters.search ?? '');
+    const [selectedType, setSelectedType] = useState(filters.job_type ?? '');
+    const [selectedLocation, setSelectedLocation] = useState(filters.location ?? '');
     const [filteredJobs, setFilteredJobs] = useState(jobs || []);
     const isAuthenticated = !!auth?.user;
     const [savedJobs, setSavedJobs] = useState([]);
+
+    useEffect(() => {
+        setSearchQuery(filters.search ?? '');
+        setSelectedType(filters.job_type ?? '');
+        setSelectedLocation(filters.location ?? '');
+    }, [filters.job_type, filters.location, filters.search]);
 
     // Filter jobs based on search and filters
     useEffect(() => {
@@ -431,7 +440,6 @@ export default function PublicJobListings({ auth, jobs }) {
     }, [jobs, searchQuery, selectedType, selectedLocation]);
 
     // Get unique locations from jobs
-    const locations = [...new Set(jobs?.map(job => job.location).filter(Boolean))];
     const jobTypes = ['Full Time', 'Part Time', 'Contract', 'Internship', 'Freelance', 'Remote'];
 
     const handleViewDetails = (job) => {
@@ -439,12 +447,18 @@ export default function PublicJobListings({ auth, jobs }) {
         setShowDetailsModal(true);
     };
 
-    const handleApply = (job) => {
+    const handleApply = () => {
+        if (auth?.guard === 'member') {
+            window.location.href = route('member.jobs.index');
+            return;
+        }
+
         if (!auth?.user) {
             window.location.href = route('login');
             return;
         }
-        window.location.href = `/member/jobs/${job.id}/apply`;
+
+        window.location.href = route('login');
     };
 
     const handleCloseModal = () => {
@@ -467,8 +481,8 @@ export default function PublicJobListings({ auth, jobs }) {
     return (
         <>
             <Head title="Browse Jobs - ATS" />
-
-            <div className={`min-h-screen ${bgColor}`}>
+            <HomepageLayout>
+                <div className={`min-h-screen ${bgColor}`}>
                 {/* Header */}
                 <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -613,7 +627,6 @@ export default function PublicJobListings({ auth, jobs }) {
                                 <CandidateJobCard
                                     key={job.id}
                                     job={job}
-                                    hasApplied={false}
                                     onViewDetails={handleViewDetails}
                                     onApply={handleApply}
                                     isDark={isDark}
@@ -634,7 +647,17 @@ export default function PublicJobListings({ auth, jobs }) {
                     hasApplied={false}
                     onApply={handleApply}
                 />
-            </div>
+                </div>
+                <Footer />
+            </HomepageLayout>
         </>
+    );
+}
+
+export default function PublicJobListings(props) {
+    return (
+        <ThemeProvider>
+            <PublicJobListingsContent {...props} />
+        </ThemeProvider>
     );
 }
