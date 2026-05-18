@@ -5,6 +5,12 @@ import AuthenticatedLayout from './Layouts/AuthenticatedLayout';
 const StatusBadge = ({ status }) => {
     const styles = {
         pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        assigned_to_calling_team: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+        interested: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        interview_scheduled: 'bg-sky-100 text-sky-800 border-sky-300',
+        selected: 'bg-green-100 text-green-800 border-green-300',
+        on_hold: 'bg-orange-100 text-orange-800 border-orange-300',
+        on_hold_not_interested: 'bg-red-100 text-red-800 border-red-300',
         shortlisted: 'bg-emerald-100 text-emerald-800 border-emerald-300',
         waiting_list: 'bg-blue-100 text-blue-800 border-blue-300',
         hired: 'bg-purple-100 text-purple-800 border-purple-300',
@@ -14,6 +20,12 @@ const StatusBadge = ({ status }) => {
 
     const labels = {
         pending: 'Pending',
+        assigned_to_calling_team: 'Assigned To Calling Team',
+        interested: 'Interested',
+        interview_scheduled: 'Interview Scheduled',
+        selected: 'Selected',
+        on_hold: 'On Hold',
+        on_hold_not_interested: 'On Hold (Not Interested)',
         shortlisted: 'Shortlisted',
         waiting_list: 'Waiting List',
         hired: 'Hired',
@@ -75,7 +87,19 @@ const ApplicationRow = ({ application, onWithdraw }) => {
                 <div className="text-slate-500 text-sm">{application.job?.company || application.job?.company_name || '-'}</div>
             </td>
             <td className="px-5 py-4">
-                <StatusBadge status={application.status} />
+                <div className="space-y-2">
+                    <StatusBadge status={application.status} />
+                    {application.interview_date_time && (
+                        <div className="text-xs text-slate-500">
+                            Interview: {formatDate(application.interview_date_time)}
+                        </div>
+                    )}
+                    {application.interview_mode === "offline" && application.interview_address && (
+                        <div className="text-xs text-slate-500">
+                            Address: {application.interview_address}
+                        </div>
+                    )}
+                </div>
             </td>
             <td className="px-5 py-4 text-slate-600 text-sm">
                 {formatDate(application.created_at)}
@@ -174,6 +198,12 @@ export default function MyApplications({ auth, applications, statusCounts }) {
     const filters = [
         { key: 'all', label: 'All Applications', count: applications.total },
         { key: 'pending', label: 'Pending', count: statusCounts.pending || 0 },
+        { key: 'assigned_to_calling_team', label: 'Assigned', count: statusCounts.assigned_to_calling_team || 0 },
+        { key: 'interested', label: 'Interested', count: statusCounts.interested || 0 },
+        { key: 'interview_scheduled', label: 'Interview', count: statusCounts.interview_scheduled || 0 },
+        { key: 'selected', label: 'Selected', count: statusCounts.selected || 0 },
+        { key: 'on_hold_not_interested', label: 'Not Interested', count: statusCounts.on_hold_not_interested || 0 },
+        { key: 'on_hold', label: 'On Hold', count: statusCounts.on_hold || 0 },
         { key: 'shortlisted', label: 'Shortlisted', count: statusCounts.shortlisted || 0 },
         { key: 'waiting_list', label: 'Waiting List', count: statusCounts.waiting_list || 0 },
         { key: 'hired', label: 'Hired', count: statusCounts.hired || 0 },

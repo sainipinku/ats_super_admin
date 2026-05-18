@@ -165,7 +165,7 @@ class CandidateJobController extends Controller
         // Check if user has already applied
         $hasApplied = false;
         $application = null;
-        
+
         if (Auth::guard('member')->check()) {
             $application = JobApplication::where('job_id', $job->id)
                 ->where('candidate_id', Auth::guard('member')->id())
@@ -508,6 +508,12 @@ class CandidateJobController extends Controller
         // Application status counts
         $statusCounts = [
             'pending' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'pending')->count(),
+            'assigned_to_calling_team' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'assigned_to_calling_team')->count(),
+            'interested' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'interested')->count(),
+            'interview_scheduled' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'interview_scheduled')->count(),
+            'selected' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'selected')->count(),
+            'on_hold_not_interested' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'on_hold_not_interested')->count(),
+            'on_hold' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'on_hold')->count(),
             'shortlisted' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'shortlisted')->count(),
             'waiting_list' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'waiting_list')->count(),
             'hired' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'hired')->count(),

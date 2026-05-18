@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Job;
 use App\Models\JobApplication;
+use App\Models\Member;
+use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -79,7 +81,9 @@ class JobController extends Controller
 
     public function applicationsIndex()
     {
-        return Inertia::render('Admin/JobApplications/Index');
+        return Inertia::render('Admin/JobPosts/JobApplicants', [
+            'callingTeamMembers' => $this->callingTeamMembersForAdmin(),
+        ]);
     }
 
     /**
@@ -436,7 +440,9 @@ class JobController extends Controller
      */
     public function applicants()
     {
-        return Inertia::render('Admin/JobPosts/JobApplicants');
+        return Inertia::render('Admin/JobPosts/JobApplicants', [
+            'callingTeamMembers' => $this->callingTeamMembersForAdmin(),
+        ]);
     }
 
     /**
@@ -446,55 +452,63 @@ class JobController extends Controller
     {
         $adminId = Auth::guard('admin')->id();
 
-        // Get all job IDs created by this admin
         $jobIds = Job::where('created_by', $adminId)->pluck('id');
 
-        $query = JobApplication::with(['job' => function($q) {
-                $q->select('id', 'title', 'company', 'location', 'job_type');
-            }, 'candidate' => function($q) {
-                $q->select('id', 'name', 'email', 'phone', 'image');
-            }])
+        $query = JobApplication::query()
+            ->with([
+                'job' => function ($q) {
+                    $q->select('id', 'title', 'company', 'location', 'job_type');
+                },
+                'candidate' => function ($q) {
+                    $q->select('id', 'name', 'email', 'phone', 'image');
+                },
+                'assignedCallingTeamMember' => function ($q) {
+                    $q->select('id', 'name', 'email', 'phone');
+                },
+            ])
             ->whereIn('job_id', $jobIds)
-            ->orderBy('created_at', 'desc');
+            ->orderByDesc('updated_at');
 
-        // Filter by status
-        if ($request->has('status') && $request->status) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        // Filter by job
-        if ($request->has('job_id') && $request->job_id) {
+        if ($request->filled('job_id')) {
             $query->where('job_id', $request->job_id);
         }
 
-        // Search by candidate name or email
-        if ($request->has('search') && $request->search) {
+        if ($request->filled('calling_team_member_id')) {
+            $query->where('assigned_calling_team_member_id', $request->calling_team_member_id);
+        }
+
+        if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('candidate_name', 'like', "%{$search}%")
-                  ->orWhere('candidate_email', 'like', "%{$search}%")
-                  ->orWhereHas('job', function($jq) use ($search) {
-                      $jq->where('title', 'like', "%{$search}%");
-                  });
+                    ->orWhere('candidate_email', 'like', "%{$search}%")
+                    ->orWhere('candidate_phone', 'like', "%{$search}%")
+                    ->orWhereHas('job', function ($jq) use ($search) {
+                        $jq->where('title', 'like', "%{$search}%")
+                            ->orWhere('company', 'like', "%{$search}%");
+                    });
             });
         }
 
         $applications = $query->paginate(12)->withQueryString();
 
-        // Get all jobs for filter dropdown
         $jobs = Job::where('created_by', $adminId)
             ->select('id', 'title', 'company')
             ->orderBy('title')
             ->get();
 
-        // Status counts
         $statusCounts = [
             'pending' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'pending')->count(),
-            'shortlisted' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'shortlisted')->count(),
-            'waiting_list' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'waiting_list')->count(),
-            'hired' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'hired')->count(),
-            'not_selected' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'not_selected')->count(),
-            'rejected' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'rejected')->count(),
+            'assigned_to_calling_team' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'assigned_to_calling_team')->count(),
+            'interested' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'interested')->count(),
+            'interview_scheduled' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'interview_scheduled')->count(),
+            'selected' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'selected')->count(),
+            'on_hold_not_interested' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'on_hold_not_interested')->count(),
+            'on_hold' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'on_hold')->count(),
             'total' => JobApplication::whereIn('job_id', $jobIds)->count(),
         ];
 
@@ -502,10 +516,12 @@ class JobController extends Controller
             'success' => true,
             'data' => $applications,
             'jobs' => $jobs,
+            'callingTeamMembers' => $this->callingTeamMembersForAdmin(),
             'statusCounts' => $statusCounts,
             'filters' => [
                 'status' => $request->status ?? '',
                 'job_id' => $request->job_id ?? '',
+                'calling_team_member_id' => $request->calling_team_member_id ?? '',
                 'search' => $request->search ?? '',
             ],
         ]);
@@ -526,7 +542,7 @@ class JobController extends Controller
             ], 403);
         }
 
-        $application->load(['job', 'candidate', 'reviewer']);
+        $application->load(['job', 'candidate', 'reviewer', 'assignedCallingTeamMember']);
 
         return response()->json([
             'success' => true,
@@ -550,7 +566,7 @@ class JobController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => 'required|in:pending,shortlisted,waiting_list,hired,not_selected,rejected',
+            'status' => 'required|in:pending,shortlisted,waiting_list,hired,not_selected,rejected,assigned_to_calling_team,interested,interview_scheduled,selected,on_hold,on_hold_not_interested',
             'admin_notes' => 'nullable|string|max:5000',
         ]);
 
@@ -564,7 +580,97 @@ class JobController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Application status updated successfully.',
-            'data' => $application->fresh(),
+            'data' => $application->fresh(['job', 'candidate', 'assignedCallingTeamMember']),
         ]);
+    }
+
+    public function assignCallingTeam(Request $request, JobApplication $application)
+    {
+        $adminId = Auth::guard('admin')->id();
+
+        $application->load('job');
+
+        if (!$application->job || (int) $application->job->created_by !== (int) $adminId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to assign this application.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'calling_team_member_id' => ['required', 'integer'],
+            'admin_notes' => 'nullable|string|max:5000',
+        ]);
+
+        $callingTeamMember = Member::query()
+            ->where('id', $validated['calling_team_member_id'])
+            ->where('assigned_admin_id', $adminId)
+            ->where('is_calling_team', true)
+            ->where('status', 1)
+            ->first();
+
+        if (!$callingTeamMember) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Selected calling team member is invalid.',
+            ], 422);
+        }
+
+        $application->update([
+            'assigned_calling_team_member_id' => $callingTeamMember->id,
+            'assigned_to_calling_team_at' => now(),
+            'status' => 'assigned_to_calling_team',
+            'admin_notes' => $validated['admin_notes'] ?? $application->admin_notes,
+            'reviewed_at' => now(),
+            'reviewed_by' => $adminId,
+        ]);
+
+        Notification::create([
+            'model' => 'callingteam',
+            'listing_id' => $callingTeamMember->id,
+            'job_id' => $application->job_id,
+            'type' => 'candidate_assigned_to_calling_team',
+            'status' => 'unread',
+            'data' => $this->notificationData($application, [
+                'admin_notes' => $validated['admin_notes'] ?? null,
+            ]),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Candidate assigned successfully.',
+            'data' => $application->fresh(['job', 'candidate', 'assignedCallingTeamMember']),
+        ]);
+    }
+
+    private function callingTeamMembersForAdmin()
+    {
+        return Member::query()
+            ->where('assigned_admin_id', Auth::guard('admin')->id())
+            ->where('is_calling_team', true)
+            ->where('status', 1)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'phone', 'username']);
+    }
+
+    private function notificationData(JobApplication $application, array $extra = []): array
+    {
+        $application->loadMissing(['job:id,uuid,title,company,created_by', 'assignedCallingTeamMember:id,name,email']);
+
+        return array_merge([
+            'application_id' => $application->id,
+            'application_uuid' => $application->uuid,
+            'job_id' => $application->job_id,
+            'job_uuid' => $application->job?->uuid,
+            'job_title' => $application->job?->title,
+            'job_company' => $application->job?->company,
+            'candidate_id' => $application->candidate_id,
+            'candidate_name' => $application->candidate_name,
+            'candidate_email' => $application->candidate_email,
+            'candidate_phone' => $application->candidate_phone,
+            'status' => $application->status,
+            'calling_team_member_id' => $application->assigned_calling_team_member_id,
+            'calling_team_member_name' => $application->assignedCallingTeamMember?->name,
+        ], $extra);
     }
 }

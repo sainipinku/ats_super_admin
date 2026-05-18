@@ -34,6 +34,7 @@ class AdminMemberController extends Controller
         $requiredDepartments = $authUser->departments ?? [];
         $query = Member::where('id', '!=', $authUser->id)
             ->where('assigned_admin_id', $authUser->id)
+            ->where('is_calling_team', false)
             ->whereJsonContains('roles', '3')
             ->whereJsonDoesntContain('roles', '1')
             ->whereJsonDoesntContain('roles', '2');
@@ -119,6 +120,7 @@ class AdminMemberController extends Controller
             'departments' => $validated['departments'],
             'designation' => $validated['designations'],
             'roles' => ['3'],
+            'is_calling_team' => false,
             'status' => (int) ($validated['status'] ?? 1),
             'password' => Hash::make($validated['password']),
             'gender' => $validated['gender'] ?? null,
@@ -200,7 +202,7 @@ class AdminMemberController extends Controller
                     'status' => $status
                 ]);
             }
-            
+
             return redirect()->back()->with('success', 'Member account status updated successfully!');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to update member status!');

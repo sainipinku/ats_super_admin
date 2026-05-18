@@ -388,6 +388,10 @@ if ($activeMembers->count() > 0) {
             return ['model' => 'member', 'user' => Auth::guard('member')->user()];
         }
 
+        if (Auth::guard('callingteam')->check()) {
+            return ['model' => 'callingteam', 'user' => Auth::guard('callingteam')->user()];
+        }
+
         abort(401);
     }
 

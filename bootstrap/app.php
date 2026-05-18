@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'authorized' => RedirectIfAuthenticated::class,
              'member' => \App\Http\Middleware\MemberMiddleware::class,
               'admin' => \App\Http\Middleware\AdminMiddleware::class,
+              'callingteam' => \App\Http\Middleware\CallingTeamMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

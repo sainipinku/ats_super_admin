@@ -63,6 +63,11 @@ return [
         'driver' => 'session',
         'provider' => 'members',
     ],
+
+    'callingteam' => [
+        'driver' => 'session',
+        'provider' => 'members',
+    ],
     ],
 
     /*

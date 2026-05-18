@@ -26,6 +26,12 @@ class RedirectIfAuthenticated
                 switch ($guard) {
                     case 'superadmin':
                         return redirect()->route('super.dashboard');
+                    case 'admin':
+                        return redirect()->route('admin.dashboard');
+                    case 'member':
+                        return redirect()->route('member.dashboard');
+                    case 'callingteam':
+                        return redirect()->route('callingteam.dashboard');
                     default:
                         return redirect('/dashboard');
                 }

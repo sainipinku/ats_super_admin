@@ -1,0 +1,134 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Member;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+
+class CallingTeamController extends Controller
+{
+    public function index(Request $request)
+    {
+        $adminId = Auth::guard('admin')->id();
+        $perPage = max(1, min((int) $request->input('per_page', 10), 50));
+
+        $query = Member::query()
+            ->where('assigned_admin_id', $adminId)
+            ->where('is_calling_team', true)
+            ->orderByDesc('created_at');
+
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($builder) use ($search) {
+                $builder->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('username', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        return Inertia::render('Admin/CallingTeam/Index', [
+            'members' => $query->paginate($perPage)->withQueryString(),
+            'filters' => $request->only(['search', 'status', 'per_page']),
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $admin = Auth::guard('admin')->user();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => [
+                'required',
+                'string',
+                Rule::unique('members')->whereNull('deleted_at'),
+            ],
+            'email' => [
+                'nullable',
+                'email',
+                Rule::unique('members')->whereNull('deleted_at'),
+            ],
+            'password' => ['required', 'string', 'min:6', 'same:confirm_password'],
+            'confirm_password' => ['required', 'string', 'min:6'],
+            'status' => ['nullable', 'in:0,1'],
+        ]);
+
+        Member::create([
+            'name' => $validated['name'],
+            'phone' => $validated['phone'],
+            'email' => $validated['email'] ?? null,
+            'password' => Hash::make($validated['password']),
+            'status' => (int) ($validated['status'] ?? 1),
+            'roles' => [],
+            'is_calling_team' => true,
+            'created_by' => $admin->id,
+            'assigned_admin_id' => $admin->id,
+            'username' => $this->generateUsername($validated['name']),
+            'slug' => Str::slug($validated['name'] . '-' . Str::random(4)),
+        ]);
+
+        return redirect()->back()->with('success', 'Calling team member created successfully.');
+    }
+
+    public function updateStatus(Request $request, Member $member)
+    {
+        abort_unless(
+            (int) $member->assigned_admin_id === (int) Auth::guard('admin')->id() && $member->is_calling_team,
+            403
+        );
+
+        $request->validate([
+            'status' => 'required|boolean',
+        ]);
+
+        $member->update([
+            'status' => (int) $request->boolean('status'),
+        ]);
+
+        return redirect()->back()->with('success', 'Calling team member status updated successfully.');
+    }
+
+    public function membersList()
+    {
+        $members = Member::query()
+            ->where('assigned_admin_id', Auth::guard('admin')->id())
+            ->where('is_calling_team', true)
+            ->where('status', 1)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'phone', 'username']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $members,
+        ]);
+    }
+
+    private function generateUsername(string $name): string
+    {
+        $cleanName = Str::lower(preg_replace('/[^a-z0-9]/', '', $name));
+        $base = $cleanName ?: 'callingteam';
+        $counter = 0;
+
+        do {
+            $username = $base . ($counter > 0 ? $counter : '');
+            $exists = Member::query()
+                ->where('username', $username)
+                ->whereNull('deleted_at')
+                ->exists();
+            $counter++;
+        } while ($exists);
+
+        return $username;
+    }
+}

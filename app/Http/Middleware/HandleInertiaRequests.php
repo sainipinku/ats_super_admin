@@ -44,6 +44,9 @@ class HandleInertiaRequests extends Middleware
         } elseif (Auth::guard('member')->check()) {
             $user = Auth::guard('member')->user();
             $guard = 'member';
+        } elseif (Auth::guard('callingteam')->check()) {
+            $user = Auth::guard('callingteam')->user();
+            $guard = 'callingteam';
         }
 
         return array_merge(parent::share($request), [

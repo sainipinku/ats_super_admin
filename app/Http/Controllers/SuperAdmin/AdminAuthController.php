@@ -28,6 +28,9 @@ class AdminAuthController extends Controller
         if (Auth::guard('member')->check()) {
             return redirect()->route('member.dashboard');
         }
+        if (Auth::guard('callingteam')->check()) {
+            return redirect()->route('callingteam.dashboard');
+        }
     }
 
 
@@ -85,6 +88,12 @@ class AdminAuthController extends Controller
         if ((int)($member->status ?? 1) === 0) {
             return back()->withErrors([
                 'login' => 'Your account is inactive. Please contact admin to activate your account.',
+            ]);
+        }
+
+        if ($member->is_calling_team) {
+            return back()->withErrors([
+                'login' => 'Use the calling team login portal to access your account.',
             ]);
         }
 

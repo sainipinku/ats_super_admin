@@ -144,6 +144,35 @@ const Sidebar = ({ isOpen, onClose }) => {
 
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
                     <Link
+                        href={route("admin.job.applications.index")}
+                        className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
+                            route().current("admin.job.applications.index") ||
+                            route().current("admin.job.applicants")
+                                ? "text-[#4F46E5] dark:text-[#4F46E5] bg-[#4F46E5]/10"
+                                : "text-[#727272] hover:text-[#4F46E5] dark:hover:text-[#4F46E5]"
+                        }`}
+                    >
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M7 2H14L19 7V22H7V2ZM14 3.5V8H18.5M9 12H17M9 16H17M9 8H12"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                        Job Applications
+                    </Link>
+                </li>
+
+                <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
+                    <Link
                         href={route("admin.job.posts.listing")}
                         onClick={(e) => {
                             console.log('Job Listing clicked');
@@ -171,6 +200,41 @@ const Sidebar = ({ isOpen, onClose }) => {
                             />
                         </svg>
                         Job Listing
+                    </Link>
+                </li>
+
+                <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
+                    <Link
+                        href={route("admin.calling-team.index")}
+                        className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
+                            route().current("admin.calling-team.index")
+                                ? "text-[#4F46E5] dark:text-[#4F46E5] bg-[#4F46E5]/10"
+                                : "text-[#727272] hover:text-[#4F46E5] dark:hover:text-[#4F46E5]"
+                        }`}
+                    >
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12ZM4 20C4 16.6863 7.58172 14 12 14C16.4183 14 20 16.6863 20 20"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                            <path
+                                d="M18 8H22M20 6V10"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                        Calling Team
                     </Link>
                 </li>
 
