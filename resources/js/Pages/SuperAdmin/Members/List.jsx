@@ -2177,6 +2177,7 @@ const getRoleBadgeColor = (roleId) => {
                                             : ""
                                     }`}
                                 />
+                                
                                 {passwordForm.new_password_confirmation.length >
                                     0 &&
                                     passwordForm.new_password !==
