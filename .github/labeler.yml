@@ -1,7 +1,5 @@
-# .github/labeler.yml
 # Auto-labels PRs based on files changed
 
-# ── Scope labels ─────────────────────────────
 frontend:
   - changed-files:
       - any-glob-to-any-file:
