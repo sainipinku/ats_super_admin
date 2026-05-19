@@ -3,6 +3,9 @@ import Modal from '@/Components/Modal';
 import Loading from '@/Components/Loading';
 import { Head, router } from '@inertiajs/react';
 
+
+
+
 export default function EmailLogModal({ member, show, onClose }) {
     const [emailLogs, setEmailLogs] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
