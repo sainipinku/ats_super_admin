@@ -1,0 +1,420 @@
+# GitHub Actions — Complete CI Setup
+
+This setup gives you:
+
+* Run tests on every push
+* Run PR checks
+* Code coverage reports
+* Slack notifications
+* Email notifications
+* No GitHub Variables required
+* Works with Node.js projects
+
+---
+
+# 1. Main CI Workflow
+
+Create:
+
+`.github/workflows/ci.yml`
+
+```yaml
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18, 20]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Lint
+        run: npm run lint --if-present
+
+      - name: Run Tests
+        run: npm test -- --coverage
+
+      - name: Upload Coverage Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-node-${{ matrix.node-version }}
+          path: coverage/
+
+      - name: Save Coverage Summary
+        run: |
+          echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
+          cat coverage/lcov-report/index.html > /dev/null || true
+
+```
+
+---
+
+# 2. PR Title + Branch Validation
+
+Create:
+
+`.github/workflows/pr-check.yml`
+
+```yaml
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate PR Title
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+
+          echo "PR Title: $TITLE"
+
+          if [[ ! "$TITLE" =~ ^(feat|fix|docs|style|refactor|test|chore): ]]; then
+            echo "Invalid PR title"
+            echo "Use format: feat: add login page"
+            exit 1
+          fi
+
+      - name: Validate Branch Name
+        run: |
+          BRANCH="${{ github.head_ref }}"
+
+          echo "Branch Name: $BRANCH"
+
+          if [[ ! "$BRANCH" =~ ^(feature|fix|hotfix|release)/ ]]; then
+            echo "Invalid branch name"
+            echo "Use: feature/login-page"
+            exit 1
+          fi
+
+```
+
+---
+
+# 3. Code Coverage Badge + Report
+
+Install:
+
+```bash
+npm install --save-dev jest
+```
+
+Add in `package.json`
+
+```json
+{
+  "scripts": {
+    "test": "jest",
+    "coverage": "jest --coverage"
+  }
+}
+```
+
+Jest config:
+
+Create:
+
+`jest.config.js`
+
+```js
+module.exports = {
+  collectCoverage: true,
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'html'],
+};
+```
+
+---
+
+# 4. Slack Notification Workflow
+
+Create:
+
+`.github/workflows/slack-notify.yml`
+
+```yaml
+name: Slack Notifications
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types:
+      - completed
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Slack Success Notification
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: |
+            ✅ CI Passed
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.event.workflow_run.head_branch }}
+            Commit: ${{ github.event.workflow_run.head_sha }}
+        env:
+          SLACK_WEBHOOK_URL: https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+
+      - name: Slack Failure Notification
+        if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: |
+            ❌ CI Failed
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.event.workflow_run.head_branch }}
+            Commit: ${{ github.event.workflow_run.head_sha }}
+        env:
+          SLACK_WEBHOOK_URL: https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+
+```
+
+---
+
+# 5. Email Notification Workflow
+
+Create:
+
+`.github/workflows/email-notify.yml`
+
+```yaml
+name: Email Notifications
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types:
+      - completed
+
+jobs:
+  send-email:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Success Email
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: your-email@gmail.com
+          password: your-app-password
+          subject: "CI Passed"
+          body: |
+            CI completed successfully.
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.event.workflow_run.head_branch }}
+            Commit: ${{ github.event.workflow_run.head_sha }}
+
+          to: your-email@gmail.com
+          from: GitHub Actions
+          secure: true
+
+      - name: Send Failure Email
+        if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: your-email@gmail.com
+          password: your-app-password
+          subject: "CI Failed"
+          body: |
+            CI failed.
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.event.workflow_run.head_branch }}
+            Commit: ${{ github.event.workflow_run.head_sha }}
+
+          to: your-email@gmail.com
+          from: GitHub Actions
+          secure: true
+
+```
+
+---
+
+# 6. Recommended Project Structure
+
+```txt
+.github/
+└── workflows/
+    ├── ci.yml
+    ├── pr-check.yml
+    ├── slack-notify.yml
+    └── email-notify.yml
+
+src/
+tests/
+package.json
+jest.config.js
+```
+
+---
+
+# 7. Branch Protection Rules
+
+GitHub Repository → Settings → Branches
+
+Add rules:
+
+* Require pull request reviews before merging
+* Require status checks to pass before merging
+* Require branches to be up to date
+* Require conversation resolution
+
+Required checks:
+
+* CI Pipeline
+* PR Validation
+
+---
+
+# 8. Optional — Auto Cancel Previous Running Builds
+
+Add inside `ci.yml`
+
+```yaml
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+Example:
+
+```yaml
+name: CI Pipeline
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+---
+
+# 9. Optional — Cache Node Modules Faster
+
+Already included:
+
+```yaml
+cache: npm
+```
+
+This speeds up installs automatically.
+
+---
+
+# 10. Optional — Add Build Step
+
+Add in `ci.yml`
+
+```yaml
+- name: Build Project
+  run: npm run build
+```
+
+---
+
+# 11. Optional — Run Only On Main + Dev
+
+```yaml
+on:
+  push:
+    branches:
+      - main
+      - dev
+```
+
+---
+
+# 12. Example npm Scripts
+
+```json
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "jest",
+    "lint": "eslint ."
+  }
+}
+```
+
+---
+
+# 13. Install Required Packages
+
+```bash
+npm install
+npm install --save-dev jest eslint
+```
+
+---
+
+# 14. Gmail App Password Setup
+
+For email notifications:
+
+1. Enable 2FA in Gmail
+2. Google Account → Security
+3. App Passwords
+4. Generate App Password
+5. Paste password in workflow
+
+---
+
+# 15. Slack Webhook Setup
+
+1. Create Slack App
+2. Enable Incoming Webhooks
+3. Create Webhook URL
+4. Paste URL in workflow
+
+---
+
+# Final Result
+
+You now have:
+
+✅ CI on push
+✅ PR validation
+✅ Test automation
+✅ Coverage reports
+✅ Slack alerts
+✅ Email alerts
+✅ Multi-node testing
+✅ Artifact uploads
+✅ Faster caching
+✅ Branch protections
