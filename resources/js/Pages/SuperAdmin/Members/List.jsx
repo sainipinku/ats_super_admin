@@ -68,6 +68,7 @@ export default function Members({
         image: null,
     });
 
+    const [modalType, setModalType] = useState(null); // null | 'admin' | 'member'
     const [passwordForm, setPasswordForm] = useState({
         new_password: "",
         new_password_confirmation: "",
@@ -202,6 +203,20 @@ const getRoleBadgeColor = (roleId) => {
     const handlePerPageChange = (e) => {
         setPerPage(e.target.value);
         setHasUserInteracted(true);
+    };
+
+    const handleCreateMember = () => {
+        setCurrentMember(null);
+        setModalType('member');
+        setFormData((prev) => ({ ...prev, roles: ['3'] }));
+        setIsOpen(true);
+    };
+
+    const handleCreateAdmin = () => {
+        setCurrentMember(null);
+        setModalType('admin');
+        setFormData((prev) => ({ ...prev, roles: ['1'] }));
+        setIsOpen(true);
     };
 
     const handleCreate = () => {
@@ -381,6 +396,7 @@ const getRoleBadgeColor = (roleId) => {
     const handleClose = () => {
         setIsOpen(false);
         setCurrentMember(null);
+        setModalType(null);
         setFormData({
             name: "",
             phone: "",
@@ -828,7 +844,7 @@ const getRoleBadgeColor = (roleId) => {
 
                         <div className="flex items-center space-x-1 mt-[10px] md:mt-[0]">
                             <button
-                                onClick={handleCreate}
+                                onClick={handleCreateMember}
                                 className="flex items-center gap-[5px] px-[20px] py-[12px] text-[15px] text-white rounded-[10px] bluebtbg"
                             >
                                 <svg
@@ -844,6 +860,24 @@ const getRoleBadgeColor = (roleId) => {
                                     />
                                 </svg>
                                 Create Member
+                            </button>
+                             <button
+                                onClick={handleCreateAdmin}
+                                className="flex items-center gap-[5px] px-[20px] py-[12px] text-[15px] text-white rounded-[10px] bluebtbg"
+                            >
+                                <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 16 16"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                >
+                                    <path
+                                        d="M11.9997 8.66671H8.66634V12C8.66634 12.3667 8.36634 12.6667 7.99968 12.6667C7.63301 12.6667 7.33301 12.3667 7.33301 12V8.66671H3.99967C3.63301 8.66671 3.33301 8.36671 3.33301 8.00004C3.33301 7.63338 3.63301 7.33337 3.99967 7.33337H7.33301V4.00004C7.33301 3.63337 7.63301 3.33337 7.99968 3.33337C8.36634 3.33337 8.66634 3.63337 8.66634 4.00004V7.33337H11.9997C12.3663 7.33337 12.6663 7.63338 12.6663 8.00004C12.6663 8.36671 12.3663 8.66671 11.9997 8.66671Z"
+                                        fill="white"
+                                    />
+                                </svg>
+                                Create Admin
                             </button>
                         </div>
                     </div>
@@ -1217,6 +1251,8 @@ const getRoleBadgeColor = (roleId) => {
                             <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">
                                 {currentMember
                                     ? "Edit Member"
+                                    : modalType === 'admin'
+                                    ? "Create New Admin"
                                     : "Create New Member"}
                             </h2>
 
@@ -2020,7 +2056,16 @@ const getRoleBadgeColor = (roleId) => {
                                         <span className="text-red-500">*</span>
                                     </h3>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                        {roles.map((role) => (
+                                        {roles
+                                            .filter((role) => {
+                                                if (currentMember) return true;
+                                                if (modalType === 'admin') return String(role.id) === '1';
+                                                if (modalType === 'member') return String(role.id) === '3';
+                                                return true;
+                                            })
+                                            .map((role) => {
+                                                const isLocked = !currentMember && (modalType === 'admin' || modalType === 'member');
+                                                return (
                                             <div
                                                 key={role.id}
                                                 className="flex items-center"
@@ -2034,7 +2079,8 @@ const getRoleBadgeColor = (roleId) => {
                                                             String(role.id)
                                                         ) ?? false
                                                     }
-                                                    onChange={handleRoleChange}
+                                                    onChange={isLocked ? undefined : handleRoleChange}
+                                                    disabled={isLocked}
                                                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                                                 />
                                                 <label
@@ -2044,7 +2090,8 @@ const getRoleBadgeColor = (roleId) => {
                                                     {role.name}
                                                 </label>
                                             </div>
-                                        ))}
+                                                );
+                                            })}
                                     </div>
                                     {errors.roles && (
                                         <p className="mt-1 text-sm text-red-600">
@@ -2099,6 +2146,8 @@ const getRoleBadgeColor = (roleId) => {
                                             </div>
                                         ) : currentMember ? (
                                             "Update Member"
+                                        ) : modalType === 'admin' ? (
+                                            "Create Admin"
                                         ) : (
                                             "Create Member"
                                         )}
