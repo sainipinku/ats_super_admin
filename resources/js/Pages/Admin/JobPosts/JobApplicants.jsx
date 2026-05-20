@@ -6,13 +6,17 @@ import AuthenticatedLayout from '../Layouts/AuthenticatedLayout';
 import { useAlerts } from '../../../Components/Alerts';
 
 const STATUS_META = {
-    pending: { label: 'Pending', badge: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-    assigned_to_calling_team: { label: 'Assigned To Calling Team', badge: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-    interested: { label: 'Interested', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-    interview_scheduled: { label: 'Interview Scheduled', badge: 'bg-sky-100 text-sky-800 border-sky-200' },
-    selected: { label: 'Selected', badge: 'bg-green-100 text-green-800 border-green-200' },
-    on_hold: { label: 'On Hold', badge: 'bg-orange-100 text-orange-800 border-orange-200' },
-    on_hold_not_interested: { label: 'On Hold (Not Interested)', badge: 'bg-red-100 text-red-800 border-red-200' },
+    applied: { label: 'Applied', badge: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+    viewed: { label: 'Viewed', badge: 'bg-blue-100 text-blue-800 border-blue-200' },
+    assigned_to_calling_member: { label: 'Assigned To Calling Member', badge: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+    calling_in_progress: { label: 'Calling In Progress', badge: 'bg-sky-100 text-sky-800 border-sky-200' },
+    calling_approved: { label: 'Calling Approved', badge: 'bg-green-100 text-green-800 border-green-200' },
+    calling_rejected: { label: 'Calling Rejected', badge: 'bg-rose-100 text-rose-800 border-rose-200' },
+    admin_review: { label: 'Admin Review', badge: 'bg-violet-100 text-violet-800 border-violet-200' },
+    offer_letter_generated: { label: 'Offer Letter Generated', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+    approved: { label: 'Approved', badge: 'bg-green-100 text-green-800 border-green-200' },
+    follow_up: { label: 'Follow Up', badge: 'bg-amber-100 text-amber-800 border-amber-200' },
+    no_response: { label: 'No Response', badge: 'bg-slate-100 text-slate-700 border-slate-200' },
     shortlisted: { label: 'Shortlisted', badge: 'bg-teal-100 text-teal-800 border-teal-200' },
     waiting_list: { label: 'Waiting List', badge: 'bg-blue-100 text-blue-800 border-blue-200' },
     hired: { label: 'Hired', badge: 'bg-purple-100 text-purple-800 border-purple-200' },
@@ -22,13 +26,16 @@ const STATUS_META = {
 
 const FILTER_ORDER = [
     { key: '', label: 'All', countKey: 'total', color: 'gray' },
-    { key: 'pending', label: 'Pending', countKey: 'pending', color: 'yellow' },
-    { key: 'assigned_to_calling_team', label: 'Assigned', countKey: 'assigned_to_calling_team', color: 'indigo' },
-    { key: 'interested', label: 'Interested', countKey: 'interested', color: 'green' },
-    { key: 'interview_scheduled', label: 'Interview', countKey: 'interview_scheduled', color: 'sky' },
-    { key: 'selected', label: 'Selected', countKey: 'selected', color: 'emerald' },
-    { key: 'on_hold_not_interested', label: 'Not Interested', countKey: 'on_hold_not_interested', color: 'red' },
-    { key: 'on_hold', label: 'On Hold', countKey: 'on_hold', color: 'orange' },
+    { key: 'applied', label: 'Applied', countKey: 'applied', color: 'yellow' },
+    { key: 'viewed', label: 'Viewed', countKey: 'viewed', color: 'sky' },
+    { key: 'shortlisted', label: 'Shortlisted', countKey: 'shortlisted', color: 'green' },
+    { key: 'assigned_to_calling_member', label: 'Assigned', countKey: 'assigned_to_calling_member', color: 'indigo' },
+    { key: 'calling_in_progress', label: 'In Progress', countKey: 'calling_in_progress', color: 'sky' },
+    { key: 'calling_approved', label: 'Calling Approved', countKey: 'calling_approved', color: 'emerald' },
+    { key: 'calling_rejected', label: 'Calling Rejected', countKey: 'calling_rejected', color: 'red' },
+    { key: 'admin_review', label: 'Admin Review', countKey: 'admin_review', color: 'orange' },
+    { key: 'offer_letter_generated', label: 'Offer Generated', countKey: 'offer_letter_generated', color: 'emerald' },
+    { key: 'rejected', label: 'Rejected', countKey: 'rejected', color: 'red' },
 ];
 
 const filterColorClass = {
@@ -120,7 +127,7 @@ function ApplicantCard({ application, onOpen }) {
     );
 }
 
-export default function JobApplicants({ auth, callingTeamMembers: initialCallingTeamMembers = [] }) {
+export default function JobApplicants({ callingTeamMembers: initialCallingTeamMembers = [] }) {
     const [applications, setApplications] = useState([]);
     const [jobs, setJobs] = useState([]);
     const [callingTeamMembers, setCallingTeamMembers] = useState(initialCallingTeamMembers);
@@ -135,6 +142,14 @@ export default function JobApplicants({ auth, callingTeamMembers: initialCalling
     const [showModal, setShowModal] = useState(false);
     const [adminNotes, setAdminNotes] = useState('');
     const [assignMemberId, setAssignMemberId] = useState('');
+    const [finalReviewForm, setFinalReviewForm] = useState({
+        decision: 'follow_up',
+        decision_reason: '',
+    });
+    const [offerLetterForm, setOfferLetterForm] = useState({
+        offer_salary_package: '',
+        offer_joining_date: '',
+    });
     const [saving, setSaving] = useState(false);
 
     const { successAlert, errorAlert } = useAlerts();
@@ -195,6 +210,14 @@ export default function JobApplicants({ auth, callingTeamMembers: initialCalling
                 setSelectedApplication(payload);
                 setAdminNotes(payload.admin_notes || '');
                 setAssignMemberId(payload.assigned_calling_team_member_id ? String(payload.assigned_calling_team_member_id) : '');
+                setFinalReviewForm({
+                    decision: payload.admin_final_decision || payload.hiring_decision || 'follow_up',
+                    decision_reason: payload.admin_final_decision_reason || '',
+                });
+                setOfferLetterForm({
+                    offer_salary_package: payload.offer_salary_package || '',
+                    offer_joining_date: payload.offer_joining_date || '',
+                });
                 setShowModal(true);
             }
         } catch (error) {
@@ -248,6 +271,83 @@ export default function JobApplicants({ auth, callingTeamMembers: initialCalling
             }
         } catch (error) {
             errorAlert(error?.response?.data?.message || 'Failed to assign candidate');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const saveAdminFinalReview = async () => {
+        if (!selectedApplication) return;
+
+        setSaving(true);
+        try {
+            const response = await axios.patch(
+                route('admin.api.job.applicants.admin-final-review', selectedApplication.id),
+                {
+                    ...finalReviewForm,
+                    admin_notes: adminNotes,
+                }
+            );
+
+            if (response.data.success) {
+                successAlert('Final review saved successfully');
+                setSelectedApplication(response.data.data);
+                await refreshCurrentPage();
+            }
+        } catch (error) {
+            errorAlert(error?.response?.data?.message || 'Failed to save final review');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const generateOfferLetter = async () => {
+        if (!selectedApplication) return;
+
+        setSaving(true);
+        try {
+            const response = await axios.patch(
+                route('admin.api.job.applicants.generate-offer-letter', selectedApplication.id),
+                offerLetterForm
+            );
+
+            if (response.data.success) {
+                successAlert('Offer letter generated successfully');
+                setSelectedApplication(response.data.data);
+                await refreshCurrentPage();
+            }
+        } catch (error) {
+            errorAlert(error?.response?.data?.message || 'Failed to generate offer letter');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const downloadOfferLetter = () => {
+        if (!selectedApplication) return;
+
+        window.open(
+            route('admin.api.job.applicants.download-offer-letter', selectedApplication.id),
+            '_blank'
+        );
+    };
+
+    const sendOfferLetter = async () => {
+        if (!selectedApplication) return;
+
+        setSaving(true);
+        try {
+            const response = await axios.patch(
+                route('admin.api.job.applicants.send-offer-letter', selectedApplication.id)
+            );
+
+            if (response.data.success) {
+                successAlert('Offer letter email sent successfully');
+                setSelectedApplication(response.data.data);
+                await refreshCurrentPage();
+            }
+        } catch (error) {
+            errorAlert(error?.response?.data?.message || 'Failed to send offer letter email');
         } finally {
             setSaving(false);
         }
@@ -407,11 +507,23 @@ export default function JobApplicants({ auth, callingTeamMembers: initialCalling
 
                                 {(selectedApplication.call_outcome || selectedApplication.call_outcome_reason || selectedApplication.call_notes) && (
                                     <div className="rounded-2xl border border-slate-200 p-4">
-                                        <p className="text-xs uppercase tracking-wide text-slate-500">Calling Update</p>
+                                        <p className="text-xs uppercase tracking-wide text-slate-500">Calling Member Remarks</p>
                                         <div className="mt-3 space-y-2 text-sm text-slate-700">
+                                            <p><span className="font-semibold">Calling Member:</span> {selectedApplication.assigned_calling_team_member?.name || 'Not assigned'}</p>
                                             <p><span className="font-semibold">Outcome:</span> {selectedApplication.call_outcome || 'Not updated'}</p>
                                             <p><span className="font-semibold">Reason:</span> {selectedApplication.call_outcome_reason || '—'}</p>
                                             <p><span className="font-semibold">Notes:</span> {selectedApplication.call_notes || '—'}</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {(selectedApplication.hiring_decision || selectedApplication.hiring_decision_reason) && (
+                                    <div className="rounded-2xl border border-slate-200 p-4">
+                                        <p className="text-xs uppercase tracking-wide text-slate-500">Calling Team Recommendation</p>
+                                        <div className="mt-3 space-y-2 text-sm text-slate-700">
+                                            <p><span className="font-semibold">Decision:</span> {STATUS_META[selectedApplication.hiring_decision]?.label || selectedApplication.hiring_decision || '—'}</p>
+                                            <p><span className="font-semibold">Reason:</span> {selectedApplication.hiring_decision_reason || '—'}</p>
+                                            <p><span className="font-semibold">Updated At:</span> {selectedApplication.hiring_decision_updated_at ? new Date(selectedApplication.hiring_decision_updated_at).toLocaleString('en-IN') : '—'}</p>
                                         </div>
                                     </div>
                                 )}
@@ -476,9 +588,123 @@ export default function JobApplicants({ auth, callingTeamMembers: initialCalling
                                 </div>
 
                                 <div className="rounded-2xl border border-slate-200 p-4">
-                                    <p className="text-xs uppercase tracking-wide text-slate-500">Quick Admin Override</p>
+                                    <p className="text-xs uppercase tracking-wide text-slate-500">Admin Final Review</p>
+                                    <select
+                                        value={finalReviewForm.decision}
+                                        onChange={(event) =>
+                                            setFinalReviewForm((prev) => ({
+                                                ...prev,
+                                                decision: event.target.value,
+                                            }))
+                                        }
+                                        className="mt-3 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500"
+                                    >
+                                        <option value="approved">Approved</option>
+                                        <option value="rejected">Rejected</option>
+                                        <option value="follow_up">Follow Up</option>
+                                        <option value="no_response">No Response</option>
+                                    </select>
+                                    <textarea
+                                        value={finalReviewForm.decision_reason}
+                                        onChange={(event) =>
+                                            setFinalReviewForm((prev) => ({
+                                                ...prev,
+                                                decision_reason: event.target.value,
+                                            }))
+                                        }
+                                        rows={4}
+                                        placeholder={
+                                            finalReviewForm.decision === 'approved'
+                                                ? 'Approval reason (required)'
+                                                : finalReviewForm.decision === 'rejected'
+                                                ? 'Rejection reason (optional)'
+                                                : 'Reason (optional)'
+                                        }
+                                        className="mt-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                                    />
+                                    <p className="mt-2 text-xs text-slate-500">
+                                        Review calling remarks first, then save the final admin decision.
+                                    </p>
+                                    {(selectedApplication.admin_final_decision || selectedApplication.admin_final_decision_reason) && (
+                                        <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
+                                            <p><span className="font-semibold">Saved Decision:</span> {STATUS_META[selectedApplication.admin_final_decision]?.label || selectedApplication.admin_final_decision || '—'}</p>
+                                            <p><span className="font-semibold">Saved Reason:</span> {selectedApplication.admin_final_decision_reason || '—'}</p>
+                                            <p><span className="font-semibold">Reviewed At:</span> {selectedApplication.admin_final_decision_updated_at ? new Date(selectedApplication.admin_final_decision_updated_at).toLocaleString('en-IN') : '—'}</p>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={saveAdminFinalReview}
+                                        disabled={saving}
+                                        className="mt-3 w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                                    >
+                                        Save Final Review
+                                    </button>
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-200 p-4">
+                                    <p className="text-xs uppercase tracking-wide text-slate-500">Offer Letter</p>
+                                    <input
+                                        value={offerLetterForm.offer_salary_package}
+                                        onChange={(event) =>
+                                            setOfferLetterForm((prev) => ({
+                                                ...prev,
+                                                offer_salary_package: event.target.value,
+                                            }))
+                                        }
+                                        placeholder="Salary package"
+                                        className="mt-3 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500"
+                                    />
+                                    <input
+                                        type="date"
+                                        value={offerLetterForm.offer_joining_date}
+                                        onChange={(event) =>
+                                            setOfferLetterForm((prev) => ({
+                                                ...prev,
+                                                offer_joining_date: event.target.value,
+                                            }))
+                                        }
+                                        className="mt-3 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500"
+                                    />
+                                    <button
+                                        onClick={generateOfferLetter}
+                                        disabled={saving || selectedApplication.admin_final_decision !== 'approved'}
+                                        className="mt-3 w-full rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        Generate PDF Offer Letter
+                                    </button>
+                                    <button
+                                        onClick={downloadOfferLetter}
+                                        disabled={saving || !selectedApplication.offer_letter_path}
+                                        className="mt-3 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        Download PDF
+                                    </button>
+                                    <button
+                                        onClick={sendOfferLetter}
+                                        disabled={saving || !selectedApplication.offer_letter_path}
+                                        className="mt-3 w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        Send Offer Letter Email
+                                    </button>
+                                    <p className="mt-2 text-xs text-slate-500">
+                                        PDF generation and email sending are enabled only after admin final approval.
+                                    </p>
+                                    {selectedApplication.offer_letter_triggered_at && (
+                                        <p className="mt-2 text-xs text-slate-600">
+                                            PDF generated on {new Date(selectedApplication.offer_letter_triggered_at).toLocaleString('en-IN')}
+                                        </p>
+                                    )}
+                                    {selectedApplication.offer_letter_sent_at && (
+                                        <p className="mt-1 text-xs text-slate-600">
+                                            Email sent on {new Date(selectedApplication.offer_letter_sent_at).toLocaleString('en-IN')}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-200 p-4">
+                                    <p className="text-xs uppercase tracking-wide text-slate-500">Quick Status Override</p>
                                     <div className="mt-3 grid grid-cols-2 gap-2">
-                                        {['pending', 'shortlisted', 'selected', 'on_hold', 'rejected'].map((status) => (
+                                        {['applied', 'viewed', 'shortlisted', 'assigned_to_calling_member', 'calling_in_progress', 'calling_approved', 'calling_rejected', 'admin_review', 'offer_letter_generated', 'rejected'].map((status) => (
                                             <button
                                                 key={status}
                                                 onClick={() => updateManualStatus(status)}

@@ -183,6 +183,10 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::get('/api/job-applicants', [JobController::class, 'getApplicants'])->name('admin.api.job.applicants.list');
     Route::get('/api/job-applicants/{application}', [JobController::class, 'getApplicantDetails'])->name('admin.api.job.applicants.details');
     Route::patch('/api/job-applicants/{application}/status', [JobController::class, 'updateApplicantStatus'])->name('admin.api.job.applicants.status');
+    Route::patch('/api/job-applicants/{application}/admin-final-review', [JobController::class, 'adminFinalReview'])->name('admin.api.job.applicants.admin-final-review');
+    Route::patch('/api/job-applicants/{application}/generate-offer-letter', [JobController::class, 'generateOfferLetter'])->name('admin.api.job.applicants.generate-offer-letter');
+    Route::get('/api/job-applicants/{application}/download-offer-letter', [JobController::class, 'downloadOfferLetter'])->name('admin.api.job.applicants.download-offer-letter');
+    Route::patch('/api/job-applicants/{application}/send-offer-letter', [JobController::class, 'sendOfferLetterEmail'])->name('admin.api.job.applicants.send-offer-letter');
     Route::patch('/api/job-applicants/{application}/assign-calling-team', [JobController::class, 'assignCallingTeam'])->name('admin.api.job.applicants.assign-calling-team');
     Route::get('/api/calling-team-members', [CallingTeamController::class, 'membersList'])->name('admin.api.calling-team.members');
 

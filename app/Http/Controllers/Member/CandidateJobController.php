@@ -340,7 +340,7 @@ class CandidateJobController extends Controller
             'candidate_phone' => $candidate->phone,
             'candidate_skills' => $candidate->skills ?? null,
             'candidate_experience' => $candidate->experience ?? null,
-            'status' => 'pending',
+            'status' => 'applied',
         ]);
 
         // Increment job applicants count
@@ -507,14 +507,15 @@ class CandidateJobController extends Controller
 
         // Application status counts
         $statusCounts = [
-            'pending' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'pending')->count(),
-            'assigned_to_calling_team' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'assigned_to_calling_team')->count(),
-            'interested' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'interested')->count(),
-            'interview_scheduled' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'interview_scheduled')->count(),
-            'selected' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'selected')->count(),
-            'on_hold_not_interested' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'on_hold_not_interested')->count(),
-            'on_hold' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'on_hold')->count(),
+            'applied' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'applied')->count(),
+            'viewed' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'viewed')->count(),
             'shortlisted' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'shortlisted')->count(),
+            'assigned_to_calling_member' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'assigned_to_calling_member')->count(),
+            'calling_in_progress' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'calling_in_progress')->count(),
+            'calling_approved' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'calling_approved')->count(),
+            'calling_rejected' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'calling_rejected')->count(),
+            'admin_review' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'admin_review')->count(),
+            'offer_letter_generated' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'offer_letter_generated')->count(),
             'waiting_list' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'waiting_list')->count(),
             'hired' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'hired')->count(),
             'not_selected' => JobApplication::where('candidate_id', $candidate->id)->where('status', 'not_selected')->count(),
@@ -541,7 +542,7 @@ class CandidateJobController extends Controller
             ], 403);
         }
 
-        if (!in_array($application->status, ['pending'])) {
+        if (!in_array($application->status, ['applied', 'viewed'], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Cannot withdraw application at this stage.',

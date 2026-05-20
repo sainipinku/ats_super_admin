@@ -88,6 +88,14 @@ export default function AuthenticatedLayout({ children }) {
         switch (notification?.type) {
             case "candidate_assigned_to_calling_team":
                 return `New candidate assigned: ${title}`;
+            case "candidate_approved":
+                return `Candidate approved: ${title}`;
+            case "candidate_rejected":
+                return `Candidate rejected: ${title}`;
+            case "candidate_follow_up":
+                return `Candidate follow up: ${title}`;
+            case "candidate_no_response":
+                return `Candidate no response: ${title}`;
             default:
                 return title;
         }

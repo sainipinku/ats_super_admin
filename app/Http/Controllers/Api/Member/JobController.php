@@ -489,7 +489,7 @@ class JobController extends Controller
             'candidate_phone' => $member->phone,
             'candidate_skills' => $member->skills ?? null,
             'candidate_experience' => $member->experience ?? null,
-            'status' => 'pending',
+            'status' => 'applied',
         ]);
 
         if (isset($job->applicants)) {
@@ -517,7 +517,7 @@ class JobController extends Controller
         ->where('candidate_id', $member->id);
     
     // Apply status filter if provided
-    if ($status && in_array($status, ['pending', 'shortlisted', 'waiting_list', 'hired', 'not_selected', 'rejected'])) {
+    if ($status && in_array($status, ['applied', 'viewed', 'shortlisted', 'assigned_to_calling_member', 'calling_in_progress', 'calling_approved', 'calling_rejected', 'admin_review', 'offer_letter_generated', 'waiting_list', 'hired', 'not_selected', 'rejected'])) {
         $query->where('status', $status);
     }
     
@@ -526,8 +526,15 @@ class JobController extends Controller
         ->paginate(max(1, min($perPage, 50)));
     
     $statusCounts = [
-        'pending' => JobApplication::where('candidate_id', $member->id)->where('status', 'pending')->count(),
+        'applied' => JobApplication::where('candidate_id', $member->id)->where('status', 'applied')->count(),
+        'viewed' => JobApplication::where('candidate_id', $member->id)->where('status', 'viewed')->count(),
         'shortlisted' => JobApplication::where('candidate_id', $member->id)->where('status', 'shortlisted')->count(),
+        'assigned_to_calling_member' => JobApplication::where('candidate_id', $member->id)->where('status', 'assigned_to_calling_member')->count(),
+        'calling_in_progress' => JobApplication::where('candidate_id', $member->id)->where('status', 'calling_in_progress')->count(),
+        'calling_approved' => JobApplication::where('candidate_id', $member->id)->where('status', 'calling_approved')->count(),
+        'calling_rejected' => JobApplication::where('candidate_id', $member->id)->where('status', 'calling_rejected')->count(),
+        'admin_review' => JobApplication::where('candidate_id', $member->id)->where('status', 'admin_review')->count(),
+        'offer_letter_generated' => JobApplication::where('candidate_id', $member->id)->where('status', 'offer_letter_generated')->count(),
         'waiting_list' => JobApplication::where('candidate_id', $member->id)->where('status', 'waiting_list')->count(),
         'hired' => JobApplication::where('candidate_id', $member->id)->where('status', 'hired')->count(),
         'not_selected' => JobApplication::where('candidate_id', $member->id)->where('status', 'not_selected')->count(),

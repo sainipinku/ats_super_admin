@@ -477,14 +477,14 @@ className={`
                             />
                         </div>
 
-                        <div className="flex items-center space-x-1 mt-[10px] md:mt-[0]">
+                        {/* <div className="flex items-center space-x-1 mt-[10px] md:mt-[0]">
                             <button
                                 onClick={handleCreate}
                                 className="flex items-center gap-[5px] px-[20px] py-[12px] text-[15px] text-white rounded-[10px] bluebtbg"
                             >
                                 Create Roles
                             </button>
-                        </div>
+                        </div> */}
                     </div>
 
                     <div class="p-[15px]">

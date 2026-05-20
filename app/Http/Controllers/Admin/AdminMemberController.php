@@ -73,9 +73,16 @@ class AdminMemberController extends Controller
     {
         $authUser = Auth::guard('admin')->user();
         $allowedDepartmentIds = collect($authUser->departments ?? [])
-            ->map(fn ($id) => (string) $id)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
             ->values()
             ->all();
+
+        if (empty($allowedDepartmentIds)) {
+            return back()
+                ->withErrors(['departments' => 'No department is assigned to your admin account.'])
+                ->withInput();
+        }
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -89,8 +96,6 @@ class AdminMemberController extends Controller
                 'email',
                 Rule::unique('members')->whereNull('deleted_at'),
             ],
-            'departments' => ['required', 'array', 'min:1'],
-            'departments.*' => ['required', Rule::in($allowedDepartmentIds)],
             'designations' => ['required', 'array', 'min:1'],
             'designations.*' => ['required', 'integer'],
             'gender' => ['nullable', 'in:male,female,other'],
@@ -98,18 +103,16 @@ class AdminMemberController extends Controller
             'password' => ['required', 'string', 'min:6', 'same:confirm_password'],
             'confirm_password' => ['required', 'string', 'min:6'],
             'status' => ['nullable', 'in:0,1'],
-        ], [
-            'departments.*.in' => 'You can only assign members to your own departments.',
         ]);
 
         $designationCount = Designation::query()
             ->whereIn('id', $validated['designations'])
-            ->whereIn('department_id', $validated['departments'])
+            ->whereIn('department_id', $allowedDepartmentIds)
             ->count();
 
         if ($designationCount !== count($validated['designations'])) {
             return back()
-                ->withErrors(['designations' => 'Selected designations must belong to the selected departments.'])
+                ->withErrors(['designations' => 'Selected designations must belong to your assigned departments.'])
                 ->withInput();
         }
 
@@ -117,7 +120,7 @@ class AdminMemberController extends Controller
             'name' => $validated['name'],
             'phone' => $validated['phone'],
             'email' => $validated['email'] ?? null,
-            'departments' => $validated['departments'],
+            'departments' => $allowedDepartmentIds,
             'designation' => $validated['designations'],
             'roles' => ['3'],
             'is_calling_team' => false,
@@ -139,6 +142,7 @@ class AdminMemberController extends Controller
         $authUser = Auth::guard('admin')->user();
         $allowedDepartmentIds = collect($authUser->departments ?? [])
             ->map(fn ($id) => (int) $id)
+            ->filter()
             ->values()
             ->all();
 
@@ -148,6 +152,10 @@ class AdminMemberController extends Controller
             ->filter(fn ($id) => in_array($id, $allowedDepartmentIds, true))
             ->values()
             ->all();
+
+        if (empty($departmentIds)) {
+            $departmentIds = $allowedDepartmentIds;
+        }
 
         if (empty($departmentIds)) {
             return response()->json([]);

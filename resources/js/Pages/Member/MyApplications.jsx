@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import AuthenticatedLayout from './Layouts/AuthenticatedLayout';
 
 const StatusBadge = ({ status }) => {
     const styles = {
-        pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-        assigned_to_calling_team: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-        interested: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-        interview_scheduled: 'bg-sky-100 text-sky-800 border-sky-300',
-        selected: 'bg-green-100 text-green-800 border-green-300',
-        on_hold: 'bg-orange-100 text-orange-800 border-orange-300',
-        on_hold_not_interested: 'bg-red-100 text-red-800 border-red-300',
+        applied: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        viewed: 'bg-blue-100 text-blue-800 border-blue-300',
+        assigned_to_calling_member: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+        calling_in_progress: 'bg-sky-100 text-sky-800 border-sky-300',
+        calling_approved: 'bg-green-100 text-green-800 border-green-300',
+        calling_rejected: 'bg-red-100 text-red-800 border-red-300',
+        admin_review: 'bg-violet-100 text-violet-800 border-violet-300',
+        offer_letter_generated: 'bg-emerald-100 text-emerald-800 border-emerald-300',
         shortlisted: 'bg-emerald-100 text-emerald-800 border-emerald-300',
         waiting_list: 'bg-blue-100 text-blue-800 border-blue-300',
         hired: 'bg-purple-100 text-purple-800 border-purple-300',
@@ -19,13 +20,14 @@ const StatusBadge = ({ status }) => {
     };
 
     const labels = {
-        pending: 'Pending',
-        assigned_to_calling_team: 'Assigned To Calling Team',
-        interested: 'Interested',
-        interview_scheduled: 'Interview Scheduled',
-        selected: 'Selected',
-        on_hold: 'On Hold',
-        on_hold_not_interested: 'On Hold (Not Interested)',
+        applied: 'Applied',
+        viewed: 'Viewed',
+        assigned_to_calling_member: 'Assigned To Calling Member',
+        calling_in_progress: 'Calling In Progress',
+        calling_approved: 'Calling Approved',
+        calling_rejected: 'Calling Rejected',
+        admin_review: 'Admin Review',
+        offer_letter_generated: 'Offer Letter Generated',
         shortlisted: 'Shortlisted',
         waiting_list: 'Waiting List',
         hired: 'Hired',
@@ -34,7 +36,7 @@ const StatusBadge = ({ status }) => {
     };
 
     return (
-        <span className={`px-3 py-1.5 rounded-full text-xs font-medium border ${styles[status] || styles.pending}`}>
+        <span className={`px-3 py-1.5 rounded-full text-xs font-medium border ${styles[status] || styles.applied}`}>
             {labels[status] || status}
         </span>
     );
@@ -67,7 +69,7 @@ const ApplicationRow = ({ application, onWithdraw }) => {
         }
     };
 
-    const canWithdraw = ['pending'].includes(application.status);
+    const canWithdraw = ['applied', 'viewed'].includes(application.status);
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
@@ -197,18 +199,19 @@ export default function MyApplications({ auth, applications, statusCounts }) {
 
     const filters = [
         { key: 'all', label: 'All Applications', count: applications.total },
-        { key: 'pending', label: 'Pending', count: statusCounts.pending || 0 },
-        { key: 'assigned_to_calling_team', label: 'Assigned', count: statusCounts.assigned_to_calling_team || 0 },
-        { key: 'interested', label: 'Interested', count: statusCounts.interested || 0 },
-        { key: 'interview_scheduled', label: 'Interview', count: statusCounts.interview_scheduled || 0 },
-        { key: 'selected', label: 'Selected', count: statusCounts.selected || 0 },
-        { key: 'on_hold_not_interested', label: 'Not Interested', count: statusCounts.on_hold_not_interested || 0 },
-        { key: 'on_hold', label: 'On Hold', count: statusCounts.on_hold || 0 },
+        { key: 'applied', label: 'Applied', count: statusCounts.applied || 0 },
+        { key: 'viewed', label: 'Viewed', count: statusCounts.viewed || 0 },
+        { key: 'assigned_to_calling_member', label: 'Assigned', count: statusCounts.assigned_to_calling_member || 0 },
+        { key: 'calling_in_progress', label: 'Calling In Progress', count: statusCounts.calling_in_progress || 0 },
+        { key: 'calling_approved', label: 'Calling Approved', count: statusCounts.calling_approved || 0 },
+        { key: 'calling_rejected', label: 'Calling Rejected', count: statusCounts.calling_rejected || 0 },
+        { key: 'admin_review', label: 'Admin Review', count: statusCounts.admin_review || 0 },
+        { key: 'offer_letter_generated', label: 'Offer Generated', count: statusCounts.offer_letter_generated || 0 },
+        { key: 'rejected', label: 'Rejected', count: statusCounts.rejected || 0 },
         { key: 'shortlisted', label: 'Shortlisted', count: statusCounts.shortlisted || 0 },
         { key: 'waiting_list', label: 'Waiting List', count: statusCounts.waiting_list || 0 },
         { key: 'hired', label: 'Hired', count: statusCounts.hired || 0 },
         { key: 'not_selected', label: 'Not Selected', count: statusCounts.not_selected || 0 },
-        { key: 'rejected', label: 'Rejected', count: statusCounts.rejected || 0 },
     ];
 
     return (

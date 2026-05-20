@@ -380,7 +380,7 @@ class JobRequestController extends Controller
 
         $newStatus = $validated['action'] === 'approve' ? 'shortlisted' : 'rejected';
 
-        if (!in_array($application->status, ['pending', 'shortlisted', 'waiting_list', 'hired', 'not_selected', 'rejected'], true)) {
+        if (!in_array($application->status, ['applied', 'viewed', 'shortlisted', 'waiting_list', 'hired', 'not_selected', 'rejected'], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid application status.',
@@ -488,8 +488,15 @@ class JobRequestController extends Controller
 
         // Status counts
         $statusCounts = [
-            'pending' => JobApplication::where('status', 'pending')->count(),
+            'applied' => JobApplication::where('status', 'applied')->count(),
+            'viewed' => JobApplication::where('status', 'viewed')->count(),
             'shortlisted' => JobApplication::where('status', 'shortlisted')->count(),
+            'assigned_to_calling_member' => JobApplication::where('status', 'assigned_to_calling_member')->count(),
+            'calling_in_progress' => JobApplication::where('status', 'calling_in_progress')->count(),
+            'calling_approved' => JobApplication::where('status', 'calling_approved')->count(),
+            'calling_rejected' => JobApplication::where('status', 'calling_rejected')->count(),
+            'admin_review' => JobApplication::where('status', 'admin_review')->count(),
+            'offer_letter_generated' => JobApplication::where('status', 'offer_letter_generated')->count(),
             'waiting_list' => JobApplication::where('status', 'waiting_list')->count(),
             'hired' => JobApplication::where('status', 'hired')->count(),
             'not_selected' => JobApplication::where('status', 'not_selected')->count(),
@@ -529,7 +536,7 @@ class JobRequestController extends Controller
     public function updateApplicantStatus(Request $request, JobApplication $application)
     {
         $validated = $request->validate([
-            'status' => 'required|in:pending,shortlisted,waiting_list,hired,not_selected,rejected',
+            'status' => 'required|in:applied,viewed,shortlisted,assigned_to_calling_member,calling_in_progress,calling_approved,calling_rejected,admin_review,offer_letter_generated,waiting_list,hired,not_selected,rejected',
             'admin_notes' => 'nullable|string|max:5000',
         ]);
 

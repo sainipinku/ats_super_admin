@@ -33,6 +33,16 @@ class JobApplication extends Model
         'interview_contact_person',
         'interview_confirmed_at',
         'offer_letter_triggered_at',
+        'hiring_decision',
+        'hiring_decision_reason',
+        'hiring_decision_updated_at',
+        'admin_final_decision',
+        'admin_final_decision_reason',
+        'admin_final_decision_updated_at',
+        'offer_salary_package',
+        'offer_joining_date',
+        'offer_letter_path',
+        'offer_letter_sent_at',
         'candidate_name',
         'candidate_email',
         'candidate_phone',
@@ -49,6 +59,10 @@ class JobApplication extends Model
         'interview_date_time' => 'datetime',
         'interview_confirmed_at' => 'datetime',
         'offer_letter_triggered_at' => 'datetime',
+        'hiring_decision_updated_at' => 'datetime',
+        'admin_final_decision_updated_at' => 'datetime',
+        'offer_joining_date' => 'date',
+        'offer_letter_sent_at' => 'datetime',
     ];
 
     /**

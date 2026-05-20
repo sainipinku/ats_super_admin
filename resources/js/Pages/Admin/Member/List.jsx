@@ -8,7 +8,7 @@ import ConfirmDialog from "@/Components/ConfirmDialog";
 import ShowUserProfile from "@/Components/ShowUserProfile";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/20/solid";
 
-const getDefaultCreateForm = () => ({
+const getDefaultCreateForm = (departmentIds = []) => ({
     name: "",
     phone: "",
     email: "",
@@ -17,7 +17,7 @@ const getDefaultCreateForm = () => ({
     status: "1",
     password: "",
     confirm_password: "",
-    departments: [],
+    departments: departmentIds,
     designations: [],
 });
 
@@ -30,7 +30,13 @@ export default function MembersList({ members, filters, departments }) {
     const [memberToUpdate, setMemberToUpdate] = useState(null);
     const [newStatus, setNewStatus] = useState(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [createForm, setCreateForm] = useState(getDefaultCreateForm);
+    const adminDepartmentIds = departments.map((department) =>
+        String(department.id)
+    );
+    const adminDepartmentNames = departments.map((department) => department.name);
+    const [createForm, setCreateForm] = useState(() =>
+        getDefaultCreateForm(adminDepartmentIds)
+    );
     const [designations, setDesignations] = useState([]);
     const [createErrors, setCreateErrors] = useState({});
     const [isCreating, setIsCreating] = useState(false);
@@ -158,7 +164,7 @@ export default function MembersList({ members, filters, departments }) {
 
     const handleCreateOpen = () => {
         setCreateErrors({});
-        setCreateForm(getDefaultCreateForm());
+        setCreateForm(getDefaultCreateForm(adminDepartmentIds));
         setDesignations([]);
         setIsCreateModalOpen(true);
     };
@@ -166,7 +172,7 @@ export default function MembersList({ members, filters, departments }) {
     const handleCreateClose = () => {
         setIsCreateModalOpen(false);
         setCreateErrors({});
-        setCreateForm(getDefaultCreateForm());
+        setCreateForm(getDefaultCreateForm(adminDepartmentIds));
         setDesignations([]);
         setIsCreating(false);
     };
@@ -764,20 +770,11 @@ export default function MembersList({ members, filters, departments }) {
                             <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">
                                 Departments <span className="text-red-500">*</span>
                             </h3>
-                            <select
-                                value={createForm.departments[0] || ""}
-                                onChange={(e) =>
-                                    handleCreateArraySelect("departments", e.target.value)
-                                }
-                                className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white"
-                            >
-                                <option value="">Select Department</option>
-                                {departments.map((department) => (
-                                    <option key={department.id} value={String(department.id)}>
-                                        {department.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="w-full px-3 py-2 border rounded-md bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-white">
+                                {adminDepartmentNames.length > 0
+                                    ? adminDepartmentNames.join(", ")
+                                    : "No department assigned"}
+                            </div>
                             {createErrors.departments && (
                                 <p className="mt-1 text-sm text-red-600">{createErrors.departments}</p>
                             )}

@@ -3,14 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\OfferLetterMail;
 use App\Models\Job;
 use App\Models\JobApplication;
 use App\Models\Member;
 use App\Models\Notification;
+use App\Models\SiteSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Mccarlosen\LaravelMpdf\Facades\LaravelMpdf as PDF;
 
 class JobController extends Controller
 {
@@ -502,13 +507,16 @@ class JobController extends Controller
             ->get();
 
         $statusCounts = [
-            'pending' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'pending')->count(),
-            'assigned_to_calling_team' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'assigned_to_calling_team')->count(),
-            'interested' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'interested')->count(),
-            'interview_scheduled' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'interview_scheduled')->count(),
-            'selected' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'selected')->count(),
-            'on_hold_not_interested' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'on_hold_not_interested')->count(),
-            'on_hold' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'on_hold')->count(),
+            'applied' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'applied')->count(),
+            'viewed' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'viewed')->count(),
+            'shortlisted' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'shortlisted')->count(),
+            'assigned_to_calling_member' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'assigned_to_calling_member')->count(),
+            'calling_in_progress' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'calling_in_progress')->count(),
+            'calling_approved' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'calling_approved')->count(),
+            'calling_rejected' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'calling_rejected')->count(),
+            'admin_review' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'admin_review')->count(),
+            'offer_letter_generated' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'offer_letter_generated')->count(),
+            'rejected' => JobApplication::whereIn('job_id', $jobIds)->where('status', 'rejected')->count(),
             'total' => JobApplication::whereIn('job_id', $jobIds)->count(),
         ];
 
@@ -542,6 +550,14 @@ class JobController extends Controller
             ], 403);
         }
 
+        if ($application->status === 'applied') {
+            $application->update([
+                'status' => 'viewed',
+                'reviewed_at' => now(),
+                'reviewed_by' => $adminId,
+            ]);
+        }
+
         $application->load(['job', 'candidate', 'reviewer', 'assignedCallingTeamMember']);
 
         return response()->json([
@@ -566,7 +582,7 @@ class JobController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => 'required|in:pending,shortlisted,waiting_list,hired,not_selected,rejected,assigned_to_calling_team,interested,interview_scheduled,selected,on_hold,on_hold_not_interested',
+            'status' => 'required|in:applied,viewed,shortlisted,waiting_list,hired,not_selected,rejected,assigned_to_calling_member,calling_in_progress,calling_approved,calling_rejected,admin_review,offer_letter_generated',
             'admin_notes' => 'nullable|string|max:5000',
         ]);
 
@@ -580,6 +596,193 @@ class JobController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Application status updated successfully.',
+            'data' => $application->fresh(['job', 'candidate', 'assignedCallingTeamMember']),
+        ]);
+    }
+
+    public function adminFinalReview(Request $request, JobApplication $application)
+    {
+        $adminId = Auth::guard('admin')->id();
+
+        $application->load('job');
+
+        if (!$application->job || (int) $application->job->created_by !== (int) $adminId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to update this application.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'decision' => 'required|in:approved,rejected,follow_up,no_response',
+            'decision_reason' => 'nullable|string|max:5000',
+            'admin_notes' => 'nullable|string|max:5000',
+        ]);
+
+        if ($validated['decision'] === 'approved' && blank($validated['decision_reason'] ?? null)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Approval reason is required.',
+            ], 422);
+        }
+
+        $application->update([
+            'status' => 'admin_review',
+            'admin_final_decision' => $validated['decision'],
+            'admin_final_decision_reason' => $validated['decision_reason'] ?? null,
+            'admin_final_decision_updated_at' => now(),
+            'admin_notes' => $validated['admin_notes'] ?? $application->admin_notes,
+            'reviewed_at' => now(),
+            'reviewed_by' => $adminId,
+            'offer_letter_triggered_at' => $validated['decision'] === 'approved'
+                ? $application->offer_letter_triggered_at
+                : null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Final review saved successfully.',
+            'data' => $application->fresh(['job', 'candidate', 'assignedCallingTeamMember']),
+        ]);
+    }
+
+    public function generateOfferLetter(Request $request, JobApplication $application)
+    {
+        $adminId = Auth::guard('admin')->id();
+
+        $application->load('job');
+
+        if (!$application->job || (int) $application->job->created_by !== (int) $adminId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to generate offer for this application.',
+            ], 403);
+        }
+
+        if ($application->admin_final_decision !== 'approved') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Admin approval is required before generating the offer letter.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'offer_salary_package' => ['required', 'string', 'max:255'],
+            'offer_joining_date' => ['required', 'date'],
+        ]);
+
+        $setting = SiteSetting::first();
+        $relativePath = 'offer_letters/offer-letter-' . $application->uuid . '.pdf';
+
+        Storage::disk('public')->makeDirectory('offer_letters');
+
+        $pdf = PDF::loadView('pdf.offer_letter', $this->offerLetterViewData(
+            $application->fresh(['job', 'candidate']),
+            $setting,
+            $validated['offer_salary_package'],
+            $validated['offer_joining_date']
+        ));
+
+        $pdf->save(storage_path('app/public/' . $relativePath));
+
+        $application->update([
+            'offer_salary_package' => $validated['offer_salary_package'],
+            'offer_joining_date' => $validated['offer_joining_date'],
+            'offer_letter_path' => $relativePath,
+            'status' => 'offer_letter_generated',
+            'offer_letter_triggered_at' => now(),
+            'reviewed_at' => now(),
+            'reviewed_by' => $adminId,
+        ]);
+
+        Notification::create([
+            'model' => 'member',
+            'listing_id' => $application->candidate_id,
+            'job_id' => $application->job_id,
+            'type' => 'offer_letter_generation_requested',
+            'status' => 'unread',
+            'data' => $this->notificationData($application, [
+                'offer_letter_triggered_at' => $application->fresh()->offer_letter_triggered_at,
+            ]),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Offer letter generated successfully.',
+            'data' => $application->fresh(['job', 'candidate', 'assignedCallingTeamMember']),
+        ]);
+    }
+
+    public function downloadOfferLetter(JobApplication $application)
+    {
+        $adminId = Auth::guard('admin')->id();
+
+        $application->load('job');
+
+        if (!$application->job || (int) $application->job->created_by !== (int) $adminId) {
+            abort(403, 'Unauthorized to download this offer letter.');
+        }
+
+        if (!$application->offer_letter_path || !Storage::disk('public')->exists($application->offer_letter_path)) {
+            abort(404, 'Offer letter not found.');
+        }
+
+        $filename = 'offer-letter-' . Str::slug($application->candidate_name ?: 'candidate') . '.pdf';
+
+        return Storage::disk('public')->download($application->offer_letter_path, $filename);
+    }
+
+    public function sendOfferLetterEmail(JobApplication $application)
+    {
+        $adminId = Auth::guard('admin')->id();
+
+        $application->load(['job', 'candidate']);
+
+        if (!$application->job || (int) $application->job->created_by !== (int) $adminId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to send this offer letter.',
+            ], 403);
+        }
+
+        if ($application->admin_final_decision !== 'approved') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Admin approval is required before sending the offer letter.',
+            ], 422);
+        }
+
+        if (blank($application->candidate_email)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Candidate email is missing.',
+            ], 422);
+        }
+
+        if (!$application->offer_letter_path || !Storage::disk('public')->exists($application->offer_letter_path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Generate the offer letter PDF first.',
+            ], 422);
+        }
+
+        Mail::to($application->candidate_email)->send(
+            new OfferLetterMail(
+                $application,
+                SiteSetting::first(),
+                storage_path('app/public/' . $application->offer_letter_path)
+            )
+        );
+
+        $application->update([
+            'offer_letter_sent_at' => now(),
+            'reviewed_at' => now(),
+            'reviewed_by' => $adminId,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Offer letter email sent successfully.',
             'data' => $application->fresh(['job', 'candidate', 'assignedCallingTeamMember']),
         ]);
     }
@@ -619,7 +822,7 @@ class JobController extends Controller
         $application->update([
             'assigned_calling_team_member_id' => $callingTeamMember->id,
             'assigned_to_calling_team_at' => now(),
-            'status' => 'assigned_to_calling_team',
+            'status' => 'assigned_to_calling_member',
             'admin_notes' => $validated['admin_notes'] ?? $application->admin_notes,
             'reviewed_at' => now(),
             'reviewed_by' => $adminId,
@@ -672,5 +875,29 @@ class JobController extends Controller
             'calling_team_member_id' => $application->assigned_calling_team_member_id,
             'calling_team_member_name' => $application->assignedCallingTeamMember?->name,
         ], $extra);
+    }
+
+    private function offerLetterViewData(
+        JobApplication $application,
+        ?SiteSetting $setting,
+        string $salaryPackage,
+        string $joiningDate
+    ): array {
+        $logoPath = null;
+
+        if ($setting?->light_logo_path && Storage::disk('public')->exists($setting->light_logo_path)) {
+            $logoPath = Storage::disk('public')->path($setting->light_logo_path);
+        } elseif ($setting?->dark_logo_path && Storage::disk('public')->exists($setting->dark_logo_path)) {
+            $logoPath = Storage::disk('public')->path($setting->dark_logo_path);
+        }
+
+        return [
+            'application' => $application,
+            'setting' => $setting,
+            'salaryPackage' => $salaryPackage,
+            'joiningDate' => $joiningDate,
+            'logoPath' => $logoPath,
+            'generatedDate' => now(),
+        ];
     }
 }

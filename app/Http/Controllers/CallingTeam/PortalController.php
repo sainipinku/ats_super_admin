@@ -12,12 +12,10 @@ use Inertia\Inertia;
 class PortalController extends Controller
 {
     private const DASHBOARD_STATUSES = [
-        'assigned_to_calling_team',
-        'interested',
-        'interview_scheduled',
-        'selected',
-        'on_hold_not_interested',
-        'on_hold',
+        'assigned_to_calling_member',
+        'calling_in_progress',
+        'calling_approved',
+        'calling_rejected',
     ];
 
     public function dashboard(Request $request)
@@ -76,12 +74,8 @@ class PortalController extends Controller
             ], 422);
         }
 
-        $status = $validated['call_outcome'] === 'interested'
-            ? 'interested'
-            : 'on_hold_not_interested';
-
         $application->update([
-            'status' => $status,
+            'status' => 'calling_in_progress',
             'call_outcome' => $validated['call_outcome'],
             'call_outcome_reason' => $validated['call_outcome_reason'] ?? null,
             'call_notes' => $validated['call_notes'] ?? $application->call_notes,
@@ -136,7 +130,7 @@ class PortalController extends Controller
         }
 
         $application->update([
-            'status' => 'interview_scheduled',
+            'status' => 'calling_in_progress',
             'call_outcome' => $application->call_outcome ?: 'interested',
             'call_notes' => $validated['call_notes'] ?? $application->call_notes,
             'interview_date_time' => $validated['interview_date_time'],
@@ -177,40 +171,48 @@ class PortalController extends Controller
         $application = $this->resolveAssignedApplication($application);
 
         $validated = $request->validate([
-            'decision' => 'required|in:selected,not_selected',
+            'decision' => 'required|in:approved,rejected,follow_up,no_response',
+            'decision_reason' => 'nullable|string|max:5000',
             'call_notes' => 'nullable|string|max:5000',
         ]);
 
-        $status = $validated['decision'] === 'selected' ? 'selected' : 'on_hold';
+        if ($validated['decision'] === 'approved' && blank($validated['decision_reason'] ?? null)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Approval reason is required.',
+            ], 422);
+        }
 
         $application->update([
-            'status' => $status,
+            'status' => $validated['decision'] === 'approved'
+                ? 'calling_approved'
+                : ($validated['decision'] === 'rejected' ? 'calling_rejected' : 'calling_in_progress'),
+            'hiring_decision' => $validated['decision'],
+            'hiring_decision_reason' => $validated['decision_reason'] ?? null,
+            'hiring_decision_updated_at' => now(),
             'call_notes' => $validated['call_notes'] ?? $application->call_notes,
-            'offer_letter_triggered_at' => $validated['decision'] === 'selected'
-                ? now()
-                : $application->offer_letter_triggered_at,
             'reviewed_at' => now(),
             'reviewed_by' => Auth::guard('callingteam')->id(),
         ]);
 
-        $notificationType = $validated['decision'] === 'selected'
-            ? 'candidate_selected'
-            : 'candidate_not_selected';
+        $notificationType = match ($validated['decision']) {
+            'approved' => 'candidate_approved',
+            'rejected' => 'candidate_rejected',
+            'follow_up' => 'candidate_follow_up',
+            default => 'candidate_no_response',
+        };
 
         $this->notifyAdmin($application, $notificationType, [
-            'offer_letter_triggered_at' => $application->fresh()->offer_letter_triggered_at,
+            'hiring_decision' => $validated['decision'],
+            'hiring_decision_reason' => $validated['decision_reason'] ?? null,
             'call_notes' => $validated['call_notes'] ?? null,
         ]);
 
         $this->notifyCandidate($application, $notificationType, [
+            'hiring_decision' => $validated['decision'],
+            'hiring_decision_reason' => $validated['decision_reason'] ?? null,
             'call_notes' => $validated['call_notes'] ?? null,
         ]);
-
-        if ($validated['decision'] === 'selected') {
-            $this->notifyAdmin($application, 'offer_letter_generation_requested', [
-                'offer_letter_triggered_at' => $application->fresh()->offer_letter_triggered_at,
-            ]);
-        }
 
         return response()->json([
             'success' => true,
@@ -335,6 +337,8 @@ class PortalController extends Controller
             'candidate_email' => $application->candidate_email,
             'candidate_phone' => $application->candidate_phone,
             'status' => $application->status,
+            'hiring_decision' => $application->hiring_decision,
+            'hiring_decision_reason' => $application->hiring_decision_reason,
             'calling_team_member_id' => $application->assigned_calling_team_member_id,
             'calling_team_member_name' => $application->assignedCallingTeamMember?->name,
         ];

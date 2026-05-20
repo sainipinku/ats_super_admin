@@ -248,6 +248,14 @@ export default function AuthenticatedLayout({ header, children }) {
                 return `Candidate selected: ${notification?.data?.candidate_name || title}`;
             case "candidate_not_selected":
                 return `Candidate not selected: ${notification?.data?.candidate_name || title}`;
+            case "candidate_approved":
+                return `Candidate approved: ${notification?.data?.candidate_name || title}`;
+            case "candidate_rejected":
+                return `Candidate rejected: ${notification?.data?.candidate_name || title}`;
+            case "candidate_follow_up":
+                return `Candidate follow up: ${notification?.data?.candidate_name || title}`;
+            case "candidate_no_response":
+                return `Candidate no response: ${notification?.data?.candidate_name || title}`;
             case "offer_letter_generation_requested":
                 return `Offer flow requested: ${notification?.data?.candidate_name || title}`;
             default:

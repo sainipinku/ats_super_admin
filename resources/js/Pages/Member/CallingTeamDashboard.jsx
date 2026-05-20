@@ -6,22 +6,22 @@ import AuthenticatedLayout from './Layouts/AuthenticatedLayout';
 import { useAlerts } from '../../Components/Alerts';
 
 const STATUS_META = {
-    assigned_to_calling_team: { label: 'Assigned To Calling Team', badge: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-    interested: { label: 'Interested', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-    interview_scheduled: { label: 'Interview Scheduled', badge: 'bg-sky-100 text-sky-800 border-sky-200' },
-    selected: { label: 'Selected', badge: 'bg-green-100 text-green-800 border-green-200' },
-    on_hold: { label: 'On Hold', badge: 'bg-orange-100 text-orange-800 border-orange-200' },
-    on_hold_not_interested: { label: 'On Hold (Not Interested)', badge: 'bg-red-100 text-red-800 border-red-200' },
+    assigned_to_calling_member: { label: 'Assigned To Calling Member', badge: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+    calling_in_progress: { label: 'Calling In Progress', badge: 'bg-sky-100 text-sky-800 border-sky-200' },
+    calling_approved: { label: 'Calling Approved', badge: 'bg-green-100 text-green-800 border-green-200' },
+    calling_rejected: { label: 'Calling Rejected', badge: 'bg-rose-100 text-rose-800 border-rose-200' },
+    approved: { label: 'Approved', badge: 'bg-green-100 text-green-800 border-green-200' },
+    rejected: { label: 'Rejected', badge: 'bg-rose-100 text-rose-800 border-rose-200' },
+    follow_up: { label: 'Follow Up', badge: 'bg-amber-100 text-amber-800 border-amber-200' },
+    no_response: { label: 'No Response', badge: 'bg-slate-100 text-slate-700 border-slate-200' },
 };
 
 const FILTERS = [
     { key: '', label: 'All', countKey: 'total' },
-    { key: 'assigned_to_calling_team', label: 'Assigned', countKey: 'assigned_to_calling_team' },
-    { key: 'interested', label: 'Interested', countKey: 'interested' },
-    { key: 'interview_scheduled', label: 'Interview', countKey: 'interview_scheduled' },
-    { key: 'selected', label: 'Selected', countKey: 'selected' },
-    { key: 'on_hold_not_interested', label: 'Not Interested', countKey: 'on_hold_not_interested' },
-    { key: 'on_hold', label: 'On Hold', countKey: 'on_hold' },
+    { key: 'assigned_to_calling_member', label: 'Assigned', countKey: 'assigned_to_calling_member' },
+    { key: 'calling_in_progress', label: 'In Progress', countKey: 'calling_in_progress' },
+    { key: 'calling_approved', label: 'Calling Approved', countKey: 'calling_approved' },
+    { key: 'calling_rejected', label: 'Calling Rejected', countKey: 'calling_rejected' },
 ];
 
 function StatusBadge({ status }) {
@@ -70,7 +70,7 @@ function CandidateCard({ application, onOpen }) {
     );
 }
 
-export default function CallingTeamDashboard({ auth, applications: initialApplications, statusCounts: initialStatusCounts, filters: initialFilters }) {
+export default function CallingTeamDashboard({ applications: initialApplications, statusCounts: initialStatusCounts, filters: initialFilters }) {
     const [applications, setApplications] = useState(initialApplications?.data || []);
     const [statusCounts, setStatusCounts] = useState(initialStatusCounts || {});
     const [pagination, setPagination] = useState({
@@ -86,7 +86,11 @@ export default function CallingTeamDashboard({ auth, applications: initialApplic
     const [saving, setSaving] = useState(false);
     const [callForm, setCallForm] = useState({ call_outcome: 'interested', call_outcome_reason: '', call_notes: '' });
     const [interviewForm, setInterviewForm] = useState({ interview_date_time: '', interview_mode: 'offline', interview_address: '', interview_instructions: '', interview_contact_person: '', call_notes: '' });
-    const [decisionNotes, setDecisionNotes] = useState('');
+    const [decisionForm, setDecisionForm] = useState({
+        decision: 'follow_up',
+        decision_reason: '',
+        call_notes: '',
+    });
 
     const { successAlert, errorAlert } = useAlerts();
 
@@ -150,7 +154,11 @@ export default function CallingTeamDashboard({ auth, applications: initialApplic
                     interview_contact_person: payload.interview_contact_person || '',
                     call_notes: payload.call_notes || '',
                 });
-                setDecisionNotes(payload.call_notes || '');
+                setDecisionForm({
+                    decision: payload.hiring_decision || 'follow_up',
+                    decision_reason: payload.hiring_decision_reason || '',
+                    call_notes: payload.call_notes || '',
+                });
                 setShowModal(true);
             }
         } catch (error) {
@@ -196,14 +204,11 @@ export default function CallingTeamDashboard({ auth, applications: initialApplic
         }
     };
 
-    const submitDecision = async (decision) => {
+    const submitDecision = async () => {
         if (!selectedApplication) return;
         setSaving(true);
         try {
-            const response = await axios.patch(route('member.calling-team.applications.final-decision', selectedApplication.id), {
-                decision,
-                call_notes: decisionNotes,
-            });
+            const response = await axios.patch(route('member.calling-team.applications.final-decision', selectedApplication.id), decisionForm);
             if (response.data.success) {
                 successAlert('Candidate status updated');
                 setSelectedApplication(response.data.data);
@@ -392,27 +397,52 @@ export default function CallingTeamDashboard({ auth, applications: initialApplic
                             <div className="space-y-5">
                                 <div className="rounded-2xl border border-slate-200 p-4">
                                     <p className="text-xs uppercase tracking-wide text-slate-500">Final Decision</p>
+                                    <select
+                                        value={decisionForm.decision}
+                                        onChange={(event) => setDecisionForm((prev) => ({ ...prev, decision: event.target.value }))}
+                                        className="mt-4 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500"
+                                    >
+                                        <option value="approved">Approved</option>
+                                        <option value="rejected">Rejected</option>
+                                        <option value="follow_up">Follow Up</option>
+                                        <option value="no_response">No Response</option>
+                                    </select>
                                     <textarea
-                                        value={decisionNotes}
-                                        onChange={(event) => setDecisionNotes(event.target.value)}
+                                        value={decisionForm.decision_reason}
+                                        onChange={(event) => setDecisionForm((prev) => ({ ...prev, decision_reason: event.target.value }))}
                                         rows={5}
-                                        placeholder="Notes for selected or not selected decision"
+                                        placeholder={
+                                            decisionForm.decision === 'approved'
+                                                ? 'Approval reason (required)'
+                                                : decisionForm.decision === 'rejected'
+                                                ? 'Rejection reason (optional)'
+                                                : 'Reason (optional)'
+                                        }
                                         className="mt-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
                                     />
+                                    <textarea
+                                        value={decisionForm.call_notes}
+                                        onChange={(event) => setDecisionForm((prev) => ({ ...prev, call_notes: event.target.value }))}
+                                        rows={4}
+                                        placeholder="Internal notes"
+                                        className="mt-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                                    />
+                                    <p className="mt-2 text-xs text-slate-500">
+                                        Approval reason is mandatory. Rejection reason is optional.
+                                    </p>
                                     <div className="mt-4 grid gap-2">
-                                        <button onClick={() => submitDecision('selected')} disabled={saving} className="rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">
-                                            Mark Selected
-                                        </button>
-                                        <button onClick={() => submitDecision('not_selected')} disabled={saving} className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50">
-                                            Mark Not Selected / On Hold
+                                        <button onClick={submitDecision} disabled={saving} className="rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">
+                                            Save Hiring Decision
                                         </button>
                                     </div>
                                 </div>
 
-                                {(selectedApplication.interview_date_time || selectedApplication.call_outcome || selectedApplication.call_notes) && (
+                                {(selectedApplication.interview_date_time || selectedApplication.call_outcome || selectedApplication.call_notes || selectedApplication.hiring_decision) && (
                                     <div className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-700">
                                         <p className="text-xs uppercase tracking-wide text-slate-500">Latest Update</p>
                                         <div className="mt-3 space-y-2">
+                                            <p><span className="font-semibold">Decision:</span> {STATUS_META[selectedApplication.hiring_decision]?.label || selectedApplication.hiring_decision || '—'}</p>
+                                            <p><span className="font-semibold">Decision Reason:</span> {selectedApplication.hiring_decision_reason || '—'}</p>
                                             <p><span className="font-semibold">Outcome:</span> {selectedApplication.call_outcome || '—'}</p>
                                             <p><span className="font-semibold">Reason:</span> {selectedApplication.call_outcome_reason || '—'}</p>
                                             <p><span className="font-semibold">Interview:</span> {selectedApplication.interview_date_time ? new Date(selectedApplication.interview_date_time).toLocaleString('en-IN') : '—'}</p>
