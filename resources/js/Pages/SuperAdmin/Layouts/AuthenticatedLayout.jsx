@@ -538,9 +538,9 @@ export default function AuthenticatedLayout({ header, children }) {
                                                                                     : x
                                                                             )
                                                                         );
-                                                                        window.location.href = withSuperPrefix(
-                                                                            "/super/job-requests/all-jobs"
-                                                                        );
+                                                                         window.location.href = withSuperPrefix(
+                                                                             "/super/job-requests"
+                                                                         );
                                                                     }}
                                                                 >
                                                                     <div className="w-full flex items-start justify-between gap-2">

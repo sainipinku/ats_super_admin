@@ -352,7 +352,6 @@ export default function JobRequests({ auth }) {
     const [loading, setLoading] = useState(true);
     const [selectedJob, setSelectedJob] = useState(null);
     const [showModal, setShowModal] = useState(false);
-    const [filter, setFilter] = useState("all"); // all, pending, active, declined
     const [rejectionReason, setRejectionReason] = useState("");
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [jobToReject, setJobToReject] = useState(null);
@@ -445,22 +444,6 @@ export default function JobRequests({ auth }) {
         }
     };
 
-    const filteredJobs = jobs.filter((job) => {
-        if (filter === "all") return true;
-        return job.status === filter;
-    });
-
-    const getJobCounts = () => {
-        return {
-            all: jobs.length,
-            pending: jobs.filter((j) => j.status === "pending").length,
-            active: jobs.filter((j) => j.status === "active").length,
-            declined: jobs.filter((j) => j.status === "declined").length,
-        };
-    };
-
-    const counts = getJobCounts();
-
     return (
         <AuthenticatedLayout>
             <Head title="Job Requests" />
@@ -477,37 +460,12 @@ export default function JobRequests({ auth }) {
                         </p>
                     </div>
 
-                    {/* Filter Tabs */}
-                    <div className="flex flex-wrap gap-2 mb-6">
-                        {[
-                            { key: "all", label: "All", count: counts.all },
-                            { key: "pending", label: "Pending", count: counts.pending },
-                            { key: "active", label: "Active", count: counts.active },
-                            { key: "declined", label: "Rejected", count: counts.declined },
-                        ].map((tab) => (
-                            <button
-                                key={tab.key}
-                                onClick={() => setFilter(tab.key)}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                    filter === tab.key
-                                        ? "bg-[#5146E6] text-white"
-                                        : "bg-white dark:bg-gray-800 text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-700"
-                                }`}
-                            >
-                                {tab.label}
-                                <span className="ml-2 px-2 py-0.5 bg-slate-200 dark:bg-gray-600 text-slate-700 dark:text-gray-300 rounded-full text-xs">
-                                    {tab.count}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-
                     {/* Job Cards Grid */}
                     {loading ? (
                         <div className="flex items-center justify-center py-12">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5146E6]"></div>
                         </div>
-                    ) : filteredJobs.length === 0 ? (
+                    ) : jobs.filter(job => job.status === 'pending').length === 0 ? (
                         <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">
                             <svg
                                 className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4"
@@ -526,14 +484,12 @@ export default function JobRequests({ auth }) {
                                 No Job Requests Found
                             </h3>
                             <p className="text-gray-500 dark:text-gray-400">
-                                {filter === "all"
-                                    ? "No job requests have been submitted yet."
-                                    : `No ${filter} job requests found.`}
+                                No pending job requests found.
                             </p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {filteredJobs.map((job) => (
+                            {jobs.filter(job => job.status === 'pending').map((job) => (
                                 <JobRequestCard
                                     key={job.id}
                                     job={job}
