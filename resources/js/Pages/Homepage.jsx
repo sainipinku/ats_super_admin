@@ -5,7 +5,7 @@ import HomepageLayout from '@/Layouts/HomepageLayout';
 
 export default function Homepage() {
     const countdownTarget = useMemo(
-        () => Date.now() + (20 * 24 * 60 * 60 * 1000),
+        () => Date.now() + (10 * 24 * 60 * 60 * 1000),
         []
     );
     const [timeLeft, setTimeLeft] = useState(() => getTimeLeft(countdownTarget));
@@ -22,7 +22,6 @@ export default function Homepage() {
         <ThemeProvider>
             <Head title="Find Your Dream Career | ATS" />
             <HomepageLayout>
-                {/* Homepage sections are temporarily hidden. */}
                 <section className="min-h-[calc(100vh-5rem)] flex items-center justify-center px-4 py-16">
                     <div className="w-full max-w-4xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl dark:border-slate-800 dark:bg-slate-900">
                         <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-500">
@@ -32,7 +31,7 @@ export default function Homepage() {
                             Our new homepage is on the way
                         </h1>
                         <p className="mx-auto mt-4 max-w-2xl text-base text-slate-600 dark:text-slate-300 sm:text-lg">
-                            Launch countdown for the next 20 days.
+                            Launch countdown for the next 10 days.
                         </p>
 
                         <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">

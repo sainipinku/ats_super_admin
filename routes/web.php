@@ -16,6 +16,9 @@ use App\Http\Controllers\SuperAdmin\JobRequestController;
 use App\Http\Controllers\SuperAdmin\ContactMessageController;
 use App\Http\Controllers\Admin\ResumeController;
 use App\Http\Controllers\Admin\JobController;
+use App\Http\Controllers\Admin\CallingTeamController;
+use App\Http\Controllers\CallingTeam\AuthController as CallingTeamAuthController;
+use App\Http\Controllers\CallingTeam\PortalController as CallingTeamPortalController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -89,6 +92,7 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::get('/list', [MemberController::class, 'index'])->name('list');
             Route::post('/store', [MemberController::class, 'store'])->name('store');
             Route::put('/update/{id}', [MemberController::class, 'store'])->name('update');
+            Route::post('/{member}/assign-admin', [MemberController::class, 'assignAdmin'])->name('assign-admin');
             Route::delete('/{uuid}', [MemberController::class, 'destroy'])->name('destroy');
             Route::post('/update-status/{uuid}', [MemberController::class, 'updateStatus'])->name('status');
             Route::put('/{member}/password', [MemberController::class, 'updatePassword'])->name('password');
@@ -161,6 +165,9 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
 
     // Job Applications routes (From Main Branch)
     Route::get('/job-applications', [JobController::class, 'applicationsIndex'])->name('admin.job.applications.index');
+    Route::get('/calling-team', [CallingTeamController::class, 'index'])->name('admin.calling-team.index');
+    Route::post('/calling-team', [CallingTeamController::class, 'store'])->name('admin.calling-team.store');
+    Route::post('/calling-team/{member}/status', [CallingTeamController::class, 'updateStatus'])->name('admin.calling-team.status');
 
     // Job API routes
     Route::get('/api/jobs', [JobController::class, 'getAdminJobs'])->name('admin.api.jobs.list');
@@ -176,6 +183,12 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::get('/api/job-applicants', [JobController::class, 'getApplicants'])->name('admin.api.job.applicants.list');
     Route::get('/api/job-applicants/{application}', [JobController::class, 'getApplicantDetails'])->name('admin.api.job.applicants.details');
     Route::patch('/api/job-applicants/{application}/status', [JobController::class, 'updateApplicantStatus'])->name('admin.api.job.applicants.status');
+    Route::patch('/api/job-applicants/{application}/admin-final-review', [JobController::class, 'adminFinalReview'])->name('admin.api.job.applicants.admin-final-review');
+    Route::patch('/api/job-applicants/{application}/generate-offer-letter', [JobController::class, 'generateOfferLetter'])->name('admin.api.job.applicants.generate-offer-letter');
+    Route::get('/api/job-applicants/{application}/download-offer-letter', [JobController::class, 'downloadOfferLetter'])->name('admin.api.job.applicants.download-offer-letter');
+    Route::patch('/api/job-applicants/{application}/send-offer-letter', [JobController::class, 'sendOfferLetterEmail'])->name('admin.api.job.applicants.send-offer-letter');
+    Route::patch('/api/job-applicants/{application}/assign-calling-team', [JobController::class, 'assignCallingTeam'])->name('admin.api.job.applicants.assign-calling-team');
+    Route::get('/api/calling-team-members', [CallingTeamController::class, 'membersList'])->name('admin.api.calling-team.members');
 
     // Job Applications API route (From Main Branch)
     Route::get('/api/applications', [JobController::class, 'listApplications'])->name('admin.api.applications.list');
@@ -195,6 +208,33 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::post('/profile/photo/remove', [App\Http\Controllers\Admin\AdminController::class, 'userProfilePhotoRemove'])->name('admin.profile.photo.remove');
 });
 /** ADMIN ROUTES END HERE **/
+
+/** CALLING TEAM ROUTES START HERE **/
+Route::prefix('calling-team')->group(function () {
+    Route::middleware('authorized:callingteam')->group(function () {
+        Route::get('/login', [CallingTeamAuthController::class, 'login'])->name('callingteam.login');
+        Route::post('/verify', [CallingTeamAuthController::class, 'verify'])->name('callingteam.verify');
+    });
+
+    Route::middleware(['callingteam'])->group(function () {
+        Route::get('/dashboard', [CallingTeamPortalController::class, 'dashboard'])->name('callingteam.dashboard');
+        Route::get('/applications', [CallingTeamPortalController::class, 'listApplications'])->name('callingteam.applications.list');
+        Route::get('/applications/{application}', [CallingTeamPortalController::class, 'show'])->name('callingteam.applications.show');
+        Route::patch('/applications/{application}/call-outcome', [CallingTeamPortalController::class, 'updateCallOutcome'])->name('callingteam.applications.call-outcome');
+        Route::patch('/applications/{application}/schedule-interview', [CallingTeamPortalController::class, 'scheduleInterview'])->name('callingteam.applications.schedule-interview');
+        Route::patch('/applications/{application}/final-decision', [CallingTeamPortalController::class, 'finalDecision'])->name('callingteam.applications.final-decision');
+
+        Route::get('/api/notifications/unread-count', [App\Http\Controllers\Admin\AdminController::class, 'notificationsUnreadCount'])->name('callingteam.api.notifications.unread_count');
+        Route::get('/api/notifications/list', [App\Http\Controllers\Admin\AdminController::class, 'notificationsList'])->name('callingteam.api.notifications.list');
+        Route::patch('/api/notifications/{notification}/read', [App\Http\Controllers\Admin\AdminController::class, 'notificationsMarkRead'])->name('callingteam.api.notifications.read');
+        Route::patch('/api/notifications/read-all', [App\Http\Controllers\Admin\AdminController::class, 'notificationsMarkAllRead'])->name('callingteam.api.notifications.read_all');
+        Route::delete('/api/notifications/{notification}', [App\Http\Controllers\Admin\AdminController::class, 'notificationsDelete'])->name('callingteam.api.notifications.delete');
+        Route::delete('/api/notifications/delete-all', [App\Http\Controllers\Admin\AdminController::class, 'notificationsDeleteAll'])->name('callingteam.api.notifications.delete_all');
+
+        Route::post('/logout', [CallingTeamPortalController::class, 'logout'])->name('callingteam.logout');
+    });
+});
+/** CALLING TEAM ROUTES END HERE **/
 
 /** MEMBER ROUTES START HERE **/
 Route::prefix('member')->middleware(['member'])->group(function () {
@@ -232,6 +272,7 @@ Route::prefix('member')->middleware(['member'])->group(function () {
 /** PUBLIC ROUTES START HERE **/
 Route::get('/', [HomeController::class, 'authShowPage'])->name('home');
 Route::get('/homepage', [HomeController::class, 'showHomepage'])->name('homepage');
+Route::get('/jobs', [HomeController::class, 'jobs'])->name('jobs.index');
 Route::get('/companies', [HomeController::class, 'companies'])->name('companies.index');
 Route::get('/about', [HomeController::class, 'about'])->name('about');
 Route::get('/contact', [HomeController::class, 'contact'])->name('contact.show');

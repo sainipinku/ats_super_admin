@@ -11,7 +11,7 @@ export default function Footer() {
     const subTextColor = isDark ? 'text-gray-400' : 'text-gray-600';
 
     const links = [
-        { name: 'Browse Jobs', href: route('member.jobs.index') },
+        { name: 'Browse Jobs', href: route('jobs.index') },
         { name: 'Companies', href: route('companies.index') },
         { name: 'About Us', href: route('about') },
         { name: 'Contact', href: route('contact.show') },

@@ -41,6 +41,7 @@ class MemberController extends Controller
    public function index(Request $request)
 {
     $members = Member::query()
+        ->with(['assignedAdmin:id,name'])
         ->when(
             $request->search,
             fn($q) =>
@@ -68,16 +69,24 @@ class MemberController extends Controller
         $member->departments_data = Department::whereIn('id', $departmentIds)->get();
         $designationIds = is_array($member->designation) ? $member->designation : ($member->designation ? [$member->designation] : []);
         $member->designations_data = Designation::whereIn('id', $designationIds)->get();
+        $member->assigned_admin_name = $member->assignedAdmin?->name;
         return $member;
     });
 
     $departments = Department::where('status', 1)->get(['id', 'name']);
     $roles = Role::where('status', 1)->get(['id', 'name']);
+    $admins = Member::query()
+        ->where('status', 1)
+        ->whereJsonContains('roles', '1')
+        ->whereJsonDoesntContain('roles', '2')
+        ->orderBy('name')
+        ->get(['id', 'name', 'email', 'phone']);
 
     return Inertia::render('SuperAdmin/Members/List', [
         'members' => $members,
         'departments' => $departments,
         'roles' => $roles,
+        'admins' => $admins,
         'filters' => $request->only(['search', 'status', 'per_page']),
     ]);
 }
@@ -324,6 +333,38 @@ class MemberController extends Controller
                 ->withInput()
                 ->with('error', 'An error occurred: ' . $e->getMessage());
         }
+    }
+
+    public function assignAdmin(Request $request, Member $member)
+    {
+        $validated = $request->validate([
+            'admin_id' => ['required', 'integer'],
+        ]);
+
+        $admin = Member::query()
+            ->where('id', $validated['admin_id'])
+            ->where('status', 1)
+            ->whereJsonContains('roles', '1')
+            ->whereJsonDoesntContain('roles', '2')
+            ->first();
+
+        if (!$admin) {
+            return redirect()->back()->withErrors([
+                'admin_id' => 'Selected admin is invalid.',
+            ]);
+        }
+
+        if (in_array('1', $member->roles ?? [], true) || in_array('2', $member->roles ?? [], true)) {
+            return redirect()->back()->withErrors([
+                'admin_id' => 'Only regular members can be assigned to admins.',
+            ]);
+        }
+
+        $member->update([
+            'assigned_admin_id' => $admin->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Member assigned to admin successfully!');
     }
 
 

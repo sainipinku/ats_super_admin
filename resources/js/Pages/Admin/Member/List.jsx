@@ -8,7 +8,7 @@ import ConfirmDialog from "@/Components/ConfirmDialog";
 import ShowUserProfile from "@/Components/ShowUserProfile";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/20/solid";
 
-const getDefaultCreateForm = () => ({
+const getDefaultCreateForm = (departmentIds = []) => ({
     name: "",
     phone: "",
     email: "",
@@ -17,7 +17,7 @@ const getDefaultCreateForm = () => ({
     status: "1",
     password: "",
     confirm_password: "",
-    departments: [],
+    departments: departmentIds,
     designations: [],
 });
 
@@ -30,7 +30,13 @@ export default function MembersList({ members, filters, departments }) {
     const [memberToUpdate, setMemberToUpdate] = useState(null);
     const [newStatus, setNewStatus] = useState(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [createForm, setCreateForm] = useState(getDefaultCreateForm);
+    const adminDepartmentIds = departments.map((department) =>
+        String(department.id)
+    );
+    const adminDepartmentNames = departments.map((department) => department.name);
+    const [createForm, setCreateForm] = useState(() =>
+        getDefaultCreateForm(adminDepartmentIds)
+    );
     const [designations, setDesignations] = useState([]);
     const [createErrors, setCreateErrors] = useState({});
     const [isCreating, setIsCreating] = useState(false);
@@ -158,7 +164,7 @@ export default function MembersList({ members, filters, departments }) {
 
     const handleCreateOpen = () => {
         setCreateErrors({});
-        setCreateForm(getDefaultCreateForm());
+        setCreateForm(getDefaultCreateForm(adminDepartmentIds));
         setDesignations([]);
         setIsCreateModalOpen(true);
     };
@@ -166,7 +172,7 @@ export default function MembersList({ members, filters, departments }) {
     const handleCreateClose = () => {
         setIsCreateModalOpen(false);
         setCreateErrors({});
-        setCreateForm(getDefaultCreateForm());
+        setCreateForm(getDefaultCreateForm(adminDepartmentIds));
         setDesignations([]);
         setIsCreating(false);
     };
@@ -184,19 +190,12 @@ export default function MembersList({ members, filters, departments }) {
         }));
     };
 
-    const toggleCreateSelection = (field, value) => {
-        setCreateForm((prev) => {
-            const currentValues = prev[field];
-            const nextValues = currentValues.includes(value)
-                ? currentValues.filter((item) => item !== value)
-                : [...currentValues, value];
-
-            return {
-                ...prev,
-                [field]: nextValues,
-                ...(field === "departments" ? { designations: [] } : {}),
-            };
-        });
+    const handleCreateArraySelect = (field, value) => {
+        setCreateForm((prev) => ({
+            ...prev,
+            [field]: value ? [value] : [],
+            ...(field === "departments" ? { designations: [] } : {}),
+        }));
     };
 
     const handleCreateSubmit = (e) => {
@@ -771,22 +770,10 @@ export default function MembersList({ members, filters, departments }) {
                             <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">
                                 Departments <span className="text-red-500">*</span>
                             </h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                {departments.map((department) => (
-                                    <label
-                                        key={department.id}
-                                        className="flex items-center gap-2 rounded-md border px-3 py-2 dark:border-gray-700"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={createForm.departments.includes(String(department.id))}
-                                            onChange={() =>
-                                                toggleCreateSelection("departments", String(department.id))
-                                            }
-                                        />
-                                        <span className="text-sm dark:text-white">{department.name}</span>
-                                    </label>
-                                ))}
+                            <div className="w-full px-3 py-2 border rounded-md bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-white">
+                                {adminDepartmentNames.length > 0
+                                    ? adminDepartmentNames.join(", ")
+                                    : "No department assigned"}
                             </div>
                             {createErrors.departments && (
                                 <p className="mt-1 text-sm text-red-600">{createErrors.departments}</p>
@@ -797,29 +784,27 @@ export default function MembersList({ members, filters, departments }) {
                             <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">
                                 Designations <span className="text-red-500">*</span>
                             </h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                {designations.length > 0 ? (
-                                    designations.map((designation) => (
-                                        <label
-                                            key={designation.id}
-                                            className="flex items-center gap-2 rounded-md border px-3 py-2 dark:border-gray-700"
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={createForm.designations.includes(String(designation.id))}
-                                                onChange={() =>
-                                                    toggleCreateSelection("designations", String(designation.id))
-                                                }
-                                            />
-                                            <span className="text-sm dark:text-white">{designation.name}</span>
-                                        </label>
-                                    ))
-                                ) : (
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Select department first to load designations.
-                                    </p>
-                                )}
-                            </div>
+                            <select
+                                value={createForm.designations[0] || ""}
+                                onChange={(e) =>
+                                    handleCreateArraySelect("designations", e.target.value)
+                                }
+                                disabled={createForm.departments.length === 0 || designations.length === 0}
+                                className="w-full px-3 py-2 border rounded-md disabled:opacity-60 dark:bg-gray-700 dark:text-white"
+                            >
+                                <option value="">
+                                    {createForm.departments.length === 0
+                                        ? "Select department first"
+                                        : designations.length === 0
+                                        ? "No designations available"
+                                        : "Select Designation"}
+                                </option>
+                                {designations.map((designation) => (
+                                    <option key={designation.id} value={String(designation.id)}>
+                                        {designation.name}
+                                    </option>
+                                ))}
+                            </select>
                             {createErrors.designations && (
                                 <p className="mt-1 text-sm text-red-600">{createErrors.designations}</p>
                             )}

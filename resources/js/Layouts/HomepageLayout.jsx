@@ -29,7 +29,7 @@ export default function HomepageLayout({ children }) {
 
     const navLinks = [
         { name: 'Home', href: route('homepage'), icon: Home },
-        // { name: 'Browse Jobs', href: route('member.jobs.index'), icon: Briefcase },
+        // { name: 'Browse Jobs', href: route('jobs.index'), icon: Briefcase },
         // { name: 'Companies', href: route('companies.index'), icon: Building2 },
         // { name: 'About', href: route('about'), icon: Sparkles },
         // { name: 'Contact', href: route('contact.show'), icon: Mail },

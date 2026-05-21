@@ -44,7 +44,7 @@ export default function CTASection() {
                             <ArrowRight className="w-5 h-5" />
                         </Link>
                         <Link
-                            href={route('member.jobs.index')}
+                            href={route('jobs.index')}
                             className={`px-8 py-3 rounded-lg font-semibold flex items-center gap-2 ${
                                 isDark ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-white text-gray-700 hover:bg-gray-100'
                             }`}

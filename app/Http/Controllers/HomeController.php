@@ -9,6 +9,7 @@ use App\Models\Job;
 use App\Models\Member;
 use App\Models\JobApplication;
 use App\Models\ContactMessage;
+use App\Models\Role;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Hash;
@@ -36,6 +37,9 @@ class HomeController extends Controller
         }
         if (Auth::guard('member')->check()) {
             return Redirect::route('member.dashboard');
+        }
+        if (Auth::guard('callingteam')->check()) {
+            return Redirect::route('callingteam.dashboard');
         }
         $roles = Role::where('status', 1)->where('id', '!=', 2)->get();
         return Inertia::render('Auth/Login', [
@@ -77,6 +81,10 @@ class HomeController extends Controller
         $user = $userModel::where($fieldType, $request->identifier)->first();
 
         if ($user) {
+            if ($guard === 'member' && $user->is_calling_team) {
+                continue;
+            }
+
             // Check if account is inactive
             if ($user->status == 0) {
                 $inactiveUser = $user;
@@ -224,6 +232,9 @@ class HomeController extends Controller
         if (Auth::guard('member')->check()) {
             return Redirect::route('member.dashboard');
         }
+        if (Auth::guard('callingteam')->check()) {
+            return Redirect::route('callingteam.dashboard');
+        }
         if (Auth::guard('superadmin')->check()) {
             return Redirect::route('super.dashboard');
         }
@@ -257,6 +268,42 @@ class HomeController extends Controller
         return Inertia::render('Homepage', [
             'stats' => $stats,
             'jobs' => $featuredJobs,
+        ]);
+    }
+
+    public function jobs(Request $request)
+    {
+        $query = Job::with(['creator' => function ($q) {
+                $q->select('id', 'name', 'email');
+            }])
+            ->where('status', 'active')
+            ->orderBy('created_at', 'desc');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('company', 'like', "%{$search}%")
+                    ->orWhere('location', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('job_type')) {
+            $query->where('job_type', $request->job_type);
+        }
+
+        if ($request->filled('location')) {
+            $query->where('location', 'like', "%{$request->location}%");
+        }
+
+        return Inertia::render('Public/JobListings', [
+            'jobs' => $query->get(),
+            'filters' => [
+                'search' => $request->search ?? '',
+                'job_type' => $request->job_type ?? '',
+                'location' => $request->location ?? '',
+            ],
         ]);
     }
 

@@ -22,6 +22,8 @@ class Member extends Authenticatable
     protected $fillable = [
         'uuid',
         'created_by',
+        'assigned_admin_id',
+        'is_calling_team',
         'name',
         'username',
         'email',
@@ -61,6 +63,7 @@ class Member extends Authenticatable
         'candidate_profile' => 'array',
         'resume_uploaded_at' => 'datetime',
         'resume_size' => 'integer',
+        'is_calling_team' => 'boolean',
     ];
     public function uniqueIds()
     {
@@ -71,6 +74,16 @@ class Member extends Authenticatable
     public function creator()
     {
         return $this->belongsTo(Member::class, 'created_by');
+    }
+
+    public function assignedAdmin()
+    {
+        return $this->belongsTo(Member::class, 'assigned_admin_id');
+    }
+
+    public function callingTeamAssignments()
+    {
+        return $this->hasMany(JobApplication::class, 'assigned_calling_team_member_id');
     }
 
 
@@ -216,6 +229,11 @@ class Member extends Authenticatable
         return $this->id === 3 || $this->slug === 'member';
     }
 
+    public function isCallingTeam(): bool
+    {
+        return (bool) $this->is_calling_team;
+    }
+
 
     public function getRoleName($roleId)
     {
@@ -225,6 +243,10 @@ class Member extends Authenticatable
 
     public function getGuardName(): string
     {
+        if ($this->is_calling_team) {
+            return 'callingteam';
+        }
+
         return match ($this->id) {
             1 => 'admin',
             3 => 'member',
@@ -237,6 +259,10 @@ class Member extends Authenticatable
      */
     public function getDashboardRoute(): string
     {
+        if ($this->is_calling_team) {
+            return 'callingteam.dashboard';
+        }
+
         return match ($this->id) {
             1 => 'admin.dashboard',
             3 => 'member.dashboard',

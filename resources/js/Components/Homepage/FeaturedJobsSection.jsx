@@ -457,8 +457,12 @@ export default function FeaturedJobsSection({ jobs: featuredJobs }) {
     };
 
     const handleApply = (job) => {
-        // Redirect to application page or show apply modal
-        window.location.href = `/apply/${job.id}`;
+        if (auth?.guard === 'member') {
+            window.location.href = route('member.jobs.index');
+            return;
+        }
+
+        window.location.href = route('login');
     };
 
     const handleCloseModal = () => {
@@ -508,7 +512,7 @@ export default function FeaturedJobsSection({ jobs: featuredJobs }) {
                         <h3 className={`text-xl font-semibold mb-2 ${textColor}`}>No jobs available</h3>
                         <p className={`mb-6 ${subTextColor}`}>Check back later for new opportunities</p>
                         <Link
-                            href={route('member.jobs.index')}
+                            href={route('jobs.index')}
                             className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg font-medium ${
                                 isDark ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                             }`}
@@ -555,7 +559,7 @@ export default function FeaturedJobsSection({ jobs: featuredJobs }) {
                     className="text-center mt-12"
                 >
                     <Link
-                        href={route('member.jobs.index')}
+                        href={route('jobs.index')}
                         className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/25"
                     >
                         Explore All Opportunities

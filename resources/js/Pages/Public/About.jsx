@@ -39,7 +39,7 @@ export default function About() {
 
                     <div className="mt-10 flex flex-wrap gap-3">
                         <Link
-                            href={route('member.jobs.index')}
+                            href={route('jobs.index')}
                             className="px-6 py-3 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors"
                         >
                             Browse Jobs
@@ -57,4 +57,3 @@ export default function About() {
         </ThemeProvider>
     );
 }
-

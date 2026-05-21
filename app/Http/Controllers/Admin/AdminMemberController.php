@@ -33,11 +33,11 @@ class AdminMemberController extends Controller
         $authUser = Auth::guard('admin')->user();
         $requiredDepartments = $authUser->departments ?? [];
         $query = Member::where('id', '!=', $authUser->id)
-            ->where(function ($query) use ($requiredDepartments) {
-                foreach ($requiredDepartments as $deptId) {
-                    $query->orWhereJsonContains('departments', (string)$deptId);
-                }
-            })->whereJsonDoesntContain('roles', '2');
+            ->where('assigned_admin_id', $authUser->id)
+            ->where('is_calling_team', false)
+            ->whereJsonContains('roles', '3')
+            ->whereJsonDoesntContain('roles', '1')
+            ->whereJsonDoesntContain('roles', '2');
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -73,9 +73,16 @@ class AdminMemberController extends Controller
     {
         $authUser = Auth::guard('admin')->user();
         $allowedDepartmentIds = collect($authUser->departments ?? [])
-            ->map(fn ($id) => (string) $id)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
             ->values()
             ->all();
+
+        if (empty($allowedDepartmentIds)) {
+            return back()
+                ->withErrors(['departments' => 'No department is assigned to your admin account.'])
+                ->withInput();
+        }
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -89,8 +96,6 @@ class AdminMemberController extends Controller
                 'email',
                 Rule::unique('members')->whereNull('deleted_at'),
             ],
-            'departments' => ['required', 'array', 'min:1'],
-            'departments.*' => ['required', Rule::in($allowedDepartmentIds)],
             'designations' => ['required', 'array', 'min:1'],
             'designations.*' => ['required', 'integer'],
             'gender' => ['nullable', 'in:male,female,other'],
@@ -98,18 +103,16 @@ class AdminMemberController extends Controller
             'password' => ['required', 'string', 'min:6', 'same:confirm_password'],
             'confirm_password' => ['required', 'string', 'min:6'],
             'status' => ['nullable', 'in:0,1'],
-        ], [
-            'departments.*.in' => 'You can only assign members to your own departments.',
         ]);
 
         $designationCount = Designation::query()
             ->whereIn('id', $validated['designations'])
-            ->whereIn('department_id', $validated['departments'])
+            ->whereIn('department_id', $allowedDepartmentIds)
             ->count();
 
         if ($designationCount !== count($validated['designations'])) {
             return back()
-                ->withErrors(['designations' => 'Selected designations must belong to the selected departments.'])
+                ->withErrors(['designations' => 'Selected designations must belong to your assigned departments.'])
                 ->withInput();
         }
 
@@ -117,14 +120,16 @@ class AdminMemberController extends Controller
             'name' => $validated['name'],
             'phone' => $validated['phone'],
             'email' => $validated['email'] ?? null,
-            'departments' => $validated['departments'],
+            'departments' => $allowedDepartmentIds,
             'designation' => $validated['designations'],
             'roles' => ['3'],
+            'is_calling_team' => false,
             'status' => (int) ($validated['status'] ?? 1),
             'password' => Hash::make($validated['password']),
             'gender' => $validated['gender'] ?? null,
             'dob' => $validated['dob'] ?? null,
             'created_by' => $authUser->id,
+            'assigned_admin_id' => $authUser->id,
             'username' => $this->generateUsername($validated['name']),
             'slug' => Str::slug($validated['name'] . '-' . Str::random(4)),
         ]);
@@ -137,6 +142,7 @@ class AdminMemberController extends Controller
         $authUser = Auth::guard('admin')->user();
         $allowedDepartmentIds = collect($authUser->departments ?? [])
             ->map(fn ($id) => (int) $id)
+            ->filter()
             ->values()
             ->all();
 
@@ -146,6 +152,10 @@ class AdminMemberController extends Controller
             ->filter(fn ($id) => in_array($id, $allowedDepartmentIds, true))
             ->values()
             ->all();
+
+        if (empty($departmentIds)) {
+            $departmentIds = $allowedDepartmentIds;
+        }
 
         if (empty($departmentIds)) {
             return response()->json([]);
@@ -165,6 +175,7 @@ class AdminMemberController extends Controller
         $request->validate([
             'status' => 'required|boolean',
         ]);
+        abort_unless((int) $member->assigned_admin_id === (int) Auth::guard('admin')->id(), 403);
         try {
             $member->update(['status' => $request->status]);
 
@@ -199,7 +210,7 @@ class AdminMemberController extends Controller
                     'status' => $status
                 ]);
             }
-            
+
             return redirect()->back()->with('success', 'Member account status updated successfully!');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to update member status!');
@@ -208,7 +219,10 @@ class AdminMemberController extends Controller
 
     public function memberDetails(Request $request, $uuid)
     {
-        $member = Member::where('uuid', $uuid)->firstOrFail();
+        $member = Member::where('uuid', $uuid)
+            ->where('assigned_admin_id', Auth::guard('admin')->id())
+            ->whereJsonContains('roles', '3')
+            ->firstOrFail();
         $tasks = $this->getMemberTasks($member, $request);
         $taskStats = $this->getTaskStats($member);
         $taskInstanceStats = $this->getTaskInstanceStats($member);

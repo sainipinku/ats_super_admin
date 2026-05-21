@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/Contexts/ThemeContext';
-import { Link } from '@inertiajs/react';
 import { Search, MapPin, Building2, Target, Award, Star } from 'lucide-react';
 import LocationInput from '@/Components/LocationInput';
 
@@ -27,15 +26,6 @@ export default function HeroSection() {
     const [searchQuery, setSearchQuery] = useState('');
     const [location, setLocation] = useState('');
 
-    const popularSearches = [
-        'React Developer',
-        'Python Engineer',
-        'Product Manager',
-        'UX Designer',
-        'Data Analyst',
-        'Marketing'
-    ];
-
     const floatingCards = [
         { icon: Building2, label: '10K+ Companies', color: 'bg-blue-500' },
         { icon: Target, label: 'Smart Matching', color: 'bg-purple-500' },
@@ -47,7 +37,6 @@ export default function HeroSection() {
     const textColor = isDark ? 'text-white' : 'text-gray-900';
     const subTextColor = isDark ? 'text-gray-400' : 'text-gray-600';
     const cardBg = isDark ? 'bg-gray-800/50 border-gray-700' : 'bg-white border-gray-200';
-    const inputBg = isDark ? 'bg-gray-700/50' : 'bg-gray-100';
     const badgeBg = isDark ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-blue-50 text-blue-700 border-blue-200';
 
     return (
@@ -97,15 +86,15 @@ export default function HeroSection() {
   className="w-full max-w-5xl mx-auto mb-8 px-3 sm:px-4"
 >
   <div
-    className={`relative flex flex-col md:flex-row items-stretch md:items-center 
+    className={`relative flex flex-col md:flex-row items-stretch md:items-center
     gap-2 md:gap-0 px-3 sm:px-5 py-2 md:py-2.5
-    ${isDark ? 'bg-gray-800/80' : 'bg-white/90'} 
+    ${isDark ? 'bg-gray-800/80' : 'bg-white/90'}
     backdrop-blur-sm rounded-2xl md:rounded-full shadow-lg hover:shadow-xl transition-all duration-300`}
   >
 
     {/* Job Title Input */}
     <div className="flex items-center gap-3 flex-1 w-full md:w-auto px-3 py-2 md:py-0 h-full
-      [&_input]:border-0 [&_input]:outline-none [&_input]:ring-0 
+      [&_input]:border-0 [&_input]:outline-none [&_input]:ring-0
       [&_input]:focus:!outline-none [&_input]:focus:!ring-0">
 
       <Search className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
@@ -141,8 +130,8 @@ export default function HeroSection() {
           onChange={setLocation}
           placeholder="City, state"
           variant="pill"
-          className="w-full h-full bg-transparent 
-          !border-0 !outline-none !ring-0 !shadow-none 
+          className="w-full h-full bg-transparent
+          !border-0 !outline-none !ring-0 !shadow-none
           text-sm sm:text-base text-slate-600 placeholder:text-slate-400
           focus:!outline-none focus:!ring-0"
         />
@@ -155,14 +144,14 @@ export default function HeroSection() {
         const params = new URLSearchParams();
         if (searchQuery) params.append('title', searchQuery);
         if (location) params.append('location', location);
-        const jobsUrl = route('member.jobs.index');
+        const jobsUrl = route('jobs.index');
         window.location.href = `${jobsUrl}${params.toString() ? '?' + params.toString() : ''}`;
       }}
-      className="w-full md:w-auto mt-2 md:mt-0 md:ml-2 
-      min-h-[48px] md:min-h-[52px] px-6 md:px-8 
-      flex items-center justify-center 
-      bg-blue-600 hover:bg-blue-700 text-white font-medium 
-      rounded-full shadow-md hover:shadow-lg 
+      className="w-full md:w-auto mt-2 md:mt-0 md:ml-2
+      min-h-[48px] md:min-h-[52px] px-6 md:px-8
+      flex items-center justify-center
+      bg-blue-600 hover:bg-blue-700 text-white font-medium
+      rounded-full shadow-md hover:shadow-lg
       transition-all duration-200 whitespace-nowrap"
     >
       Find jobs

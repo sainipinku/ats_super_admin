@@ -209,8 +209,15 @@ export default function Dashboard({
     };
 
     const statusOptions = [
-        { value: "pending", label: "Pending" },
+        { value: "applied", label: "Applied" },
+        { value: "viewed", label: "Viewed" },
         { value: "shortlisted", label: "Shortlisted" },
+        { value: "assigned_to_calling_member", label: "Assigned To Calling Member" },
+        { value: "calling_in_progress", label: "Calling In Progress" },
+        { value: "calling_approved", label: "Calling Approved" },
+        { value: "calling_rejected", label: "Calling Rejected" },
+        { value: "admin_review", label: "Admin Review" },
+        { value: "offer_letter_generated", label: "Offer Letter Generated" },
         { value: "waiting_list", label: "Waiting List" },
         { value: "hired", label: "Hired" },
         { value: "not_selected", label: "Not Selected" },
@@ -870,8 +877,15 @@ export default function Dashboard({
                                                             value={app.status}
                                                             onChange={(e) => handleStatusChangeDirectly(app, e.target.value)}
                                                             className={`w-full px-2 py-1.5 text-xs font-medium rounded-full border cursor-pointer outline-none ${
-                                                                app.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                                                                app.status === 'applied' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                                                                app.status === 'viewed' ? 'bg-blue-100 text-blue-800 border-blue-300' :
                                                                 app.status === 'shortlisted' ? 'bg-green-100 text-green-800 border-green-300' :
+                                                                app.status === 'assigned_to_calling_member' ? 'bg-indigo-100 text-indigo-800 border-indigo-300' :
+                                                                app.status === 'calling_in_progress' ? 'bg-sky-100 text-sky-800 border-sky-300' :
+                                                                app.status === 'calling_approved' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                                                                app.status === 'calling_rejected' ? 'bg-red-100 text-red-800 border-red-300' :
+                                                                app.status === 'admin_review' ? 'bg-violet-100 text-violet-800 border-violet-300' :
+                                                                app.status === 'offer_letter_generated' ? 'bg-teal-100 text-teal-800 border-teal-300' :
                                                                 app.status === 'waiting_list' ? 'bg-blue-100 text-blue-800 border-blue-300' :
                                                                 app.status === 'hired' ? 'bg-purple-100 text-purple-800 border-purple-300' :
                                                                 app.status === 'not_selected' ? 'bg-orange-100 text-orange-800 border-orange-300' :
@@ -888,7 +902,7 @@ export default function Dashboard({
                                                     )}
                                                 </td>
                                                 <td className="py-2 pr-3">
-                                                    {app.status === "pending" ? (
+                                                    {app.status === "applied" || app.status === "viewed" ? (
                                                         <div className="flex items-center gap-2">
                                                             <button
                                                                 type="button"
