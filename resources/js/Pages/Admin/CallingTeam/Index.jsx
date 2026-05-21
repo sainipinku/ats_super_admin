@@ -104,7 +104,7 @@ export default function Index({ members, filters }) {
         <AuthenticatedLayout>
             <Head title="Calling Team" />
 
-            <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
+            <div className="min-h-screen bg-slate-100 p-4 sm:p-6 pt-20 sm:pt-24">
                 <div className="max-w-7xl mx-auto space-y-6">
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div>

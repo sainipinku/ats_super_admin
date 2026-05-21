@@ -346,7 +346,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                         >
                                             Calling Team
                                         </NavLink>
-
+{/* 
                                         <NavLink
                                             href={route("admin.members.dashboard")}
                                             active={
@@ -355,7 +355,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                             }
                                         >
                                             Members
-                                        </NavLink>
+                                        </NavLink> */}
                                     </div>
                                 </div>
 
