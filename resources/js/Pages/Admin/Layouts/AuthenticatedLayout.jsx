@@ -346,7 +346,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                         >
                                             Calling Team
                                         </NavLink>
-
+{/* 
                                         <NavLink
                                             href={route("admin.members.dashboard")}
                                             active={
@@ -355,7 +355,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                             }
                                         >
                                             Members
-                                        </NavLink>
+                                        </NavLink> */}
                                     </div>
                                 </div>
 
@@ -430,9 +430,16 @@ export default function AuthenticatedLayout({ header, children }) {
                                                                             : item
                                                                     )
                                                                 );
-                                                                window.location.href = route(
-                                                                    "admin.job.applications.index"
-                                                                );
+                                                                 // Redirect based on notification type
+                                                                 if (notification.type === "job_applied") {
+                                                                     window.location.href = route(
+                                                                         "admin.job.applications.index"
+                                                                     );
+                                                                 } else {
+                                                                     window.location.href = route(
+                                                                         "admin.job.posts.listing"
+                                                                     );
+                                                                 }
                                                             }}
                                                         >
                                                             <div className="w-full flex items-start justify-between gap-2">
