@@ -72,6 +72,30 @@ export default function Sidebar({ isOpen, onClose }) {
                         Dashboard
                     </Link>
                 </li>
+                <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a]">
+                    <Link
+                        href={route("callingteam.profile")}
+                        className={linkClass(route().current("callingteam.profile"))}
+                    >
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z"
+                                fill="currentColor"
+                            />
+                            <path
+                                d="M12 14C7.58172 14 4 17.134 4 21H20C20 17.134 16.4183 14 12 14Z"
+                                fill="currentColor"
+                            />
+                        </svg>
+                        Profile
+                    </Link>
+                </li>
             </ul>
         </div>
     );

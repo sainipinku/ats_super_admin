@@ -200,6 +200,12 @@ export default function AuthenticatedLayout({ children }) {
                                     >
                                         Dashboard
                                     </NavLink>
+                                    <NavLink
+                                        href={route("callingteam.profile")}
+                                        active={route().current("callingteam.profile")}
+                                    >
+                                        Profile
+                                    </NavLink>
                                 </div>
                             </div>
 
@@ -290,6 +296,7 @@ export default function AuthenticatedLayout({ children }) {
                                         <img
                                             src={page?.auth?.user?.profile_photo_url}
                                             alt="User"
+                                            className="h-full w-full rounded-full object-cover border border-slate-200 dark:border-slate-700"
                                         />
                                     </button>
 

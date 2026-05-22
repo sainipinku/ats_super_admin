@@ -3,6 +3,7 @@ import { Head, usePage, router } from "@inertiajs/react";
 import { useState, useEffect, useRef } from "react";
 import Modal from "@/Components/Modal";
 import NoData from "@/Components/NoData";
+import { useAlerts } from "@/Components/Alerts";
 import { toast } from "react-hot-toast";
 import UserProfile from "@/Components/UserProfile";
 import { FaEdit } from "react-icons/fa";
@@ -23,6 +24,7 @@ export default function Members({
     roles,
     admins = [],
 }) {
+    const { successAlert } = useAlerts();
     const [selectedFile, setSelectedFile] = useState(null);
     const [showImageModal, setShowImageModal] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
@@ -61,6 +63,7 @@ export default function Members({
     const [formData, setFormData] = useState({
         name: "",
         phone: "",
+        email: "",
         dob: "",
         gender: "male",
         status: "active",
@@ -70,6 +73,7 @@ export default function Members({
         designations: [],
         roles: [],
         image: null,
+        is_calling_team: false,
     });
 
     const [modalType, setModalType] = useState(null); // null | 'admin' | 'member'
@@ -96,6 +100,8 @@ export default function Members({
             .filter(Boolean)
             .some((value) => value.toLowerCase().includes(keyword));
     });
+    const isCallingTeamContext =
+        modalType === "calling-team" || currentMember?.is_calling_team;
 
     const fetchDesignations = async (departmentIds) => {
         if (!Array.isArray(departmentIds)) {
@@ -158,6 +164,7 @@ export default function Members({
                 departments: currentMember?.departments || [],
                 designations: currentMember?.designation || [],
                 roles: currentMember?.roles?.map((r) => String(r)) || [],
+                is_calling_team: currentMember?.is_calling_team || false,
                 password: "",
                 confirm_password: "",
                 image: null,
@@ -222,15 +229,21 @@ const getRoleBadgeColor = (roleId) => {
 
     const handleCreateMember = () => {
         setCurrentMember(null);
-        setModalType('member');
-        setFormData((prev) => ({ ...prev, roles: ['3'] }));
+        setModalType("calling-team");
+        setFormData((prev) => ({
+            ...prev,
+            is_calling_team: true,
+            departments: [],
+            designations: [],
+            roles: [],
+        }));
         setIsOpen(true);
     };
 
     const handleCreateAdmin = () => {
         setCurrentMember(null);
         setModalType('admin');
-        setFormData((prev) => ({ ...prev, roles: ['1'] }));
+        setFormData((prev) => ({ ...prev, roles: ['1'], is_calling_team: false }));
         setIsOpen(true);
     };
 
@@ -315,6 +328,9 @@ const getRoleBadgeColor = (roleId) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        const isCreate = !currentMember;
+        const isCallingTeamCreate = isCreate && formData.is_calling_team;
+
         currentMember ? setIsUpdateLoading(true) : setIsCreateLoading(true);
         setIsSubmitting(true);
 
@@ -347,24 +363,34 @@ const getRoleBadgeColor = (roleId) => {
         }
 
         router.post(endpoint, data, {
-            onSuccess: () => {
+            onSuccess: (page) => {
+                const successMessage =
+                    page.props?.flash?.success ||
+                    (currentMember
+                        ? currentMember?.is_calling_team
+                            ? "Calling team member updated successfully!"
+                            : "Member updated successfully!"
+                        : isCallingTeamCreate
+                        ? "Calling team member created successfully!"
+                        : "Member created successfully!");
+
                 handleClose();
                 setErrors({});
-                setIsSubmitting(false);
-                currentMember
-                    ? setIsUpdateLoading(false)
-                    : setIsCreateLoading(false);
+                successAlert(successMessage);
             },
             onError: (errors) => {
                 setErrors(errors);
+                if (errors.message) {
+                }
+            },
+            onFinish: () => {
                 setIsSubmitting(false);
                 currentMember
                     ? setIsUpdateLoading(false)
                     : setIsCreateLoading(false);
-                if (errors.message) {
-                }
             },
             preserveScroll: true,
+            preserveState: false,
             forceFormData: true,
         });
     };
@@ -411,6 +437,7 @@ const getRoleBadgeColor = (roleId) => {
         setFormData({
             name: "",
             phone: "",
+            email: "",
             dob: "",
             gender: "male",
             status: "active",
@@ -421,6 +448,7 @@ const getRoleBadgeColor = (roleId) => {
             designation: "",
             designations: "",
             roles: [],
+            is_calling_team: false,
         });
         setErrors({});
         setSelectedFile(null);
@@ -827,9 +855,10 @@ const getRoleBadgeColor = (roleId) => {
     };
 
     const canAssignMemberToAdmin = (member) =>
-        member?.roles?.includes("3") &&
-        !member?.roles?.includes("1") &&
-        !member?.roles?.includes("2");
+        (member?.is_calling_team ||
+            (member?.roles?.includes("3") &&
+                !member?.roles?.includes("1") &&
+                !member?.roles?.includes("2")));
 
     return (
         <AuthenticatedLayout user={auth.user}>
@@ -923,7 +952,7 @@ const getRoleBadgeColor = (roleId) => {
                                         fill="white"
                                     />
                                 </svg>
-                                Create Member
+                                Create Calling Team Member
                             </button>
                              <button
                                 onClick={handleCreateAdmin}
@@ -1081,7 +1110,11 @@ const getRoleBadgeColor = (roleId) => {
                                                 </td>
                                                 <td className="p-3">
   <div className="flex justify-center gap-2 flex-wrap">
-    {member.roles && member.roles.length > 0 ? (
+    {member.is_calling_team ? (
+      <span className="inline-flex items-center gap-x-1 py-1 px-3 rounded-full text-xs font-medium bg-sky-600 text-white">
+        Calling Team
+      </span>
+    ) : member.roles && member.roles.length > 0 ? (
       member.roles.map((roleId) => (
         <span
           key={roleId}
@@ -1433,10 +1466,12 @@ const getRoleBadgeColor = (roleId) => {
                         <div className="p-6">
                             <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">
                                 {currentMember
-                                    ? "Edit Member"
+                                    ? currentMember?.is_calling_team
+                                        ? "Edit Calling Team Member"
+                                        : "Edit Member"
                                     : modalType === 'admin'
                                     ? "Create New Admin"
-                                    : "Create New Member"}
+                                    : "Create Calling Team Member"}
                             </h2>
 
                             <form
@@ -1692,7 +1727,7 @@ const getRoleBadgeColor = (roleId) => {
                                 </div>
 
                                 {/* Departments & Designations Section */}
-                                <div className="mb-6">
+                                {!isCallingTeamContext && <div className="mb-6">
                                     <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-4">
                                         Departments & Designations
                                     </h3>
@@ -2224,10 +2259,10 @@ const getRoleBadgeColor = (roleId) => {
                                             )}
                                         </div>
                                     </div>
-                                </div>
+                                </div>}
 
                                 {/* Roles Section */}
-                                <div className="mb-6">
+                                {!isCallingTeamContext && <div className="mb-6">
                                     <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-4">
                                         Roles{" "}
                                         <span className="text-red-500">*</span>
@@ -2275,7 +2310,7 @@ const getRoleBadgeColor = (roleId) => {
                                             {errors.roles}
                                         </p>
                                     )}
-                                </div>
+                                </div>}
 
                                 {/* Form Actions */}
                                 <div className="flex justify-end gap-3">
@@ -2322,11 +2357,13 @@ const getRoleBadgeColor = (roleId) => {
                                                     : "Creating..."}
                                             </div>
                                         ) : currentMember ? (
-                                            "Update Member"
+                                            currentMember?.is_calling_team
+                                                ? "Update Calling Team Member"
+                                                : "Update Member"
                                         ) : modalType === 'admin' ? (
                                             "Create Admin"
                                         ) : (
-                                            "Create Member"
+                                            "Create Calling Team Member"
                                         )}
                                     </button>
                                 </div>
@@ -2403,7 +2440,7 @@ const getRoleBadgeColor = (roleId) => {
                                             : ""
                                     }`}
                                 />
-                                
+
                                 {passwordForm.new_password_confirmation.length >
                                     0 &&
                                     passwordForm.new_password !==

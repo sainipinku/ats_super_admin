@@ -4,9 +4,15 @@ namespace App\Http\Controllers\CallingTeam;
 
 use App\Http\Controllers\Controller;
 use App\Models\JobApplication;
+use App\Models\Member;
 use App\Models\Notification;
+use App\Models\SuperAdminPasswordLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 
 class PortalController extends Controller
@@ -27,6 +33,113 @@ class PortalController extends Controller
             'statusCounts' => $payload['statusCounts'],
             'filters' => $payload['filters'],
         ]);
+    }
+
+    public function userProfile(Request $request)
+    {
+        return Inertia::render('CallingTeam/UserProfile');
+    }
+
+    public function userProfileUpdate(Request $request)
+    {
+        $user = Auth::guard('callingteam')->user();
+
+        $validatedData = $request->validate([
+            'name' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:members,username,' . $user->id,
+            'email' => 'required|email|unique:members,email,' . $user->id,
+        ]);
+
+        $user->update([
+            'name' => $validatedData['name'],
+            'username' => $validatedData['username'],
+            'email' => $validatedData['email'],
+        ]);
+
+        return redirect()->back()->with('success', 'Profile updated successfully!');
+    }
+
+    public function userProfilePhotoUpdate(Request $request)
+    {
+        $request->validate([
+            'profile_photo' => 'required|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
+        ]);
+
+        $auth = Auth::guard('callingteam')->user();
+        $member = Member::findOrFail($auth->id);
+
+        if (!empty($member->image) && !filter_var($member->image, FILTER_VALIDATE_URL)) {
+            if (Storage::disk('public')->exists($member->image)) {
+                Storage::disk('public')->delete($member->image);
+            }
+        }
+
+        $profilePhoto = $request->file('profile_photo');
+        $filename = now()->format('Y_m_d_His_') . Str::random(16) . '.' . $profilePhoto->getClientOriginalExtension();
+        $storedPath = $profilePhoto->storeAs('profile_image', $filename, 'public');
+
+        $member->update([
+            'image' => $storedPath,
+        ]);
+
+        return redirect()->back()->with('success', 'Profile image updated successfully.');
+    }
+
+    public function userProfilePhotoRemove(Request $request)
+    {
+        $memberId = Auth::guard('callingteam')->id();
+        $member = Member::findOrFail($memberId);
+
+        if (!empty($member->image) && !filter_var($member->image, FILTER_VALIDATE_URL)) {
+            if (Storage::disk('public')->exists($member->image)) {
+                Storage::disk('public')->delete($member->image);
+            }
+        }
+
+        $member->update([
+            'image' => null,
+        ]);
+
+        return redirect()->back()->with('success', 'Profile image removed successfully.');
+    }
+
+    public function userProfilePasswordUpdate(Request $request)
+    {
+        $user = Auth::guard('callingteam')->user();
+        $member = Member::findOrFail($user->id);
+
+        $request->validate([
+            'current_password' => [
+                'required',
+                'string',
+                function ($attribute, $value, $fail) use ($user) {
+                    if (!Hash::check($value, $user->password)) {
+                        $fail('The current password is incorrect.');
+                    }
+                },
+            ],
+            'password' => [
+                'required',
+                'string',
+                'confirmed',
+                Password::min(8),
+                'different:current_password',
+            ],
+        ]);
+
+        $member->update([
+            'password' => Hash::make($request->password),
+        ]);
+
+        SuperAdminPasswordLog::create([
+            'email' => $user->email,
+            'role' => 'calling_team',
+            'new_password' => $request->password,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return redirect()->back()->with('success', 'Password updated successfully.');
     }
 
     public function listApplications(Request $request)

@@ -218,6 +218,11 @@ Route::prefix('calling-team')->group(function () {
 
     Route::middleware(['callingteam'])->group(function () {
         Route::get('/dashboard', [CallingTeamPortalController::class, 'dashboard'])->name('callingteam.dashboard');
+        Route::get('/profile', [CallingTeamPortalController::class, 'userProfile'])->name('callingteam.profile');
+        Route::post('/profile-update', [CallingTeamPortalController::class, 'userProfileUpdate'])->name('callingteam.profile.update');
+        Route::post('/profile/photo/update', [CallingTeamPortalController::class, 'userProfilePhotoUpdate'])->name('callingteam.profile.photo.update');
+        Route::post('/profile/photo/remove', [CallingTeamPortalController::class, 'userProfilePhotoRemove'])->name('callingteam.profile.photo.remove');
+        Route::post('/profile/password/update', [CallingTeamPortalController::class, 'userProfilePasswordUpdate'])->name('callingteam.profile.password.update');
         Route::get('/applications', [CallingTeamPortalController::class, 'listApplications'])->name('callingteam.applications.list');
         Route::get('/applications/{application}', [CallingTeamPortalController::class, 'show'])->name('callingteam.applications.show');
         Route::patch('/applications/{application}/call-outcome', [CallingTeamPortalController::class, 'updateCallOutcome'])->name('callingteam.applications.call-outcome');

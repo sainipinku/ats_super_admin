@@ -7,6 +7,7 @@ use App\Models\Member;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -62,7 +63,16 @@ class CallingTeamController extends Controller
             'password' => ['required', 'string', 'min:6', 'same:confirm_password'],
             'confirm_password' => ['required', 'string', 'min:6'],
             'status' => ['nullable', 'in:0,1'],
+            'dob' => ['nullable', 'date'],
+            'gender' => ['nullable', 'in:male,female,other'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
         ]);
+
+        $imagePath = null;
+
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('member-images', 'public');
+        }
 
         Member::create([
             'name' => $validated['name'],
@@ -76,6 +86,9 @@ class CallingTeamController extends Controller
             'assigned_admin_id' => $admin->id,
             'username' => $this->generateUsername($validated['name']),
             'slug' => Str::slug($validated['name'] . '-' . Str::random(4)),
+            'dob' => $validated['dob'] ?? null,
+            'gender' => $validated['gender'] ?? null,
+            'image' => $imagePath,
         ]);
 
         return redirect()->back()->with('success', 'Calling team member created successfully.');

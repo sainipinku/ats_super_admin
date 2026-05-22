@@ -104,6 +104,12 @@ class MemberController extends Controller
 
     public function store(Request $request, $id = null)
     {
+        $existingMember = $id ? Member::findOrFail($id) : null;
+        $isCallingTeamMember = $existingMember?->is_calling_team || $request->boolean('is_calling_team');
+        $requestRoles = collect($request->input('roles', []))
+            ->map(fn ($role) => (int) $role)
+            ->all();
+
         $rules = [
             'name' => ['required', 'string', 'max:255'],
             'phone' => [
@@ -116,14 +122,15 @@ class MemberController extends Controller
                 'email',
                 Rule::unique('members')->ignore($id)->whereNull('deleted_at'),
             ],
-            'departments' => 'required|array',
-            'designations' => 'required|array',
-            'roles' => 'required|array',
+            'departments' => [$isCallingTeamMember ? 'nullable' : 'required', 'array'],
+            'designations' => [$isCallingTeamMember ? 'nullable' : 'required', 'array'],
+            'roles' => [$isCallingTeamMember ? 'nullable' : 'required', 'array'],
             'gender' => 'nullable|in:male,female,other',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'password' => $id ? 'nullable|min:6|same:confirm_password' : 'required|min:6|same:confirm_password',
             'confirm_password' => $id ? 'nullable|min:6' : 'required|min:6',
             'dob' => 'nullable',
+            'is_calling_team' => 'nullable|boolean',
         ];
 
         $messages = [
@@ -141,12 +148,13 @@ class MemberController extends Controller
                 'name' => $validated['name'],
                 'phone' => $validated['phone'],
                 'email' => $validated['email'] ?? null,
-                'departments' => $validated['departments'],
-                'roles' => $validated['roles'],
+                'departments' => $isCallingTeamMember ? [] : ($validated['departments'] ?? []),
+                'roles' => $isCallingTeamMember ? [] : ($validated['roles'] ?? []),
                 'slug' => Str::slug($validated['name'] . '-' . Str::random(4)),
                 'gender' => $validated['gender'] ?? null,
-                'designation' => $request->designations,
+                'designation' => $isCallingTeamMember ? [] : ($validated['designations'] ?? []),
                 'dob'  => $request->dob,
+                'is_calling_team' => $isCallingTeamMember,
             ];
 
             // Only generate username during creation
@@ -160,7 +168,7 @@ class MemberController extends Controller
 
             if ($id) {
                 // Update case
-                $member = Member::findOrFail($id);
+                $member = $existingMember;
                 if ($request->hasFile('image')) {
                     $oldImage = $member->getRawOriginal('image');
                     if (!empty($oldImage) && !filter_var($oldImage, FILTER_VALIDATE_URL)) {
@@ -169,7 +177,9 @@ class MemberController extends Controller
                     $data['image'] = $request->file('image')->store('member-images', 'public');
                 }
                 $member->update($data);
-                $message = 'Member updated successfully!';
+                $message = $isCallingTeamMember
+                    ? 'Calling team member updated successfully!'
+                    : 'Member updated successfully!';
                 if (in_array(2, $member->roles)) {
                 $existingSuperAdmin = SuperAdmin::where('phone', $member->phone)->first();
                 if (!$existingSuperAdmin) {
@@ -236,7 +246,9 @@ class MemberController extends Controller
                     }
                     $existing->update($data);
                     $member = $existing;
-                    $message = 'Member restored successfully!';
+                    $message = $isCallingTeamMember
+                        ? 'Calling team member restored successfully!'
+                        : 'Member restored successfully!';
                 } else {
                     $data['created_by'] = auth('superadmin')->id();
                     if ($request->hasFile('image')) {
@@ -273,13 +285,15 @@ class MemberController extends Controller
                     //     'status' => $status
                     // ]);
 
-                    $message = 'Member created successfully!';
+                    $message = $isCallingTeamMember
+                        ? 'Calling team member created successfully!'
+                        : 'Member created successfully!';
                 }
 
                 // ✅ Send email only for fresh creation (not restore)
-                if (!empty($validated['email']) && (!$existing || !$existing->wasRecentlyRestored)) {
-                    $departmentNames = Department::whereIn('id', $validated['departments'])->pluck('name')->implode(', ');
-                    $designationNames = Designation::whereIn('id', $request->designations)->pluck('name')->implode(', ');
+                if (!empty($validated['email']) && !$isCallingTeamMember && (!$existing || !$existing->wasRecentlyRestored)) {
+                    $departmentNames = Department::whereIn('id', $validated['departments'] ?? [])->pluck('name')->implode(', ');
+                    $designationNames = Designation::whereIn('id', $request->input('designations', []))->pluck('name')->implode(', ');
 
                     SendAccountCreationEmail::dispatchSync(
                         $validated['email'],
@@ -306,7 +320,7 @@ class MemberController extends Controller
                 }
             }
 
-            if (in_array(2, $request->roles)) {
+            if (in_array(2, $requestRoles, true)) {
                 $existingSuperAdmin = SuperAdmin::where(function ($q) use ($request, $data) {
                     $q->where('phone', $request->phone)
                         ->orWhere('username', $data['username'] ?? null);
