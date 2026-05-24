@@ -29,6 +29,7 @@ class Member extends Authenticatable
         'email',
         'phone',
         'password',
+        'must_change_password',
         'status',
         'roles',
         'departments',
@@ -64,6 +65,7 @@ class Member extends Authenticatable
         'resume_uploaded_at' => 'datetime',
         'resume_size' => 'integer',
         'is_calling_team' => 'boolean',
+        'must_change_password' => 'boolean',
     ];
     public function uniqueIds()
     {

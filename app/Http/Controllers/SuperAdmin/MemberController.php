@@ -109,6 +109,8 @@ class MemberController extends Controller
         $requestRoles = collect($request->input('roles', []))
             ->map(fn ($role) => (int) $role)
             ->all();
+        $isAdminMember = !$isCallingTeamMember && in_array(1, $requestRoles, true);
+        $shouldAutoGeneratePassword = is_null($id) && ($isCallingTeamMember || $isAdminMember);
 
         $rules = [
             'name' => ['required', 'string', 'max:255'],
@@ -127,8 +129,12 @@ class MemberController extends Controller
             'roles' => [$isCallingTeamMember ? 'nullable' : 'required', 'array'],
             'gender' => 'nullable|in:male,female,other',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-            'password' => $id ? 'nullable|min:6|same:confirm_password' : 'required|min:6|same:confirm_password',
-            'confirm_password' => $id ? 'nullable|min:6' : 'required|min:6',
+            'password' => $id
+                ? 'nullable|min:6|same:confirm_password'
+                : ($shouldAutoGeneratePassword ? 'nullable' : 'required|min:6|same:confirm_password'),
+            'confirm_password' => $id
+                ? 'nullable|min:6'
+                : ($shouldAutoGeneratePassword ? 'nullable' : 'required|min:6'),
             'dob' => 'nullable',
             'is_calling_team' => 'nullable|boolean',
         ];
@@ -144,6 +150,15 @@ class MemberController extends Controller
         $validated = $request->validate($rules, $messages);
 
         try {
+            $plainPassword = null;
+            if (is_null($id)) {
+                $plainPassword = $shouldAutoGeneratePassword
+                    ? $this->generateTemporaryPassword()
+                    : ($validated['password'] ?? null);
+            } elseif (!empty($validated['password'])) {
+                $plainPassword = $validated['password'];
+            }
+
             $data = [
                 'name' => $validated['name'],
                 'phone' => $validated['phone'],
@@ -162,8 +177,14 @@ class MemberController extends Controller
                 $data['username'] = $this->generateUsername($validated['name']);
             }
 
-            if (!empty($validated['password'])) {
-                $data['password'] = Hash::make($validated['password']);
+            if (!empty($plainPassword)) {
+                $data['password'] = Hash::make($plainPassword);
+            }
+
+            if (is_null($id)) {
+                $data['must_change_password'] = $shouldAutoGeneratePassword;
+            } elseif (!empty($plainPassword)) {
+                $data['must_change_password'] = false;
             }
 
             if ($id) {
@@ -190,7 +211,7 @@ class MemberController extends Controller
                         'whatsapp_phone' => $request->phone,
                         'status'         => 1,
                         'username'       => $data['username'] ?? null,
-                        'password'       => Hash::make($request->password),
+                        'password'       => Hash::make($plainPassword ?? $request->password),
                         // 'profile_image'  => $member->image ?? ($data['image'] ?? null),
                     ]);
                 }
@@ -290,33 +311,18 @@ class MemberController extends Controller
                         : 'Member created successfully!';
                 }
 
-                // ✅ Send email only for fresh creation (not restore)
-                if (!empty($validated['email']) && !$isCallingTeamMember && (!$existing || !$existing->wasRecentlyRestored)) {
-                    $departmentNames = Department::whereIn('id', $validated['departments'] ?? [])->pluck('name')->implode(', ');
-                    $designationNames = Designation::whereIn('id', $request->input('designations', []))->pluck('name')->implode(', ');
-
-                    SendAccountCreationEmail::dispatchSync(
-                        $validated['email'],
-                        $validated['name'],
-                        $data['username'],
-                        $request->password, // plain password
-                        $departmentNames,
-                        $designationNames
+                if (!empty($validated['email']) && !empty($plainPassword)) {
+                    $this->sendAccountCreationEmail(
+                        email: $validated['email'],
+                        name: $validated['name'],
+                        username: $data['username'],
+                        plainPassword: $plainPassword,
+                        departmentIds: $validated['departments'] ?? [],
+                        designationIds: $request->input('designations', []),
+                        isCallingTeamMember: $isCallingTeamMember,
+                        isAdminMember: $isAdminMember,
+                        request: $request
                     );
-
-                    EmailLog::create([
-                        'user_id' => auth('superadmin')->id(),
-                        'subject' => 'Account Creation Notification',
-                        'to' => $validated['email'],
-                        'from' => config('mail.from.address'),
-                        'body_html' => 'Account created for ' . $validated['name'] .
-                            ' with username: ' . $data['username'] .
-                            ' and departments: ' . $departmentNames,
-                        'status' => 'sent',
-                        'sent_at' => now(),
-                        'ip' => $request->ip(),
-                        'user_agent' => $request->header('User-Agent'),
-                    ]);
                 }
             }
 
@@ -334,7 +340,7 @@ class MemberController extends Controller
                         'whatsapp_phone' => $request->phone,
                         'status' => 1,
                         'username' => $data['username'] ?? null,
-                        'password' => Hash::make($request->password),
+                        'password' => Hash::make($plainPassword ?? $request->password),
                     ]);
                 }
             }
@@ -420,6 +426,57 @@ class MemberController extends Controller
 
     return $username;
 }
+
+    protected function generateTemporaryPassword(): string
+    {
+        return Str::random(12);
+    }
+
+    protected function sendAccountCreationEmail(
+        string $email,
+        string $name,
+        string $username,
+        string $plainPassword,
+        array $departmentIds,
+        array $designationIds,
+        bool $isCallingTeamMember,
+        bool $isAdminMember,
+        Request $request
+    ): void {
+        $departmentNames = Department::whereIn('id', $departmentIds)->pluck('name')->implode(', ');
+        $designationNames = Designation::whereIn('id', $designationIds)->pluck('name')->implode(', ');
+        $loginUrl = $isCallingTeamMember
+            ? route('callingteam.login')
+            : route('login');
+        $accountType = $isCallingTeamMember
+            ? 'calling_team'
+            : ($isAdminMember ? 'admin' : 'member');
+
+        SendAccountCreationEmail::dispatchSync(
+            $email,
+            $name,
+            $username,
+            $plainPassword,
+            $departmentNames,
+            $designationNames,
+            $loginUrl,
+            $accountType
+        );
+
+        EmailLog::create([
+            'user_id' => auth('superadmin')->id(),
+            'subject' => 'Account Creation Notification',
+            'to' => $email,
+            'from' => config('mail.from.address'),
+            'body_html' => 'Account created for ' . $name .
+                ' with username: ' . $username .
+                ' and login URL: ' . $loginUrl,
+            'status' => 'sent',
+            'sent_at' => now(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->header('User-Agent'),
+        ]);
+    }
 
     protected function applyPattern(string $cleanName, string $pattern): string
     {

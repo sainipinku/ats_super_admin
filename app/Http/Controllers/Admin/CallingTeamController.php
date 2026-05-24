@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendAccountCreationEmail;
+use App\Models\EmailLog;
 use App\Models\Member;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -60,13 +62,12 @@ class CallingTeamController extends Controller
                 'email',
                 Rule::unique('members')->whereNull('deleted_at'),
             ],
-            'password' => ['required', 'string', 'min:6', 'same:confirm_password'],
-            'confirm_password' => ['required', 'string', 'min:6'],
             'status' => ['nullable', 'in:0,1'],
             'dob' => ['nullable', 'date'],
             'gender' => ['nullable', 'in:male,female,other'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
         ]);
+        $temporaryPassword = $this->generateTemporaryPassword();
 
         $imagePath = null;
 
@@ -74,11 +75,12 @@ class CallingTeamController extends Controller
             $imagePath = $request->file('image')->store('member-images', 'public');
         }
 
-        Member::create([
+        $member = Member::create([
             'name' => $validated['name'],
             'phone' => $validated['phone'],
             'email' => $validated['email'] ?? null,
-            'password' => Hash::make($validated['password']),
+            'password' => Hash::make($temporaryPassword),
+            'must_change_password' => true,
             'status' => (int) ($validated['status'] ?? 1),
             'roles' => [],
             'is_calling_team' => true,
@@ -90,6 +92,35 @@ class CallingTeamController extends Controller
             'gender' => $validated['gender'] ?? null,
             'image' => $imagePath,
         ]);
+
+        if (!empty($validated['email'])) {
+            $loginUrl = route('callingteam.login');
+
+            SendAccountCreationEmail::dispatchSync(
+                $validated['email'],
+                $validated['name'],
+                $member->username,
+                $temporaryPassword,
+                '',
+                '',
+                $loginUrl,
+                'calling_team'
+            );
+
+            EmailLog::create([
+                'user_id' => $admin->id,
+                'subject' => 'Account Creation Notification',
+                'to' => $validated['email'],
+                'from' => config('mail.from.address'),
+                'body_html' => 'Calling team account created for ' . $validated['name']
+                    . ' with username: ' . $member->username
+                    . ' and login URL: ' . $loginUrl,
+                'status' => 'sent',
+                'sent_at' => now(),
+                'ip' => $request->ip(),
+                'user_agent' => $request->header('User-Agent'),
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Calling team member created successfully.');
     }
@@ -143,5 +174,10 @@ class CallingTeamController extends Controller
         } while ($exists);
 
         return $username;
+    }
+
+    private function generateTemporaryPassword(): string
+    {
+        return Str::random(12);
     }
 }

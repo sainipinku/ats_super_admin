@@ -107,13 +107,14 @@ class PortalController extends Controller
     {
         $user = Auth::guard('callingteam')->user();
         $member = Member::findOrFail($user->id);
+        $requiresCurrentPassword = !$member->must_change_password;
 
         $request->validate([
             'current_password' => [
-                'required',
+                $requiresCurrentPassword ? 'required' : 'nullable',
                 'string',
-                function ($attribute, $value, $fail) use ($user) {
-                    if (!Hash::check($value, $user->password)) {
+                function ($attribute, $value, $fail) use ($user, $requiresCurrentPassword) {
+                    if ($requiresCurrentPassword && !Hash::check($value, $user->password)) {
                         $fail('The current password is incorrect.');
                     }
                 },
@@ -129,6 +130,7 @@ class PortalController extends Controller
 
         $member->update([
             'password' => Hash::make($request->password),
+            'must_change_password' => false,
         ]);
 
         SuperAdminPasswordLog::create([

@@ -329,13 +329,14 @@ if ($activeMembers->count() > 0) {
     public function userProfilePasswordUpdate(Request $request)
     {
         $user = Auth::guard('admin')->user();
-        $superAdmin = Member::find($user->id);
+        $superAdmin = Member::findOrFail($user->id);
+        $requiresCurrentPassword = !$superAdmin->must_change_password;
         $validated = $request->validate([
             'current_password' => [
-                'required',
+                $requiresCurrentPassword ? 'required' : 'nullable',
                 'string',
-                function ($attribute, $value, $fail) use ($user) {
-                    if (!Hash::check($value, $user->password)) {
+                function ($attribute, $value, $fail) use ($user, $requiresCurrentPassword) {
+                    if ($requiresCurrentPassword && !Hash::check($value, $user->password)) {
                         $fail('The current password is incorrect.');
                     }
                 }
@@ -350,6 +351,7 @@ if ($activeMembers->count() > 0) {
         ]);
         $superAdmin->update([
             'password' => Hash::make($request->password),
+            'must_change_password' => false,
         ]);
         SuperAdminPasswordLog::create([
             'email'        => $user->email,

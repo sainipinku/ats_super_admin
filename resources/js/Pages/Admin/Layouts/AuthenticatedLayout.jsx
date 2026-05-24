@@ -1,7 +1,8 @@
 import { useAlerts } from "@/Components/Alerts";
 import ApplicationLogo from "@/Components/ApplicationLogo";
+import Modal from "@/Components/Modal";
 import NavLink from "@/Components/NavLink";
-import { Link, usePage } from "@inertiajs/react";
+import { Link, router, usePage } from "@inertiajs/react";
 import { useEffect, useRef, useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { FaSun } from "react-icons/fa6";
@@ -21,6 +22,7 @@ import {
 
 export default function AuthenticatedLayout({ header, children }) {
     const user = usePage().props;
+    const authUser = user.auth?.user;
 
     const { successAlert, errorAlert, warningAlert, infoAlert } = useAlerts();
     const { flash, errors, messages } = usePage().props;
@@ -40,6 +42,15 @@ export default function AuthenticatedLayout({ header, children }) {
     const [notificationsLoading, setNotificationsLoading] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const [notifications, setNotifications] = useState([]);
+    const [mustChangePassword, setMustChangePassword] = useState(
+        Boolean(authUser?.must_change_password)
+    );
+    const [forcePasswordForm, setForcePasswordForm] = useState({
+        password: "",
+        password_confirmation: "",
+    });
+    const [forcePasswordErrors, setForcePasswordErrors] = useState({});
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
     const formatRelativeTime = (value) => {
         if (!value) return "";
@@ -274,6 +285,34 @@ export default function AuthenticatedLayout({ header, children }) {
             fetchNotifications();
         }
     }, [bellOpen]);
+
+    useEffect(() => {
+        setMustChangePassword(Boolean(authUser?.must_change_password));
+    }, [authUser?.must_change_password]);
+
+    const handleForcePasswordUpdate = (event) => {
+        event.preventDefault();
+        setIsUpdatingPassword(true);
+        setForcePasswordErrors({});
+
+        router.post(route("admin.profile.password.update"), forcePasswordForm, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setMustChangePassword(false);
+                setForcePasswordForm({
+                    password: "",
+                    password_confirmation: "",
+                });
+                successAlert("Password updated successfully.");
+            },
+            onError: (nextErrors) => {
+                setForcePasswordErrors(nextErrors);
+            },
+            onFinish: () => {
+                setIsUpdatingPassword(false);
+            },
+        });
+    };
 
     return (
         <>
@@ -525,6 +564,71 @@ export default function AuthenticatedLayout({ header, children }) {
                 )}
 
                 <main className="mt-8">{children}</main>
+
+                <Modal show={mustChangePassword} closeable={false} maxWidth="md">
+                    <div className="p-4">
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                            Reset Password
+                        </h2>
+                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                            Please set a new password before using the admin panel.
+                        </p>
+
+                        <form onSubmit={handleForcePasswordUpdate} className="mt-6 space-y-4">
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    New Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={forcePasswordForm.password}
+                                    onChange={(event) =>
+                                        setForcePasswordForm((prev) => ({
+                                            ...prev,
+                                            password: event.target.value,
+                                        }))
+                                    }
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                />
+                                {forcePasswordErrors.password && (
+                                    <p className="mt-1 text-sm text-red-600">
+                                        {forcePasswordErrors.password}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Confirm Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={forcePasswordForm.password_confirmation}
+                                    onChange={(event) =>
+                                        setForcePasswordForm((prev) => ({
+                                            ...prev,
+                                            password_confirmation: event.target.value,
+                                        }))
+                                    }
+                                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                />
+                                {forcePasswordErrors.password_confirmation && (
+                                    <p className="mt-1 text-sm text-red-600">
+                                        {forcePasswordErrors.password_confirmation}
+                                    </p>
+                                )}
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={isUpdatingPassword}
+                                className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {isUpdatingPassword ? "Updating..." : "Update Password"}
+                            </button>
+                        </form>
+                    </div>
+                </Modal>
 
                 <Toaster position="top-right" reverseOrder={false} gutter={8} />
             </div>

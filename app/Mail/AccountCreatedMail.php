@@ -16,6 +16,8 @@ class AccountCreatedMail extends Mailable
     public $password;
     public $departmentNames;
     public $designationNames;
+    public $loginUrl;
+    public $accountType;
     public $email;
     public $emailPassword;
     public $setting; // Add this property
@@ -26,6 +28,8 @@ class AccountCreatedMail extends Mailable
         $password,
         $departmentNames,
         $designationNames,
+        $loginUrl,
+        $accountType,
         $email,
         $emailPassword
     ) {
@@ -34,6 +38,8 @@ class AccountCreatedMail extends Mailable
         $this->password = $password;
         $this->departmentNames = $departmentNames;
         $this->designationNames = $designationNames;
+        $this->loginUrl = $loginUrl;
+        $this->accountType = $accountType;
         $this->email = $email;
         $this->emailPassword = $emailPassword;
         $this->setting = SiteSetting::first();
@@ -49,6 +55,8 @@ class AccountCreatedMail extends Mailable
                 'password' => $this->password,
                 'departmentNames' => $this->departmentNames,
                 'designationNames' => $this->designationNames,
+                'loginUrl' => $this->loginUrl,
+                'accountType' => $this->accountType,
                 'email' => $this->email,
                 'emailPassword' => $this->emailPassword,
                 'setting' => $this->setting,

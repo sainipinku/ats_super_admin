@@ -1,6 +1,8 @@
 @php
     $departments = !empty($departmentNames) ? implode(', ', (array) $departmentNames) : 'N/A';
     $designations = !empty($designationNames) ? implode(', ', (array) $designationNames) : 'N/A';
+    $loginLink = $loginUrl ?? url('/login');
+    $typeLabel = ucwords(str_replace('_', ' ', $accountType ?? 'member'));
 @endphp
 
 <table align="center" style="width: 100%; max-width: 450px; font-family: Inter, sans-serif; border: 1px solid #f2f2f2;">
@@ -15,7 +17,7 @@
     <tr>
         <td style="padding: 25px 20px; font-size: 14px; color: #1E1E1E;">
             <p>Hi <strong>{{ $name ?? 'User' }}</strong>,</p>
-            <p>Your account has been successfully created. Below are your account details:</p>
+            <p>Your {{ $typeLabel }} account has been successfully created. Below are your login details:</p>
 
             <table style="width:100%; border-collapse: collapse; margin-top: 15px;">
                 <tr>
@@ -25,6 +27,12 @@
                 <tr>
                     <td style="padding: 8px; font-weight: 600;">Password:</td>
                     <td style="padding: 8px;">{{ $password ?? 'N/A' }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; font-weight: 600;">Login URL:</td>
+                    <td style="padding: 8px;">
+                        <a href="{{ $loginLink }}">{{ $loginLink }}</a>
+                    </td>
                 </tr>
                 <tr>
                     <td style="padding: 8px; font-weight: 600;">Email:</td>
@@ -44,7 +52,7 @@
                 </tr>
             </table>
 
-            <p style="margin-top: 20px;">You can now log in and start using your account.</p>
+            <p style="margin-top: 20px;">Please log in using this temporary password and reset it immediately after your first login.</p>
         </td>
     </tr>
     <!-- EMAIL BODY END -->

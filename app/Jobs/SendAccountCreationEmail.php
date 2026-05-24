@@ -21,8 +21,10 @@ class SendAccountCreationEmail implements ShouldQueue
     protected $password;
     protected $departmentNames;
     protected $designationNames;
+    protected $loginUrl;
+    protected $accountType;
 
-    public function __construct($email, $name, $username, $password, $departmentNames, $designationNames)
+    public function __construct($email, $name, $username, $password, $departmentNames, $designationNames, $loginUrl = null, $accountType = 'member')
     {
         $this->email = $email;
         $this->name = $name;
@@ -30,6 +32,8 @@ class SendAccountCreationEmail implements ShouldQueue
         $this->password = $password;
         $this->departmentNames = $departmentNames;
         $this->designationNames = $designationNames;
+        $this->loginUrl = $loginUrl;
+        $this->accountType = $accountType;
     }
 
     public function handle()
@@ -47,6 +51,8 @@ class SendAccountCreationEmail implements ShouldQueue
                     $this->password,
                     $this->departmentNames,
                     $this->designationNames,
+                    $this->loginUrl,
+                    $this->accountType,
                     $emailCredentials['email'],
                     $emailCredentials['password']
                 )

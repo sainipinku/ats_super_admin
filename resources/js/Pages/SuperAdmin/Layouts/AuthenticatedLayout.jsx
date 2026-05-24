@@ -372,7 +372,7 @@ export default function AuthenticatedLayout({ header, children }) {
     </NavLink>
 
     {/* Roles */}
-    <NavLink
+    {/* <NavLink
         className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
             route().current("super.role.list")
                 ? "bg-blue-600 text-white shadow-md"
@@ -382,7 +382,7 @@ export default function AuthenticatedLayout({ header, children }) {
         active={route().current("super.role.list")}
     >
         Roles
-    </NavLink>
+    </NavLink> */}
 
     {/* Departments */}
     <NavLink

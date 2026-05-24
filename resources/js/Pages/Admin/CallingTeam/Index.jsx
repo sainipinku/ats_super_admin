@@ -10,8 +10,6 @@ const emptyForm = {
     email: "",
     dob: "",
     gender: "male",
-    password: "",
-    confirm_password: "",
     status: "1",
     image: null,
 };
@@ -308,6 +306,9 @@ export default function Index({ members, filters }) {
                     <h2 className="text-2xl font-bold text-slate-800 mb-6 dark:text-white">
                         Create Calling Team Member
                     </h2>
+                    <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+                        Password will be auto-generated and login details will be sent to the member email. On first login, password reset will be required.
+                    </div>
 
                     <form onSubmit={submit} className="grid gap-4">
                         <div className="mb-2 flex justify-center">
@@ -422,7 +423,7 @@ export default function Index({ members, filters }) {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-1">
                             <div>
                                 <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                                     Gender
@@ -439,45 +440,6 @@ export default function Index({ members, filters }) {
                                     <option value="other">Other</option>
                                 </select>
                                 {errors.gender && <p className="mt-1 text-sm text-red-600">{errors.gender}</p>}
-                            </div>
-
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Password
-                                </label>
-                                <input
-                                    type="password"
-                                    value={form.password}
-                                    onChange={(event) =>
-                                        setForm((prev) => ({ ...prev, password: event.target.value }))
-                                    }
-                                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                />
-                                {errors.password && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-                                )}
-                            </div>
-
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Confirm Password
-                                </label>
-                                <input
-                                    type="password"
-                                    value={form.confirm_password}
-                                    onChange={(event) =>
-                                        setForm((prev) => ({
-                                            ...prev,
-                                            confirm_password: event.target.value,
-                                        }))
-                                    }
-                                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                />
-                                {errors.confirm_password && (
-                                    <p className="mt-1 text-sm text-red-600">
-                                        {errors.confirm_password}
-                                    </p>
-                                )}
                             </div>
                         </div>
 
