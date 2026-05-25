@@ -102,106 +102,93 @@ class MemberController extends Controller
      * @throws \Illuminate\Database\Eloquent\ModelNotFoundException If the member is not found for update.
      */
 
-    public function store(Request $request, $id = null)
-    {
-        $existingMember = $id ? Member::findOrFail($id) : null;
-        $isCallingTeamMember = $existingMember?->is_calling_team || $request->boolean('is_calling_team');
-        $requestRoles = collect($request->input('roles', []))
-            ->map(fn ($role) => (int) $role)
-            ->all();
-        $isAdminMember = !$isCallingTeamMember && in_array(1, $requestRoles, true);
-        $shouldAutoGeneratePassword = is_null($id) && ($isCallingTeamMember || $isAdminMember);
+      public function store(Request $request, $id = null)
+{
+    // Convert is_calling_team to boolean if it's a string
+    if ($request->has('is_calling_team')) {
+        $request->merge([
+            'is_calling_team' => filter_var($request->input('is_calling_team'), FILTER_VALIDATE_BOOLEAN)
+        ]);
+    }
 
-        $rules = [
-            'name' => ['required', 'string', 'max:255'],
-            'phone' => [
-                'required',
-                'string',
-                Rule::unique('members')->ignore($id)->whereNull('deleted_at'),
-            ],
-            'email' => [
-                'nullable',
-                'email',
-                Rule::unique('members')->ignore($id)->whereNull('deleted_at'),
-            ],
-            'departments' => [$isCallingTeamMember ? 'nullable' : 'required', 'array'],
-            'designations' => [$isCallingTeamMember ? 'nullable' : 'required', 'array'],
-            'roles' => [$isCallingTeamMember ? 'nullable' : 'required', 'array'],
-            'gender' => 'nullable|in:male,female,other',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-            'password' => $id
-                ? 'nullable|min:6|same:confirm_password'
-                : ($shouldAutoGeneratePassword ? 'nullable' : 'required|min:6|same:confirm_password'),
-            'confirm_password' => $id
-                ? 'nullable|min:6'
-                : ($shouldAutoGeneratePassword ? 'nullable' : 'required|min:6'),
-            'dob' => 'nullable',
-            'is_calling_team' => 'nullable|boolean',
+    $existingMember = $id ? Member::findOrFail($id) : null;
+    $isCallingTeamMember = $existingMember?->is_calling_team || $request->boolean('is_calling_team');
+    $requestRoles = collect($request->input('roles', []))
+        ->map(fn ($role) => (int) $role)
+        ->all();
+
+    $rules = [
+        'name' => ['required', 'string', 'max:255'],
+        'phone' => [
+            'required',
+            'string',
+            Rule::unique('members')->ignore($id)->whereNull('deleted_at'),
+        ],
+        'email' => [
+            'nullable',
+            'email',
+            Rule::unique('members')->ignore($id)->whereNull('deleted_at'),
+        ],
+        'departments' => [$isCallingTeamMember ? 'nullable' : 'required', 'array'],
+        'designations' => [$isCallingTeamMember ? 'nullable' : 'required', 'array'],
+        'roles' => [$isCallingTeamMember ? 'nullable' : 'required', 'array'],
+        'gender' => 'nullable|in:male,female,other',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+        'password' => $id ? 'nullable|min:6|same:confirm_password' : 'required|min:6|same:confirm_password',
+        'confirm_password' => $id ? 'nullable|min:6' : 'required|min:6',
+        'dob' => 'nullable',
+        'is_calling_team' => 'nullable',
+    ];
+
+    $messages = [
+        'phone.unique' => 'This phone number is already in use.',
+        'email.unique' => 'This email address is already in use.',
+        'departments.required' => 'Please select at least one department.',
+        'designations.required' => 'Please select at least one designation.',
+        'roles.required' => 'Please select at least one role.',
+    ];
+
+    $validated = $request->validate($rules, $messages);
+
+    try {
+        $data = [
+            'name' => $validated['name'],
+            'phone' => $validated['phone'],
+            'email' => $validated['email'] ?? null,
+            'departments' => $isCallingTeamMember ? [] : ($validated['departments'] ?? []),
+            'roles' => $isCallingTeamMember ? [] : ($validated['roles'] ?? []),
+            'slug' => Str::slug($validated['name'] . '-' . Str::random(4)),
+            'gender' => $validated['gender'] ?? null,
+            'designation' => $isCallingTeamMember ? [] : ($validated['designations'] ?? []),
+            'dob'  => $request->dob,
+            'is_calling_team' => $isCallingTeamMember,
         ];
 
-        $messages = [
-            'phone.unique' => 'This phone number is already in use.',
-            'email.unique' => 'This email address is already in use.',
-            'departments.required' => 'Please select at least one department.',
-            'designations.required' => 'Please select at least one designation.',
-            'roles.required' => 'Please select at least one role.',
-        ];
+        // Only generate username during creation
+        if (is_null($id)) {
+            $data['username'] = $this->generateUsername($validated['name']);
+        }
 
-        $validated = $request->validate($rules, $messages);
+        if (!empty($validated['password'])) {
+            $data['password'] = Hash::make($validated['password']);
+        }
 
-        try {
-            $plainPassword = null;
-            if (is_null($id)) {
-                $plainPassword = $shouldAutoGeneratePassword
-                    ? $this->generateTemporaryPassword()
-                    : ($validated['password'] ?? null);
-            } elseif (!empty($validated['password'])) {
-                $plainPassword = $validated['password'];
-            }
-
-            $data = [
-                'name' => $validated['name'],
-                'phone' => $validated['phone'],
-                'email' => $validated['email'] ?? null,
-                'departments' => $isCallingTeamMember ? [] : ($validated['departments'] ?? []),
-                'roles' => $isCallingTeamMember ? [] : ($validated['roles'] ?? []),
-                'slug' => Str::slug($validated['name'] . '-' . Str::random(4)),
-                'gender' => $validated['gender'] ?? null,
-                'designation' => $isCallingTeamMember ? [] : ($validated['designations'] ?? []),
-                'dob'  => $request->dob,
-                'is_calling_team' => $isCallingTeamMember,
-            ];
-
-            // Only generate username during creation
-            if (is_null($id)) {
-                $data['username'] = $this->generateUsername($validated['name']);
-            }
-
-            if (!empty($plainPassword)) {
-                $data['password'] = Hash::make($plainPassword);
-            }
-
-            if (is_null($id)) {
-                $data['must_change_password'] = $shouldAutoGeneratePassword;
-            } elseif (!empty($plainPassword)) {
-                $data['must_change_password'] = false;
-            }
-
-            if ($id) {
-                // Update case
-                $member = $existingMember;
-                if ($request->hasFile('image')) {
-                    $oldImage = $member->getRawOriginal('image');
-                    if (!empty($oldImage) && !filter_var($oldImage, FILTER_VALIDATE_URL)) {
-                        Storage::disk('public')->delete($oldImage);
-                    }
-                    $data['image'] = $request->file('image')->store('member-images', 'public');
+        if ($id) {
+            // Update case
+            $member = $existingMember;
+            if ($request->hasFile('image')) {
+                $oldImage = $member->getRawOriginal('image');
+                if (!empty($oldImage) && !filter_var($oldImage, FILTER_VALIDATE_URL)) {
+                    Storage::disk('public')->delete($oldImage);
                 }
-                $member->update($data);
-                $message = $isCallingTeamMember
-                    ? 'Calling team member updated successfully!'
-                    : 'Member updated successfully!';
-                if (in_array(2, $member->roles)) {
+                $data['image'] = $request->file('image')->store('member-images', 'public');
+            }
+            $member->update($data);
+            $message = $isCallingTeamMember
+                ? 'Calling team member updated successfully!'
+                : 'Member updated successfully!';
+
+            if (in_array(2, $member->roles)) {
                 $existingSuperAdmin = SuperAdmin::where('phone', $member->phone)->first();
                 if (!$existingSuperAdmin) {
                     SuperAdmin::create([
@@ -211,149 +198,104 @@ class MemberController extends Controller
                         'whatsapp_phone' => $request->phone,
                         'status'         => 1,
                         'username'       => $data['username'] ?? null,
-                        'password'       => Hash::make($plainPassword ?? $request->password),
-                        // 'profile_image'  => $member->image ?? ($data['image'] ?? null),
+                        'password'       => Hash::make($request->password),
                     ]);
                 }
             }
-                $phoneNumber = $member->phone;
-                $templateName = "member_profile_update_message";
-                $languageCode = "en";
-                $bodyParameters = [
-                    $member->name ?? '--',
-                    $member->email ?? '--',
-                    $member->phone ?? '--',
-                    $member->gender ?? '--',
-                    $member->dob ?? '--',
-                    $member->department_names ?? '--',
-                    $member->designation_names ?? '--',
-                    $member->role_names ?? '--'
-                ];
-                // $payload = createMessagePayload($phoneNumber, $templateName, $languageCode, null, $bodyParameters);
-                // $int = new InteraktServices();
-                // $resp = $int->sendMessage($payload);
+        } else {
+            $existing = Member::withTrashed()
+                ->where(function ($q) use ($validated) {
+                    $q->where('phone', $validated['phone']);
+                    if (!empty($validated['email'])) {
+                        $q->orWhere('email', $validated['email']);
+                    }
+                })
+                ->first();
 
-                // if ($resp['status'] == true) {
-                //     $status = 'success';
-                // } else {
-                //     $status = 'failed';
-                // }
-                // WhatsappLog::create([
-                //     'member_id' => $member->id,
-                //     'phone' => $phoneNumber,
-                //     'error' => $resp,
-                //     'error_message' => $resp['result']['message'],
-                //     'status' => $status
-                // ]);
+            if ($existing && $existing->trashed()) {
+                // Restore instead of inserting duplicate
+                $existing->restore();
+                if ($request->hasFile('image')) {
+                    $oldImage = $existing->getRawOriginal('image');
+                    if (!empty($oldImage) && !filter_var($oldImage, FILTER_VALIDATE_URL)) {
+                        Storage::disk('public')->delete($oldImage);
+                    }
+                    $data['image'] = $request->file('image')->store('member-images', 'public');
+                }
+                $existing->update($data);
+                $member = $existing;
+                $message = $isCallingTeamMember
+                    ? 'Calling team member restored successfully!'
+                    : 'Member restored successfully!';
             } else {
-                $existing = Member::withTrashed()
-                    ->where(function ($q) use ($validated) {
-                        $q->where('phone', $validated['phone']);
-                        if (!empty($validated['email'])) {
-                            $q->orWhere('email', $validated['email']);
-                        }
-                    })
-                    ->first();
-
-                if ($existing && $existing->trashed()) {
-                    // Restore instead of inserting duplicate
-                    $existing->restore();
-                    if ($request->hasFile('image')) {
-                        $oldImage = $existing->getRawOriginal('image');
-                        if (!empty($oldImage) && !filter_var($oldImage, FILTER_VALIDATE_URL)) {
-                            Storage::disk('public')->delete($oldImage);
-                        }
-                        $data['image'] = $request->file('image')->store('member-images', 'public');
-                    }
-                    $existing->update($data);
-                    $member = $existing;
-                    $message = $isCallingTeamMember
-                        ? 'Calling team member restored successfully!'
-                        : 'Member restored successfully!';
-                } else {
-                    $data['created_by'] = auth('superadmin')->id();
-                    if ($request->hasFile('image')) {
-                        $data['image'] = $request->file('image')->store('member-images', 'public');
-                    }
-                    $member = Member::create($data);
-
-                    //Send Message
-                    $phoneNumber = $member->phone;
-                    $templateName = "member_add_message";
-                    $languageCode = "en";
-                    $bodyParameters = [
-                        $member->name ?? '--',
-                        $member->email ?? '--',
-                        $member->phone ?? '--',
-                        $member->department_names ?? '--',
-                        $member->designation_names ?? '--',
-                        $member->role_names ?? '--'
-                    ];
-                    // $payload = createMessagePayload($phoneNumber, $templateName, $languageCode, null, $bodyParameters);
-                    // $int = new InteraktServices();
-                    // $resp = $int->sendMessage($payload);
-
-                    // if ($resp['status'] == true) {
-                    //     $status = 'success';
-                    // } else {
-                    //     $status = 'failed';
-                    // }
-                    // WhatsappLog::create([
-                    //     'member_id' => $member->id,
-                    //     'phone' => $phoneNumber,
-                    //     'error' => $resp,
-                    //     'error_message' => $resp['result']['message'],
-                    //     'status' => $status
-                    // ]);
-
-                    $message = $isCallingTeamMember
-                        ? 'Calling team member created successfully!'
-                        : 'Member created successfully!';
+                $data['created_by'] = auth('superadmin')->id();
+                if ($request->hasFile('image')) {
+                    $data['image'] = $request->file('image')->store('member-images', 'public');
                 }
-
-                if (!empty($validated['email']) && !empty($plainPassword)) {
-                    $this->sendAccountCreationEmail(
-                        email: $validated['email'],
-                        name: $validated['name'],
-                        username: $data['username'],
-                        plainPassword: $plainPassword,
-                        departmentIds: $validated['departments'] ?? [],
-                        designationIds: $request->input('designations', []),
-                        isCallingTeamMember: $isCallingTeamMember,
-                        isAdminMember: $isAdminMember,
-                        request: $request
-                    );
-                }
+                $member = Member::create($data);
+                $message = $isCallingTeamMember
+                    ? 'Calling team member created successfully!'
+                    : 'Member created successfully!';
             }
 
-            if (in_array(2, $requestRoles, true)) {
-                $existingSuperAdmin = SuperAdmin::where(function ($q) use ($request, $data) {
-                    $q->where('phone', $request->phone)
-                        ->orWhere('username', $data['username'] ?? null);
-                })->first();
+            // ✅ Send email only for fresh creation (not restore)
+            if (!empty($validated['email']) && !$isCallingTeamMember && (!$existing || !$existing->wasRecentlyRestored)) {
+                $departmentNames = Department::whereIn('id', $validated['departments'] ?? [])->pluck('name')->implode(', ');
+                $designationNames = Designation::whereIn('id', $request->input('designations', []))->pluck('name')->implode(', ');
 
-                if (!$existingSuperAdmin) {
-                    SuperAdmin::create([
-                        'name' => $request->name,
-                        'roles' => "super",
-                        'phone' => $request->phone,
-                        'whatsapp_phone' => $request->phone,
-                        'status' => 1,
-                        'username' => $data['username'] ?? null,
-                        'password' => Hash::make($plainPassword ?? $request->password),
-                    ]);
-                }
+                SendAccountCreationEmail::dispatchSync(
+                    $validated['email'],
+                    $validated['name'],
+                    $data['username'],
+                    $request->password, // plain password
+                    $departmentNames,
+                    $designationNames
+                );
+
+                EmailLog::create([
+                    'user_id' => auth('superadmin')->id(),
+                    'subject' => 'Account Creation Notification',
+                    'to' => $validated['email'],
+                    'from' => config('mail.from.address'),
+                    'body_html' => 'Account created for ' . $validated['name'] .
+                        ' with username: ' . $data['username'] .
+                        ' and departments: ' . $departmentNames,
+                    'status' => 'sent',
+                    'sent_at' => now(),
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->header('User-Agent'),
+                ]);
             }
-
-            return redirect()->back()->with('success', $message);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'An error occurred: ' . $e->getMessage());
         }
+
+        if (in_array(2, $requestRoles, true)) {
+            $existingSuperAdmin = SuperAdmin::where(function ($q) use ($request, $data) {
+                $q->where('phone', $request->phone)
+                    ->orWhere('username', $data['username'] ?? null);
+            })->first();
+
+            if (!$existingSuperAdmin) {
+                SuperAdmin::create([
+                    'name' => $request->name,
+                    'roles' => "super",
+                    'phone' => $request->phone,
+                    'whatsapp_phone' => $request->phone,
+                    'status' => 1,
+                    'username' => $data['username'] ?? null,
+                    'password' => Hash::make($request->password),
+                ]);
+            }
+        }
+
+        return redirect()->back()->with('success', $message);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        throw $e;
+    } catch (\Exception $e) {
+        return redirect()->back()
+            ->withInput()
+            ->with('error', 'An error occurred: ' . $e->getMessage());
     }
+}
 
     public function assignAdmin(Request $request, Member $member)
     {
