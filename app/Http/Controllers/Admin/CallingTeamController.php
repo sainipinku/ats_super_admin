@@ -58,7 +58,7 @@ class CallingTeamController extends Controller
                 Rule::unique('members')->whereNull('deleted_at'),
             ],
             'email' => [
-                'nullable',
+                'required',
                 'email',
                 Rule::unique('members')->whereNull('deleted_at'),
             ],

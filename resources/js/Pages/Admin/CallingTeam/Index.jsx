@@ -392,7 +392,7 @@ export default function Index({ members, filters }) {
 
                             <div>
                                 <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Email
+                                    Email <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="email"
@@ -400,6 +400,7 @@ export default function Index({ members, filters }) {
                                     onChange={(event) =>
                                         setForm((prev) => ({ ...prev, email: event.target.value }))
                                     }
+                                    required
                                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                 />
                                 {errors.email && (
