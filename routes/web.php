@@ -14,6 +14,7 @@ use App\Http\Controllers\SuperAdmin\RolesController;
 use App\Http\Controllers\SuperAdmin\ResumeController as SuperResumeController;
 use App\Http\Controllers\SuperAdmin\JobRequestController;
 use App\Http\Controllers\SuperAdmin\ContactMessageController;
+use App\Http\Controllers\SuperAdmin\SiteSettingController;
 use App\Http\Controllers\Admin\ResumeController;
 use App\Http\Controllers\Admin\JobController;
 use App\Http\Controllers\Admin\CallingTeamController;
@@ -84,6 +85,12 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::put('/update/{id}', [DesignationController::class, 'store'])->name('update');
             Route::delete('/{id}', [DesignationController::class, 'destroy'])->name('destroy');
             Route::post('/update-status/{uuid}', [DesignationController::class, 'updateStatus'])->name('status');
+        });
+
+        Route::group(['prefix' => 'settings', 'as' => 'settings.'], function () {
+            Route::get('/', [SiteSettingController::class, 'index'])->name('index');
+            Route::get('/list', [SiteSettingController::class, 'list'])->name('list');
+            Route::post('/update', [SiteSettingController::class, 'update'])->name('update');
         });
 
         Route::get('/designations/by-departments', [MemberController::class, 'getByDepartments'])->name('designations.by_departments');
