@@ -48,7 +48,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 </button>
             </div>
             <ul className="px-[5px] py-[8px]">
-                <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
+                <li class="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
                     <a
                         href={route("super.dashboard")}
                         className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
@@ -73,7 +73,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                         Dashboard
                     </a>
                 </li>
-                <li class="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
+                <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
                     <a
                         href={route("super.role.list")}
                         className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
