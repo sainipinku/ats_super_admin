@@ -675,13 +675,14 @@ export default function MembersList({ members, filters, departments }) {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Email
+                                    Email <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="email"
                                     name="email"
                                     value={createForm.email}
                                     onChange={handleCreateChange}
+                                    required
                                     className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white"
                                 />
                                 {createErrors.email && (

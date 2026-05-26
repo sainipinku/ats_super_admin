@@ -378,7 +378,7 @@ const getRoleBadgeColor = (roleId) => {
 
                 handleClose();
                 setErrors({});
-                successAlert(successMessage);
+                // successAlert(successMessage);
             },
             onError: (errors) => {
                 setErrors(errors);
@@ -1622,13 +1622,17 @@ const getRoleBadgeColor = (roleId) => {
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                            Email
+                                            Email{" "}
+                                            <span className="text-red-500">
+                                                *
+                                            </span>
                                         </label>
                                         <input
                                             type="email"
                                             name="email"
                                             value={formData.email}
                                             onChange={handleChange}
+                                            required
                                             className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white ${
                                                 errors.email
                                                     ? "border-red-500"
