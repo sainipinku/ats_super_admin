@@ -392,7 +392,7 @@ const getRoleBadgeColor = (roleId) => {
                     : setIsCreateLoading(false);
             },
             preserveScroll: true,
-            preserveState: false,
+            preserveState: true,
             forceFormData: true,
         });
     };
@@ -1632,7 +1632,6 @@ const getRoleBadgeColor = (roleId) => {
                                             name="email"
                                             value={formData.email}
                                             onChange={handleChange}
-                                            required
                                             className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white ${
                                                 errors.email
                                                     ? "border-red-500"

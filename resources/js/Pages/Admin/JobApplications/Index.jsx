@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Head } from "@inertiajs/react";
 import AuthenticatedLayout from "../Layouts/AuthenticatedLayout";
 import ConfirmDialog from "../../../Components/ConfirmDialog";
+import ResumePreviewModal from "../../../Components/ResumePreviewModal";
 import { useAlerts } from "../../../Components/Alerts";
 
 export default function Index({ auth }) {
@@ -32,6 +33,7 @@ export default function Index({ auth }) {
 
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
+    const [previewFallbackUrl, setPreviewFallbackUrl] = useState(null);
 
     const lastSearchRef = useRef({ mode: "all", value: "" });
 
@@ -275,6 +277,7 @@ export default function Index({ auth }) {
             );
             const data = await res.json().catch(() => null);
             if (!res.ok || !data?.success) {
+                console.log(data);
                 errorAlert(data?.message || "Failed to update status.");
                 return;
             }
@@ -290,6 +293,7 @@ export default function Index({ auth }) {
             });
             successAlert("Status updated successfully!");
         } catch (e) {
+            console.log(e);
             errorAlert("Failed to update status.");
         } finally {
             setUpdatingStatusId(null);
@@ -302,14 +306,24 @@ export default function Index({ auth }) {
         return lower.endsWith(".pdf") || lower.endsWith(".html") || lower.includes("generated-resumes");
     };
 
-    const openResume = (url) => {
-        if (!url) return;
-        if (isPreviewable(url)) {
-            setPreviewUrl(String(url).startsWith("/") ? url : `/${url}`);
-            setPreviewOpen(true);
-        } else {
-            window.open(String(url).startsWith("/") ? url : `/${url}`, "_blank");
+    const openResume = (url, applicationId) => {
+        const resolved = url
+            ? (String(url).startsWith("/") || /^https?:\/\//i.test(String(url))
+                  ? String(url)
+                  : `/${url}`)
+            : null;
+        const fallbackUrl = applicationId
+            ? route("admin.api.job.applicants.resume-preview", applicationId)
+            : null;
+
+        if (resolved && !isPreviewable(resolved)) {
+            window.open(resolved, "_blank");
+            return;
         }
+
+        setPreviewUrl(resolved);
+        setPreviewFallbackUrl(fallbackUrl);
+        setPreviewOpen(true);
     };
 
     const apps = Array.isArray(applicationsPage?.data) ? applicationsPage.data : [];
@@ -540,23 +554,18 @@ export default function Index({ auth }) {
                                                         : "-"}
                                                 </td>
                                                 <td className="px-5 py-3">
-                                                    {app.resume_url ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                openResume(
-                                                                    app.resume_url
-                                                                )
-                                                            }
-                                                            className="px-2 py-1 rounded text-blue-600 hover:bg-blue-50 font-medium text-sm"
-                                                        >
-                                                            Preview
-                                                        </button>
-                                                    ) : (
-                                                        <span className="text-slate-400">
-                                                            —
-                                                        </span>
-                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            openResume(
+                                                                app.resume_url,
+                                                                app.id
+                                                            )
+                                                        }
+                                                        className="px-2 py-1 rounded text-blue-600 hover:bg-blue-50 font-medium text-sm"
+                                                    >
+                                                        {app.resume_url ? "Preview" : "Generated Preview"}
+                                                    </button>
                                                 </td>
                                                 <td className="px-5 py-3">
                                                     {app.status === "applied" || app.status === "viewed" ? (
@@ -663,46 +672,16 @@ export default function Index({ auth }) {
                 modalSpinnerMessage="Processing Please Wait...."
             />
 
-            {previewOpen && previewUrl && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="relative bg-white rounded-2xl shadow-xl max-w-5xl w-full overflow-hidden">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setPreviewOpen(false);
-                                setPreviewUrl(null);
-                            }}
-                            className="absolute top-4 right-4 z-20 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-slate-100 transition-colors"
-                        >
-                            <svg
-                                className="w-5 h-5 text-slate-600"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
-                                />
-                            </svg>
-                        </button>
-                        <div className="px-5 py-3 pr-14 border-b border-slate-200">
-                            <div className="font-semibold text-slate-900">
-                                Resume Preview
-                            </div>
-                        </div>
-                        <div className="h-[75vh]">
-                            <iframe
-                                src={previewUrl}
-                                title="Resume Preview"
-                                className="w-full h-full"
-                            />
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ResumePreviewModal
+                isOpen={previewOpen}
+                sourceUrl={previewUrl}
+                fallbackUrl={previewFallbackUrl}
+                onClose={() => {
+                    setPreviewOpen(false);
+                    setPreviewUrl(null);
+                    setPreviewFallbackUrl(null);
+                }}
+            />
         </AuthenticatedLayout>
     );
 }

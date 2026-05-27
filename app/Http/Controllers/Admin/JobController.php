@@ -11,6 +11,7 @@ use App\Models\Notification;
 use App\Models\SiteSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -573,31 +574,199 @@ class JobController extends Controller
     {
         $adminId = Auth::guard('admin')->id();
 
+        Log::info('Admin job application status update requested.', [
+            'application_id' => $application->id,
+            'job_id' => $application->job_id,
+            'candidate_id' => $application->candidate_id,
+            'old_status' => $application->status,
+            'requested_status' => $request->input('status'),
+            'requested_by' => $adminId,
+        ]);
+
         // Check if the application belongs to a job created by this admin
         if ($application->job->created_by !== $adminId) {
+            Log::warning('Admin job application status update unauthorized.', [
+                'application_id' => $application->id,
+                'job_id' => $application->job_id,
+                'job_created_by' => $application->job->created_by,
+                'requested_by' => $adminId,
+                'requested_status' => $request->input('status'),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized to update this application.',
             ], 403);
         }
 
-        $validated = $request->validate([
-            'status' => 'required|in:applied,viewed,shortlisted,waiting_list,hired,not_selected,rejected,assigned_to_calling_member,calling_in_progress,calling_approved,calling_rejected,admin_review,offer_letter_generated',
-            'admin_notes' => 'nullable|string|max:5000',
+        try {
+            $validated = $request->validate([
+                'status' => 'required|in:applied,viewed,shortlisted,waiting_list,hired,not_selected,rejected,assigned_to_calling_member,calling_in_progress,calling_approved,calling_rejected,admin_review,offer_letter_generated',
+                'admin_notes' => 'nullable|string|max:5000',
+            ]);
+
+            Log::info('Admin job application status validation passed.', [
+                'application_id' => $application->id,
+                'validated_status' => $validated['status'],
+                'has_admin_notes' => !empty($validated['admin_notes']),
+                'requested_by' => $adminId,
+            ]);
+
+            $application->update([
+                'status' => $validated['status'],
+                'admin_notes' => $validated['admin_notes'] ?? $application->admin_notes,
+                'reviewed_at' => now(),
+                'reviewed_by' => $adminId,
+            ]);
+
+            Log::info('Admin job application status updated successfully.', [
+                'application_id' => $application->id,
+                'job_id' => $application->job_id,
+                'candidate_id' => $application->candidate_id,
+                'new_status' => $validated['status'],
+                'reviewed_by' => $adminId,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Application status updated successfully.',
+                'data' => $application->fresh(['job', 'candidate', 'assignedCallingTeamMember']),
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('Admin job application status validation failed.', [
+                'application_id' => $application->id,
+                'requested_status' => $request->input('status'),
+                'requested_by' => $adminId,
+                'errors' => $e->errors(),
+            ]);
+
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Admin job application status update failed.', [
+                'application_id' => $application->id,
+                'job_id' => $application->job_id,
+                'candidate_id' => $application->candidate_id,
+                'requested_status' => $request->input('status'),
+                'requested_by' => $adminId,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update application status.',
+            ], 500);
+        }
+    }
+
+    public function previewApplicantResume(JobApplication $application)
+    {
+        $adminId = Auth::guard('admin')->id();
+
+        $application->load([
+            'job:id,title,company,location,created_by',
+            'candidate:id,name,email,phone,image,candidate_profile',
         ]);
 
-        $application->update([
-            'status' => $validated['status'],
-            'admin_notes' => $validated['admin_notes'] ?? $application->admin_notes,
-            'reviewed_at' => now(),
-            'reviewed_by' => $adminId,
-        ]);
+        if (!$application->job || (int) $application->job->created_by !== (int) $adminId) {
+            abort(403);
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Application status updated successfully.',
-            'data' => $application->fresh(['job', 'candidate', 'assignedCallingTeamMember']),
+        return response()->view('job_applications.resume_preview', [
+            'resume' => $this->buildApplicantResumePreviewData($application),
         ]);
+    }
+
+    private function buildApplicantResumePreviewData(JobApplication $application): array
+    {
+        $candidate = $application->candidate;
+        $profile = is_array($candidate?->candidate_profile) ? $candidate->candidate_profile : [];
+        $education = is_array($profile['education'] ?? null) ? $profile['education'] : [];
+        $experience = is_array($profile['experience'] ?? null) ? $profile['experience'] : [];
+        $projects = collect($profile['projects'] ?? [])
+            ->filter(fn ($project) => is_array($project))
+            ->map(fn ($project) => [
+                'title' => trim((string) ($project['title'] ?? '')),
+                'description' => trim((string) ($project['description'] ?? '')),
+                'link' => trim((string) ($project['link'] ?? '')),
+            ])
+            ->filter(fn ($project) => $project['title'] !== '' || $project['description'] !== '' || $project['link'] !== '')
+            ->values()
+            ->all();
+
+        $skills = collect($profile['skills'] ?? [])
+            ->filter(fn ($skill) => is_string($skill) && trim($skill) !== '')
+            ->values()
+            ->all();
+
+        if (empty($skills) && is_array($application->candidate_skills)) {
+            $skills = collect($application->candidate_skills)
+                ->filter(fn ($skill) => is_string($skill) && trim($skill) !== '')
+                ->values()
+                ->all();
+        }
+
+        $summary = collect([
+            $profile['summary'] ?? null,
+            $profile['career_objective'] ?? null,
+            $application->cover_letter,
+        ])->filter(fn ($value) => is_string($value) && trim($value) !== '')
+            ->implode("\n\n");
+
+        return [
+            'name' => $application->candidate_name ?: ($candidate?->name ?? 'Candidate'),
+            'email' => $application->candidate_email ?: ($candidate?->email ?? null),
+            'phone' => $application->candidate_phone ?: ($candidate?->phone ?? null),
+            'job_title' => $application->job?->title,
+            'company' => $application->job?->company,
+            'location' => $profile['current_location'] ?? $profile['location'] ?? $application->job?->location,
+            'profile_photo_url' => $this->resolveCandidateImageUrl($candidate?->image),
+            'summary' => $summary,
+            'skills' => $skills,
+            'experience' => [
+                'total_years' => $experience['total_years'] ?? ($application->candidate_experience ?? null),
+                'current_company' => $experience['current_company'] ?? null,
+                'current_designation' => $experience['current_designation'] ?? null,
+                'last_salary_amount' => $experience['last_salary']['amount'] ?? null,
+                'last_salary_unit' => $experience['last_salary']['unit'] ?? null,
+                'expected_salary_amount' => $experience['expected_salary']['amount'] ?? null,
+                'expected_salary_unit' => $experience['expected_salary']['unit'] ?? null,
+            ],
+            'education' => [
+                [
+                    'title' => '10th',
+                    'subtitle' => $education['tenth']['percentage'] ?? null,
+                ],
+                [
+                    'title' => '12th',
+                    'subtitle' => $education['twelfth']['percentage'] ?? null,
+                ],
+                [
+                    'title' => $education['degree']['name'] ?? 'Degree',
+                    'subtitle' => collect([
+                        $education['degree']['college'] ?? null,
+                        $education['degree']['cgpa'] ?? null,
+                    ])->filter()->implode(' | '),
+                ],
+            ],
+            'projects' => $projects,
+        ];
+    }
+
+    private function resolveCandidateImageUrl(?string $image): ?string
+    {
+        if (empty($image)) {
+            return null;
+        }
+
+        if (filter_var($image, FILTER_VALIDATE_URL)) {
+            return $image;
+        }
+
+        return Storage::disk('public')->exists($image)
+            ? Storage::disk('public')->url($image)
+            : null;
     }
 
     public function adminFinalReview(Request $request, JobApplication $application)
