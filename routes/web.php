@@ -128,6 +128,8 @@ Route::prefix('super')->name('super.')->group(function () {
         Route::group(['prefix' => 'job-applications', 'as' => 'job.applications.'], function () {
             Route::get('/', [JobRequestController::class, 'applicationsIndex'])->name('index');
             Route::get('/api/list', [JobRequestController::class, 'listApplications'])->name('api.list');
+            Route::patch('/api/{application}/status', [JobRequestController::class, 'updateApplicantStatus'])->name('api.status');
+            Route::get('/api/{application}/resume-preview', [JobRequestController::class, 'previewApplicantResume'])->name('api.resume-preview');
         });
 
        
@@ -193,6 +195,7 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     // Job Applicants API routes (Your Version)
     Route::get('/api/job-applicants', [JobController::class, 'getApplicants'])->name('admin.api.job.applicants.list');
     Route::get('/api/job-applicants/{application}', [JobController::class, 'getApplicantDetails'])->name('admin.api.job.applicants.details');
+    Route::get('/api/job-applicants/{application}/resume-preview', [JobController::class, 'previewApplicantResume'])->name('admin.api.job.applicants.resume-preview');
     Route::patch('/api/job-applicants/{application}/status', [JobController::class, 'updateApplicantStatus'])->name('admin.api.job.applicants.status');
     Route::patch('/api/job-applicants/{application}/admin-final-review', [JobController::class, 'adminFinalReview'])->name('admin.api.job.applicants.admin-final-review');
     Route::patch('/api/job-applicants/{application}/generate-offer-letter', [JobController::class, 'generateOfferLetter'])->name('admin.api.job.applicants.generate-offer-letter');

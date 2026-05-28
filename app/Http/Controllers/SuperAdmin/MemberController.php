@@ -363,11 +363,23 @@ class MemberController extends Controller
 
         return redirect()->back()->with('success', $message);
     } catch (\Illuminate\Validation\ValidationException $e) {
+        $validationErrors = $e->errors();
+        $firstValidationMessage = collect($validationErrors)
+            ->flatten()
+            ->filter()
+            ->first() ?? 'Please fix the highlighted errors and try again.';
+
+        Log::warning('Member store validation failed.', [
+            'member_id' => $id,
+            'phone' => $request->input('phone'),
+            'email' => $request->input('email'),
+            'errors' => $validationErrors,
+        ]);
 
         return redirect()->back()
             ->withInput()
-            ->withErrors($e->errors())
-            ->with('error', 'Please fix the highlighted errors and try again.');
+            ->withErrors($validationErrors)
+            ->with('error', $firstValidationMessage);
     } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
         Log::error('Member not found during store update request.', [
             'member_id' => $id,

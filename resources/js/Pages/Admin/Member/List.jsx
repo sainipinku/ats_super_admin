@@ -214,6 +214,7 @@ export default function MembersList({ members, filters, departments }) {
 
         router.post(route("admin.members.store"), data, {
             preserveScroll: true,
+            preserveState: true,
             forceFormData: true,
             onSuccess: () => {
                 handleCreateClose();
@@ -682,7 +683,6 @@ export default function MembersList({ members, filters, departments }) {
                                     name="email"
                                     value={createForm.email}
                                     onChange={handleCreateChange}
-                                    required
                                     className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:text-white"
                                 />
                                 {createErrors.email && (

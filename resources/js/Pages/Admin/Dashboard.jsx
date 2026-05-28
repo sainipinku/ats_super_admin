@@ -2,6 +2,7 @@ import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
 import AuthenticatedLayout from "./Layouts/AuthenticatedLayout";
 import ConfirmDialog from "@/Components/ConfirmDialog";
+import ResumePreviewModal from "@/Components/ResumePreviewModal";
 import { useAlerts } from "@/Components/Alerts";
 // import ActivityLogSectionAdmin from "@/Components/ActivityLogSectionAdmin";
 // import AdminPasswordLogSection from "@/Components/AdminPasswordLogSection";
@@ -41,6 +42,7 @@ export default function Dashboard({
     const [decisionAction, setDecisionAction] = useState(null);
     const [resumePreviewOpen, setResumePreviewOpen] = useState(false);
     const [resumePreviewUrl, setResumePreviewUrl] = useState(null);
+    const [resumePreviewFallbackUrl, setResumePreviewFallbackUrl] = useState(null);
 
     const { successAlert, errorAlert } = useAlerts();
 
@@ -104,6 +106,7 @@ export default function Dashboard({
             );
             const data = await res.json().catch(() => null);
             if (!res.ok || !data?.success) {
+                console.log(data);
                 errorAlert(data?.message || "Failed to update status.");
                 return;
             }
@@ -113,6 +116,7 @@ export default function Dashboard({
             );
             successAlert("Status updated successfully!");
         } catch (e) {
+            console.log(e);
             errorAlert("Failed to update status.");
         } finally {
             setUpdatingStatusId(null);
@@ -140,15 +144,24 @@ export default function Dashboard({
         return u.endsWith(".pdf") || u.endsWith(".html") || u.includes("generated-resumes");
     };
 
-    const openResumePreview = (url) => {
-        if (!url) return;
-        const resolved = String(url).startsWith("/") ? url : `/${url}`;
-        if (isPreviewableResume(resolved)) {
-            setResumePreviewUrl(resolved);
-            setResumePreviewOpen(true);
-        } else {
+    const openResumePreview = (url, applicationId) => {
+        const resolved = url
+            ? (String(url).startsWith("/") || /^https?:\/\//i.test(String(url))
+                  ? String(url)
+                  : `/${url}`)
+            : null;
+        const fallbackUrl = applicationId
+            ? route("admin.api.job.applicants.resume-preview", applicationId)
+            : null;
+
+        if (resolved && !isPreviewableResume(resolved)) {
             window.open(resolved, "_blank");
+            return;
         }
+
+        setResumePreviewUrl(resolved);
+        setResumePreviewFallbackUrl(fallbackUrl);
+        setResumePreviewOpen(true);
     };
     const [filters, setFilters] = useState({
         year: initialFilters?.year || new Date().getFullYear(),
@@ -369,17 +382,18 @@ export default function Dashboard({
                                                     {app.created_at ? new Date(app.created_at).toLocaleString("en-US") : "-"}
                                                 </td>
                                                 <td className="p-3">
-                                                    {app.resume_url ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openResumePreview(app.resume_url)}
-                                                            className="text-blue-600 hover:underline font-medium"
-                                                        >
-                                                            Preview
-                                                        </button>
-                                                    ) : (
-                                                        <span className="text-gray-400">—</span>
-                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            openResumePreview(
+                                                                app.resume_url,
+                                                                app.id
+                                                            )
+                                                        }
+                                                        className="text-blue-600 hover:underline font-medium"
+                                                    >
+                                                        {app.resume_url ? "Preview" : "Generated Preview"}
+                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -415,46 +429,16 @@ export default function Dashboard({
                         modalSpinnerMessage="Processing Please Wait...."
                     />
 
-                    {resumePreviewOpen && resumePreviewUrl && (
-                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                            <div className="relative bg-white rounded-2xl shadow-xl max-w-5xl w-full overflow-hidden">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setResumePreviewOpen(false);
-                                        setResumePreviewUrl(null);
-                                    }}
-                                    className="absolute top-4 right-4 z-20 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-slate-100 transition-colors"
-                                >
-                                    <svg
-                                        className="w-5 h-5 text-slate-600"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M6 18L18 6M6 6l12 12"
-                                        />
-                                    </svg>
-                                </button>
-                                <div className="px-5 py-3 pr-14 border-b border-slate-200">
-                                    <div className="font-semibold text-slate-900">
-                                        Resume Preview
-                                    </div>
-                                </div>
-                                <div className="h-[75vh]">
-                                    <iframe
-                                        src={resumePreviewUrl}
-                                        title="Resume Preview"
-                                        className="w-full h-full"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    <ResumePreviewModal
+                        isOpen={resumePreviewOpen}
+                        sourceUrl={resumePreviewUrl}
+                        fallbackUrl={resumePreviewFallbackUrl}
+                        onClose={() => {
+                            setResumePreviewOpen(false);
+                            setResumePreviewUrl(null);
+                            setResumePreviewFallbackUrl(null);
+                        }}
+                    />
 
                     {/* Commented out all other sections */}
                     {/*

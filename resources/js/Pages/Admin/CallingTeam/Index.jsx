@@ -98,6 +98,7 @@ export default function Index({ members, filters }) {
 
         router.post(route("admin.calling-team.store"), payload, {
             preserveScroll: true,
+            preserveState: true,
             forceFormData: true,
             onSuccess: () => {
                 handleCreateModalClose();
@@ -400,7 +401,6 @@ export default function Index({ members, filters }) {
                                     onChange={(event) =>
                                         setForm((prev) => ({ ...prev, email: event.target.value }))
                                     }
-                                    required
                                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                 />
                                 {errors.email && (

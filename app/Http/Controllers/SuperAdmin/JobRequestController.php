@@ -7,6 +7,7 @@ use App\Models\Job;
 use App\Models\JobApplication;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -535,22 +536,177 @@ class JobRequestController extends Controller
      */
     public function updateApplicantStatus(Request $request, JobApplication $application)
     {
-        $validated = $request->validate([
-            'status' => 'required|in:applied,viewed,shortlisted,assigned_to_calling_member,calling_in_progress,calling_approved,calling_rejected,admin_review,offer_letter_generated,waiting_list,hired,not_selected,rejected',
-            'admin_notes' => 'nullable|string|max:5000',
+        $superAdminId = Auth::guard('superadmin')->id();
+
+        Log::info('Super admin job application status update requested.', [
+            'application_id' => $application->id,
+            'job_id' => $application->job_id,
+            'candidate_id' => $application->candidate_id,
+            'old_status' => $application->status,
+            'requested_status' => $request->input('status'),
+            'requested_by' => $superAdminId,
         ]);
 
-        $application->update([
-            'status' => $validated['status'],
-            'admin_notes' => $validated['admin_notes'] ?? $application->admin_notes,
-            'reviewed_at' => now(),
-            'reviewed_by' => Auth::guard('superadmin')->id(),
+        try {
+            $validated = $request->validate([
+                'status' => 'required|in:applied,viewed,shortlisted,assigned_to_calling_member,calling_in_progress,calling_approved,calling_rejected,admin_review,offer_letter_generated,waiting_list,hired,not_selected,rejected',
+                'admin_notes' => 'nullable|string|max:5000',
+            ]);
+
+            Log::info('Super admin job application status validation passed.', [
+                'application_id' => $application->id,
+                'validated_status' => $validated['status'],
+                'has_admin_notes' => !empty($validated['admin_notes']),
+            ]);
+
+            $application->update([
+                'status' => $validated['status'],
+                'admin_notes' => $validated['admin_notes'] ?? $application->admin_notes,
+                'reviewed_at' => now(),
+                'reviewed_by' => $superAdminId,
+            ]);
+
+            Log::info('Super admin job application status updated successfully.', [
+                'application_id' => $application->id,
+                'job_id' => $application->job_id,
+                'candidate_id' => $application->candidate_id,
+                'new_status' => $validated['status'],
+                'reviewed_by' => $superAdminId,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Application status updated successfully.',
+                'data' => $application->fresh(),
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('Super admin job application status validation failed.', [
+                'application_id' => $application->id,
+                'requested_status' => $request->input('status'),
+                'requested_by' => $superAdminId,
+                'errors' => $e->errors(),
+            ]);
+
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Super admin job application status update failed.', [
+                'application_id' => $application->id,
+                'job_id' => $application->job_id,
+                'candidate_id' => $application->candidate_id,
+                'requested_status' => $request->input('status'),
+                'requested_by' => $superAdminId,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update application status.',
+            ], 500);
+        }
+    }
+
+    public function previewApplicantResume(JobApplication $application)
+    {
+        $application->load([
+            'job:id,title,company,location',
+            'candidate:id,name,email,phone,image,candidate_profile',
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Application status updated successfully.',
-            'data' => $application->fresh(),
+        return response()->view('job_applications.resume_preview', [
+            'resume' => $this->buildApplicantResumePreviewData($application),
         ]);
+    }
+
+    private function buildApplicantResumePreviewData(JobApplication $application): array
+    {
+        $candidate = $application->candidate;
+        $profile = is_array($candidate?->candidate_profile) ? $candidate->candidate_profile : [];
+        $education = is_array($profile['education'] ?? null) ? $profile['education'] : [];
+        $experience = is_array($profile['experience'] ?? null) ? $profile['experience'] : [];
+        $projects = collect($profile['projects'] ?? [])
+            ->filter(fn ($project) => is_array($project))
+            ->map(fn ($project) => [
+                'title' => trim((string) ($project['title'] ?? '')),
+                'description' => trim((string) ($project['description'] ?? '')),
+                'link' => trim((string) ($project['link'] ?? '')),
+            ])
+            ->filter(fn ($project) => $project['title'] !== '' || $project['description'] !== '' || $project['link'] !== '')
+            ->values()
+            ->all();
+
+        $skills = collect($profile['skills'] ?? [])
+            ->filter(fn ($skill) => is_string($skill) && trim($skill) !== '')
+            ->values()
+            ->all();
+
+        if (empty($skills) && is_array($application->candidate_skills)) {
+            $skills = collect($application->candidate_skills)
+                ->filter(fn ($skill) => is_string($skill) && trim($skill) !== '')
+                ->values()
+                ->all();
+        }
+
+        $summary = collect([
+            $profile['summary'] ?? null,
+            $profile['career_objective'] ?? null,
+            $application->cover_letter,
+        ])->filter(fn ($value) => is_string($value) && trim($value) !== '')
+            ->implode("\n\n");
+
+        return [
+            'name' => $application->candidate_name ?: ($candidate?->name ?? 'Candidate'),
+            'email' => $application->candidate_email ?: ($candidate?->email ?? null),
+            'phone' => $application->candidate_phone ?: ($candidate?->phone ?? null),
+            'job_title' => $application->job?->title,
+            'company' => $application->job?->company,
+            'location' => $profile['current_location'] ?? $profile['location'] ?? $application->job?->location,
+            'profile_photo_url' => $this->resolveCandidateImageUrl($candidate?->image),
+            'summary' => $summary,
+            'skills' => $skills,
+            'experience' => [
+                'total_years' => $experience['total_years'] ?? ($application->candidate_experience ?? null),
+                'current_company' => $experience['current_company'] ?? null,
+                'current_designation' => $experience['current_designation'] ?? null,
+                'last_salary_amount' => $experience['last_salary']['amount'] ?? null,
+                'last_salary_unit' => $experience['last_salary']['unit'] ?? null,
+                'expected_salary_amount' => $experience['expected_salary']['amount'] ?? null,
+                'expected_salary_unit' => $experience['expected_salary']['unit'] ?? null,
+            ],
+            'education' => [
+                [
+                    'title' => '10th',
+                    'subtitle' => $education['tenth']['percentage'] ?? null,
+                ],
+                [
+                    'title' => '12th',
+                    'subtitle' => $education['twelfth']['percentage'] ?? null,
+                ],
+                [
+                    'title' => $education['degree']['name'] ?? 'Degree',
+                    'subtitle' => collect([
+                        $education['degree']['college'] ?? null,
+                        $education['degree']['cgpa'] ?? null,
+                    ])->filter()->implode(' | '),
+                ],
+            ],
+            'projects' => $projects,
+        ];
+    }
+
+    private function resolveCandidateImageUrl(?string $image): ?string
+    {
+        if (empty($image)) {
+            return null;
+        }
+
+        if (filter_var($image, FILTER_VALIDATE_URL)) {
+            return $image;
+        }
+
+        return Storage::disk('public')->exists($image)
+            ? Storage::disk('public')->url($image)
+            : null;
     }
 }
