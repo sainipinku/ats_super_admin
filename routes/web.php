@@ -130,6 +130,7 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::get('/api/list', [JobRequestController::class, 'listApplications'])->name('api.list');
         });
 
+       
         Route::group(['prefix' => 'contact-messages', 'as' => 'contact.messages.'], function () {
             Route::get('/', [ContactMessageController::class, 'index'])->name('index');
             Route::patch('/{message}/toggle-read', [ContactMessageController::class, 'toggleRead'])->name('toggle-read');
