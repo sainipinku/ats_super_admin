@@ -74,6 +74,7 @@ export default function Members({
         roles: [],
         image: null,
         is_calling_team: false,
+        assigned_admin_id: "",
     });
 
     const [modalType, setModalType] = useState(null); // null | 'admin' | 'member'
@@ -167,6 +168,7 @@ export default function Members({
                 designations: currentMember?.designation || [],
                 roles: currentMember?.roles?.map((r) => String(r)) || [],
                 is_calling_team: currentMember?.is_calling_team || false,
+                assigned_admin_id: currentMember?.assigned_admin_id ? String(currentMember.assigned_admin_id) : "",
                 password: "",
                 confirm_password: "",
                 image: null,
@@ -229,23 +231,42 @@ const getRoleBadgeColor = (roleId) => {
         setHasUserInteracted(true);
     };
 
+    const resetFormData = () => ({
+        name: "",
+        phone: "",
+        email: "",
+        dob: "",
+        gender: "male",
+        status: "active",
+        password: "",
+        confirm_password: "",
+        departments: [],
+        designations: [],
+        roles: [],
+        image: null,
+        is_calling_team: false,
+        assigned_admin_id: "",
+    });
+
     const handleCreateMember = () => {
         setCurrentMember(null);
         setModalType("calling-team");
-        setFormData((prev) => ({
-            ...prev,
+        setFormData({
+            ...resetFormData(),
             is_calling_team: true,
-            departments: [],
-            designations: [],
             roles: [],
-        }));
+        });
         setIsOpen(true);
     };
 
     const handleCreateAdmin = () => {
         setCurrentMember(null);
         setModalType('admin');
-        setFormData((prev) => ({ ...prev, roles: ['1'], is_calling_team: false }));
+        setFormData({
+            ...resetFormData(),
+            roles: ['1'],
+            is_calling_team: false,
+        });
         setIsOpen(true);
     };
 
@@ -315,6 +336,13 @@ const getRoleBadgeColor = (roleId) => {
         setFormData((prev) => ({
             ...prev,
             designations: selectedValues,
+        }));
+    };
+
+    const handleAdminChange = (e) => {
+        setFormData((prev) => ({
+            ...prev,
+            assigned_admin_id: e.target.value,
         }));
     };
 
@@ -436,22 +464,7 @@ const getRoleBadgeColor = (roleId) => {
         setIsOpen(false);
         setCurrentMember(null);
         setModalType(null);
-        setFormData({
-            name: "",
-            phone: "",
-            email: "",
-            dob: "",
-            gender: "male",
-            status: "active",
-            departments: [],
-            password: "",
-            confirm_password: "",
-            image: null,
-            designation: "",
-            designations: "",
-            roles: [],
-            is_calling_team: false,
-        });
+        setFormData(resetFormData());
         setErrors({});
         setSelectedFile(null);
         setShowImageModal(false);
@@ -1647,15 +1660,24 @@ const getRoleBadgeColor = (roleId) => {
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                            Date of Birth
+                                            Date of Birth{" "}
+                                            <span className="text-red-500">*</span>
+                                            {" "}
+                                            <span className="text-xs text-gray-400">(must be 18+)</span>
                                         </label>
                                         <input
                                             type="date"
                                             name="dob"
                                             value={formData.dob}
                                             onChange={handleChange}
+                                            max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
                                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                                         />
+                                        {errors.dob && (
+                                            <p className="mt-1 text-sm text-red-600">
+                                                {errors.dob}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div>
@@ -1675,6 +1697,28 @@ const getRoleBadgeColor = (roleId) => {
                                             <option value="other">Other</option>
                                         </select>
                                     </div>
+
+                                    {/* Assign Admin Dropdown */}
+                                    {!currentMember && modalType !== 'admin' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Assign to Admin{" "}
+                                                <span className="text-xs text-gray-400">(optional)</span>
+                                            </label>
+                                            <select
+                                                value={formData.assigned_admin_id}
+                                                onChange={handleAdminChange}
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                            >
+                                                <option value="">-- Select Admin --</option>
+                                                {admins.map((admin) => (
+                                                    <option key={admin.id} value={String(admin.id)}>
+                                                        {admin.name} {admin.email ? `(${admin.email})` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
 
                                     {!currentMember && !usesAutoGeneratedPassword && (
                                         <>

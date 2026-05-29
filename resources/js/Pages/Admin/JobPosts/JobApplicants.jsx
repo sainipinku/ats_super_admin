@@ -517,36 +517,6 @@ export default function JobApplicants({ callingTeamMembers: initialCallingTeamMe
                                     </div>
                                 )}
 
-                                {(selectedApplication.hiring_decision || selectedApplication.hiring_decision_reason) && (
-                                    <div className="rounded-2xl border border-slate-200 p-4">
-                                        <p className="text-xs uppercase tracking-wide text-slate-500">Calling Team Recommendation</p>
-                                        <div className="mt-3 space-y-2 text-sm text-slate-700">
-                                            <p><span className="font-semibold">Decision:</span> {STATUS_META[selectedApplication.hiring_decision]?.label || selectedApplication.hiring_decision || '—'}</p>
-                                            <p><span className="font-semibold">Reason:</span> {selectedApplication.hiring_decision_reason || '—'}</p>
-                                            <p><span className="font-semibold">Updated At:</span> {selectedApplication.hiring_decision_updated_at ? new Date(selectedApplication.hiring_decision_updated_at).toLocaleString('en-IN') : '—'}</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {selectedApplication.interview_date_time && (
-                                    <div className="rounded-2xl border border-slate-200 p-4">
-                                        <p className="text-xs uppercase tracking-wide text-slate-500">Interview Schedule</p>
-                                        <div className="mt-3 space-y-2 text-sm text-slate-700">
-                                            <p><span className="font-semibold">Date & Time:</span> {new Date(selectedApplication.interview_date_time).toLocaleString('en-IN')}</p>
-                                            <p><span className="font-semibold">Mode:</span> {selectedApplication.interview_mode || '—'}</p>
-                                            <p><span className="font-semibold">Address:</span> {selectedApplication.interview_address || '—'}</p>
-                                            <p><span className="font-semibold">Instructions:</span> {selectedApplication.interview_instructions || '—'}</p>
-                                            <p><span className="font-semibold">Contact Person:</span> {selectedApplication.interview_contact_person || '—'}</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {selectedApplication.cover_letter && (
-                                    <div className="rounded-2xl border border-slate-200 p-4">
-                                        <p className="text-xs uppercase tracking-wide text-slate-500">Cover Letter</p>
-                                        <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{selectedApplication.cover_letter}</p>
-                                    </div>
-                                )}
                             </div>
 
                             <div className="space-y-5">

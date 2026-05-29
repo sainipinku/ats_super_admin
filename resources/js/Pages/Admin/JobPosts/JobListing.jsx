@@ -1301,6 +1301,13 @@ export default function JobListing({ auth }) {
                                 </div>
                             </div>
 
+                            {selectedJob.status === 'declined' && selectedJob.rejection_reason && (
+                                <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                                    <h3 className="text-sm font-semibold text-red-700 dark:text-red-400 mb-1">Rejection Reason</h3>
+                                    <p className="text-sm text-red-600 dark:text-red-300">{selectedJob.rejection_reason}</p>
+                                </div>
+                            )}
+
                             <div className="mb-6">
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Skills Required</h3>
                                 <div className="flex flex-wrap gap-2">
