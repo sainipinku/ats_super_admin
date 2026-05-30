@@ -122,9 +122,8 @@ class MemberController extends Controller
             ->map(fn ($role) => (int) $role)
             ->all();
         $shouldAutoGeneratePassword = is_null($id)
-            && ($isCallingTeamMember || in_array(1, $requestRoles, true));
-
-
+            && ($isCallingTeamMember || in_array(1, $requestRoles, true))
+            && empty($request->input('password'));
 
         $rules = [
             'name' => ['required', 'string', 'max:255'],
@@ -181,8 +180,6 @@ class MemberController extends Controller
 
         if ($shouldAutoGeneratePassword && empty($plainPassword)) {
             $plainPassword = $this->generateTemporaryPassword();
-
-
         }
 
         $data = [
@@ -213,12 +210,7 @@ class MemberController extends Controller
 
         if (!empty($plainPassword)) {
             $data['password'] = Hash::make($plainPassword);
-
-            if ($shouldAutoGeneratePassword) {
-                $data['must_change_password'] = true;
-            }
-
-
+            $data['must_change_password'] = $shouldAutoGeneratePassword;
         }
 
         if ($id) {

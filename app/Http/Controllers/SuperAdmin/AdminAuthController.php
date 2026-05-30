@@ -18,8 +18,7 @@ class AdminAuthController extends Controller
      */
     public function login()
     {
-        return Inertia::render('SuperAdmin/Auth/Login');
-         if (Auth::guard('superadmin')->check()) {
+        if (Auth::guard('superadmin')->check()) {
             return redirect()->route('super.dashboard');
         }
         if (Auth::guard('admin')->check()) {
@@ -31,6 +30,8 @@ class AdminAuthController extends Controller
         if (Auth::guard('callingteam')->check()) {
             return redirect()->route('callingteam.dashboard');
         }
+
+        return Inertia::render('SuperAdmin/Auth/Login');
     }
 
 

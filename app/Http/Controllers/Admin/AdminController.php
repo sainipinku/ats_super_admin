@@ -39,7 +39,8 @@ class AdminController extends Controller
                 ? $auth->departments
                 : json_decode($auth->departments, true) ?? [];
             $activeMembers = Member::where('status', 1)
-                ->where(function ($query) use ($adminDepartmentIds) {
+                ->where('id', '!=', $auth->id)
+            ->where(function ($query) use ($adminDepartmentIds) {
                     foreach ($adminDepartmentIds as $deptId) {
                         $query->orWhereJsonContains('departments', (int)$deptId)
                             ->orWhereJsonContains('departments', (string)$deptId);
