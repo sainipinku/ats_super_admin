@@ -396,7 +396,6 @@ className={`
                                             <th className="p-3">SR No.</th>
                                             <th className="p-3">Department</th>
                                             <th className="p-3">Name</th>
-                                            <th className="p-3 text-center">Members</th>
                                             <th className="p-3">Status</th>
                                             <th className="p-3">Created By</th>
                                             <th className="p-3 text-center">Actions</th>
@@ -416,83 +415,7 @@ className={`
                                                     <td className="p-3 ">
                                                         {designation.name}
                                                     </td>
-                                                    <td align="center" className="p-3 text-center">
-                                                        {designation.member_details
-                                                            ?.length > 0 ? (
-                                                            <div className="flex items-center justify-center gap-1">
-                                                                <div className="flex gap-[0px] items-center">
-                                                                    {designation.member_details
-                                                                        .slice(0, 3)
-                                                                        .map((member) => (
-                                                                            <div
-                                                                                key={
-                                                                                    member.id
-                                                                                }
-                                                                                className="mr-[-20px]"
-                                                                            >
-                                                                                <ShowUserProfile
-                                                                                    user={
-                                                                                        member
-                                                                                    }
-                                                                                    className="!w-8 !h-8 border-2 border-white dark:border-gray-800"
-                                                                                />
-                                                                                <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 z-10">
-                                                                                    {
-                                                                                        member.name
-                                                                                    }
-                                                                                </div>
-                                                                            </div>
-                                                                        ))}
-                                                                </div>
-                                                                {designation.member_details
-                                                                    .length > 3 && (
-                                                                    <div className="mr-[-20px]">
-                                                                        <span
-                                                                            className="ml-1 text-sm bg-gray-200 dark:bg-gray-700 rounded-full px-2 py-1 cursor-pointer"
-                                                                            onClick={() =>
-                                                                                handleAssignMembers(
-                                                                                    designation.id,
-                                                                                    designation.name
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            +
-                                                                            {designation
-                                                                                .member_details
-                                                                                .length - 3}
-                                                                        </span>
-                                                                        <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 z-10">
-                                                                            Click to manage
-                                                                            members
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                                <button
-                                                                    className="flex items-center justify-center bg-[#5146E6] w-[30px] h-[30px] whitespace-nowrap text-[15px] text-white rounded-[50px] border-[1px] border-[#fff] ml-[-10px]"
-                                                                    onClick={() =>
-                                                                        handleAssignMembers(
-                                                                            designation.id,
-                                                                            designation.name
-                                                                        )
-                                                                    }
-                                                                >
-                                                                     +
-                                                                </button>
-                                                            </div>
-                                                        ) : (
-                                                            <button
-                                                                className="inline-flex items-center justify-center w-[30px] h-[30px] border-[1px] border-[#5146E6] cursor-pointer text-[15px] text-[#5146E6] rounded-[60px]"
-                                                                onClick={() =>
-                                                                    handleAssignMembers(
-                                                                        designation.id,
-                                                                        designation.name
-                                                                    )
-                                                                }
-                                                            >
-                                                                +
-                                                            </button>
-                                                        )}
-                                                    </td>
+
 
                                                     <td className="p-3">
                                                         <span
