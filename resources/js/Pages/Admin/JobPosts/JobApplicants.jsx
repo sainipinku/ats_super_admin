@@ -547,6 +547,7 @@ export default function JobApplicants({ callingTeamMembers: initialCallingTeamMe
                                         <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{selectedApplication.cover_letter}</p>
                                     </div>
                                 )}
+
                             </div>
 
                             <div className="space-y-5">

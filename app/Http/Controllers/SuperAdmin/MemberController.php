@@ -149,8 +149,20 @@ class MemberController extends Controller
             'confirm_password' => $shouldAutoGeneratePassword
                 ? 'nullable|min:6'
                 : ($id ? 'nullable|min:6' : 'required|min:6'),
-            'dob' => 'nullable',
+            'dob' => [
+                'required',
+                'date',
+                function ($attribute, $value, $fail) {
+                    if ($value) {
+                        $dob = \Carbon\Carbon::parse($value);
+                        if ($dob->age < 18) {
+                            $fail('Member must be at least 18 years old.');
+                        }
+                    }
+                },
+            ],
             'is_calling_team' => 'nullable',
+            'assigned_admin_id' => 'nullable|integer|exists:members,id',
         ];
 
         $messages = [
@@ -184,6 +196,7 @@ class MemberController extends Controller
             'designation' => $isCallingTeamMember ? [] : ($validated['designations'] ?? []),
             'dob'  => $request->dob,
             'is_calling_team' => $isCallingTeamMember,
+            'assigned_admin_id' => $request->filled('assigned_admin_id') ? $request->input('assigned_admin_id') : null,
         ];
 
 

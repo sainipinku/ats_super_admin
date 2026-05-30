@@ -132,13 +132,17 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::get('/api/{application}/resume-preview', [JobRequestController::class, 'previewApplicantResume'])->name('api.resume-preview');
         });
 
+       
         Route::group(['prefix' => 'contact-messages', 'as' => 'contact.messages.'], function () {
             Route::get('/', [ContactMessageController::class, 'index'])->name('index');
             Route::patch('/{message}/toggle-read', [ContactMessageController::class, 'toggleRead'])->name('toggle-read');
             Route::delete('/{message}', [ContactMessageController::class, 'destroy'])->name('destroy');
         });
+
     });
 });
+
+
 /** SUPER ADMIN ROUTES END HERE **/
 
 /** ADMIN ROUTES START HERE **/
