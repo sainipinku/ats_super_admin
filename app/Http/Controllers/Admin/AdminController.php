@@ -40,7 +40,12 @@ class AdminController extends Controller
                 : json_decode($auth->departments, true) ?? [];
             $activeMembers = Member::where('status', 1)
                 ->where('id', '!=', $auth->id)
-            ->where(function ($query) use ($adminDepartmentIds) {
+                ->where('assigned_admin_id', $auth->id)
+                ->where('is_calling_team', false)
+                ->whereJsonContains('roles', '3')
+                ->whereJsonDoesntContain('roles', '1')
+                ->whereJsonDoesntContain('roles', '2')
+                ->where(function ($query) use ($adminDepartmentIds) {
                     foreach ($adminDepartmentIds as $deptId) {
                         $query->orWhereJsonContains('departments', (int)$deptId)
                             ->orWhereJsonContains('departments', (string)$deptId);
@@ -175,6 +180,12 @@ if ($activeMembers->count() > 0) {
             $superAdminPasswordLog = $passwordLogQuery
                 ->paginate($perPagePasswordLog, ['*'], 'pagePasswordLog')
                 ->appends($request->except('pagePasswordLog'));
+
+            // Calculate total members count (all members assigned to this admin, regardless of status/role/calling_team)
+            $totalMembers = Member::where('id', '!=', $auth->id)
+                ->where('assigned_admin_id', $auth->id)
+                ->count();
+
             return Inertia::render('Admin/Dashboard', [
                 'auth' => [
                     'guard' => 'admin',
@@ -191,6 +202,7 @@ if ($activeMembers->count() > 0) {
                     'inProgressTasks' => $inProgressTasks,
                     'overdueTasks' => $overdueTasks,
                     'tasksByDepartment' => $tasksByDepartment,
+                    'totalMembers' => $totalMembers,
                 ],
                 'recentTasks' => $recentTasks,
                 'activityLogs' => $activityLogs,
