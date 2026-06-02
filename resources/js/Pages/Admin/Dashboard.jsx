@@ -257,7 +257,7 @@ export default function Dashboard({
                                         Total Members
                                     </h3>
                                     <h2 className="text-3xl font-bold mt-2 text-gray-900 dark:text-white">
-                                        {members?.length || 0}
+                                        {stats?.totalMembers || 0}
                                     </h2>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                         Active members in the system
