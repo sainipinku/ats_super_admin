@@ -237,24 +237,48 @@ const JobDetailModal = ({ job, isOpen, onClose, onApprove, onReject }) => {
                     )}
 
                     {/* Key Responsibilities */}
-                    {job.key_responsibilities && (
-                        <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Key Responsibilities</p>
-                            <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
-                                {job.key_responsibilities}
-                            </p>
-                        </div>
-                    )}
+                    {(() => {
+                        const responsibilities = Array.isArray(job.key_responsibilities) 
+                            ? job.key_responsibilities 
+                            : (typeof job.key_responsibilities === 'string' && job.key_responsibilities
+                                ? job.key_responsibilities.split('\n').map(s => s.trim()).filter(Boolean)
+                                : []);
+                        return responsibilities.length > 0 && (
+                            <div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Key Responsibilities</p>
+                                <ul className="space-y-1">
+                                    {responsibilities.map((item, idx) => (
+                                        <li key={idx} className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                                            <span className="text-blue-500 mt-1">•</span>
+                                            {item}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        );
+                    })()}
 
                     {/* Qualifications */}
-                    {job.qualifications && (
-                        <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Qualifications</p>
-                            <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
-                                {job.qualifications}
-                            </p>
-                        </div>
-                    )}
+                    {(() => {
+                        const qualifications = Array.isArray(job.qualifications) 
+                            ? job.qualifications 
+                            : (typeof job.qualifications === 'string' && job.qualifications
+                                ? job.qualifications.split('\n').map(s => s.trim()).filter(Boolean)
+                                : []);
+                        return qualifications.length > 0 && (
+                            <div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Qualifications</p>
+                                <ul className="space-y-1">
+                                    {qualifications.map((item, idx) => (
+                                        <li key={idx} className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                                            <span className="text-blue-500 mt-1">•</span>
+                                            {item}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        );
+                    })()}
 
                     {/* Perks */}
                     {job.perks && job.perks.length > 0 && (

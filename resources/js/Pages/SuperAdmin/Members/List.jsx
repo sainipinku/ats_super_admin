@@ -14,7 +14,7 @@ import qs from "qs";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/20/solid";
 import Loading from "@/Components/Loading";
 import EmailLogModal from "./EmailLogModal";
-import UploadDocument from "./UploadDocument";
+// import UploadDocument from "./UploadDocument";
 
 export default function Members({
     members,
@@ -30,7 +30,7 @@ export default function Members({
     const [isOpen, setIsOpen] = useState(false);
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
     const [currentMember, setCurrentMember] = useState(null);
-        const [isOpenModal, setIsOpenModal] = useState(false);
+        // const [isOpenModal, setIsOpenModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState(filters.search || "");
     const [statusFilter, setStatusFilter] = useState(filters.status || "");
     const [perPage, setPerPage] = useState(filters.per_page || 10);
@@ -49,6 +49,8 @@ export default function Members({
         match: false,
     });
     const [showEmailLogModal, setShowEmailLogModal] = useState(false);
+    const [viewMemberDetails, setViewMemberDetails] = useState(false);
+    const [selectedMemberForDetails, setSelectedMemberForDetails] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isCreateLoading, setIsCreateLoading] = useState(false);
     const [isUpdateLoading, setIsUpdateLoading] = useState(false);
@@ -746,7 +748,7 @@ const getRoleBadgeColor = (roleId) => {
                                         : "Deactivate Member"}
                                 </button>
                             </li>
-                            <li className="flex items-center gap-[5px] p-2 text-[12px] text-black hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-b-[#f2f2f2] dark:border-b-gray-600">
+                            {/* <li className="flex items-center gap-[5px] p-2 text-[12px] text-black hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-b-[#f2f2f2] dark:border-b-gray-600">
                                 <a
                                     href={route("super.members.details", {
                                         uuid: taskItem.uuid,
@@ -766,7 +768,7 @@ const getRoleBadgeColor = (roleId) => {
                                     </svg>
                                     Task History Details
                                 </a>
-                            </li>
+                            </li> */}
   {/* {!hasSuperAdminRole && ( */}
                             <li className="flex items-center gap-[5px] p-2 text-[12px] text-black hover:bg-gray-100 cursor-pointer border-b border-b-[#f2f2f2]">
                                 <button
@@ -840,26 +842,16 @@ const getRoleBadgeColor = (roleId) => {
                            <li className="flex items-center gap-[5px] p-2 text-[12px] text-black hover:bg-gray-100 cursor-pointer border-b border-b-[#f2f2f2]">
     <button
         onClick={() => {
-            setSelectedMemberForEmailLogs(taskItem);
-            setShowEmailLogModal(true);
+            setSelectedMemberForDetails(taskItem);
+            setViewMemberDetails(true);
         }}
         className="flex items-center gap-[8px]"
     >
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            width="20"
-            height="20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-            <polyline points="22,6 12,13 2,6"></polyline>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
         </svg>
-        View Email Logs
+        View Member Details
     </button>
 </li>
                         </ul>
@@ -1178,7 +1170,7 @@ const getRoleBadgeColor = (roleId) => {
                                                             </span>
                                                         </button>
                                                     )}
-                                                    <button
+                                                    {/* <button
                                                         onClick={() => {
                                                             setIsOpenModal(
                                                                 true
@@ -1190,9 +1182,9 @@ const getRoleBadgeColor = (roleId) => {
                                                         className="px-2 py-1 m-3 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
                                                     >
                                                         Upload/View Document
-                                                    </button>
+                                                    </button> */}
                                                     {member.assigned_admin_name && (
-                                                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                                        <div className="text-small font-bold text-black-500 dark:text-black-400 mb-2">
                                                             Assigned:{" "}
                                                             {
                                                                 member.assigned_admin_name
@@ -1372,11 +1364,11 @@ const getRoleBadgeColor = (roleId) => {
         }}
     />
 )}
-         <UploadDocument
+         {/* <UploadDocument
                 isOpenModal={isOpenModal}
                 setIsOpenModal={setIsOpenModal}
                 member={currentMember}
-            />
+            /> */}
                     <Modal
                         show={showAssignAdminModal}
                         onClose={handleAssignAdminClose}
@@ -2324,13 +2316,18 @@ const getRoleBadgeColor = (roleId) => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                         {roles
                                             .filter((role) => {
-                                                if (currentMember) return true;
+                                                if (currentMember) {
+                                                    if (currentMember.is_calling_team) return false;
+                                                    if (currentMember.roles?.includes('1')) return String(role.id) === '1';
+                                                    if (currentMember.roles?.includes('3')) return String(role.id) === '3';
+                                                    return true;
+                                                }
                                                 if (modalType === 'admin') return String(role.id) === '1';
                                                 if (modalType === 'member') return String(role.id) === '3';
                                                 return true;
                                             })
                                             .map((role) => {
-                                                const isLocked = !currentMember && (modalType === 'admin' || modalType === 'member');
+                                                const isLocked = !!(currentMember);
                                                 return (
                                             <div
                                                 key={role.id}
@@ -2557,6 +2554,103 @@ const getRoleBadgeColor = (roleId) => {
                                 </button>
                             </div>
                         </form>
+                    </Modal>
+
+                    <Modal
+                        show={viewMemberDetails}
+                        onClose={() => {
+                            setViewMemberDetails(false);
+                            setSelectedMemberForDetails(null);
+                        }}
+                        maxWidth="2xl"
+                        topCloseButton={true}
+                        handleTopClose={() => {
+                            setViewMemberDetails(false);
+                            setSelectedMemberForDetails(null);
+                        }}
+                    >
+                        {selectedMemberForDetails && (
+                            <div className="p-4">
+                                <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">
+                                    Member Details
+                                </h2>
+                                <div className="flex flex-col items-center mb-6">
+                                    {selectedMemberForDetails.profile_photo_url ? (
+                                        <img
+                                            className="w-24 h-24 rounded-full border-4 border-gray-200 dark:border-gray-600 object-cover shadow-md"
+                                            src={selectedMemberForDetails.profile_photo_url}
+                                            alt={selectedMemberForDetails.name || 'Member Avatar'}
+                                        />
+                                    ) : (
+                                        <div className="w-24 h-24 rounded-full border-4 border-gray-200 dark:border-gray-600 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold shadow-md">
+                                            {selectedMemberForDetails.name ? selectedMemberForDetails.name.charAt(0).toUpperCase() : '?'}
+                                        </div>
+                                    )}
+                                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mt-4">
+                                        {selectedMemberForDetails.name || 'N/A'}
+                                    </h3>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Phone</label>
+                                        <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{selectedMemberForDetails.phone || 'N/A'}</p>
+                                    </div>
+                                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</label>
+                                        <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{selectedMemberForDetails.email || 'N/A'}</p>
+                                    </div>
+                                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Gender</label>
+                                        <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{selectedMemberForDetails.gender ? selectedMemberForDetails.gender.toUpperCase() : 'N/A'}</p>
+                                    </div>
+                                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</label>
+                                        <p className="mt-1 text-sm font-medium">
+                                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusDisplay(selectedMemberForDetails.status).class}`}>
+                                                {getStatusDisplay(selectedMemberForDetails.status).text}
+                                            </span>
+                                        </p>
+                                    </div>
+                                    {selectedMemberForDetails.dob && (
+                                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date of Birth</label>
+                                            <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{selectedMemberForDetails.dob}</p>
+                                        </div>
+                                    )}
+                                    {selectedMemberForDetails.assigned_admin_name && (
+                                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assigned Admin</label>
+                                            <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{selectedMemberForDetails.assigned_admin_name}</p>
+                                        </div>
+                                    )}
+                                    {selectedMemberForDetails.departments_data && selectedMemberForDetails.departments_data.length > 0 && (
+                                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 sm:col-span-2">
+                                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Departments</label>
+                                            <div className="flex gap-2 flex-wrap">
+                                                {selectedMemberForDetails.departments_data.map((dept) => (
+                                                    <span key={dept.id} className="inline-flex items-center gap-x-1 py-1 px-3 rounded-full text-xs font-medium bg-blue-600 text-white">
+                                                        {dept.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {selectedMemberForDetails.designations_data && selectedMemberForDetails.designations_data.length > 0 && (
+                                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 sm:col-span-2">
+                                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Designations</label>
+                                            <div className="flex gap-2 flex-wrap">
+                                                {selectedMemberForDetails.designations_data.map((desig) => (
+                                                    <span key={desig.id} className="inline-flex items-center gap-x-1 py-1 px-3 rounded-full text-xs font-medium bg-green-600 text-white">
+                                                        {desig.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </Modal>
 
                 </div>

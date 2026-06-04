@@ -165,28 +165,36 @@ class JobRequestController extends Controller
             'description' => 'nullable|string',
             'location' => 'required|string|max:255',
             'job_type' => 'required|string|max:50',
+            'openings' => 'nullable|integer|min:1',
             'experience' => 'nullable|string|max:100',
             'salary' => 'nullable|string|max:100',
             'skills' => 'nullable',
             'perks' => 'nullable',
-            'key_responsibilities' => 'nullable|string',
-            'qualifications' => 'nullable|string',
+            'key_responsibilities' => 'nullable',
+            'qualifications' => 'nullable',
+            'assets' => 'nullable',
             'last_date' => 'nullable|date',
             'company_image' => 'nullable|image|max:5120',
+            'contact_person' => 'nullable|string|max:255',
+            'contact_phone' => 'nullable|string|max:30',
+            'contact_email' => 'nullable|email|max:255',
+            'company_address' => 'nullable|string',
         ]);
 
-        if (array_key_exists('skills', $validated) && is_string($validated['skills'])) {
-            $validated['skills'] = json_decode($validated['skills'], true) ?: [];
-        }
-        if (array_key_exists('perks', $validated) && is_string($validated['perks'])) {
-            $validated['perks'] = json_decode($validated['perks'], true) ?: [];
+        // Convert JSON strings to arrays for array-based fields
+        foreach (['skills', 'perks', 'key_responsibilities', 'qualifications', 'assets'] as $arrField) {
+            if (!empty($validated[$arrField]) && is_string($validated[$arrField])) {
+                $decoded = json_decode($validated[$arrField], true);
+                $validated[$arrField] = is_array($decoded) ? $decoded : [];
+            } elseif (empty($validated[$arrField])) {
+                $validated[$arrField] = [];
+            }
         }
 
-        if (array_key_exists('skills', $validated) && is_array($validated['skills']) === false && $validated['skills'] !== null) {
-            $validated['skills'] = [];
-        }
-        if (array_key_exists('perks', $validated) && is_array($validated['perks']) === false && $validated['perks'] !== null) {
-            $validated['perks'] = [];
+        // Default openings to 1
+        $validated['openings'] = (int) ($validated['openings'] ?? 1);
+        if ($validated['openings'] < 1) {
+            $validated['openings'] = 1;
         }
 
         if ($request->hasFile('company_image')) {
