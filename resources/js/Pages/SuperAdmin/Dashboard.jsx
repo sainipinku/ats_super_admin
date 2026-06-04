@@ -569,52 +569,7 @@ export default function Dashboard({
             <div className="mt-[75px]">
                 <div className="min-h-screen py-[40px] px-[15px]">
                     {/* First Row - Core Stats */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        {/* Total Tasks Card */}
-                        <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-[14px] font-[400] text-prime-color uppercase">
-                                        Total Tasks
-                                    </p>
-                                    <h3 className="text-[30px] font-[500] text-second-color mt-1">
-                                        {stats.tasks.total || (
-                                            <span className="text-[15px] font-[500] text-second-color">
-                                                No Data Available
-                                            </span>
-                                        )}
-                                    </h3>
-                                </div>
-                                <div className="taskdone px-[13px] py-[10px] rounded-lg border">
-                                    <FaTasks className="text-[#5146E6]" size={20} />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Closed Tasks Card */}
-                        <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-[14px] font-[400] text-prime-color uppercase">
-                                        Closed Tasks
-                                    </p>
-                                    <h3 className="text-[30px] font-[500] text-second-color mt-1">
-                                        {stats.tasks.completed || (
-                                            <span className="text-[15px] font-semibold text-second-color">
-                                                No Data Available
-                                            </span>
-                                        )}
-                                    </h3>
-                                </div>
-                                <div className="taskdone px-[13px] py-[10px] rounded-lg border">
-                                    <FaCheckCircle
-                                        className="text-green-500 dark:text-green-400"
-                                        size={20}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
                         {/* Total Active Staff Card */}
                         <div className="cards border borderbx rounded-lg p-4 shadow-sm">
                             <div className="flex items-center justify-between">
@@ -663,7 +618,7 @@ export default function Dashboard({
                     </div>
 
                     {/* Second Row - Additional Stats */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                         {/* Total Roles Card */}
                         <div className="cards border borderbx rounded-lg p-4 shadow-sm">
                             <div className="flex items-center justify-between">
@@ -738,33 +693,9 @@ export default function Dashboard({
                                 </div>
                             </div>
                         </div>
-
-                        {/* Overdue Tasks Card */}
-                        <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-[14px] font-[400] text-prime-color uppercase">
-                                        Overdue Task Instance
-                                    </p>
-                                    <h3 className="text-[30px] font-[500] text-second-color mt-1">
-                                        {stats.tasks.overdue || (
-                                            <span className="text-[15px] font-semibold text-second-color">
-                                                No Data Available
-                                            </span>
-                                        )}
-                                    </h3>
-                                </div>
-                                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30">
-                                    <FaExclamationTriangle
-                                        className="text-red-500 dark:text-red-400"
-                                        size={20}
-                                    />
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
                         <div
                             className="cards border borderbx rounded-lg p-4 shadow-sm cursor-pointer"
                             onClick={() => router.visit(route("super.job.requests.all.jobs"))}
@@ -1016,84 +947,11 @@ export default function Dashboard({
                         }}
                     />
 
-                    {/* <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                        <GlobalFilters />
-                        
-                        <div className="grid grid-cols-1 gap-6 mb-6">
-                            
-                            <div className="cards border borderbx rounded-lg p-4 shadow-sm">
-                                <ChartHeader
-                                    title="Task Type Distribution"
-                                    icon={
-                                        <div className="taskrunning px-[13px] py-[10px] rounded-lg border">
-                                            <FaChartPie className="text-[#5146E6]" />
-                                        </div>
-                                    }
-                                />
-                                <div className="h-64">
-                                    <ResponsiveContainer
-                                        width="100%"
-                                        height="100%"
-                                    >
-                                        <PieChart>
-                                            <Pie
-                                                data={taskTypeData}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                                label={({ name, percent }) =>
-                                                    `${name}\n${(
-                                                        percent * 100
-                                                    ).toFixed(0)}%`
-                                                }
-                                                labelLine={false}
-                                            >
-                                                {taskTypeData.map(
-                                                    (entry, index) => (
-                                                        <Cell
-                                                            key={`cell-${index}`}
-                                                            fill={entry.color}
-                                                        />
-                                                    )
-                                                )}
-                                            </Pie>
-                                            <Tooltip
-                                                formatter={(value) => [
-                                                    `${value} tasks`,
-                                                    "Count",
-                                                ]}
-                                                contentStyle={
-                                                    chartTheme.tooltip
-                                                }
-                                            />
-                                            <Legend
-                                                layout="horizontal"
-                                                verticalAlign="bottom"
-                                                align="center"
-                                                wrapperStyle={
-                                                    chartTheme.legend
-                                                        .wrapperStyle
-                                                }
-                                            />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-                        </div>
-                    </div> */}
-                    {/* <Calendar /> */}
                     <ActivityLogSection activityLogs={activityLogs} />
                     <PasswordLogSection
                         passwordLogs={passwordLogs}
                         auth={auth}
                     />
-                    {/* <ImageActionLogSection
-                        imageActionLogs={imageActionLogs}
-                        auth={auth}
-                    /> */}
                 </div>
             </div>
         </AuthenticatedLayout>

@@ -748,27 +748,6 @@ const getRoleBadgeColor = (roleId) => {
                                         : "Deactivate Member"}
                                 </button>
                             </li>
-                            {/* <li className="flex items-center gap-[5px] p-2 text-[12px] text-black hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-b-[#f2f2f2] dark:border-b-gray-600">
-                                <a
-                                    href={route("super.members.details", {
-                                        uuid: taskItem.uuid,
-                                    })}
-                                    className="flex items-center gap-[8px] text-black dark:text-white"
-                                >
-                                    <svg
-                                        stroke="currentColor"
-                                        fill="currentColor"
-                                        strokeWidth="0"
-                                        viewBox="0 0 576 512"
-                                        height="20"
-                                        width="20"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                    >
-                                        <path d="M572.52 241.4C518.29 135.59 410.93 64 288 64S57.68 135.64 3.48 241.41a32.35 32.35 0 0 0 0 29.19C57.71 376.41 165.07 448 288 448s230.32-71.64 284.52-177.41a32.35 32.35 0 0 0 0-29.19zM288 400a144 144 0 1 1 144-144 143.93 143.93 0 0 1-144 144zm0-240a95.31 95.31 0 0 0-25.31 3.79 47.85 47.85 0 0 1-66.9 66.9A95.78 95.78 0 1 0 288 160z"></path>
-                                    </svg>
-                                    Task History Details
-                                </a>
-                            </li> */}
   {/* {!hasSuperAdminRole && ( */}
                             <li className="flex items-center gap-[5px] p-2 text-[12px] text-black hover:bg-gray-100 cursor-pointer border-b border-b-[#f2f2f2]">
                                 <button
@@ -839,21 +818,6 @@ const getRoleBadgeColor = (roleId) => {
                                 </button>
                             </li>
                                {/* )} */}
-                           <li className="flex items-center gap-[5px] p-2 text-[12px] text-black hover:bg-gray-100 cursor-pointer border-b border-b-[#f2f2f2]">
-    <button
-        onClick={() => {
-            setSelectedMemberForDetails(taskItem);
-            setViewMemberDetails(true);
-        }}
-        className="flex items-center gap-[8px]"
-    >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-            <circle cx="12" cy="7" r="4"></circle>
-        </svg>
-        View Member Details
-    </button>
-</li>
                         </ul>
                     </div>
                 )}
@@ -1170,19 +1134,6 @@ const getRoleBadgeColor = (roleId) => {
                                                             </span>
                                                         </button>
                                                     )}
-                                                    {/* <button
-                                                        onClick={() => {
-                                                            setIsOpenModal(
-                                                                true
-                                                            );
-                                                            setCurrentMember(
-                                                                member
-                                                            );
-                                                        }}
-                                                        className="px-2 py-1 m-3 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
-                                                    >
-                                                        Upload/View Document
-                                                    </button> */}
                                                     {member.assigned_admin_name && (
                                                         <div className="text-small font-bold text-black-500 dark:text-black-400 mb-2">
                                                             Assigned:{" "}
