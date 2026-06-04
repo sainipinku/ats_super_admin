@@ -479,81 +479,81 @@ export default function Dashboard({
             };
         }
     };
-    const GlobalFilters = () => (
-        <div className="flex flex-col gap-[5px] sm:flex-row items-center mb-6 pb-[15px] border-b-[1px] border-b-[#5146E64D]">
-            <div className="w-full sm:w-auto text-lg font-semibold text-second-color">
-                Filters:
-            </div>
-            <select
-                value={filters.year}
-                onChange={(e) => updateFilters("year", e.target.value)}
-                className="w-full sm:w-auto sm:min-w-[120px] text-sm selectbg border rounded-md px-3 py-2"
-                disabled={loading}
-            >
-                {yearOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                        {option.label}
-                    </option>
-                ))}
-            </select>
-            <select
-                value={filters.month}
-                onChange={(e) => updateFilters("month", e.target.value)}
-                className="w-full sm:w-auto min-w-[120px] text-sm selectbg border rounded-md px-3 py-2"
-                disabled={loading}
-            >
-                {monthOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                        {option.label}
-                    </option>
-                ))}
-            </select>
-            <select
-                value={filters.member_id || ""}
-                onChange={(e) => updateFilters("member_id", e.target.value)}
-                className="w-full sm:w-auto min-w-[180px] text-sm selectbg border rounded-md px-3 py-2"
-                disabled={loading}
-            >
-                {memberOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                        {option.label}
-                    </option>
-                ))}
-            </select>
-            <div className="flex gap-2">
-                <button
-                    onClick={() => handleExport("print")}
-                    className="flex items-center gap-1 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                    title="Print Report"
-                >
-                    <FaPrint size={14} />
-                    <span>Print</span>
-                </button>
-            </div>
-            {loading && (
-                <svg
-                    className="animate-spin h-5 w-5 text-gray-500"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                >
-                    <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                    ></circle>
-                    <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                </svg>
-            )}
-        </div>
-    );
+    // const GlobalFilters = () => (
+    //     <div className="flex flex-col gap-[5px] sm:flex-row items-center mb-6 pb-[15px] border-b-[1px] border-b-[#5146E64D]">
+    //         <div className="w-full sm:w-auto text-lg font-semibold text-second-color">
+    //             Filters:
+    //         </div>
+    //         <select
+    //             value={filters.year}
+    //             onChange={(e) => updateFilters("year", e.target.value)}
+    //             className="w-full sm:w-auto sm:min-w-[120px] text-sm selectbg border rounded-md px-3 py-2"
+    //             disabled={loading}
+    //         >
+    //             {yearOptions.map((option) => (
+    //                 <option key={option.value} value={option.value}>
+    //                     {option.label}
+    //                 </option>
+    //             ))}
+    //         </select>
+    //         <select
+    //             value={filters.month}
+    //             onChange={(e) => updateFilters("month", e.target.value)}
+    //             className="w-full sm:w-auto min-w-[120px] text-sm selectbg border rounded-md px-3 py-2"
+    //             disabled={loading}
+    //         >
+    //             {monthOptions.map((option) => (
+    //                 <option key={option.value} value={option.value}>
+    //                     {option.label}
+    //                 </option>
+    //             ))}
+    //         </select>
+    //         <select
+    //             value={filters.member_id || ""}
+    //             onChange={(e) => updateFilters("member_id", e.target.value)}
+    //             className="w-full sm:w-auto min-w-[180px] text-sm selectbg border rounded-md px-3 py-2"
+    //             disabled={loading}
+    //         >
+    //             {memberOptions.map((option) => (
+    //                 <option key={option.value} value={option.value}>
+    //                     {option.label}
+    //                 </option>
+    //             ))}
+    //         </select>
+    //         <div className="flex gap-2">
+    //             <button
+    //                 onClick={() => handleExport("print")}
+    //                 className="flex items-center gap-1 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+    //                 title="Print Report"
+    //             >
+    //                 <FaPrint size={14} />
+    //                 <span>Print</span>
+    //             </button>
+    //         </div>
+    //         {loading && (
+    //             <svg
+    //                 className="animate-spin h-5 w-5 text-gray-500"
+    //                 xmlns="http://www.w3.org/2000/svg"
+    //                 fill="none"
+    //                 viewBox="0 0 24 24"
+    //             >
+    //                 <circle
+    //                     className="opacity-25"
+    //                     cx="12"
+    //                     cy="12"
+    //                     r="10"
+    //                     stroke="currentColor"
+    //                     strokeWidth="4"
+    //                 ></circle>
+    //                 <path
+    //                     className="opacity-75"
+    //                     fill="currentColor"
+    //                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+    //                 ></path>
+    //             </svg>
+    //         )}
+    //     </div>
+    // );
     const ChartHeader = ({ title, icon }) => (
         <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
@@ -1016,11 +1016,11 @@ export default function Dashboard({
                         }}
                     />
 
-                    <div className="cards border borderbx rounded-lg p-4 shadow-sm">
+                    {/* <div className="cards border borderbx rounded-lg p-4 shadow-sm">
                         <GlobalFilters />
-                        {/* Main Charts Section */}
+                        
                         <div className="grid grid-cols-1 gap-6 mb-6">
-                            {/* Task Type Distribution */}
+                            
                             <div className="cards border borderbx rounded-lg p-4 shadow-sm">
                                 <ChartHeader
                                     title="Task Type Distribution"
@@ -1083,17 +1083,17 @@ export default function Dashboard({
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <Calendar />
+                    </div> */}
+                    {/* <Calendar /> */}
                     <ActivityLogSection activityLogs={activityLogs} />
                     <PasswordLogSection
                         passwordLogs={passwordLogs}
                         auth={auth}
                     />
-                    <ImageActionLogSection
+                    {/* <ImageActionLogSection
                         imageActionLogs={imageActionLogs}
                         auth={auth}
-                    />
+                    /> */}
                 </div>
             </div>
         </AuthenticatedLayout>

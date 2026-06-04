@@ -52,23 +52,41 @@ class JobController extends Controller
             ->map(function ($job) {
                 return [
                     'id' => $job->id,
+                    'uuid' => $job->uuid,
                     'title' => $job->title,
                     'company' => $job->company,
+                    'company_image' => $job->company_image,
                     'companyImage' => $job->company_image,
+                    'description' => $job->description,
                     'location' => $job->location,
+                    'job_type' => $job->job_type,
                     'type' => $job->job_type,
+                    'openings' => $job->openings ?? 1,
                     'experience' => $job->experience,
                     'salary' => $job->salary,
-                    'skills' => $job->skills,
-                    'perks' => $job->perks,
-                    'description' => $job->description,
+                    'skills' => $job->skills ?? [],
+                    'perks' => $job->perks ?? [],
+                    'key_responsibilities' => $job->key_responsibilities,
                     'keyResponsibilities' => $job->key_responsibilities,
                     'qualifications' => $job->qualifications,
+                    'last_date' => $job->last_date,
                     'lastDate' => $job->last_date,
+                    'assets' => $job->assets ?? [],
+                    'contact_person' => $job->contact_person,
+                    'contactPerson' => $job->contact_person,
+                    'contact_phone' => $job->contact_phone,
+                    'contactPhone' => $job->contact_phone,
+                    'contact_email' => $job->contact_email,
+                    'contactEmail' => $job->contact_email,
+                    'company_address' => $job->company_address,
+                    'companyAddress' => $job->company_address,
+                    'rejection_reason' => $job->rejection_reason,
+                    'rejectionReason' => $job->rejection_reason,
                     'active' => $job->status === 'active',
                     'status' => $job->status,
-                    'createdAt' => $job->created_at,
                     'applicants' => $job->applicants ?? 0,
+                    'created_at' => $job->created_at,
+                    'createdAt' => $job->created_at,
                 ];
             });
 
@@ -103,24 +121,38 @@ class JobController extends Controller
             'description' => 'nullable|string',
             'location' => 'required|string|max:255',
             'job_type' => 'required|string|max:50',
+            'openings' => 'nullable|integer|min:1',
             'experience' => 'nullable|string|max:100',
             'salary' => 'nullable|string|max:100',
-            'skills' => 'nullable|string', // JSON string from frontend
-            'perks' => 'nullable|string', // JSON string from frontend
-            'key_responsibilities' => 'nullable|string',
-            'qualifications' => 'nullable|string',
+            'skills' => 'nullable', // JSON string or array from frontend
+            'perks' => 'nullable', // JSON string or array from frontend
+            'key_responsibilities' => 'nullable',
+            'qualifications' => 'nullable',
+            'assets' => 'nullable',
             'last_date' => 'nullable|date',
             'company_image' => 'nullable|image|max:5120',
+            'contact_person' => 'nullable|string|max:255',
+            'contact_phone' => 'nullable|string|max:30',
+            'contact_email' => 'nullable|email|max:255',
+            'company_address' => 'nullable|string',
             'latitude' => 'nullable|decimal:8,6|between:-90,90',
             'longitude' => 'nullable|decimal:9,6|between:-180,180',
         ]);
 
-        // Convert JSON strings to arrays
-        if (!empty($validated['skills'])) {
-            $validated['skills'] = json_decode($validated['skills'], true) ?: [];
+        // Convert JSON strings to arrays (or accept array directly)
+        foreach (['skills', 'perks', 'key_responsibilities', 'qualifications', 'assets'] as $arrField) {
+            if (!empty($validated[$arrField]) && is_string($validated[$arrField])) {
+                $decoded = json_decode($validated[$arrField], true);
+                $validated[$arrField] = is_array($decoded) ? $decoded : [];
+            } elseif (empty($validated[$arrField])) {
+                $validated[$arrField] = [];
+            }
         }
-        if (!empty($validated['perks'])) {
-            $validated['perks'] = json_decode($validated['perks'], true) ?: [];
+
+        // Default openings to 1
+        $validated['openings'] = (int) ($validated['openings'] ?? 1);
+        if ($validated['openings'] < 1) {
+            $validated['openings'] = 1;
         }
 
         // Handle company image upload
@@ -149,7 +181,47 @@ class JobController extends Controller
     {
         $jobs = Job::where('created_by', Auth::guard('admin')->id())
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($job) {
+                return [
+                    'id' => $job->id,
+                    'uuid' => $job->uuid,
+                    'title' => $job->title,
+                    'company' => $job->company,
+                    'company_image' => $job->company_image,
+                    'companyImage' => $job->company_image,
+                    'description' => $job->description,
+                    'location' => $job->location,
+                    'job_type' => $job->job_type,
+                    'type' => $job->job_type,
+                    'openings' => $job->openings ?? 1,
+                    'experience' => $job->experience,
+                    'salary' => $job->salary,
+                    'skills' => $job->skills ?? [],
+                    'perks' => $job->perks ?? [],
+                    'key_responsibilities' => $job->key_responsibilities,
+                    'keyResponsibilities' => $job->key_responsibilities,
+                    'qualifications' => $job->qualifications,
+                    'last_date' => $job->last_date,
+                    'lastDate' => $job->last_date,
+                    'assets' => $job->assets ?? [],
+                    'contact_person' => $job->contact_person,
+                    'contactPerson' => $job->contact_person,
+                    'contact_phone' => $job->contact_phone,
+                    'contactPhone' => $job->contact_phone,
+                    'contact_email' => $job->contact_email,
+                    'contactEmail' => $job->contact_email,
+                    'company_address' => $job->company_address,
+                    'companyAddress' => $job->company_address,
+                    'rejection_reason' => $job->rejection_reason,
+                    'rejectionReason' => $job->rejection_reason,
+                    'status' => $job->status,
+                    'active' => $job->status === 'active',
+                    'applicants' => $job->applicants ?? 0,
+                    'created_at' => $job->created_at,
+                    'createdAt' => $job->created_at,
+                ];
+            });
 
         return response()->json([
             'success' => true,
@@ -289,24 +361,38 @@ class JobController extends Controller
             'description' => 'nullable|string',
             'location' => 'required|string|max:255',
             'job_type' => 'required|string|max:50',
+            'openings' => 'nullable|integer|min:1',
             'experience' => 'nullable|string|max:100',
             'salary' => 'nullable|string|max:100',
-            'skills' => 'nullable|string', // JSON string from frontend
-            'perks' => 'nullable|string', // JSON string from frontend
-            'key_responsibilities' => 'nullable|string',
-            'qualifications' => 'nullable|string',
+            'skills' => 'nullable', // JSON string or array from frontend
+            'perks' => 'nullable', // JSON string or array from frontend
+            'key_responsibilities' => 'nullable',
+            'qualifications' => 'nullable',
+            'assets' => 'nullable',
             'last_date' => 'nullable|date',
             'company_image' => 'nullable|image|max:5120',
+            'contact_person' => 'nullable|string|max:255',
+            'contact_phone' => 'nullable|string|max:30',
+            'contact_email' => 'nullable|email|max:255',
+            'company_address' => 'nullable|string',
             'latitude' => 'nullable|decimal:8,6|between:-90,90',
             'longitude' => 'nullable|decimal:9,6|between:-180,180',
         ]);
 
-        // Convert JSON strings to arrays
-        if (!empty($validated['skills'])) {
-            $validated['skills'] = json_decode($validated['skills'], true) ?: [];
+        // Convert JSON strings to arrays (or accept array directly)
+        foreach (['skills', 'perks', 'key_responsibilities', 'qualifications', 'assets'] as $arrField) {
+            if (!empty($validated[$arrField]) && is_string($validated[$arrField])) {
+                $decoded = json_decode($validated[$arrField], true);
+                $validated[$arrField] = is_array($decoded) ? $decoded : [];
+            } elseif (empty($validated[$arrField])) {
+                $validated[$arrField] = [];
+            }
         }
-        if (!empty($validated['perks'])) {
-            $validated['perks'] = json_decode($validated['perks'], true) ?: [];
+
+        // Default openings to 1
+        $validated['openings'] = (int) ($validated['openings'] ?? 1);
+        if ($validated['openings'] < 1) {
+            $validated['openings'] = 1;
         }
 
         // Handle company image upload

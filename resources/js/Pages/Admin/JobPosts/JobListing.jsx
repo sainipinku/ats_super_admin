@@ -6,16 +6,27 @@ import ConfirmDialog from '../../../Components/ConfirmDialog';
 import ResumePreviewModal from '../../../Components/ResumePreviewModal';
 import { useAlerts } from '../../../Components/Alerts';
 
-// Reusable JobCard Component
+const ASSETS_OPTIONS = [
+    "Bike",
+    "License",
+    "Aadhaar Card",
+    "PAN Card",
+    "Heavy Driver License",
+    "Camera",
+    "Laptop",
+    "Auto / Rickshaw",
+    "Tempo",
+    "Tempo Traveller / Van",
+    "Yulu / E-Bike"
+];
+
 const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onResend, onStatusChange, onCloseJob }) => {
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
 
-
     const canToggleStatus = ['active', 'inactive', 'closed'].includes(job.status);
     const canClose = ['active', 'inactive'].includes(job.status);
 
-    // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -25,7 +36,6 @@ const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onR
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
 
     const getStatusBadge = (status) => {
         const badges = {
@@ -40,25 +50,12 @@ const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onR
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm p-4 border min-h-[300px] relative flex flex-col border-slate-200 dark:border-gray-700 hover:border-blue-300 hover:ring-2 hover:ring-blue-200 transition-all duration-200">
-            {/* Action Icons - Edit, Delete */}
             <div className="absolute -top-4 -right-2 z-10 flex gap-1">
-                <button
-                    onClick={() => onEdit(job)}
-                    className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors shadow-md"
-                    title="Edit Job"
-                >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
+                <button onClick={() => onEdit(job)} className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors shadow-md" title="Edit Job">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 </button>
-                <button
-                    onClick={() => onDelete(job)}
-                    className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md"
-                    title="Delete Job"
-                >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+                <button onClick={() => onDelete(job)} className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md" title="Delete Job">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                 </button>
             </div>
 
@@ -71,154 +68,39 @@ const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onR
                     </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                    <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-medium whitespace-nowrap">
-                        {job.job_type || job.type}
-                    </span>
-                    {/* Show status badge */}
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${getStatusBadge(job.status)}`}>
-                        {job.status === 'active' ? 'Active' : job.status === 'inactive' ? 'Deactive' : job.status === 'closed' ? 'Closed' : job.status}
-                    </span>
+                    <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-medium whitespace-nowrap">{job.job_type || job.type}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${getStatusBadge(job.status)}`}>{job.status === 'active' ? 'Active' : job.status === 'inactive' ? 'Deactive' : job.status === 'closed' ? 'Closed' : job.status}</span>
                 </div>
             </div>
 
             <div className="space-y-1 text-slate-600 dark:text-gray-300 text-[12px] mb-2">
-                <div className="flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5 text-slate-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span>{job.location}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5 text-slate-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>{job.experience}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5 text-slate-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-emerald-600 font-medium">{job.salary}</span>
-                </div>
+                <div className="flex items-center gap-1"><span>{job.location}</span></div>
+                <div className="flex items-center gap-1"><span>{job.experience}</span></div>
+                <div className="flex items-center gap-1"><span className="text-emerald-600 font-medium">{job.salary}</span></div>
             </div>
 
-            {/* Skills */}
             <div className="flex flex-wrap gap-1 mb-2">
                 {job.skills?.slice(0, 3).map((skill, index) => (
-                    <span key={index} className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium">
-                        {skill}
-                    </span>
+                    <span key={index} className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium">{skill}</span>
                 ))}
-                {job.skills?.length > 3 && (
-                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px]">
-                        +{job.skills.length - 3}
-                    </span>
-                )}
             </div>
 
             <div className="mb-2">
                 <p className="text-[11px] font-medium text-slate-700 mb-1">Perks:</p>
-                <p className="text-[10px] text-slate-600 line-clamp-1">
-                    {job.perks?.join(' • ') || 'Flexible working hours • Health Insurance • Learning opportunities'}
-                </p>
+                <p className="text-[10px] text-slate-600 line-clamp-1">{job.perks?.join(' • ') || 'Flexible working hours • Health Insurance • Learning opportunities'}</p>
             </div>
 
             <div className="mt-auto">
                 <hr className="my-2" />
-
                 {job.status === 'declined' && (
-                    <button
-                        onClick={() => onResend(job)}
-                        className="w-full mb-2 py-2 rounded-xl bg-yellow-500 text-white text-[12px] font-semibold hover:bg-yellow-600 transition-colors"
-                    >
-                        ↻ Resend for Approval
-                    </button>
+                    <button onClick={() => onResend(job)} className="w-full mb-2 py-2 rounded-xl bg-yellow-500 text-white text-[12px] font-semibold hover:bg-yellow-600 transition-colors">↻ Resend for Approval</button>
                 )}
-
                 <div className="flex justify-between items-center text-[12px] text-slate-500 mb-3">
-                    <p>Posted {job.created_at ? new Date(job.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                    }) : (job.createdAt ? new Date(job.createdAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                    }) : 'Just now')} <span className="mx-2">•</span> {job.applicants || 0} applicants</p>
-
-                    {/* Job Status Dropdown - Only for active/inactive/closed jobs */}
-                    {canToggleStatus && (
-                        <div className="relative" ref={dropdownRef}>
-                            <button
-                                onClick={() => setShowDropdown(!showDropdown)}
-                                className="flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 text-[10px] font-medium transition-colors"
-                                title="Change Job Status"
-                            >
-                                Job Status
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </button>
-                            {showDropdown && (
-                                <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20">
-                                    <button
-                                        onClick={() => {
-                                            onStatusChange(job, 'active');
-                                            setShowDropdown(false);
-                                        }}
-                                        disabled={job.status === 'active'}
-                                        className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${
-                                            job.status === 'active' ? 'text-green-600 font-semibold bg-green-50' : 'text-slate-700'
-                                        }`}
-                                    >
-                                        Active
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            onStatusChange(job, 'inactive');
-                                            setShowDropdown(false);
-                                        }}
-                                        disabled={job.status === 'inactive'}
-                                        className={`w-full text-left px-3 py-2 text-[11px] hover:bg-slate-50 transition-colors ${
-                                            job.status === 'inactive' ? 'text-gray-600 font-semibold bg-gray-50' : 'text-slate-700'
-                                        }`}
-                                    >
-                                        Deactive
-                                    </button>
-                                    {canClose && (
-                                        <>
-                                            <div className="border-t border-slate-100 my-1"></div>
-                                            <button
-                                                onClick={() => {
-                                                    onCloseJob(job);
-                                                    setShowDropdown(false);
-                                                }}
-                                                className="w-full text-left px-3 py-2 text-[11px] text-red-600 hover:bg-red-50 transition-colors"
-                                            >
-                                                Close
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <p>Posted {new Date(job.created_at || job.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} <span className="mx-2">•</span> {job.applicants || 0} applicants</p>
                 </div>
-
                 <div className="grid grid-cols-2 gap-2">
-                    <button
-                        onClick={() => onViewDetails(job)}
-                        className="w-full py-2 rounded-xl text-blue-600 text-[14px] font-semibold hover:bg-blue-50 transition-colors"
-                    >
-                        View Details
-                    </button>
-                    <button
-                        onClick={() => onViewApplications(job)}
-                        className="w-full py-2 rounded-xl text-emerald-600 text-[14px] font-semibold hover:bg-emerald-50 transition-colors"
-                    >
-                        Applicants
-                    </button>
+                    <button onClick={() => onViewDetails(job)} className="w-full py-2 rounded-xl text-blue-600 text-[14px] font-semibold hover:bg-blue-50 transition-colors">View Details</button>
+                    <button onClick={() => onViewApplications(job)} className="w-full py-2 rounded-xl text-emerald-600 text-[14px] font-semibold hover:bg-emerald-50 transition-colors">Applicants</button>
                 </div>
             </div>
         </div>
@@ -226,41 +108,20 @@ const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onR
 };
 
 const defaultCreateForm = {
-    title: '',
-    company: '',
-    location: '',
-    job_type: 'Full Time',
-    experience: '',
-    min_salary: '',
-    max_salary: '',
-    salary_period: 'year',
-    last_date: '',
-    description: '',
-    key_responsibilities: '',
-    qualifications: '',
-    skills: '',
-    perks: '',
-    company_image: null,
-    company_image_preview: '',
+    title: '', company: '', location: '', job_type: 'Full Time', openings: 1, experience: '',
+    min_salary: '', max_salary: '', salary_period: 'Monthly', last_date: '', description: '',
+    currentSkill: '', skillsList: [], currentPerk: '', perksList: [],
+    responsibilities: [], currentResponsibility: '',
+    qualificationsList: [], currentQualification: '',
+    assets: [], company_image: null, company_image_preview: '',
+    contact_person: '', contact_phone: '', contact_email: '', company_address: '',
 };
 
 const parseSalaryRange = (salary) => {
-    if (!salary) {
-        return { min: '', max: '', period: 'year' };
-    }
-
-    const match = String(salary).replace(/\s+/g, ' ').trim()
-        .match(/₹?\s*([\d,]+)\s*-\s*₹?\s*([\d,]+)\s*\/\s*(year|month)/i);
-
-    if (!match) {
-        return { min: '', max: '', period: 'year' };
-    }
-
-    return {
-        min: match[1].replace(/,/g, ''),
-        max: match[2].replace(/,/g, ''),
-        period: match[3].toLowerCase(),
-    };
+    if (!salary) return { min: '', max: '', period: 'Monthly' };
+    const match = String(salary).replace(/\s+/g, ' ').trim().match(/₹?\s*([\d,]+)\s*-\s*₹?\s*([\d,]+)\s*\/\s*(year|month|hour|week)/i);
+    if (!match) return { min: '', max: '', period: 'Monthly' };
+    return { min: match[1].replace(/,/g, ''), max: match[2].replace(/,/g, ''), period: match[3].toLowerCase() };
 };
 
 const splitCommaList = (value) =>
@@ -521,6 +382,18 @@ export default function JobListing({ auth }) {
         { value: 'rejected', label: 'Rejected' },
     ];
 
+    const [editFields, setEditFields] = useState({
+        skillsList: [],
+        currentSkill: '',
+        perksList: [],
+        currentPerk: '',
+        responsibilities: [],
+        currentResponsibility: '',
+        qualificationsList: [],
+        currentQualification: '',
+        assets: [],
+    });
+
     const handleEdit = (job) => {
         const salary = parseSalaryRange(job.salary);
         setEditingJob(job);
@@ -529,19 +402,124 @@ export default function JobListing({ auth }) {
             company: job.company || '',
             location: job.location || '',
             job_type: job.job_type || job.type || 'Full Time',
+            openings: job.openings || 1,
             experience: job.experience || '',
             min_salary: salary.min,
             max_salary: salary.max,
             salary_period: salary.period,
             last_date: job.last_date || '',
             description: job.description || '',
-            key_responsibilities: job.key_responsibilities || '',
-            qualifications: job.qualifications || '',
-            skills: Array.isArray(job.skills) ? job.skills.join(', ') : (job.skills || ''),
-            perks: Array.isArray(job.perks) ? job.perks.join(', ') : (job.perks || ''),
             company_image: null,
             company_image_preview: job.company_image || job.companyImage || '',
+            contact_person: job.contact_person || '',
+            contact_phone: job.contact_phone || '',
+            contact_email: job.contact_email || '',
+            company_address: job.company_address || '',
         });
+        setEditFields({
+            skillsList: Array.isArray(job.skills) ? [...job.skills] : [],
+            currentSkill: '',
+            perksList: Array.isArray(job.perks) ? [...job.perks] : [],
+            currentPerk: '',
+            responsibilities: Array.isArray(job.key_responsibilities || job.keyResponsibilities)
+                ? [...(job.key_responsibilities || job.keyResponsibilities)]
+                : [],
+            currentResponsibility: '',
+            qualificationsList: Array.isArray(job.qualifications) ? [...job.qualifications] : [],
+            currentQualification: '',
+            assets: Array.isArray(job.assets) ? [...job.assets] : [],
+        });
+    };
+
+    const handleEditInputChange = (e) => {
+        const { name, value } = e.target;
+        if (name === 'min_salary' || name === 'max_salary') {
+            setEditForm(prev => ({ ...prev, [name]: value.replace(/[^0-9]/g, '') }));
+            return;
+        }
+        if (name === 'openings') {
+            const numVal = parseInt(value) || '';
+            if (numVal !== '' && numVal < 1) return;
+            setEditForm(prev => ({ ...prev, [name]: numVal }));
+            return;
+        }
+        setEditForm(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleEditSkillAdd = () => {
+        if (editFields.currentSkill.trim()) {
+            setEditFields(prev => ({
+                ...prev,
+                skillsList: [...prev.skillsList, prev.currentSkill.trim()],
+                currentSkill: ''
+            }));
+        }
+    };
+    const handleEditSkillRemove = (idx) => {
+        setEditFields(prev => ({ ...prev, skillsList: prev.skillsList.filter((_, i) => i !== idx) }));
+    };
+
+    const handleEditPerkAdd = () => {
+        if (editFields.currentPerk.trim()) {
+            setEditFields(prev => ({
+                ...prev,
+                perksList: [...prev.perksList, prev.currentPerk.trim()],
+                currentPerk: ''
+            }));
+        }
+    };
+    const handleEditPerkRemove = (idx) => {
+        setEditFields(prev => ({ ...prev, perksList: prev.perksList.filter((_, i) => i !== idx) }));
+    };
+
+    const handleEditRespAdd = () => {
+        if (editFields.currentResponsibility.trim()) {
+            setEditFields(prev => ({
+                ...prev,
+                responsibilities: [...prev.responsibilities, prev.currentResponsibility.trim()],
+                currentResponsibility: ''
+            }));
+        }
+    };
+    const handleEditRespRemove = (idx) => {
+        setEditFields(prev => ({ ...prev, responsibilities: prev.responsibilities.filter((_, i) => i !== idx) }));
+    };
+
+    const handleEditQualAdd = () => {
+        if (editFields.currentQualification.trim()) {
+            setEditFields(prev => ({
+                ...prev,
+                qualificationsList: [...prev.qualificationsList, prev.currentQualification.trim()],
+                currentQualification: ''
+            }));
+        }
+    };
+    const handleEditQualRemove = (idx) => {
+        setEditFields(prev => ({ ...prev, qualificationsList: prev.qualificationsList.filter((_, i) => i !== idx) }));
+    };
+
+    const handleEditToggleAsset = (asset) => {
+        setEditFields(prev => ({
+            ...prev,
+            assets: prev.assets.includes(asset)
+                ? prev.assets.filter(a => a !== asset)
+                : [...prev.assets, asset]
+        }));
+    };
+
+    const handleEditImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setEditForm(prev => ({
+                    ...prev,
+                    company_image: file,
+                    company_image_preview: reader.result
+                }));
+            };
+            reader.readAsDataURL(file);
+        }
     };
 
     const handleEditSubmit = async (e) => {
@@ -554,14 +532,21 @@ export default function JobListing({ auth }) {
         formData.append('company', editForm.company);
         formData.append('location', editForm.location);
         formData.append('job_type', editForm.job_type);
+        formData.append('openings', editForm.openings || 1);
         formData.append('experience', editForm.experience);
-        formData.append('salary', `₹${editForm.min_salary || 0} - ₹${editForm.max_salary || 0}/${editForm.salary_period || 'year'}`);
+        const salaryRange = `₹${editForm.min_salary || 0} - ₹${editForm.max_salary || 0}/${editForm.salary_period || 'Monthly'}`;
+        formData.append('salary', salaryRange);
         formData.append('last_date', editForm.last_date);
         formData.append('description', editForm.description);
-        formData.append('key_responsibilities', editForm.key_responsibilities);
-        formData.append('qualifications', editForm.qualifications);
-        formData.append('skills', JSON.stringify(splitCommaList(editForm.skills)));
-        formData.append('perks', JSON.stringify(splitCommaList(editForm.perks)));
+        formData.append('skills', JSON.stringify(editFields.skillsList));
+        formData.append('perks', JSON.stringify(editFields.perksList));
+        formData.append('key_responsibilities', JSON.stringify(editFields.responsibilities));
+        formData.append('qualifications', JSON.stringify(editFields.qualificationsList));
+        formData.append('assets', JSON.stringify(editFields.assets));
+        formData.append('contact_person', editForm.contact_person);
+        formData.append('contact_phone', editForm.contact_phone);
+        formData.append('contact_email', editForm.contact_email);
+        formData.append('company_address', editForm.company_address);
 
         if (editForm.company_image) {
             formData.append('company_image', editForm.company_image);
@@ -595,6 +580,109 @@ export default function JobListing({ auth }) {
         }
     };
 
+    const handleCreateInputChange = (e) => {
+        const { name, value } = e.target;
+        if (name === 'min_salary' || name === 'max_salary') {
+            setCreateJobForm(prev => ({ ...prev, [name]: value.replace(/[^0-9]/g, '') }));
+            return;
+        }
+        if (name === 'openings') {
+            const numVal = parseInt(value) || '';
+            if (numVal !== '' && numVal < 1) return;
+            setCreateJobForm(prev => ({ ...prev, [name]: numVal }));
+            return;
+        }
+        setCreateJobForm(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleCreateSkillAdd = () => {
+        if (createJobForm.currentSkill.trim()) {
+            setCreateJobForm(prev => ({
+                ...prev,
+                skillsList: [...prev.skillsList, prev.currentSkill.trim()],
+                currentSkill: ''
+            }));
+        }
+    };
+    const handleCreateSkillRemove = (idx) => {
+        setCreateJobForm(prev => ({
+            ...prev,
+            skillsList: prev.skillsList.filter((_, i) => i !== idx)
+        }));
+    };
+
+    const handleCreatePerkAdd = () => {
+        if (createJobForm.currentPerk.trim()) {
+            setCreateJobForm(prev => ({
+                ...prev,
+                perksList: [...prev.perksList, prev.currentPerk.trim()],
+                currentPerk: ''
+            }));
+        }
+    };
+    const handleCreatePerkRemove = (idx) => {
+        setCreateJobForm(prev => ({
+            ...prev,
+            perksList: prev.perksList.filter((_, i) => i !== idx)
+        }));
+    };
+
+    const handleCreateRespAdd = () => {
+        if (createJobForm.currentResponsibility.trim()) {
+            setCreateJobForm(prev => ({
+                ...prev,
+                responsibilities: [...prev.responsibilities, prev.currentResponsibility.trim()],
+                currentResponsibility: ''
+            }));
+        }
+    };
+    const handleCreateRespRemove = (idx) => {
+        setCreateJobForm(prev => ({
+            ...prev,
+            responsibilities: prev.responsibilities.filter((_, i) => i !== idx)
+        }));
+    };
+
+    const handleCreateQualAdd = () => {
+        if (createJobForm.currentQualification.trim()) {
+            setCreateJobForm(prev => ({
+                ...prev,
+                qualificationsList: [...prev.qualificationsList, prev.currentQualification.trim()],
+                currentQualification: ''
+            }));
+        }
+    };
+    const handleCreateQualRemove = (idx) => {
+        setCreateJobForm(prev => ({
+            ...prev,
+            qualificationsList: prev.qualificationsList.filter((_, i) => i !== idx)
+        }));
+    };
+
+    const handleCreateToggleAsset = (asset) => {
+        setCreateJobForm(prev => ({
+            ...prev,
+            assets: prev.assets.includes(asset)
+                ? prev.assets.filter(a => a !== asset)
+                : [...prev.assets, asset]
+        }));
+    };
+
+    const handleCreateImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setCreateJobForm(prev => ({
+                    ...prev,
+                    company_image: file,
+                    company_image_preview: reader.result
+                }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleCreateSubmit = async (e) => {
         e.preventDefault();
         setCreateSaving(true);
@@ -603,15 +691,22 @@ export default function JobListing({ auth }) {
         formData.append('title', createJobForm.title);
         formData.append('company', createJobForm.company);
         formData.append('location', createJobForm.location);
-        formData.append('job_type', createJobForm.job_type);
+        formData.append('job_type', createJobForm.job_type || 'Full Time');
+        formData.append('openings', createJobForm.openings || 1);
         formData.append('experience', createJobForm.experience);
-        formData.append('salary', `₹${createJobForm.min_salary || 0} - ₹${createJobForm.max_salary || 0}/${createJobForm.salary_period || 'year'}`);
+        const salaryRange = `₹${createJobForm.min_salary || 0} - ₹${createJobForm.max_salary || 0}/${createJobForm.salary_period || 'Monthly'}`;
+        formData.append('salary', salaryRange);
         formData.append('last_date', createJobForm.last_date);
         formData.append('description', createJobForm.description);
-        formData.append('key_responsibilities', createJobForm.key_responsibilities);
-        formData.append('qualifications', createJobForm.qualifications);
-        formData.append('skills', JSON.stringify(splitCommaList(createJobForm.skills)));
-        formData.append('perks', JSON.stringify(splitCommaList(createJobForm.perks)));
+        formData.append('skills', JSON.stringify(createJobForm.skillsList));
+        formData.append('perks', JSON.stringify(createJobForm.perksList));
+        formData.append('key_responsibilities', JSON.stringify(createJobForm.responsibilities));
+        formData.append('qualifications', JSON.stringify(createJobForm.qualificationsList));
+        formData.append('assets', JSON.stringify(createJobForm.assets));
+        formData.append('contact_person', createJobForm.contact_person);
+        formData.append('contact_phone', createJobForm.contact_phone);
+        formData.append('contact_email', createJobForm.contact_email);
+        formData.append('company_address', createJobForm.company_address);
 
         if (createJobForm.company_image) {
             formData.append('company_image', createJobForm.company_image);
@@ -1027,6 +1122,7 @@ export default function JobListing({ auth }) {
                 modalSpinnerMessage="Processing Please Wait...."
             />
 
+            {/* Create New Job Post Modal */}
             {createJobOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div ref={modalRef} className="relative bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
@@ -1050,8 +1146,9 @@ export default function JobListing({ auth }) {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Job Title</label>
                                     <input
+                                        name="title"
                                         value={createJobForm.title}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, title: e.target.value }))}
+                                        onChange={handleCreateInputChange}
                                         className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
                                         required
                                     />
@@ -1059,8 +1156,9 @@ export default function JobListing({ auth }) {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Company</label>
                                     <input
+                                        name="company"
                                         value={createJobForm.company}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, company: e.target.value }))}
+                                        onChange={handleCreateInputChange}
                                         className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
                                         required
                                     />
@@ -1069,15 +1167,16 @@ export default function JobListing({ auth }) {
                                     <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Location</label>
                                     <LocationInput
                                         value={createJobForm.location}
-                                        onChange={(value) => setCreateJobForm((prev) => ({ ...prev, location: value }))}
+                                        onChange={(value) => setCreateJobForm(prev => ({ ...prev, location: value }))}
                                         placeholder="Enter job location"
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Job Type</label>
                                     <select
+                                        name="job_type"
                                         value={createJobForm.job_type}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, job_type: e.target.value }))}
+                                        onChange={handleCreateInputChange}
                                         className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
                                     >
                                         <option value="Full Time">Full Time</option>
@@ -1089,10 +1188,22 @@ export default function JobListing({ auth }) {
                                     </select>
                                 </div>
                                 <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Number of Openings</label>
+                                    <input
+                                        type="number"
+                                        name="openings"
+                                        value={createJobForm.openings}
+                                        onChange={handleCreateInputChange}
+                                        min="1"
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                    />
+                                </div>
+                                <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Experience</label>
                                     <select
+                                        name="experience"
                                         value={createJobForm.experience}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, experience: e.target.value }))}
+                                        onChange={handleCreateInputChange}
                                         className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
                                         required
                                     >
@@ -1108,109 +1219,227 @@ export default function JobListing({ auth }) {
                                     <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Last Date</label>
                                     <input
                                         type="date"
+                                        name="last_date"
                                         value={createJobForm.last_date}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, last_date: e.target.value }))}
+                                        onChange={handleCreateInputChange}
                                         className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
                                     />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Minimum Salary</label>
-                                    <input
-                                        value={createJobForm.min_salary}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, min_salary: e.target.value.replace(/[^0-9]/g, '') }))}
-                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
-                                        inputMode="numeric"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Maximum Salary</label>
-                                    <input
-                                        value={createJobForm.max_salary}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, max_salary: e.target.value.replace(/[^0-9]/g, '') }))}
-                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
-                                        inputMode="numeric"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Salary Period</label>
-                                    <select
-                                        value={createJobForm.salary_period}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, salary_period: e.target.value }))}
-                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
-                                    >
-                                        <option value="year">Year</option>
-                                        <option value="month">Month</option>
-                                    </select>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Company Logo</label>
                                     <input
                                         type="file"
                                         accept="image/*"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0] || null;
-                                            setCreateJobForm((prev) => ({
-                                                ...prev,
-                                                company_image: file,
-                                                company_image_preview: file ? URL.createObjectURL(file) : '',
-                                            }));
-                                        }}
+                                        onChange={handleCreateImageUpload}
                                         className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
                                     />
                                     {createJobForm.company_image_preview ? (
-                                        <img
-                                            src={createJobForm.company_image_preview}
-                                            alt="Preview"
-                                            className="mt-2 w-20 h-20 rounded-xl object-cover border border-slate-200"
-                                        />
+                                        <img src={createJobForm.company_image_preview} alt="Preview" className="mt-2 w-20 h-20 rounded-xl object-cover border border-slate-200" />
                                     ) : null}
                                 </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Skills</label>
+                                {/* Salary */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Minimum Salary</label>
                                     <input
-                                        value={createJobForm.skills}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, skills: e.target.value }))}
-                                        placeholder="React, Laravel, MySQL"
+                                        name="min_salary"
+                                        value={createJobForm.min_salary}
+                                        onChange={handleCreateInputChange}
                                         className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                        inputMode="numeric"
                                     />
                                 </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Perks</label>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Maximum Salary</label>
                                     <input
-                                        value={createJobForm.perks}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, perks: e.target.value }))}
-                                        placeholder="Health insurance, Flexible hours"
+                                        name="max_salary"
+                                        value={createJobForm.max_salary}
+                                        onChange={handleCreateInputChange}
                                         className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                        inputMode="numeric"
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Salary Period</label>
+                                    <select
+                                        name="salary_period"
+                                        value={createJobForm.salary_period}
+                                        onChange={handleCreateInputChange}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option value="Monthly">Monthly</option>
+                                        <option value="Weekly">Weekly</option>
+                                        <option value="Yearly">Yearly</option>
+                                    </select>
+                                </div>
+                                {/* Assets Required */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
+                                        Assets Required <span className="text-xs text-slate-400">(Optional)</span>
+                                    </label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {ASSETS_OPTIONS.map((asset) => (
+                                            <button
+                                                key={asset}
+                                                type="button"
+                                                onClick={() => handleCreateToggleAsset(asset)}
+                                                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                                                    createJobForm.assets.includes(asset)
+                                                        ? 'bg-blue-600 text-white border-blue-600'
+                                                        : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600'
+                                                }`}
+                                            >
+                                                {asset}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Skills - Dynamic List */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Skills Required</label>
+                                    <div className="flex gap-2 mb-2">
+                                        <input
+                                            value={createJobForm.currentSkill}
+                                            onChange={(e) => setCreateJobForm(prev => ({ ...prev, currentSkill: e.target.value }))}
+                                            onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateSkillAdd(); } }}
+                                            placeholder="Type a skill and press Enter"
+                                            className="flex-1 border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                        />
+                                        <button type="button" onClick={handleCreateSkillAdd} className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Add</button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {createJobForm.skillsList.map((skill, idx) => (
+                                            <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm flex items-center gap-2">
+                                                {skill}
+                                                <button type="button" onClick={() => handleCreateSkillRemove(idx)} className="text-blue-600 hover:text-blue-800">✕</button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Perks - Dynamic List */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Perks & Benefits</label>
+                                    <div className="flex gap-2 mb-2">
+                                        <input
+                                            value={createJobForm.currentPerk}
+                                            onChange={(e) => setCreateJobForm(prev => ({ ...prev, currentPerk: e.target.value }))}
+                                            onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreatePerkAdd(); } }}
+                                            placeholder="Type a perk and press Enter"
+                                            className="flex-1 border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                        />
+                                        <button type="button" onClick={handleCreatePerkAdd} className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Add</button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {createJobForm.perksList.map((perk, idx) => (
+                                            <span key={idx} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm flex items-center gap-2">
+                                                {perk}
+                                                <button type="button" onClick={() => handleCreatePerkRemove(idx)} className="text-green-600 hover:text-green-800">✕</button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Job Description */}
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Job Description</label>
                                     <textarea
+                                        name="description"
                                         value={createJobForm.description}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, description: e.target.value }))}
+                                        onChange={handleCreateInputChange}
                                         rows={4}
                                         className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
                                     />
                                 </div>
+                                {/* Responsibilities - Dynamic List */}
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Key Responsibilities</label>
-                                    <textarea
-                                        value={createJobForm.key_responsibilities}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, key_responsibilities: e.target.value }))}
-                                        rows={3}
-                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
-                                    />
+                                    <div className="flex gap-2 mb-2">
+                                        <input
+                                            value={createJobForm.currentResponsibility}
+                                            onChange={(e) => setCreateJobForm(prev => ({ ...prev, currentResponsibility: e.target.value }))}
+                                            onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateRespAdd(); } }}
+                                            placeholder="Type a responsibility and press Enter"
+                                            className="flex-1 border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                        />
+                                        <button type="button" onClick={handleCreateRespAdd} className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Add</button>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {createJobForm.responsibilities.map((item, idx) => (
+                                            <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-sm">
+                                                <span className="text-blue-500">•</span>
+                                                <span className="flex-1">{item}</span>
+                                                <button type="button" onClick={() => handleCreateRespRemove(idx)} className="text-red-500 hover:text-red-700">✕</button>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
+                                {/* Qualifications - Dynamic List */}
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Qualifications</label>
-                                    <textarea
-                                        value={createJobForm.qualifications}
-                                        onChange={(e) => setCreateJobForm((prev) => ({ ...prev, qualifications: e.target.value }))}
-                                        rows={3}
-                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
-                                    />
+                                    <div className="flex gap-2 mb-2">
+                                        <input
+                                            value={createJobForm.currentQualification}
+                                            onChange={(e) => setCreateJobForm(prev => ({ ...prev, currentQualification: e.target.value }))}
+                                            onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateQualAdd(); } }}
+                                            placeholder="Type a qualification and press Enter"
+                                            className="flex-1 border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                        />
+                                        <button type="button" onClick={handleCreateQualAdd} className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Add</button>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {createJobForm.qualificationsList.map((item, idx) => (
+                                            <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-sm">
+                                                <span className="text-blue-500">•</span>
+                                                <span className="flex-1">{item}</span>
+                                                <button type="button" onClick={() => handleCreateQualRemove(idx)} className="text-red-500 hover:text-red-700">✕</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Company Details Section */}
+                                <div className="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
+                                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Company Details</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Contact Person Name</label>
+                                            <input
+                                                name="contact_person"
+                                                value={createJobForm.contact_person}
+                                                onChange={handleCreateInputChange}
+                                                placeholder="Enter contact person name"
+                                                className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Phone Number</label>
+                                            <input
+                                                name="contact_phone"
+                                                value={createJobForm.contact_phone}
+                                                onChange={handleCreateInputChange}
+                                                placeholder="Enter phone number"
+                                                className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Email Address</label>
+                                            <input
+                                                name="contact_email"
+                                                value={createJobForm.contact_email}
+                                                onChange={handleCreateInputChange}
+                                                placeholder="Enter email address"
+                                                className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Company Address</label>
+                                            <textarea
+                                                name="company_address"
+                                                value={createJobForm.company_address}
+                                                onChange={handleCreateInputChange}
+                                                rows={2}
+                                                placeholder="Enter company address"
+                                                className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1299,6 +1528,10 @@ export default function JobListing({ auth }) {
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Salary</p>
                                     <p className="font-medium text-green-600">{selectedJob.salary}</p>
                                 </div>
+                                <div>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Number of Openings</p>
+                                    <p className="font-medium text-gray-900 dark:text-white">{selectedJob.openings || 1}</p>
+                                </div>
                             </div>
 
                             {selectedJob.status === 'declined' && selectedJob.rejection_reason && (
@@ -1310,49 +1543,83 @@ export default function JobListing({ auth }) {
 
                             <div className="mb-6">
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Skills Required</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {selectedJob.skills.map((skill, index) => (
-                                        <span
-                                            key={index}
-                                            className="px-3 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm"
-                                        >
-                                            {skill}
-                                        </span>
-                                    ))}
+                                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                                    {selectedJob.skills && selectedJob.skills.length > 0 ? (
+                                        <ul className="space-y-2">
+                                            {selectedJob.skills.map((skill, idx) => (
+                                                <li key={idx} className="text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                                                    <span className="text-blue-500 mt-1">•</span>
+                                                    {skill}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-gray-700 dark:text-gray-300">No skills specified.</p>
+                                    )}
                                 </div>
                             </div>
 
-
-
                             <div className="mb-6">
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Perks & Benefits</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {selectedJob.perks.map((perk, index) => (
-                                        <span
-                                            key={index}
-                                            className="px-3 py-2 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg text-sm"
-                                        >
-                                            {perk}
-                                        </span>
-                                    ))}
+                                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                                    {selectedJob.perks && selectedJob.perks.length > 0 ? (
+                                        <ul className="space-y-2">
+                                            {selectedJob.perks.map((perk, idx) => (
+                                                <li key={idx} className="text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                                                    <span className="text-green-500 mt-1">•</span>
+                                                    {perk}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-gray-700 dark:text-gray-300">No perks specified.</p>
+                                    )}
                                 </div>
                             </div>
 
                             <div className="mb-6">
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Key Responsibilities</h3>
                                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
-                                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                                        {selectedJob.key_responsibilities || selectedJob.keyResponsibilities || 'No key responsibilities specified.'}
-                                    </p>
+                                    {(() => {
+                                        const items = Array.isArray(selectedJob.key_responsibilities || selectedJob.keyResponsibilities)
+                                            ? (selectedJob.key_responsibilities || selectedJob.keyResponsibilities)
+                                            : (typeof (selectedJob.key_responsibilities || selectedJob.keyResponsibilities) === 'string' && (selectedJob.key_responsibilities || selectedJob.keyResponsibilities)
+                                                ? (selectedJob.key_responsibilities || selectedJob.keyResponsibilities).split('\n').map(s => s.trim()).filter(Boolean)
+                                                : []);
+                                        return items.length > 0 ? (
+                                            <ul className="space-y-2">
+                                                {items.map((item, idx) => (
+                                                    <li key={idx} className="text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                                                        <span className="text-blue-500 mt-1">•</span>
+                                                        {item}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : <p className="text-gray-700 dark:text-gray-300">No key responsibilities specified.</p>;
+                                    })()}
                                 </div>
                             </div>
 
                             <div className="mb-6">
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Qualifications</h3>
                                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
-                                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                                        {selectedJob.qualifications || 'No qualifications specified.'}
-                                    </p>
+                                    {(() => {
+                                        const items = Array.isArray(selectedJob.qualifications)
+                                            ? selectedJob.qualifications
+                                            : (typeof selectedJob.qualifications === 'string' && selectedJob.qualifications
+                                                ? selectedJob.qualifications.split('\n').map(s => s.trim()).filter(Boolean)
+                                                : []);
+                                        return items.length > 0 ? (
+                                            <ul className="space-y-2">
+                                                {items.map((item, idx) => (
+                                                    <li key={idx} className="text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                                                        <span className="text-blue-500 mt-1">•</span>
+                                                        {item}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : <p className="text-gray-700 dark:text-gray-300">No qualifications specified.</p>;
+                                    })()}
                                 </div>
                             </div>
 
@@ -1364,6 +1631,36 @@ export default function JobListing({ auth }) {
                                     </p>
                                 </div>
                             </div>
+
+                            {/* Assets Required */}
+                            {selectedJob.assets && selectedJob.assets.length > 0 && (
+                                <div className="mb-6">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Assets Required</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedJob.assets.map((asset, index) => (
+                                            <span
+                                                key={index}
+                                                className="px-3 py-2 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg text-sm"
+                                            >
+                                                {asset}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Contact Details */}
+                            {(selectedJob.contact_person || selectedJob.contact_phone || selectedJob.contact_email || selectedJob.company_address) && (
+                                <div className="mb-6">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Company / Contact Details</h3>
+                                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 space-y-2">
+                                        {selectedJob.contact_person && <p><span className="text-gray-500">Contact Person:</span> <span className="font-medium">{selectedJob.contact_person}</span></p>}
+                                        {selectedJob.contact_phone && <p><span className="text-gray-500">Phone:</span> <span className="font-medium">{selectedJob.contact_phone}</span></p>}
+                                        {selectedJob.contact_email && <p><span className="text-gray-500">Email:</span> <span className="font-medium">{selectedJob.contact_email}</span></p>}
+                                        {selectedJob.company_address && <p><span className="text-gray-500">Address:</span> <span className="font-medium">{selectedJob.company_address}</span></p>}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="flex justify-between items-center pt-4 border-t dark:border-gray-700">
                                 <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -1386,14 +1683,14 @@ export default function JobListing({ auth }) {
                                         year: 'numeric'
                                     }) : 'Not specified'}</p>
                                 </div>
-                                                            </div>
+                            </div>
                         </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Confirm Dialogs - Same as Super Admin */}
+            {/* Confirm Dialogs */}
             <ConfirmDialog
                 isOpen={confirmToggleOpen}
                 onClose={() => {
@@ -1465,7 +1762,7 @@ export default function JobListing({ auth }) {
             {/* Edit Job Modal */}
             {editingJob && editForm && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div ref={modalRef} className="relative bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+                    <div ref={modalRef} className="relative bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
                         <button
                             onClick={() => {
                                 setEditingJob(null);
@@ -1490,8 +1787,9 @@ export default function JobListing({ auth }) {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Job Title</label>
                                     <input
+                                        name="title"
                                         value={editForm.title}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))}
+                                        onChange={handleEditInputChange}
                                         className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
                                         required
                                     />
@@ -1499,8 +1797,9 @@ export default function JobListing({ auth }) {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Company</label>
                                     <input
+                                        name="company"
                                         value={editForm.company}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, company: e.target.value }))}
+                                        onChange={handleEditInputChange}
                                         className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
                                         required
                                     />
@@ -1508,8 +1807,9 @@ export default function JobListing({ auth }) {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
                                     <input
+                                        name="location"
                                         value={editForm.location}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, location: e.target.value }))}
+                                        onChange={handleEditInputChange}
                                         className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
                                         required
                                     />
@@ -1517,8 +1817,9 @@ export default function JobListing({ auth }) {
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Job Type</label>
                                     <select
+                                        name="job_type"
                                         value={editForm.job_type}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, job_type: e.target.value }))}
+                                        onChange={handleEditInputChange}
                                         className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
                                         required
                                     >
@@ -1526,49 +1827,37 @@ export default function JobListing({ auth }) {
                                         <option>Part Time</option>
                                         <option>Contract</option>
                                         <option>Internship</option>
-                                        <option>Freelance</option>
                                         <option>Remote</option>
+                                        <option>Hybrid</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Experience</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Number of Openings</label>
                                     <input
-                                        value={editForm.experience}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, experience: e.target.value }))}
+                                        type="number"
+                                        name="openings"
+                                        value={editForm.openings || 1}
+                                        onChange={handleEditInputChange}
+                                        min="1"
                                         className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Salary</label>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        <input
-                                            value={editForm.min_salary}
-                                            onChange={(e) => setEditForm((p) => ({ ...p, min_salary: e.target.value.replace(/[^0-9]/g, '') }))}
-                                            placeholder="Minimum"
-                                            className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                        />
-                                        <input
-                                            value={editForm.max_salary}
-                                            onChange={(e) => setEditForm((p) => ({ ...p, max_salary: e.target.value.replace(/[^0-9]/g, '') }))}
-                                            placeholder="Maximum"
-                                            className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                        />
-                                        <select
-                                            value={editForm.salary_period}
-                                            onChange={(e) => setEditForm((p) => ({ ...p, salary_period: e.target.value }))}
-                                            className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                        >
-                                            <option value="year">Year</option>
-                                            <option value="month">Month</option>
-                                        </select>
-                                    </div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Experience</label>
+                                    <input
+                                        name="experience"
+                                        value={editForm.experience}
+                                        onChange={handleEditInputChange}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Last Date</label>
                                     <input
                                         type="date"
+                                        name="last_date"
                                         value={editForm.last_date}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, last_date: e.target.value }))}
+                                        onChange={handleEditInputChange}
                                         className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
                                     />
                                 </div>
@@ -1595,48 +1884,209 @@ export default function JobListing({ auth }) {
                                         />
                                     ) : null}
                                 </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Skills (comma separated)</label>
+                                {/* Salary */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Minimum Salary</label>
                                     <input
-                                        value={editForm.skills}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, skills: e.target.value }))}
+                                        name="min_salary"
+                                        value={editForm.min_salary}
+                                        onChange={handleEditInputChange}
+                                        placeholder="Minimum"
                                         className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
                                     />
                                 </div>
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Perks (comma separated)</label>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Maximum Salary</label>
                                     <input
-                                        value={editForm.perks}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, perks: e.target.value }))}
+                                        name="max_salary"
+                                        value={editForm.max_salary}
+                                        onChange={handleEditInputChange}
+                                        placeholder="Maximum"
                                         className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Salary Period</label>
+                                    <select
+                                        name="salary_period"
+                                        value={editForm.salary_period}
+                                        onChange={handleEditInputChange}
+                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                    >
+                                        <option value="Monthly">Monthly</option>
+                                        <option value="Weekly">Weekly</option>
+                                        <option value="Yearly">Yearly</option>
+                                    </select>
+                                </div>
+                                {/* Assets Required */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Assets Required <span className="text-xs text-slate-400">(Optional)</span>
+                                    </label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {ASSETS_OPTIONS.map((asset) => (
+                                            <button
+                                                key={asset}
+                                                type="button"
+                                                onClick={() => handleEditToggleAsset(asset)}
+                                                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                                                    editFields.assets.includes(asset)
+                                                        ? 'bg-blue-600 text-white border-blue-600'
+                                                        : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
+                                                }`}
+                                            >
+                                                {asset}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Skills - Dynamic List */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Skills Required</label>
+                                    <div className="flex gap-2 mb-2">
+                                        <input
+                                            value={editFields.currentSkill}
+                                            onChange={(e) => setEditFields(prev => ({ ...prev, currentSkill: e.target.value }))}
+                                            onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleEditSkillAdd(); } }}
+                                            placeholder="Type a skill and press Enter"
+                                            className="flex-1 border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                        />
+                                        <button type="button" onClick={handleEditSkillAdd} className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Add</button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {editFields.skillsList.map((skill, idx) => (
+                                            <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm flex items-center gap-2">
+                                                {skill}
+                                                <button type="button" onClick={() => handleEditSkillRemove(idx)} className="text-blue-600 hover:text-blue-800">✕</button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Perks - Dynamic List */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Perks & Benefits</label>
+                                    <div className="flex gap-2 mb-2">
+                                        <input
+                                            value={editFields.currentPerk}
+                                            onChange={(e) => setEditFields(prev => ({ ...prev, currentPerk: e.target.value }))}
+                                            onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleEditPerkAdd(); } }}
+                                            placeholder="Type a perk and press Enter"
+                                            className="flex-1 border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                        />
+                                        <button type="button" onClick={handleEditPerkAdd} className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Add</button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {editFields.perksList.map((perk, idx) => (
+                                            <span key={idx} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm flex items-center gap-2">
+                                                {perk}
+                                                <button type="button" onClick={() => handleEditPerkRemove(idx)} className="text-green-600 hover:text-green-800">✕</button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Job Description */}
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Job Description</label>
                                     <textarea
+                                        name="description"
                                         value={editForm.description}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))}
+                                        onChange={handleEditInputChange}
                                         rows={4}
                                         className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
                                     />
                                 </div>
+                                {/* Responsibilities - Dynamic List */}
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Key Responsibilities</label>
-                                    <textarea
-                                        value={editForm.key_responsibilities}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, key_responsibilities: e.target.value }))}
-                                        rows={3}
-                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                    />
+                                    <div className="flex gap-2 mb-2">
+                                        <input
+                                            value={editFields.currentResponsibility}
+                                            onChange={(e) => setEditFields(prev => ({ ...prev, currentResponsibility: e.target.value }))}
+                                            onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleEditRespAdd(); } }}
+                                            placeholder="Type a responsibility and press Enter"
+                                            className="flex-1 border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                        />
+                                        <button type="button" onClick={handleEditRespAdd} className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Add</button>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {editFields.responsibilities.map((item, idx) => (
+                                            <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg text-sm">
+                                                <span className="text-blue-500">•</span>
+                                                <span className="flex-1">{item}</span>
+                                                <button type="button" onClick={() => handleEditRespRemove(idx)} className="text-red-500 hover:text-red-700">✕</button>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
+                                {/* Qualifications - Dynamic List */}
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Qualifications</label>
-                                    <textarea
-                                        value={editForm.qualifications}
-                                        onChange={(e) => setEditForm((p) => ({ ...p, qualifications: e.target.value }))}
-                                        rows={3}
-                                        className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
-                                    />
+                                    <div className="flex gap-2 mb-2">
+                                        <input
+                                            value={editFields.currentQualification}
+                                            onChange={(e) => setEditFields(prev => ({ ...prev, currentQualification: e.target.value }))}
+                                            onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleEditQualAdd(); } }}
+                                            placeholder="Type a qualification and press Enter"
+                                            className="flex-1 border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                        />
+                                        <button type="button" onClick={handleEditQualAdd} className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Add</button>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {editFields.qualificationsList.map((item, idx) => (
+                                            <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg text-sm">
+                                                <span className="text-blue-500">•</span>
+                                                <span className="flex-1">{item}</span>
+                                                <button type="button" onClick={() => handleEditQualRemove(idx)} className="text-red-500 hover:text-red-700">✕</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Company Details Section */}
+                                <div className="md:col-span-2 border-t border-gray-200 pt-4 mt-2">
+                                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Company Details</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Contact Person Name</label>
+                                            <input
+                                                name="contact_person"
+                                                value={editForm.contact_person}
+                                                onChange={handleEditInputChange}
+                                                placeholder="Enter contact person name"
+                                                className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+                                            <input
+                                                name="contact_phone"
+                                                value={editForm.contact_phone}
+                                                onChange={handleEditInputChange}
+                                                placeholder="Enter phone number"
+                                                className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                                            <input
+                                                name="contact_email"
+                                                value={editForm.contact_email}
+                                                onChange={handleEditInputChange}
+                                                placeholder="Enter email address"
+                                                className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Company Address</label>
+                                            <textarea
+                                                name="company_address"
+                                                value={editForm.company_address}
+                                                onChange={handleEditInputChange}
+                                                rows={2}
+                                                placeholder="Enter company address"
+                                                className="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#5146E6] focus:border-[#5146E6]"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 

@@ -5,6 +5,14 @@ import LocationInput from '../../../Components/LocationInput';
 import ConfirmDialog from '../../../Components/ConfirmDialog';
 import { useAlerts } from '../../../Components/Alerts';
 
+// Predefined skills list
+const PREDEFINED_SKILLS = [
+    "React", "Laravel", "MySQL", "JavaScript", "PHP", "Python",
+    "Java", "Node.js", "HTML", "CSS", "TypeScript", "Vue.js",
+    "Angular", "MongoDB", "PostgreSQL", "Docker", "AWS", "Git",
+    "REST API", "GraphQL", "Redis", "RabbitMQ", "Kubernetes"
+];
+
 // Reusable JobCard Component
 const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
     const [showFullPerks, setShowFullPerks] = useState(false);
@@ -118,6 +126,20 @@ const JobCard = ({ job, onViewDetails, onEdit, onDelete }) => {
     );
 };
 
+const ASSETS_OPTIONS = [
+    "Bike",
+    "License",
+    "Aadhaar Card",
+    "PAN Card",
+    "Heavy Driver License",
+    "Camera",
+    "Laptop",
+    "Auto / Rickshaw",
+    "Tempo",
+    "Tempo Traveller / Van",
+    "Yulu / E-Bike"
+];
+
 export default function JobPostsIndex({ auth, jobs: initialJobs }) {
     const defaultFormData = {
         jobTitle: "",
@@ -126,64 +148,60 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
         companyLogoPreview: "",
         location: "",
         jobType: "Full Time",
+        openings: 1,
         experience: "",
         minSalary: "",
         maxSalary: "",
-        salaryPeriod: "year",
+        salaryPeriod: "Monthly",
         lastDate: "",
+        assets: [],
         skills: [],
         currentSkill: "",
+        perks: [],
+        currentPerk: "",
+        responsibilities: [],
+        currentResponsibility: "",
+        qualifications: [],
+        currentQualification: "",
         jobDescription: "",
-        keyResponsibilities: "",
-        qualifications: "",
-        perks: ""
+        // Company Details
+        compCompanyName: "",
+        compLogo: null,
+        compLogoPreview: "",
+        contactPerson: "",
+        contactPhone: "",
+        contactEmail: "",
+        companyAddress: ""
     };
 
-    const [formData, setFormData] = useState({
-        jobTitle: "",
-        companyName: "",
-        companyLogo: null,
-        companyLogoPreview: "",
-        location: "",
-        jobType: "Full Time",
-        experience: "",
-        minSalary: "",
-        maxSalary: "",
-        salaryPeriod: "year",
-        skills: [],
-        currentSkill: "",
-        jobDescription: "",
-        keyResponsibilities: "",
-        qualifications: "",
-        perks: "",
-        lastDate: ""
-    });
-
+    const [formData, setFormData] = useState({ ...defaultFormData });
     const [editingJobId, setEditingJobId] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+    const [showSkillDropdown, setShowSkillDropdown] = useState(false);
 
     const { successAlert, errorAlert } = useAlerts();
 
-    console.log('Job Posts Index page loaded successfully!');
-    console.log('Current route:', window.location.pathname);
-
     const parseSalary = (salaryString) => {
         if (!salaryString) {
-            return { minSalary: '', maxSalary: '', salaryPeriod: 'year' };
+            return { minSalary: '', maxSalary: '', salaryPeriod: 'Monthly' };
         }
 
         const str = String(salaryString).replace(/\s+/g, ' ').trim();
-        const match = str.match(/₹?\s*([\d,]+)\s*-\s*₹?\s*([\d,]+)\s*\/\s*(year|month)/i);
+        const match = str.match(/₹?\s*([\d,]+)\s*-\s*₹?\s*([\d,]+)\s*\/(year|month|Weekly|Yearly)/i);
         if (match) {
+            let period = match[3].toLowerCase();
+            if (period === 'year') period = 'Yearly';
+            else if (period === 'month') period = 'Monthly';
+            else period = period.charAt(0).toUpperCase() + period.slice(1).toLowerCase();
             return {
                 minSalary: match[1].replace(/,/g, ''),
                 maxSalary: match[2].replace(/,/g, ''),
-                salaryPeriod: match[3].toLowerCase(),
+                salaryPeriod: period,
             };
         }
 
-        return { minSalary: '', maxSalary: '', salaryPeriod: 'year' };
+        return { minSalary: '', maxSalary: '', salaryPeriod: 'Monthly' };
     };
 
     const fillFormForEdit = (job) => {
@@ -200,16 +218,33 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
             companyLogoPreview: job.companyImage || '',
             location: job.location || '',
             jobType: job.type || 'Full Time',
+            openings: job.openings || 1,
             experience: job.experience || '',
             minSalary,
             maxSalary,
             salaryPeriod,
             lastDate: job.lastDate || '',
+            assets: Array.isArray(job.assets) ? job.assets : [],
             skills: Array.isArray(job.skills) ? job.skills : [],
-            perks: Array.isArray(job.perks) ? job.perks.join(', ') : (job.perks || ''),
+            perks: Array.isArray(job.perks) ? job.perks : [],
+            responsibilities: Array.isArray(job.keyResponsibilities)
+                ? job.keyResponsibilities
+                : (typeof job.keyResponsibilities === 'string' && job.keyResponsibilities
+                    ? job.keyResponsibilities.split(',').map(s => s.trim()).filter(Boolean)
+                    : []),
+            qualifications: Array.isArray(job.qualifications)
+                ? job.qualifications
+                : (typeof job.qualifications === 'string' && job.qualifications
+                    ? job.qualifications.split('\n').map(s => s.trim()).filter(Boolean)
+                    : []),
             jobDescription: job.description || '',
-            keyResponsibilities: job.keyResponsibilities || '',
-            qualifications: job.qualifications || ''
+            compCompanyName: job.company || '',
+            compLogo: null,
+            compLogoPreview: job.companyImage || '',
+            contactPerson: job.contactPerson || '',
+            contactPhone: job.contactPhone || '',
+            contactEmail: job.contactEmail || '',
+            companyAddress: job.companyAddress || ''
         });
     };
 
@@ -219,7 +254,6 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
         const editJobId = urlParams.get('edit');
 
         if (editJobId && initialJobs) {
-            // Find job in initialJobs array from props
             const jobToEdit = initialJobs.find(job => job.id === parseInt(editJobId));
             if (jobToEdit) {
                 fillFormForEdit(jobToEdit);
@@ -235,20 +269,20 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
     const handleInputChange = (e) => {
         const { name, value } = e.target;
 
-        // Only allow numeric values for salary fields
         if (name === 'minSalary' || name === 'maxSalary') {
             const numericValue = value.replace(/[^0-9]/g, '');
-            setFormData(prev => ({
-                ...prev,
-                [name]: numericValue
-            }));
+            setFormData(prev => ({ ...prev, [name]: numericValue }));
             return;
         }
 
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        if (name === 'openings') {
+            const numVal = parseInt(value) || '';
+            if (numVal !== '' && numVal < 1) return;
+            setFormData(prev => ({ ...prev, [name]: numVal }));
+            return;
+        }
+
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
     const handleImageUpload = (e) => {
@@ -266,6 +300,21 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
         }
     };
 
+    const handleCompImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFormData(prev => ({
+                    ...prev,
+                    compLogo: file,
+                    compLogoPreview: reader.result
+                }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleRemoveImage = () => {
         setFormData(prev => ({
             ...prev,
@@ -274,6 +323,15 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
         }));
     };
 
+    const handleRemoveCompLogo = () => {
+        setFormData(prev => ({
+            ...prev,
+            compLogo: null,
+            compLogoPreview: null
+        }));
+    };
+
+    // Skills handlers
     const handleAddSkill = () => {
         if (formData.currentSkill.trim() && !formData.skills.includes(formData.currentSkill.trim())) {
             setFormData(prev => ({
@@ -281,7 +339,19 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                 skills: [...prev.skills, prev.currentSkill.trim()],
                 currentSkill: ""
             }));
+            setShowSkillDropdown(false);
         }
+    };
+
+    const handleSelectPredefinedSkill = (skill) => {
+        if (!formData.skills.includes(skill)) {
+            setFormData(prev => ({
+                ...prev,
+                skills: [...prev.skills, skill],
+                currentSkill: ""
+            }));
+        }
+        setShowSkillDropdown(false);
     };
 
     const handleRemoveSkill = (indexToRemove) => {
@@ -296,6 +366,91 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
             e.preventDefault();
             handleAddSkill();
         }
+    };
+
+    // Perks handlers
+    const handleAddPerk = () => {
+        if (formData.currentPerk.trim() && !formData.perks.includes(formData.currentPerk.trim())) {
+            setFormData(prev => ({
+                ...prev,
+                perks: [...prev.perks, prev.currentPerk.trim()],
+                currentPerk: ""
+            }));
+        }
+    };
+
+    const handleRemovePerk = (indexToRemove) => {
+        setFormData(prev => ({
+            ...prev,
+            perks: prev.perks.filter((_, idx) => idx !== indexToRemove)
+        }));
+    };
+
+    const handlePerkKeyPress = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddPerk();
+        }
+    };
+
+    // Responsibilities handlers
+    const handleAddResponsibility = () => {
+        if (formData.currentResponsibility.trim() && !formData.responsibilities.includes(formData.currentResponsibility.trim())) {
+            setFormData(prev => ({
+                ...prev,
+                responsibilities: [...prev.responsibilities, prev.currentResponsibility.trim()],
+                currentResponsibility: ""
+            }));
+        }
+    };
+
+    const handleRemoveResponsibility = (indexToRemove) => {
+        setFormData(prev => ({
+            ...prev,
+            responsibilities: prev.responsibilities.filter((_, idx) => idx !== indexToRemove)
+        }));
+    };
+
+    const handleResponsibilityKeyPress = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddResponsibility();
+        }
+    };
+
+    // Qualifications handlers
+    const handleAddQualification = () => {
+        if (formData.currentQualification.trim() && !formData.qualifications.includes(formData.currentQualification.trim())) {
+            setFormData(prev => ({
+                ...prev,
+                qualifications: [...prev.qualifications, prev.currentQualification.trim()],
+                currentQualification: ""
+            }));
+        }
+    };
+
+    const handleRemoveQualification = (indexToRemove) => {
+        setFormData(prev => ({
+            ...prev,
+            qualifications: prev.qualifications.filter((_, idx) => idx !== indexToRemove)
+        }));
+    };
+
+    const handleQualificationKeyPress = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddQualification();
+        }
+    };
+
+    // Assets handlers
+    const handleToggleAsset = (asset) => {
+        setFormData(prev => ({
+            ...prev,
+            assets: prev.assets.includes(asset)
+                ? prev.assets.filter(a => a !== asset)
+                : [...prev.assets, asset]
+        }));
     };
 
     const handlePreview = () => {
@@ -323,14 +478,24 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
         formDataObj.append('description', formData.jobDescription);
         formDataObj.append('location', formData.location);
         formDataObj.append('job_type', formData.jobType || 'Full Time');
+        formDataObj.append('openings', formData.openings || 1);
         formDataObj.append('experience', formData.experience);
         const salaryRange = `₹${formData.minSalary} - ₹${formData.maxSalary}/${formData.salaryPeriod}`;
         formDataObj.append('salary', salaryRange);
         formDataObj.append('skills', JSON.stringify(normalizeList(formData.skills)));
         formDataObj.append('perks', JSON.stringify(normalizeList(formData.perks)));
-        formDataObj.append('key_responsibilities', formData.keyResponsibilities);
-        formDataObj.append('qualifications', formData.qualifications);
+        formDataObj.append('key_responsibilities', JSON.stringify(normalizeList(formData.responsibilities)));
+        formDataObj.append('qualifications', JSON.stringify(normalizeList(formData.qualifications)));
         formDataObj.append('last_date', formData.lastDate);
+        formDataObj.append('assets', JSON.stringify(formData.assets));
+        formDataObj.append('contact_person', formData.contactPerson);
+        formDataObj.append('contact_phone', formData.contactPhone);
+        formDataObj.append('contact_email', formData.contactEmail);
+        formDataObj.append('company_address', formData.companyAddress);
+        formDataObj.append('contact_person', formData.contactPerson);
+        formDataObj.append('contact_phone', formData.contactPhone);
+        formDataObj.append('contact_email', formData.contactEmail);
+        formDataObj.append('company_address', formData.companyAddress);
 
         if (formData.companyLogo) {
             formDataObj.append('company_image', formData.companyLogo);
@@ -373,14 +538,20 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                 companyImage: apiJob.company_image || null,
                 location: apiJob.location,
                 type: apiJob.job_type,
+                openings: apiJob.openings,
                 experience: apiJob.experience,
                 salary: apiJob.salary,
                 skills: Array.isArray(apiJob.skills) ? apiJob.skills : [],
                 perks: Array.isArray(apiJob.perks) ? apiJob.perks : [],
                 description: apiJob.description,
-                keyResponsibilities: apiJob.key_responsibilities,
-                qualifications: apiJob.qualifications,
+                keyResponsibilities: Array.isArray(apiJob.key_responsibilities) ? apiJob.key_responsibilities : [],
+                qualifications: Array.isArray(apiJob.qualifications) ? apiJob.qualifications : [],
                 lastDate: apiJob.last_date,
+                assets: Array.isArray(apiJob.assets) ? apiJob.assets : [],
+                contactPerson: apiJob.contact_person,
+                contactPhone: apiJob.contact_phone,
+                contactEmail: apiJob.contact_email,
+                companyAddress: apiJob.company_address,
                 active: apiJob.status === 'active',
                 status: apiJob.status,
                 createdAt: apiJob.created_at,
@@ -452,7 +623,6 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
 
     const handleDelete = (job) => {
         console.log("Delete job:", job);
-        // Static - no backend logic
     };
 
     return (
@@ -461,17 +631,11 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
 
             <div className="py-6 sm:py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Page Header */}
-                    <div className="mb-6 sm:mb-8">
-
-
-                    </div>
-
-                    {/* Job Post Form Only */}
+                    {/* Job Post Form */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
                         <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                             <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
-                                {editingJobId ? 'Update Job Post' : 'Create New Job Post'}
+                                {editingJobId ? 'Update Job Post' : 'Post New Job'}
                             </h2>
                         </div>
                         <div className="p-4 sm:p-6">
@@ -560,7 +724,7 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                     {/* Location */}
                                     <div>
                                         <label htmlFor="location" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Location <span className="text-red-500">*</span>
+                                            Job Location <span className="text-red-500">*</span>
                                         </label>
                                         <LocationInput
                                             value={formData.location}
@@ -570,7 +734,7 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                     </div>
                                 </div>
 
-                                {/* Row 3: Job Type & Salary */}
+                                {/* Row 3: Job Type & Number of Openings */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {/* Job Type */}
                                     <div>
@@ -594,63 +758,22 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                         </select>
                                     </div>
 
-                                    {/* Salary */}
+                                    {/* Number of Openings */}
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Salary Range <span className="text-red-500">*</span>
+                                        <label htmlFor="openings" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Number of Openings <span className="text-red-500">*</span>
                                         </label>
-
-                                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_120px] gap-4">
-                                            {/* Minimum Salary */}
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                                                    ₹
-                                                </span>
-                                                <input
-                                                    type="text"
-                                                    id="minSalary"
-                                                    name="minSalary"
-                                                    value={formData.minSalary}
-                                                    onChange={handleInputChange}
-                                                    required
-                                                    placeholder="Minimum"
-                                                    inputMode="numeric"
-                                                    pattern="[0-9]*"
-                                                    className="w-full pl-8 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                                />
-                                            </div>
-
-                                            {/* Maximum Salary */}
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                                                    ₹
-                                                </span>
-                                                <input
-                                                    type="text"
-                                                    id="maxSalary"
-                                                    name="maxSalary"
-                                                    value={formData.maxSalary}
-                                                    onChange={handleInputChange}
-                                                    required
-                                                    placeholder="Maximum"
-                                                    inputMode="numeric"
-                                                    pattern="[0-9]*"
-                                                    className="w-full pl-8 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                                />
-                                            </div>
-
-                                            {/* Common Salary Period */}
-                                            <select
-                                                id="salaryPeriod"
-                                                name="salaryPeriod"
-                                                value={formData.salaryPeriod}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                            >
-                                                <option value="year"> Year</option>
-                                                <option value="month"> Month</option>
-                                            </select>
-                                        </div>
+                                        <input
+                                            type="number"
+                                            id="openings"
+                                            name="openings"
+                                            value={formData.openings}
+                                            onChange={handleInputChange}
+                                            min="1"
+                                            required
+                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            placeholder="Enter number of openings"
+                                        />
                                     </div>
                                 </div>
 
@@ -698,26 +821,149 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                     </div>
                                 </div>
 
-                                {/* Row 5: Skills (Full Width) */}
+                                {/* Row 5: Salary Range & Salary Period */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Salary */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Salary Range <span className="text-red-500">*</span>
+                                        </label>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_120px] gap-4">
+                                            {/* Minimum Salary */}
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                                                    ₹
+                                                </span>
+                                                <input
+                                                    type="text"
+                                                    id="minSalary"
+                                                    name="minSalary"
+                                                    value={formData.minSalary}
+                                                    onChange={handleInputChange}
+                                                    required
+                                                    placeholder="Minimum"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
+                                                    className="w-full pl-8 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                                />
+                                            </div>
+
+                                            {/* Maximum Salary */}
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                                                    ₹
+                                                </span>
+                                                <input
+                                                    type="text"
+                                                    id="maxSalary"
+                                                    name="maxSalary"
+                                                    value={formData.maxSalary}
+                                                    onChange={handleInputChange}
+                                                    required
+                                                    placeholder="Maximum"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
+                                                    className="w-full pl-8 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                                />
+                                            </div>
+
+                                            {/* Salary Period */}
+                                            <select
+                                                id="salaryPeriod"
+                                                name="salaryPeriod"
+                                                value={formData.salaryPeriod}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            >
+                                                <option value="Monthly">Monthly</option>
+                                                <option value="Weekly">Weekly</option>
+                                                <option value="Yearly">Yearly</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                                </div>
+
+                                {/* Assets Required - Chip Multi-Select */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Assets Required <span className="text-gray-400 text-xs">(Optional)</span>
+                                    </label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {ASSETS_OPTIONS.map((asset) => (
+                                            <button
+                                                key={asset}
+                                                type="button"
+                                                onClick={() => handleToggleAsset(asset)}
+                                                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all duration-200 ${
+                                                    formData.assets.includes(asset)
+                                                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                                        : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600'
+                                                }`}
+                                            >
+                                                {asset}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Skills Section */}
                                 <div>
                                     <label htmlFor="currentSkill" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                         Skills Required
                                     </label>
                                     <div className="flex flex-col sm:flex-row gap-2 mb-3">
-                                        <input
-                                            type="text"
-                                            id="currentSkill"
-                                            value={formData.currentSkill}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, currentSkill: e.target.value }))}
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault();
-                                                    handleAddSkill();
-                                                }
-                                            }}
-                                            className="flex-1 px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                            placeholder="Type skill and press Enter"
-                                        />
+                                        <div className="relative flex-1">
+                                            <input
+                                                type="text"
+                                                id="currentSkill"
+                                                value={formData.currentSkill}
+                                                onChange={(e) => {
+                                                    setFormData(prev => ({ ...prev, currentSkill: e.target.value }));
+                                                    setShowSkillDropdown(true);
+                                                }}
+                                                onFocus={() => setShowSkillDropdown(true)}
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        if (formData.currentSkill.trim()) {
+                                                            handleAddSkill();
+                                                        }
+                                                    }
+                                                }}
+                                                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                                placeholder="Type or select a skill"
+                                            />
+                                            {showSkillDropdown && formData.currentSkill && (
+                                                <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                                    {PREDEFINED_SKILLS.filter(s =>
+                                                        s.toLowerCase().includes(formData.currentSkill.toLowerCase()) &&
+                                                        !formData.skills.includes(s)
+                                                    ).map((skill) => (
+                                                        <button
+                                                            key={skill}
+                                                            type="button"
+                                                            onClick={() => handleSelectPredefinedSkill(skill)}
+                                                            className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                        >
+                                                            {skill}
+                                                        </button>
+                                                    ))}
+                                                    {formData.currentSkill.trim() && !PREDEFINED_SKILLS.some(s =>
+                                                        s.toLowerCase() === formData.currentSkill.toLowerCase()
+                                                    ) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleAddSkill}
+                                                            className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium"
+                                                        >
+                                                            + Add "{formData.currentSkill.trim()}"
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={handleAddSkill}
@@ -747,73 +993,266 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                     </div>
                                 </div>
 
-                                {/* Row 6: Perks & Key Responsibilities */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* Perks */}
-                                    <div>
-                                        <label htmlFor="perks" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Perks & Benefits
-                                        </label>
-                                        <textarea
-                                            id="perks"
-                                            name="perks"
-                                            value={formData.perks}
-                                            onChange={handleInputChange}
-                                            rows={3}
-                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                            placeholder="e.g., Health insurance, Flexible hours, Learning budget"
+                                {/* Perks & Benefits */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Perks & Benefits
+                                    </label>
+                                    <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                                        <input
+                                            type="text"
+                                            id="currentPerk"
+                                            value={formData.currentPerk}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, currentPerk: e.target.value }))}
+                                            onKeyPress={handlePerkKeyPress}
+                                            className="flex-1 px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            placeholder="Type a perk and press Enter"
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={handleAddPerk}
+                                            className="px-4 sm:px-6 py-2 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                                        >
+                                            Add Perk
+                                        </button>
                                     </div>
-
-                                    {/* Key Responsibilities */}
-                                    <div>
-                                        <label htmlFor="keyResponsibilities" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Key Responsibilities
-                                        </label>
-                                        <textarea
-                                            id="keyResponsibilities"
-                                            name="keyResponsibilities"
-                                            value={formData.keyResponsibilities}
-                                            onChange={handleInputChange}
-                                            rows={3}
-                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                            placeholder="List the main responsibilities for this role..."
-                                        />
+                                    <div className="flex flex-wrap gap-2">
+                                        {formData.perks.map((perk, index) => (
+                                            <span
+                                                key={index}
+                                                className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm flex items-center gap-2"
+                                            >
+                                                {perk}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemovePerk(index)}
+                                                    className="text-green-600 hover:text-green-800"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </span>
+                                        ))}
                                     </div>
                                 </div>
 
-                                {/* Row 7: Qualifications & Job Description */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* Qualifications */}
-                                    <div>
-                                        <label htmlFor="qualifications" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Qualifications
-                                        </label>
-                                        <textarea
-                                            id="qualifications"
-                                            name="qualifications"
-                                            value={formData.qualifications}
-                                            onChange={handleInputChange}
-                                            rows={4}
-                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                            placeholder="Required qualifications, education, certifications..."
-                                        />
-                                    </div>
+                                {/* Job Description */}
+                                <div>
+                                    <label htmlFor="jobDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Job Description
+                                    </label>
+                                    <textarea
+                                        id="jobDescription"
+                                        name="jobDescription"
+                                        value={formData.jobDescription}
+                                        onChange={handleInputChange}
+                                        rows={4}
+                                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                        placeholder="Describe role, responsibilities, and requirements..."
+                                    />
+                                </div>
 
-                                    {/* Job Description */}
-                                    <div>
-                                        <label htmlFor="jobDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            Job Description
-                                        </label>
-                                        <textarea
-                                            id="jobDescription"
-                                            name="jobDescription"
-                                            value={formData.jobDescription}
-                                            onChange={handleInputChange}
-                                            rows={4}
-                                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                                            placeholder="Describe role, responsibilities, and requirements..."
+                                {/* Responsibilities */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Key Responsibilities
+                                    </label>
+                                    <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                                        <input
+                                            type="text"
+                                            id="currentResponsibility"
+                                            value={formData.currentResponsibility}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, currentResponsibility: e.target.value }))}
+                                            onKeyPress={handleResponsibilityKeyPress}
+                                            className="flex-1 px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            placeholder="Type a responsibility and press Enter"
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={handleAddResponsibility}
+                                            className="px-4 sm:px-6 py-2 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {formData.responsibilities.map((item, index) => (
+                                            <div key={index} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-sm text-gray-700 dark:text-gray-300">
+                                                <span className="text-blue-500">•</span>
+                                                <span className="flex-1">{item}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveResponsibility(index)}
+                                                    className="text-red-500 hover:text-red-700"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Qualifications */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Qualifications
+                                    </label>
+                                    <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                                        <input
+                                            type="text"
+                                            id="currentQualification"
+                                            value={formData.currentQualification}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, currentQualification: e.target.value }))}
+                                            onKeyPress={handleQualificationKeyPress}
+                                            className="flex-1 px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                            placeholder="Type a qualification and press Enter"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleAddQualification}
+                                            className="px-4 sm:px-6 py-2 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {formData.qualifications.map((item, index) => (
+                                            <div key={index} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-sm text-gray-700 dark:text-gray-300">
+                                                <span className="text-blue-500">•</span>
+                                                <span className="flex-1">{item}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveQualification(index)}
+                                                    className="text-red-500 hover:text-red-700"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Company Details Section */}
+                                <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-6">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                                        Company Details
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* Company Name */}
+                                        <div>
+                                            <label htmlFor="compCompanyName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                Company Name
+                                            </label>
+                                            <input
+                                                type="text"
+                                                id="compCompanyName"
+                                                name="compCompanyName"
+                                                value={formData.compCompanyName}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                                placeholder="Enter company name"
+                                            />
+                                        </div>
+
+                                        {/* Company Logo Upload */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                Company Logo
+                                            </label>
+                                            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                                <input
+                                                    type="file"
+                                                    id="compLogo"
+                                                    onChange={handleCompImageUpload}
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => document.getElementById('compLogo').click()}
+                                                    className="px-4 py-2 sm:py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors dark:border-gray-600 dark:hover:bg-gray-700 text-sm sm:text-base"
+                                                >
+                                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                    </svg>
+                                                    <span className="ml-2 text-gray-700 dark:text-gray-300">Choose File</span>
+                                                </button>
+                                                {formData.compLogoPreview && (
+                                                    <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-gray-200">
+                                                        <img src={formData.compLogoPreview} alt="Preview" className="w-full h-full object-cover" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Contact Person Name */}
+                                        <div>
+                                            <label htmlFor="contactPerson" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                Contact Person Name
+                                            </label>
+                                            <input
+                                                type="text"
+                                                id="contactPerson"
+                                                name="contactPerson"
+                                                value={formData.contactPerson}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                                placeholder="Enter contact person name"
+                                            />
+                                        </div>
+
+                                        {/* Phone Number */}
+                                        <div>
+                                            <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                Phone Number
+                                            </label>
+                                            <input
+                                                type="text"
+                                                id="contactPhone"
+                                                name="contactPhone"
+                                                value={formData.contactPhone}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                                placeholder="Enter phone number"
+                                            />
+                                        </div>
+
+                                        {/* Email Address */}
+                                        <div>
+                                            <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                Email Address
+                                            </label>
+                                            <input
+                                                type="email"
+                                                id="contactEmail"
+                                                name="contactEmail"
+                                                value={formData.contactEmail}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                                placeholder="Enter email address"
+                                            />
+                                        </div>
+
+                                        {/* Company Address */}
+                                        <div>
+                                            <label htmlFor="companyAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                Company Address
+                                            </label>
+                                            <textarea
+                                                id="companyAddress"
+                                                name="companyAddress"
+                                                value={formData.companyAddress}
+                                                onChange={handleInputChange}
+                                                rows={2}
+                                                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                                                placeholder="Enter company address"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
@@ -889,6 +1328,10 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                         <p className="text-gray-900 dark:text-white">{formData.jobType || "N/A"}</p>
                                     </div>
                                     <div>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Openings:</span>
+                                        <p className="text-gray-900 dark:text-white">{formData.openings || 1}</p>
+                                    </div>
+                                    <div>
                                         <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Salary:</span>
                                         <p className="text-gray-900 dark:text-white">
                                             {formData.minSalary && formData.maxSalary
@@ -901,6 +1344,19 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                         <p className="text-gray-900 dark:text-white">{formData.experience || "N/A"}</p>
                                     </div>
                                 </div>
+
+                                {formData.assets.length > 0 && (
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Assets Required:</span>
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                            {formData.assets.map((asset, index) => (
+                                                <span key={index} className="px-2 py-1 text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
+                                                    {asset}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {formData.skills.length > 0 && (
                                     <div>
@@ -915,25 +1371,51 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                     </div>
                                 )}
 
-                                <div>
-                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Perks:</span>
-                                    <p className="text-gray-900 dark:text-white">{formData.perks || "N/A"}</p>
-                                </div>
-
-                                <div>
-                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Key Responsibilities:</span>
-                                    <p className="text-gray-900 dark:text-white">{formData.keyResponsibilities || "N/A"}</p>
-                                </div>
-
-                                <div>
-                                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Qualifications:</span>
-                                    <p className="text-gray-900 dark:text-white">{formData.qualifications || "N/A"}</p>
-                                </div>
+                                {formData.perks.length > 0 && (
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Perks:</span>
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                            {formData.perks.map((perk, index) => (
+                                                <span key={index} className="px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded">
+                                                    {perk}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div>
                                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Description:</span>
                                     <p className="text-gray-700 dark:text-gray-300">{formData.jobDescription || "N/A"}</p>
                                 </div>
+
+                                {formData.responsibilities.length > 0 && (
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Key Responsibilities:</span>
+                                        <ul className="mt-1 space-y-1">
+                                            {formData.responsibilities.map((item, index) => (
+                                                <li key={index} className="text-gray-700 dark:text-gray-300 text-sm flex items-start gap-2">
+                                                    <span className="text-blue-500 mt-1">•</span>
+                                                    {item}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {formData.qualifications.length > 0 && (
+                                    <div>
+                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Qualifications:</span>
+                                        <ul className="mt-1 space-y-1">
+                                            {formData.qualifications.map((item, index) => (
+                                                <li key={index} className="text-gray-700 dark:text-gray-300 text-sm flex items-start gap-2">
+                                                    <span className="text-blue-500 mt-1">•</span>
+                                                    {item}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex justify-end mt-6">
@@ -964,7 +1446,6 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                             </svg>
                         </button>
                         <div className="max-h-[90vh] overflow-y-auto">
-                        {/* Modal Header */}
                         <div className="relative h-40 bg-gradient-to-r from-blue-500 to-purple-600 p-6">
                             <div className="absolute top-6 left-6">
                                 <div className="w-20 h-20 rounded-2xl border-4 border-white shadow-xl overflow-hidden bg-white">
@@ -989,10 +1470,8 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                             </div>
                         </div>
 
-                        {/* Modal Content */}
                         <div className="p-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                                {/* Left Column */}
                                 <div className="space-y-6">
                                     <div className="flex items-center gap-3">
                                         <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1027,71 +1506,95 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
 
                                     <div className="flex items-center gap-3">
                                         <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2-1.343-2-3-2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                         <div>
                                             <p className="text-sm text-gray-500 dark:text-gray-400">Salary</p>
                                             <p className="font-bold text-xl text-green-600 dark:text-green-400">{selectedJob.salary}</p>
                                         </div>
                                     </div>
+
+                                    <div className="flex items-center gap-3">
+                                        <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 4M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        </svg>
+                                        <div>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">Number of Openings</p>
+                                            <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.openings || 1}</p>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {/* Right Column */}
                                 <div className="space-y-6">
-                                    <div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Skills Required</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {selectedJob.skills.map((skill, index) => (
-                                                <span
-                                                    key={index}
-                                                    className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 dark:from-blue-900/20 dark:to-indigo-900/20 dark:text-blue-300 rounded-xl border border-blue-200 dark:border-blue-800"
-                                                >
-                                                    {skill}
-                                                </span>
-                                            ))}
+                                    {selectedJob.skills && selectedJob.skills.length > 0 && (
+                                        <div>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Skills Required</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {selectedJob.skills.map((skill, index) => (
+                                                    <span
+                                                        key={index}
+                                                        className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 dark:from-blue-900/20 dark:to-indigo-900/20 dark:text-blue-300 rounded-xl border border-blue-200 dark:border-blue-800"
+                                                    >
+                                                        {skill}
+                                                    </span>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
-                                    <div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Perks & Benefits</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {selectedJob.perks.map((perk, index) => (
-                                                <span
-                                                    key={index}
-                                                    className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 dark:from-green-900/20 dark:to-emerald-900/20 dark:text-green-300 rounded-xl border border-green-200 dark:border-green-800 flex items-center gap-2"
-                                                >
-                                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                                    </svg>
-                                                    {perk}
-                                                </span>
-                                            ))}
+                                    {selectedJob.perks && selectedJob.perks.length > 0 && (
+                                        <div>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Perks & Benefits</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {selectedJob.perks.map((perk, index) => (
+                                                    <span
+                                                        key={index}
+                                                        className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 dark:from-green-900/20 dark:to-emerald-900/20 dark:text-green-300 rounded-xl border border-green-200 dark:border-green-800 flex items-center gap-2"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                        </svg>
+                                                        {perk}
+                                                    </span>
+                                                ))}
+                                            </div>
                                         </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {selectedJob.keyResponsibilities && selectedJob.keyResponsibilities.length > 0 && (
+                                <div className="mb-8">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Key Responsibilities</h3>
+                                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600">
+                                        <ul className="space-y-2">
+                                            {selectedJob.keyResponsibilities.map((item, index) => (
+                                                <li key={index} className="text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                                                    <span className="text-blue-500 mt-1">•</span>
+                                                    {item}
+                                                </li>
+                                            ))}
+                                        </ul>
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
-                            {/* Key Responsibilities Section */}
-                            <div className="mb-8">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Key Responsibilities</h3>
-                                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600">
-                                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                                        {selectedJob.keyResponsibilities || "No key responsibilities specified."}
-                                    </p>
+                            {selectedJob.qualifications && selectedJob.qualifications.length > 0 && (
+                                <div className="mb-8">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Qualifications</h3>
+                                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600">
+                                        <ul className="space-y-2">
+                                            {selectedJob.qualifications.map((item, index) => (
+                                                <li key={index} className="text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                                                    <span className="text-blue-500 mt-1">•</span>
+                                                    {item}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
-                            {/* Qualifications Section */}
-                            <div className="mb-8">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Qualifications</h3>
-                                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600">
-                                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                                        {selectedJob.qualifications || "No qualifications specified."}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Job Description Section */}
                             <div className="mb-8">
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Job Description</h3>
                                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600">
@@ -1101,7 +1604,78 @@ export default function JobPostsIndex({ auth, jobs: initialJobs }) {
                                 </div>
                             </div>
 
-                            {/* Action Buttons */}
+                            {/* Assets Required */}
+                            {selectedJob.assets && selectedJob.assets.length > 0 && (
+                                <div className="mb-8">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Assets Required</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedJob.assets.map((asset, index) => (
+                                            <span
+                                                key={index}
+                                                className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 dark:from-purple-900/20 dark:to-pink-900/20 dark:text-purple-300 rounded-xl border border-purple-200 dark:border-purple-800"
+                                            >
+                                                {asset}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Company Details Section */}
+                            <div className="mb-8">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Company Information</h3>
+                                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600 space-y-4">
+                                    {selectedJob.companyAddress && (
+                                        <div>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">Address</p>
+                                            <p className="font-medium text-gray-900 dark:text-white">{selectedJob.companyAddress}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Contact Details - Show only if any contact info exists */}
+                            {(selectedJob.contactPerson || selectedJob.contactPhone || selectedJob.contactEmail) && (
+                                <div className="mb-8">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Contact Details</h3>
+                                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600 space-y-3">
+                                        {selectedJob.contactPerson && (
+                                            <div className="flex items-center gap-3">
+                                                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                </svg>
+                                                <div>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">Name</p>
+                                                    <p className="font-medium text-gray-900 dark:text-white">{selectedJob.contactPerson}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {selectedJob.contactPhone && (
+                                            <div className="flex items-center gap-3">
+                                                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                                </svg>
+                                                <div>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">Phone</p>
+                                                    <p className="font-medium text-gray-900 dark:text-white">{selectedJob.contactPhone}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {selectedJob.contactEmail && (
+                                            <div className="flex items-center gap-3">
+                                                <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                </svg>
+                                                <div>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">Email</p>
+                                                    <p className="font-medium text-gray-900 dark:text-white">{selectedJob.contactEmail}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
                                 <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                                     <div className="flex items-center gap-1">

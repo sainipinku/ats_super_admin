@@ -26,14 +26,20 @@ class Job extends Model
         'description',
         'location',
         'job_type',
+        'openings',
         'experience',
         'salary',
         'skills',
         'perks',
         'key_responsibilities',
         'qualifications',
+        'assets',
         'last_date',
         'company_image',
+        'contact_person',
+        'contact_phone',
+        'contact_email',
+        'company_address',
         'applicants',
         'status',
         'created_by',
@@ -47,6 +53,10 @@ class Job extends Model
     protected $casts = [
         'skills' => 'array',
         'perks' => 'array',
+        'assets' => 'array',
+        'key_responsibilities' => 'array',
+        'qualifications' => 'array',
+        'openings' => 'integer',
         'approval_logs' => 'array',
         'approved_at' => 'datetime',
         'resubmitted_at' => 'datetime',
@@ -183,8 +193,20 @@ class Job extends Model
         if (empty($value)) {
             return [];
         }
-        // Split by newlines and filter empty items, re-index array
-        return array_values(array_filter(array_map('trim', explode("\n", $value))));
+        // Handle both JSON array and old newline-separated formats
+        if (is_array($value)) {
+            return array_values(array_filter($value, fn($v) => !empty(trim((string) $v))));
+        }
+        if (is_string($value)) {
+            // Check if it's a JSON array string
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                return array_values(array_filter($decoded, fn($v) => !empty(trim((string) $v))));
+            }
+            // Legacy: split by newlines
+            return array_values(array_filter(array_map('trim', explode("\n", $value))));
+        }
+        return [];
     }
 
     /**
@@ -196,8 +218,20 @@ class Job extends Model
         if (empty($value)) {
             return [];
         }
-        // Split by newlines and filter empty items, re-index array
-        return array_values(array_filter(array_map('trim', explode("\n", $value))));
+        // Handle both JSON array and old newline-separated formats
+        if (is_array($value)) {
+            return array_values(array_filter($value, fn($v) => !empty(trim((string) $v))));
+        }
+        if (is_string($value)) {
+            // Check if it's a JSON array string
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                return array_values(array_filter($decoded, fn($v) => !empty(trim((string) $v))));
+            }
+            // Legacy: split by newlines
+            return array_values(array_filter(array_map('trim', explode("\n", $value))));
+        }
+        return [];
     }
 
     /**

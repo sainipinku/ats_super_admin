@@ -288,25 +288,51 @@ const JobDetailsModal = ({ job, isOpen, onClose, hasApplied, onApply }) => {
 
                         {activeTab === 'requirements' && (
                             <div className="space-y-6">
-                                {(job.qualifications) && (
-                                    <div>
-                                        <h4 className="text-lg font-semibold text-slate-900 mb-3">Requirements</h4>
-                                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                                            <p className="text-slate-700 leading-relaxed whitespace-pre-line">
-                                                {job.qualifications || 'No qualifications specified.'}
-                                            </p>
+                                {(() => {
+                                    const quals = Array.isArray(job.qualifications) 
+                                        ? job.qualifications 
+                                        : (typeof job.qualifications === 'string' && job.qualifications
+                                            ? job.qualifications.split('\n').map(s => s.trim()).filter(Boolean)
+                                            : []);
+                                    return quals.length > 0 && (
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-slate-900 mb-3">Qualifications</h4>
+                                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                                <ul className="space-y-2">
+                                                    {quals.map((item, idx) => (
+                                                        <li key={idx} className="text-slate-700 flex items-start gap-2">
+                                                            <span className="text-blue-500 mt-1">•</span>
+                                                            {item}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    );
+                                })()}
 
-                                <div>
-                                    <h4 className="text-lg font-semibold text-slate-900 mb-3">Key Responsibilities</h4>
-                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                                        <p className="text-slate-700 leading-relaxed whitespace-pre-line">
-                                            {job.key_responsibilities || job.keyResponsibilities || 'No key responsibilities specified.'}
-                                        </p>
-                                    </div>
-                                </div>
+                                {(() => {
+                                    const responsibilities = Array.isArray(job.key_responsibilities || job.keyResponsibilities) 
+                                        ? (job.key_responsibilities || job.keyResponsibilities) 
+                                        : (typeof (job.key_responsibilities || job.keyResponsibilities) === 'string' && (job.key_responsibilities || job.keyResponsibilities)
+                                            ? (job.key_responsibilities || job.keyResponsibilities).split('\n').map(s => s.trim()).filter(Boolean)
+                                            : []);
+                                    return responsibilities.length > 0 && (
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-slate-900 mb-3">Key Responsibilities</h4>
+                                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                                <ul className="space-y-2">
+                                                    {responsibilities.map((item, idx) => (
+                                                        <li key={idx} className="text-slate-700 flex items-start gap-2">
+                                                            <span className="text-blue-500 mt-1">•</span>
+                                                            {item}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         )}
 
