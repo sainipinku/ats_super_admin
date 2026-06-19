@@ -20,6 +20,245 @@ const ASSETS_OPTIONS = [
     "Yulu / E-Bike"
 ];
 
+const QUESTION_TYPE_OPTIONS = [
+    { value: 'text', label: 'Text Input' },
+    { value: 'textarea', label: 'Textarea' },
+    { value: 'single_select', label: 'Single Select' },
+    { value: 'multi_select', label: 'Multiple Select' },
+];
+
+const QUESTION_TYPE_LABELS = QUESTION_TYPE_OPTIONS.reduce((labels, option) => {
+    labels[option.value] = option.label;
+    return labels;
+}, {});
+
+const createQuestionDraft = () => ({
+    id: `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    question: '',
+    type: 'text',
+    required: false,
+    options: [''],
+});
+
+const isSelectQuestionType = (type) => ['single_select', 'multi_select'].includes(type);
+
+const normalizeQuestionDrafts = (questions = []) =>
+    (Array.isArray(questions) ? questions : [])
+        .map((question) => {
+            const options = Array.isArray(question?.options)
+                ? question.options.map((option) => String(option || '').trim()).filter(Boolean)
+                : [];
+
+            return {
+                id: question?.id || undefined,
+                question: String(question?.question || '').trim(),
+                type: question?.type || 'text',
+                required: !!question?.required,
+                options,
+            };
+        })
+        .filter((question) => question.question || question.options.length > 0);
+
+const formatScreeningAnswerPreview = (answer) => {
+    if (Array.isArray(answer)) {
+        return answer.filter(Boolean).join(', ') || 'No answer';
+    }
+
+    if (answer === null || answer === undefined || String(answer).trim() === '') {
+        return 'No answer';
+    }
+
+    return String(answer);
+};
+
+const ScreeningQuestionsEditor = ({ questions, onChange }) => {
+    const safeQuestions = Array.isArray(questions) ? questions : [];
+
+    const updateQuestion = (index, updates) => {
+        onChange(safeQuestions.map((question, questionIndex) => (
+            questionIndex === index ? { ...question, ...updates } : question
+        )));
+    };
+
+    const removeQuestion = (index) => {
+        onChange(safeQuestions.filter((_, questionIndex) => questionIndex !== index));
+    };
+
+    const addQuestion = () => {
+        onChange([...safeQuestions, createQuestionDraft()]);
+    };
+
+    const updateOption = (questionIndex, optionIndex, value) => {
+        onChange(safeQuestions.map((question, currentQuestionIndex) => {
+            if (currentQuestionIndex !== questionIndex) {
+                return question;
+            }
+
+            const options = Array.isArray(question.options) ? [...question.options] : [''];
+            options[optionIndex] = value;
+
+            return { ...question, options };
+        }));
+    };
+
+    const addOption = (questionIndex) => {
+        onChange(safeQuestions.map((question, currentQuestionIndex) => {
+            if (currentQuestionIndex !== questionIndex) {
+                return question;
+            }
+
+            return {
+                ...question,
+                options: [...(Array.isArray(question.options) ? question.options : []), ''],
+            };
+        }));
+    };
+
+    const removeOption = (questionIndex, optionIndex) => {
+        onChange(safeQuestions.map((question, currentQuestionIndex) => {
+            if (currentQuestionIndex !== questionIndex) {
+                return question;
+            }
+
+            const options = (Array.isArray(question.options) ? question.options : []).filter((_, currentOptionIndex) => currentOptionIndex !== optionIndex);
+
+            return {
+                ...question,
+                options: options.length > 0 ? options : [''],
+            };
+        }));
+    };
+
+    return (
+        <div className="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
+            <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Application Questions</h3>
+                    <p className="text-sm text-slate-500 dark:text-gray-400">
+                        Add dynamic screening questions for applicants.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={addQuestion}
+                    className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+                >
+                    Add Question
+                </button>
+            </div>
+
+            {safeQuestions.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 dark:border-gray-600 px-4 py-5 text-sm text-slate-500 dark:text-gray-400">
+                    No screening questions added yet.
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {safeQuestions.map((question, index) => (
+                        <div key={question.id || index} className="rounded-2xl border border-slate-200 dark:border-gray-700 p-4 space-y-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-semibold text-slate-700 dark:text-gray-200">
+                                    Question {index + 1}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => removeQuestion(index)}
+                                    className="text-sm font-medium text-red-600 hover:text-red-700"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">
+                                        Question Text
+                                    </label>
+                                    <input
+                                        value={question.question || ''}
+                                        onChange={(event) => updateQuestion(index, { question: event.target.value })}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                        placeholder="Enter question"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">
+                                        Answer Type
+                                    </label>
+                                    <select
+                                        value={question.type || 'text'}
+                                        onChange={(event) => updateQuestion(index, {
+                                            type: event.target.value,
+                                            options: isSelectQuestionType(event.target.value)
+                                                ? (Array.isArray(question.options) && question.options.length > 0 ? question.options : [''])
+                                                : [],
+                                        })}
+                                        className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                    >
+                                        {QUESTION_TYPE_OPTIONS.map((type) => (
+                                            <option key={type.value} value={type.value}>
+                                                {type.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="flex items-end">
+                                    <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-gray-300">
+                                        <input
+                                            type="checkbox"
+                                            checked={!!question.required}
+                                            onChange={(event) => updateQuestion(index, { required: event.target.checked })}
+                                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        Required answer
+                                    </label>
+                                </div>
+                            </div>
+
+                            {isSelectQuestionType(question.type) && (
+                                <div>
+                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-gray-300">
+                                            Options
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => addOption(index)}
+                                            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                                        >
+                                            Add Option
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {(Array.isArray(question.options) ? question.options : ['']).map((option, optionIndex) => (
+                                            <div key={`${question.id || index}-${optionIndex}`} className="flex items-center gap-2">
+                                                <input
+                                                    value={option}
+                                                    onChange={(event) => updateOption(index, optionIndex, event.target.value)}
+                                                    className="flex-1 border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                                                    placeholder={`Option ${optionIndex + 1}`}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeOption(index, optionIndex)}
+                                                    className="px-3 py-3 rounded-xl border border-slate-200 dark:border-gray-600 text-red-600 hover:bg-red-50 dark:hover:bg-gray-700"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const JobCard = ({ job, onViewDetails, onViewApplications, onEdit, onDelete, onResend, onStatusChange, onCloseJob }) => {
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
@@ -115,6 +354,7 @@ const defaultCreateForm = {
     qualificationsList: [], currentQualification: '',
     assets: [], company_image: null, company_image_preview: '',
     contact_person: '', contact_phone: '', contact_email: '', company_address: '',
+    application_questions: [],
 };
 
 const parseSalaryRange = (salary) => {
@@ -138,6 +378,9 @@ const mapApiJobToCard = (job) => ({
     lastDate: job.last_date || job.lastDate || '',
     active: job.status === 'active',
     applicants: job.applicants || 0,
+    application_questions: Array.isArray(job.application_questions)
+        ? job.application_questions
+        : (Array.isArray(job.applicationQuestions) ? job.applicationQuestions : []),
 });
 
 export default function JobListing({ auth }) {
@@ -392,6 +635,7 @@ export default function JobListing({ auth }) {
         qualificationsList: [],
         currentQualification: '',
         assets: [],
+        applicationQuestions: [],
     });
 
     const handleEdit = (job) => {
@@ -428,6 +672,15 @@ export default function JobListing({ auth }) {
             qualificationsList: Array.isArray(job.qualifications) ? [...job.qualifications] : [],
             currentQualification: '',
             assets: Array.isArray(job.assets) ? [...job.assets] : [],
+            applicationQuestions: Array.isArray(job.application_questions)
+                ? job.application_questions.map((question) => ({
+                    id: question.id || createQuestionDraft().id,
+                    question: question.question || '',
+                    type: question.type || 'text',
+                    required: !!question.required,
+                    options: Array.isArray(question.options) && question.options.length > 0 ? question.options : [''],
+                }))
+                : [],
         });
     };
 
@@ -543,6 +796,7 @@ export default function JobListing({ auth }) {
         formData.append('key_responsibilities', JSON.stringify(editFields.responsibilities));
         formData.append('qualifications', JSON.stringify(editFields.qualificationsList));
         formData.append('assets', JSON.stringify(editFields.assets));
+        formData.append('application_questions', JSON.stringify(normalizeQuestionDrafts(editFields.applicationQuestions)));
         formData.append('contact_person', editForm.contact_person);
         formData.append('contact_phone', editForm.contact_phone);
         formData.append('contact_email', editForm.contact_email);
@@ -703,6 +957,7 @@ export default function JobListing({ auth }) {
         formData.append('key_responsibilities', JSON.stringify(createJobForm.responsibilities));
         formData.append('qualifications', JSON.stringify(createJobForm.qualificationsList));
         formData.append('assets', JSON.stringify(createJobForm.assets));
+        formData.append('application_questions', JSON.stringify(normalizeQuestionDrafts(createJobForm.application_questions)));
         formData.append('contact_person', createJobForm.contact_person);
         formData.append('contact_phone', createJobForm.contact_phone);
         formData.append('contact_email', createJobForm.contact_email);
@@ -1015,6 +1270,7 @@ export default function JobListing({ auth }) {
                                                 <th className="py-2 pr-3 font-medium">Email</th>
                                                 <th className="py-2 pr-3 font-medium">Phone</th>
                                                 <th className="py-2 pr-3 font-medium">Status</th>
+                                                <th className="py-2 pr-3 font-medium">Screening Answers</th>
                                                 <th className="py-2 pr-3 font-medium">Resume</th>
                                                 <th className="py-2 font-medium">Action</th>
                                             </tr>
@@ -1058,6 +1314,27 @@ export default function JobListing({ auth }) {
                                                                     </option>
                                                                 ))}
                                                             </select>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 pr-3">
+                                                        {Array.isArray(app.screening_answers) && app.screening_answers.length > 0 ? (
+                                                            <div className="min-w-[260px] space-y-2">
+                                                                {app.screening_answers.map((answer, answerIndex) => (
+                                                                    <div
+                                                                        key={`${app.id}-answer-${answer.question_id || answerIndex}`}
+                                                                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                                                                    >
+                                                                        <p className="text-xs font-semibold text-slate-700">
+                                                                            {answer.question || `Question ${answerIndex + 1}`}
+                                                                        </p>
+                                                                        <p className="mt-1 text-xs text-slate-600 whitespace-pre-wrap break-words">
+                                                                            {formatScreeningAnswerPreview(answer.answer)}
+                                                                        </p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-slate-400">No answers</span>
                                                         )}
                                                     </td>
                                                     <td className="py-2 pr-3">
@@ -1394,6 +1671,13 @@ export default function JobListing({ auth }) {
                                         ))}
                                     </div>
                                 </div>
+                                <ScreeningQuestionsEditor
+                                    questions={createJobForm.application_questions}
+                                    onChange={(questions) => setCreateJobForm(prev => ({
+                                        ...prev,
+                                        application_questions: questions,
+                                    }))}
+                                />
                                 {/* Company Details Section */}
                                 <div className="md:col-span-2 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
                                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Company Details</h3>
@@ -1648,6 +1932,62 @@ export default function JobListing({ auth }) {
                                     </div>
                                 </div>
                             )}
+
+                            {(() => {
+                                const questions = Array.isArray(selectedJob.application_questions)
+                                    ? selectedJob.application_questions
+                                    : (Array.isArray(selectedJob.applicationQuestions) ? selectedJob.applicationQuestions : []);
+
+                                if (questions.length < 1) {
+                                    return null;
+                                }
+
+                                return (
+                                    <div className="mb-6">
+                                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Application Questions</h3>
+                                        <div className="space-y-3">
+                                            {questions.map((question, index) => (
+                                                <div
+                                                    key={question.id || index}
+                                                    className="rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 p-4"
+                                                >
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <p className="font-medium text-gray-900 dark:text-white">
+                                                            {question.question || `Question ${index + 1}`}
+                                                        </p>
+                                                        <div className="flex items-center gap-2 text-xs">
+                                                            <span className="rounded-full bg-blue-100 px-2.5 py-1 font-medium text-blue-700">
+                                                                {QUESTION_TYPE_LABELS[question.type] || 'Text Input'}
+                                                            </span>
+                                                            <span
+                                                                className={`rounded-full px-2.5 py-1 font-medium ${
+                                                                    question.required
+                                                                        ? 'bg-red-100 text-red-700'
+                                                                        : 'bg-slate-100 text-slate-600'
+                                                                }`}
+                                                            >
+                                                                {question.required ? 'Required' : 'Optional'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    {isSelectQuestionType(question.type) && Array.isArray(question.options) && question.options.length > 0 && (
+                                                        <div className="mt-3 flex flex-wrap gap-2">
+                                                            {question.options.map((option, optionIndex) => (
+                                                                <span
+                                                                    key={`${question.id || index}-option-${optionIndex}`}
+                                                                    className="rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200"
+                                                                >
+                                                                    {option}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {/* Contact Details */}
                             {(selectedJob.contact_person || selectedJob.contact_phone || selectedJob.contact_email || selectedJob.company_address) && (
@@ -2041,6 +2381,13 @@ export default function JobListing({ auth }) {
                                         ))}
                                     </div>
                                 </div>
+                                <ScreeningQuestionsEditor
+                                    questions={editFields.applicationQuestions}
+                                    onChange={(questions) => setEditFields(prev => ({
+                                        ...prev,
+                                        applicationQuestions: questions,
+                                    }))}
+                                />
                                 {/* Company Details Section */}
                                 <div className="md:col-span-2 border-t border-gray-200 pt-4 mt-2">
                                     <h3 className="text-lg font-semibold text-slate-900 mb-4">Company Details</h3>

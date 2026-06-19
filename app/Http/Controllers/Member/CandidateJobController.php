@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Job;
 use App\Models\JobApplication;
 use App\Models\Member;
+use App\Support\JobQuestionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -189,6 +190,7 @@ class CandidateJobController extends Controller
                 'perks' => $job->perks,
                 'key_responsibilities' => $job->key_responsibilities,
                 'qualifications' => $job->qualifications,
+                'application_questions' => $job->application_questions ?? [],
                 'last_date' => $job->last_date,
                 'company_image' => $job->company_image,
                 'applicants' => $job->applicants,
@@ -243,6 +245,7 @@ class CandidateJobController extends Controller
             'cover_letter' => 'nullable|string|max:5000',
             'resume' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
             'application_profile' => 'nullable',
+            'screening_answers' => 'nullable',
         ]);
 
         $applicationProfile = null;
@@ -255,6 +258,11 @@ class CandidateJobController extends Controller
                 $applicationProfile = null;
             }
         }
+
+        $screeningAnswers = JobQuestionHelper::normalizeAnswers(
+            $request->input('screening_answers'),
+            $job->application_questions ?? []
+        );
 
         // Handle resume upload
         $resumeUrl = null;
@@ -335,6 +343,7 @@ class CandidateJobController extends Controller
             'cover_letter' => $validated['cover_letter'] ?? null,
             'resume_url' => $resumeUrl,
             'answers' => $applicationProfile,
+            'screening_answers' => $screeningAnswers,
             'candidate_name' => $candidate->name,
             'candidate_email' => $candidate->email,
             'candidate_phone' => $candidate->phone,

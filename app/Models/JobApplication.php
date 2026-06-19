@@ -17,6 +17,7 @@ class JobApplication extends Model
         'cover_letter',
         'resume_url',
         'answers',
+        'screening_answers',
         'status',
         'admin_notes',
         'reviewed_at',
@@ -52,6 +53,7 @@ class JobApplication extends Model
 
     protected $casts = [
         'answers' => 'json',
+        'screening_answers' => 'json',
         'candidate_skills' => 'json',
         'candidate_experience' => 'json',
         'reviewed_at' => 'datetime',
