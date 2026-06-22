@@ -5,62 +5,62 @@ const LocationInput = ({ value, onChange, placeholder = "Enter location...", var
     const [showSuggestions, setShowSuggestions] = useState(false);
     const inputRef = useRef(null);
 
-    // Popular Indian locations for quick access
-    const popularLocations = [
-        { display_name: "Mumbai, Maharashtra", type: "city" },
-        { display_name: "Bangalore, Karnataka", type: "city" },
-        { display_name: "Delhi, Delhi", type: "city" },
-        { display_name: "Pune, Maharashtra", type: "city" },
-        { display_name: "Hyderabad, Telangana", type: "city" },
-        { display_name: "Chennai, Tamil Nadu", type: "city" },
-        { display_name: "Kolkata, West Bengal", type: "city" },
-        { display_name: "Jaipur, Rajasthan", type: "city" },
-        { display_name: "Ahmedabad, Gujarat", type: "city" },
-        { display_name: "Noida, Uttar Pradesh", type: "city" },
-        { display_name: "Gurgaon, Haryana", type: "city" },
-        { display_name: "Remote", type: "remote" }
-    ];
+    // Google Maps API key from environment
+    const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
-    // Custom India locations (commented out for free API)
-    /*
-    const commonLocations = [
-        'Mumbai, Maharashtra', 'Pune, Maharashtra', 'Bangalore, Karnataka',
-        // ... 200+ more locations
-    ];
-    */
-
-    // Load OpenStreetMap Nominatim API (free)
-    const getFreeLocationSuggestions = async (input) => {
+    // Load Google Maps Places API
+    const getLocationSuggestions = async (input) => {
         if (input.length < 2) {
-            // Show popular locations when input is minimal
-            setSuggestions(popularLocations);
-            setShowSuggestions(true);
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        if (!GOOGLE_MAPS_API_KEY) {
+            console.error('Google Maps API key not found');
+            setSuggestions([]);
+            setShowSuggestions(false);
             return;
         }
 
         try {
-            // OpenStreetMap Nominatim API - completely free
+            // Google Maps Places API - Autocomplete with locality focus
             const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&countrycodes=in&limit=5&addressdetails=1`,
+                `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${GOOGLE_MAPS_API_KEY}&types=(cities)|(establishment)|(geocode)&components=country:in&language=en&limit=5`,
                 {
                     headers: {
-                        'User-Agent': 'ATSLocationApp/1.0' // Required for Nominatim
+                        'Accept': 'application/json',
                     }
                 }
             );
 
             if (response.ok) {
                 const data = await response.json();
-                const formattedSuggestions = data.map(place => ({
-                    display_name: place.display_name,
-                    lat: place.lat,
-                    lon: place.lon,
-                    type: place.type
-                }));
-                setSuggestions(formattedSuggestions);
-                setShowSuggestions(true);
+                if (data.status === 'OK' && data.predictions) {
+                    const formattedSuggestions = data.predictions.map(prediction => {
+                        const parts = prediction.description.split(',').map(s => s.trim());
+                        const locality = parts[0] || '';
+                        const city = parts[1] || '';
+                        const state = parts[2] || '';
+                        return {
+                            display_name: prediction.description,
+                            place_id: prediction.place_id,
+                            type: prediction.types?.[0] || 'location',
+                            structured_formatting: prediction.structured_formatting,
+                            locality,
+                            city,
+                            state
+                        };
+                    });
+                    setSuggestions(formattedSuggestions);
+                    setShowSuggestions(true);
+                } else {
+                    console.error('Google Maps API error:', data.status, data.error_message);
+                    setSuggestions([]);
+                    setShowSuggestions(false);
+                }
             } else {
-                console.error('Nominatim API error');
+                console.error('Google Maps API HTTP error');
                 setSuggestions([]);
                 setShowSuggestions(false);
             }
@@ -74,7 +74,7 @@ const LocationInput = ({ value, onChange, placeholder = "Enter location...", var
     const handleInputChange = (e) => {
         const inputValue = e.target.value;
         onChange(inputValue);
-        getFreeLocationSuggestions(inputValue);
+        getLocationSuggestions(inputValue);
     };
 
     const handleSuggestionClick = (suggestion) => {
@@ -90,8 +90,10 @@ const LocationInput = ({ value, onChange, placeholder = "Enter location...", var
     };
 
     const handleFocus = () => {
-        // Always show suggestions on focus - popular locations if empty, API results if has value
-        getFreeLocationSuggestions(value);
+        // Don't show suggestions on focus, only on typing
+        if (value && value.length >= 2) {
+            getLocationSuggestions(value);
+        }
     };
 
     const handleGetCurrentLocation = () => {
@@ -177,21 +179,21 @@ const LocationInput = ({ value, onChange, placeholder = "Enter location...", var
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
-                                <div className="flex-1 min-w-0">
-                                    <span className="text-sm text-gray-700 dark:text-gray-300 block truncate">
-                                        {suggestion.display_name}
-                                    </span>
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        {suggestion.type}
-                                    </span>
-                                </div>
+                            <div className="flex-1 min-w-0">
+                                <span className="text-sm text-gray-700 dark:text-gray-300 block truncate">
+                                    {suggestion.locality}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {suggestion.city}{suggestion.city && suggestion.state ? ', ' : ''}{suggestion.state}
+                                </span>
+                            </div>
                             </button>
                         ))}
                     </div>
                     <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Powered by OpenStreetMap
-                        </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Powered by Google Maps
+                            </p>
                     </div>
                 </div>
             )}
