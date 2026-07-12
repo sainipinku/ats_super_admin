@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\Mobile\ConstructionController;
 use App\Http\Controllers\Api\Member\JobController;
 use App\Http\Controllers\Api\Member\ProfileController;
 use App\Http\Controllers\Api\Member\TaskController;
@@ -22,7 +23,7 @@ use Illuminate\Support\Facades\Route;
         Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
     });
 
-    
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
 
@@ -50,4 +51,32 @@ use Illuminate\Support\Facades\Route;
         Route::get('/tasks/{task}/notes', [TaskController::class, 'notesIndex']);
         Route::post('/tasks/{task}/notes', [TaskController::class, 'notesStore']);
         Route::delete('/notes/{note}', [TaskController::class, 'notesDestroy']);
+
+        Route::prefix('mobile/construction')->group(function () {
+            Route::get('/projects/assigned', [ConstructionController::class, 'assignedProjects']);
+            Route::get('/survey-plans/{surveyPlan}', [ConstructionController::class, 'showSurveyPlan'])
+                ->middleware('construction.permission:survey_plan.manage');
+            Route::post('/survey-visits/check-in', [ConstructionController::class, 'checkIn'])
+                ->middleware('construction.permission:survey_plan.manage');
+            Route::post('/survey-visits/{surveyVisit}/entries', [ConstructionController::class, 'storeEntry'])
+                ->middleware('construction.permission:survey_plan.manage');
+            Route::post('/survey-visits/{surveyVisit}/measurements', [ConstructionController::class, 'storeMeasurement'])
+                ->middleware('construction.permission:survey_plan.manage');
+            Route::post('/survey-visits/{surveyVisit}/submit', [ConstructionController::class, 'submitVisit'])
+                ->middleware('construction.permission:survey_plan.manage');
+            Route::get('/drafting-jobs', [ConstructionController::class, 'draftingJobs'])
+                ->middleware('construction.permission:drafting.manage');
+            Route::post('/drafting-jobs/{draftingJob}/revisions', [ConstructionController::class, 'submitRevision'])
+                ->middleware('construction.permission:drafting.manage');
+            Route::get('/tasks/assigned', [ConstructionController::class, 'assignedTasks'])
+                ->middleware('construction.permission:execution_task.manage');
+            Route::post('/attendance/check-in', [ConstructionController::class, 'attendanceCheckIn'])
+                ->middleware('construction.permission:attendance.manage');
+            Route::post('/attendance/{attendance}/check-out', [ConstructionController::class, 'attendanceCheckOut'])
+                ->middleware('construction.permission:attendance.manage');
+            Route::post('/tasks/{task}/progress', [ConstructionController::class, 'updateTaskProgress'])
+                ->middleware('construction.permission:execution_task.manage');
+            Route::post('/reports', [ConstructionController::class, 'submitDailyProgress'])
+                ->middleware('construction.permission:dpr.manage');
+        });
     });

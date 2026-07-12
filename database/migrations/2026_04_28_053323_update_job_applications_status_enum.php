@@ -15,6 +15,10 @@ return new class extends Migration
         // Update existing 'reviewing' statuses to 'pending'
         DB::table('job_applications')->where('status', 'reviewing')->update(['status' => 'pending']);
 
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         // Modify the enum column to include new statuses
         DB::statement("ALTER TABLE job_applications MODIFY COLUMN status ENUM('pending', 'shortlisted', 'waiting_list', 'hired', 'not_selected', 'rejected') DEFAULT 'pending'");
     }
@@ -24,6 +28,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         // Revert back to original enum values
         DB::statement("ALTER TABLE job_applications MODIFY COLUMN status ENUM('pending', 'reviewing', 'shortlisted', 'rejected', 'hired') DEFAULT 'pending'");
     }

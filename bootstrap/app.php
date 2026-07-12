@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\ContractorMiddleware;
+use App\Http\Middleware\EnsureConstructionPermission;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PartnerMiddleware;
 use App\Http\Middleware\RedirectIfAuthenticated;
@@ -32,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
              'member' => \App\Http\Middleware\MemberMiddleware::class,
               'admin' => \App\Http\Middleware\AdminMiddleware::class,
               'callingteam' => \App\Http\Middleware\CallingTeamMiddleware::class,
+              'construction.permission' => EnsureConstructionPermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

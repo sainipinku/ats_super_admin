@@ -35,36 +35,40 @@ return new class extends Migration
             }
         });
 
-        DB::statement(
-            "ALTER TABLE job_applications MODIFY COLUMN status ENUM(
-                'pending',
-                'shortlisted',
-                'waiting_list',
-                'hired',
-                'not_selected',
-                'rejected',
-                'assigned_to_calling_team',
-                'interested',
-                'interview_scheduled',
-                'selected',
-                'on_hold',
-                'on_hold_not_interested'
-            ) DEFAULT 'pending'"
-        );
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement(
+                "ALTER TABLE job_applications MODIFY COLUMN status ENUM(
+                    'pending',
+                    'shortlisted',
+                    'waiting_list',
+                    'hired',
+                    'not_selected',
+                    'rejected',
+                    'assigned_to_calling_team',
+                    'interested',
+                    'interview_scheduled',
+                    'selected',
+                    'on_hold',
+                    'on_hold_not_interested'
+                ) DEFAULT 'pending'"
+            );
+        }
     }
 
     public function down(): void
     {
-        DB::statement(
-            "ALTER TABLE job_applications MODIFY COLUMN status ENUM(
-                'pending',
-                'shortlisted',
-                'waiting_list',
-                'hired',
-                'not_selected',
-                'rejected'
-            ) DEFAULT 'pending'"
-        );
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement(
+                "ALTER TABLE job_applications MODIFY COLUMN status ENUM(
+                    'pending',
+                    'shortlisted',
+                    'waiting_list',
+                    'hired',
+                    'not_selected',
+                    'rejected'
+                ) DEFAULT 'pending'"
+            );
+        }
 
         Schema::table('job_applications', function (Blueprint $table) {
             $columns = [

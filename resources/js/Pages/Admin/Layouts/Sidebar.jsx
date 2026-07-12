@@ -1,8 +1,24 @@
 // components/Sidebar.jsx
 import React from "react";
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 
 const Sidebar = ({ isOpen, onClose }) => {
+    const permissions = usePage().props.auth?.permissions ?? [];
+    const canAccessConstruction = [
+        "dashboard.view",
+        "project.manage",
+        "survey_plan.manage",
+        "survey_submission.review",
+        "drafting.manage",
+        "drawing_approval.manage",
+        "execution.manage",
+        "execution_task.manage",
+        "dpr.manage",
+        "dpr.review",
+        "attendance.manage",
+        "attendance.review",
+    ].some((permission) => permissions.includes(permission));
+
     return (
         <div
             className={`fixed top-0 left-0 h-full w-[288px] bg-white dark:bg-[#03011C] text-white transition-transform duration-300 z-[99] shadow-md ${
@@ -79,6 +95,24 @@ const Sidebar = ({ isOpen, onClose }) => {
                                         </Link>
 
                 </li>
+                {canAccessConstruction && (
+                    <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
+                        <Link
+                            href={route("admin.construction.dashboard")}
+                            className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
+                                route().current("admin.construction.*")
+                                    ? "text-[#4F46E5] dark:text-[#4F46E5] bg-[#4F46E5]/10"
+                                    : "text-[#727272] hover:text-[#4F46E5] dark:hover:text-[#4F46E5]"
+                            }`}
+                        >
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M4 10L12 3L20 10V20H4V10Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                <path d="M9 20V12H15V20" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                            </svg>
+                            Construction ERP
+                        </Link>
+                    </li>
+                )}
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
                    <Link
                         href={route("admin.members.dashboard")}

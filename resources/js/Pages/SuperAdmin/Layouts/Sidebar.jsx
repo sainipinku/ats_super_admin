@@ -110,6 +110,22 @@ const Sidebar = ({ isOpen, onClose }) => {
                 </li>
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
                     <a
+                        href={route("super.construction.dashboard")}
+                        className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
+                            route().current("super.construction.*")
+                                ? "text-white bg-[#5146E6]"
+                                : "text-[#727272] hover:text-white hover:bg-[#5146E6]"
+                        }`}
+                    >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 10L12 3L20 10V20H4V10Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                            <path d="M9 20V12H15V20" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                        </svg>
+                        Construction ERP
+                    </a>
+                </li>
+                <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a] ">
+                    <a
                         href={route("super.departments")}
                         className={`flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
                             route().current("super.departments")

@@ -132,7 +132,7 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::get('/api/{application}/resume-preview', [JobRequestController::class, 'previewApplicantResume'])->name('api.resume-preview');
         });
 
-       
+
         Route::group(['prefix' => 'contact-messages', 'as' => 'contact.messages.'], function () {
             Route::get('/', [ContactMessageController::class, 'index'])->name('index');
             Route::patch('/{message}/toggle-read', [ContactMessageController::class, 'toggleRead'])->name('toggle-read');
@@ -222,6 +222,158 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::post('/profile/photo/remove', [App\Http\Controllers\Admin\AdminController::class, 'userProfilePhotoRemove'])->name('admin.profile.photo.remove');
 });
 /** ADMIN ROUTES END HERE **/
+
+/** CONSTRUCTION ERP ROUTES START HERE **/
+Route::prefix('super/construction')
+    ->name('super.construction.')
+    ->middleware('auth.superadmin')
+    ->group(function () {
+        Route::get('/dashboard', [App\Http\Controllers\SuperAdmin\Construction\DashboardController::class, 'index'])
+            ->middleware('construction.permission:dashboard.view')
+            ->name('dashboard');
+
+        Route::get('/companies', [App\Http\Controllers\SuperAdmin\Construction\CompanyController::class, 'index'])
+            ->middleware('construction.permission:company.manage')
+            ->name('companies.index');
+        Route::post('/companies', [App\Http\Controllers\SuperAdmin\Construction\CompanyController::class, 'store'])
+            ->middleware('construction.permission:company.manage')
+            ->name('companies.store');
+
+        Route::get('/clients', [App\Http\Controllers\SuperAdmin\Construction\ClientController::class, 'index'])
+            ->middleware('construction.permission:client.manage')
+            ->name('clients.index');
+        Route::post('/clients', [App\Http\Controllers\SuperAdmin\Construction\ClientController::class, 'store'])
+            ->middleware('construction.permission:client.manage')
+            ->name('clients.store');
+
+        Route::get('/projects', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'index'])
+            ->middleware('construction.permission:project.manage')
+            ->name('projects.index');
+        Route::post('/projects', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'store'])
+            ->middleware('construction.permission:project.manage')
+            ->name('projects.store');
+        Route::get('/projects/{project}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'show'])
+            ->middleware('construction.permission:project.manage')
+            ->name('projects.show');
+        Route::post('/projects/{project}/budget', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'storeBudget'])
+            ->middleware('construction.permission:project_budget.approve')
+            ->name('projects.budget.store');
+        Route::post('/projects/{project}/team', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'assignTeam'])
+            ->middleware('construction.permission:project_team.manage')
+            ->name('projects.team.assign');
+
+        Route::get('/survey', [App\Http\Controllers\SuperAdmin\Construction\SurveyController::class, 'index'])
+            ->middleware('construction.permission:survey_plan.manage,survey_submission.review')
+            ->name('survey.index');
+        Route::post('/survey/plans', [App\Http\Controllers\SuperAdmin\Construction\SurveyController::class, 'storePlan'])
+            ->middleware('construction.permission:survey_plan.manage')
+            ->name('survey.plans.store');
+        Route::post('/survey/submissions/{submission}/review', [App\Http\Controllers\SuperAdmin\Construction\SurveyController::class, 'reviewSubmission'])
+            ->middleware('construction.permission:survey_submission.review')
+            ->name('survey.submissions.review');
+
+        Route::get('/drafting', [App\Http\Controllers\SuperAdmin\Construction\DraftingController::class, 'index'])
+            ->middleware('construction.permission:drafting.manage,drawing_approval.manage')
+            ->name('drafting.index');
+        Route::post('/drafting/jobs', [App\Http\Controllers\SuperAdmin\Construction\DraftingController::class, 'createJob'])
+            ->middleware('construction.permission:drafting.manage')
+            ->name('drafting.jobs.store');
+        Route::post('/drafting/jobs/{draftingJob}/revisions', [App\Http\Controllers\SuperAdmin\Construction\DraftingController::class, 'storeRevision'])
+            ->middleware('construction.permission:drafting.manage')
+            ->name('drafting.revisions.store');
+        Route::post('/drafting/approvals/{drawingApproval}', [App\Http\Controllers\SuperAdmin\Construction\DraftingController::class, 'approveDrawing'])
+            ->middleware('construction.permission:drawing_approval.manage')
+            ->name('drafting.approvals.update');
+
+        Route::get('/execution', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'index'])
+            ->middleware('construction.permission:execution.manage,execution_task.manage,dpr.review,attendance.review')
+            ->name('execution.index');
+        Route::post('/execution/plans', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'storePlan'])
+            ->middleware('construction.permission:execution.manage')
+            ->name('execution.plans.store');
+        Route::post('/execution/tasks', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'storeTask'])
+            ->middleware('construction.permission:execution_task.manage')
+            ->name('execution.tasks.store');
+        Route::post('/execution/tasks/{task}/assign', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'assignTask'])
+            ->middleware('construction.permission:execution_task.manage')
+            ->name('execution.tasks.assign');
+        Route::post('/execution/tasks/{task}/progress', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'updateTaskProgress'])
+            ->middleware('construction.permission:execution_task.manage')
+            ->name('execution.tasks.progress.update');
+        Route::post('/execution/reports', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'storeDailyProgress'])
+            ->middleware('construction.permission:dpr.manage')
+            ->name('execution.reports.store');
+        Route::post('/execution/reports/{report}/review', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'reviewDailyProgress'])
+            ->middleware('construction.permission:dpr.review')
+            ->name('execution.reports.review');
+        Route::post('/execution/attendance/{attendance}/review', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'reviewAttendance'])
+            ->middleware('construction.permission:attendance.review')
+            ->name('execution.attendance.review');
+    });
+
+Route::prefix('admin/construction')
+    ->name('admin.construction.')
+    ->middleware('admin')
+    ->group(function () {
+        Route::get('/dashboard', [App\Http\Controllers\Admin\Construction\DashboardController::class, 'index'])
+            ->middleware('construction.permission:dashboard.view')
+            ->name('dashboard');
+        Route::get('/projects', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'index'])
+            ->middleware('construction.permission:project.manage')
+            ->name('projects.index');
+        Route::get('/projects/{project}', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'show'])
+            ->middleware('construction.permission:project.manage')
+            ->name('projects.show');
+
+        Route::get('/survey', [App\Http\Controllers\Admin\Construction\SurveyController::class, 'index'])
+            ->middleware('construction.permission:survey_plan.manage,survey_submission.review')
+            ->name('survey.index');
+        Route::post('/survey/plans', [App\Http\Controllers\Admin\Construction\SurveyController::class, 'storePlan'])
+            ->middleware('construction.permission:survey_plan.manage')
+            ->name('survey.plans.store');
+        Route::post('/survey/submissions/{submission}/review', [App\Http\Controllers\Admin\Construction\SurveyController::class, 'reviewSubmission'])
+            ->middleware('construction.permission:survey_submission.review')
+            ->name('survey.submissions.review');
+
+        Route::get('/drafting', [App\Http\Controllers\Admin\Construction\DraftingController::class, 'index'])
+            ->middleware('construction.permission:drafting.manage,drawing_approval.manage')
+            ->name('drafting.index');
+        Route::post('/drafting/jobs', [App\Http\Controllers\Admin\Construction\DraftingController::class, 'createJob'])
+            ->middleware('construction.permission:drafting.manage')
+            ->name('drafting.jobs.store');
+        Route::post('/drafting/jobs/{draftingJob}/revisions', [App\Http\Controllers\Admin\Construction\DraftingController::class, 'storeRevision'])
+            ->middleware('construction.permission:drafting.manage')
+            ->name('drafting.revisions.store');
+        Route::post('/drafting/approvals/{drawingApproval}', [App\Http\Controllers\Admin\Construction\DraftingController::class, 'approveDrawing'])
+            ->middleware('construction.permission:drawing_approval.manage')
+            ->name('drafting.approvals.update');
+
+        Route::get('/execution', [App\Http\Controllers\Admin\Construction\ExecutionController::class, 'index'])
+            ->middleware('construction.permission:execution.manage,execution_task.manage,dpr.review,attendance.review')
+            ->name('execution.index');
+        Route::post('/execution/plans', [App\Http\Controllers\Admin\Construction\ExecutionController::class, 'storePlan'])
+            ->middleware('construction.permission:execution.manage')
+            ->name('execution.plans.store');
+        Route::post('/execution/tasks', [App\Http\Controllers\Admin\Construction\ExecutionController::class, 'storeTask'])
+            ->middleware('construction.permission:execution_task.manage')
+            ->name('execution.tasks.store');
+        Route::post('/execution/tasks/{task}/assign', [App\Http\Controllers\Admin\Construction\ExecutionController::class, 'assignTask'])
+            ->middleware('construction.permission:execution_task.manage')
+            ->name('execution.tasks.assign');
+        Route::post('/execution/tasks/{task}/progress', [App\Http\Controllers\Admin\Construction\ExecutionController::class, 'updateTaskProgress'])
+            ->middleware('construction.permission:execution_task.manage')
+            ->name('execution.tasks.progress.update');
+        Route::post('/execution/reports', [App\Http\Controllers\Admin\Construction\ExecutionController::class, 'storeDailyProgress'])
+            ->middleware('construction.permission:dpr.manage')
+            ->name('execution.reports.store');
+        Route::post('/execution/reports/{report}/review', [App\Http\Controllers\Admin\Construction\ExecutionController::class, 'reviewDailyProgress'])
+            ->middleware('construction.permission:dpr.review')
+            ->name('execution.reports.review');
+        Route::post('/execution/attendance/{attendance}/review', [App\Http\Controllers\Admin\Construction\ExecutionController::class, 'reviewAttendance'])
+            ->middleware('construction.permission:attendance.review')
+            ->name('execution.attendance.review');
+    });
+/** CONSTRUCTION ERP ROUTES END HERE **/
 
 /** CALLING TEAM ROUTES START HERE **/
 Route::prefix('calling-team')->group(function () {

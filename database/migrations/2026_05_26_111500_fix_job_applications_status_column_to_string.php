@@ -15,6 +15,10 @@ return new class extends Migration
             return;
         }
 
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         DB::statement("
             ALTER TABLE job_applications
             MODIFY COLUMN status VARCHAR(100) NOT NULL DEFAULT 'applied'
@@ -27,6 +31,10 @@ return new class extends Migration
     public function down(): void
     {
         if (!Schema::hasTable('job_applications')) {
+            return;
+        }
+
+        if (DB::getDriverName() === 'sqlite') {
             return;
         }
 

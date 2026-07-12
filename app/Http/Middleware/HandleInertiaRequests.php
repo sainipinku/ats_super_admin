@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Construction\ConstructionAuthorizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Middleware;
@@ -30,7 +31,8 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-
+        /** @var ConstructionAuthorizationService $constructionAuthorization */
+        $constructionAuthorization = app(ConstructionAuthorizationService::class);
 
         $user = null;
         $guard = null;
@@ -49,12 +51,28 @@ class HandleInertiaRequests extends Middleware
             $guard = 'callingteam';
         }
 
+        $constructionPermissions = $constructionAuthorization->permissionsFor($user);
+        $genericPermissions = [];
+
+        if ($user && method_exists($user, 'getAllPermissions')) {
+            $genericPermissions = $user->getAllPermissions()->pluck('name')->all();
+        }
+
+        $mergedPermissions = collect($genericPermissions)
+            ->merge($constructionPermissions)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         return array_merge(parent::share($request), [
             'messages' => flash()->render('array'),
 
             'auth' => [
                 'user' => $user,
                 'guard' => $guard,
+                'permissions' => $mergedPermissions,
+                'construction_permissions' => $constructionPermissions,
             ],
             'flash' => [
                 'success' => $request->session()->get('success'),
