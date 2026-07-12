@@ -13,6 +13,8 @@ use App\Models\Member;
 use Inertia\Inertia;
 use Inertia\Response;
 
+
+
 class DashboardController extends Controller
 {
     use ResolvesConstructionActor;
