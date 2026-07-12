@@ -19,6 +19,9 @@ class DashboardController extends Controller
 {
     use ResolvesConstructionActor;
 
+
+
+
     public function index(): Response
     {
         /** @var Member|null $actor */
