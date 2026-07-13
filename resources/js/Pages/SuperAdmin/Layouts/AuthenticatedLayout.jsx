@@ -357,114 +357,42 @@ export default function AuthenticatedLayout({ header, children }) {
                                             </div>
 {/* Navigation Links */}
 <div className="hidden xl:flex items-center gap-3 xl:gap-4">
-
-    {/* Dashboard */}
-    <NavLink
-        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-            route().current("super.dashboard")
-                ? "bg-blue-600 text-white shadow-md"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-        }`}
-        href={route("super.dashboard")}
-        active={route().current("super.dashboard")}
-    >
-        Dashboard
-    </NavLink>
-
-    {/* Roles */}
-    {/* <NavLink
-        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-            route().current("super.role.list")
-                ? "bg-blue-600 text-white shadow-md"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-        }`}
-        href={route("super.role.list")}
-        active={route().current("super.role.list")}
-    >
-        Roles
-    </NavLink> */}
-
-    {/* Departments */}
-    <NavLink
-        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-            route().current("super.departments")
-                ? "bg-blue-600 text-white shadow-md"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-        }`}
-        href={route("super.departments")}
-        active={route().current("super.departments")}
-    >
-        Departments
-    </NavLink>
-
-    {/* Designations */}
-    <NavLink
-        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-            route().current("super.designation.list")
-                ? "bg-blue-600 text-white shadow-md"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-        }`}
-        href={route("super.designation.list")}
-        active={route().current("super.designation.list")}
-    >
-        Designations
-    </NavLink>
-
-    {/* Members */}
-    <NavLink
-        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-            route().current("super.members.list") ||
-            route().current("super.members.details")
-                ? "bg-blue-600 text-white shadow-md"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-        }`}
-        href={route("super.members.list")}
-        active={
-            route().current("super.members.list") ||
-            route().current("super.members.details")
-        }
-    >
-        Members
-    </NavLink>
-
-    {/* Job Requests */}
-    <NavLink
-        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-            route().current("super.job.requests.index")
-                ? "bg-blue-600 text-white shadow-md"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-        }`}
-        href={route("super.job.requests.index")}
-        active={route().current("super.job.requests.index")}
-    >
-        Job Requests
-    </NavLink>
-
-    {/* All Jobs */}
-    <NavLink
-        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-            route().current("super.job.requests.all.jobs")
-                ? "bg-blue-600 text-white shadow-md"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-        }`}
-        href={route("super.job.requests.all.jobs")}
-        active={route().current("super.job.requests.all.jobs")}
-    >
-        All Jobs
-    </NavLink>
-
-    {/* Job Applications */}
-    <NavLink
-        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-            route().current("super.job.applications.index")
-                ? "bg-blue-600 text-white shadow-md"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-        }`}
-        href={route("super.job.applications.index")}
-        active={route().current("super.job.applications.index")}
-    >
-        Job Applications
-    </NavLink>
+    <FlowNavLink href={route("super.dashboard")} active={route().current("super.dashboard") || route().current("super.construction.dashboard")}>
+        Control Tower
+    </FlowNavLink>
+    <FlowNavLink href={route("super.construction.companies.index")} active={route().current("super.construction.companies.*")}>
+        Company Setup
+    </FlowNavLink>
+    <FlowNavLink href={route("super.construction.clients.index")} active={route().current("super.construction.clients.*")}>
+        Client Registration
+    </FlowNavLink>
+    <FlowNavLink href={route("super.construction.projects.index")} active={route().current("super.construction.projects.*")}>
+        Projects & Budget
+    </FlowNavLink>
+    <FlowNavLink href={route("super.construction.survey.index")} active={route().current("super.construction.survey.*")}>
+        Survey Planning
+    </FlowNavLink>
+    <FlowNavLink href={route("super.construction.drafting.index")} active={route().current("super.construction.drafting.*")}>
+        Drawing Approval
+    </FlowNavLink>
+    <FlowNavLink href={route("super.construction.execution.index")} active={route().current("super.construction.execution.*")}>
+        Construction Execution
+    </FlowNavLink>
+    <FlowNavLink href={route("super.construction.materials.index")} active={route().current("super.construction.materials.*")}>
+        Material Management
+    </FlowNavLink>
+    <FlowNavLink href={route("super.construction.vehicles.index")} active={route().current("super.construction.vehicles.*")}>
+        Vehicle Tracking
+    </FlowNavLink>
+    <FlowNavLink href={route("super.construction.equipment.index")} active={route().current("super.construction.equipment.*")}>
+        Equipment Allocation
+    </FlowNavLink>
+    <FlowNavLink href={route("super.construction.billing.index")} active={route().current("super.construction.billing.*")}>
+        Accounts & Billing
+    </FlowNavLink>
+    <FlowNavLink href={route("super.construction.handover.index")} active={route().current("super.construction.handover.*")}>
+        Handover & Closure
+    </FlowNavLink>
 </div>
 </div>
 
@@ -711,29 +639,41 @@ export default function AuthenticatedLayout({ header, children }) {
                                     }
                                 >
                                     <div className="space-y-1 pb-3 pt-2">
-                                        <ResponsiveNavLink
-                                            href={route("super.dashboard")}
-                                            active={route().current(
-                                                "super.dashboard"
-                                            )}
-                                        >
-                                            Dashboard
+                                        <ResponsiveNavLink href={route("super.dashboard")} active={route().current("super.dashboard") || route().current("super.construction.dashboard")}>
+                                            Control Tower
                                         </ResponsiveNavLink>
-                                        <ResponsiveNavLink
-                                            href={route("super.job.requests.all.jobs")}
-                                            active={route().current(
-                                                "super.job.requests.all.jobs"
-                                            )}
-                                        >
-                                            All Jobs
+                                        <ResponsiveNavLink href={route("super.construction.companies.index")} active={route().current("super.construction.companies.*")}>
+                                            Company Setup
                                         </ResponsiveNavLink>
-                                        <ResponsiveNavLink
-                                            href={route("super.job.applications.index")}
-                                            active={route().current(
-                                                "super.job.applications.index"
-                                            )}
-                                        >
-                                            Job Applications
+                                        <ResponsiveNavLink href={route("super.construction.clients.index")} active={route().current("super.construction.clients.*")}>
+                                            Client Registration
+                                        </ResponsiveNavLink>
+                                        <ResponsiveNavLink href={route("super.construction.projects.index")} active={route().current("super.construction.projects.*")}>
+                                            Projects & Budget
+                                        </ResponsiveNavLink>
+                                        <ResponsiveNavLink href={route("super.construction.survey.index")} active={route().current("super.construction.survey.*")}>
+                                            Survey Planning
+                                        </ResponsiveNavLink>
+                                        <ResponsiveNavLink href={route("super.construction.drafting.index")} active={route().current("super.construction.drafting.*")}>
+                                            Drawing Approval
+                                        </ResponsiveNavLink>
+                                        <ResponsiveNavLink href={route("super.construction.execution.index")} active={route().current("super.construction.execution.*")}>
+                                            Construction Execution
+                                        </ResponsiveNavLink>
+                                        <ResponsiveNavLink href={route("super.construction.materials.index")} active={route().current("super.construction.materials.*")}>
+                                            Material Management
+                                        </ResponsiveNavLink>
+                                        <ResponsiveNavLink href={route("super.construction.vehicles.index")} active={route().current("super.construction.vehicles.*")}>
+                                            Vehicle Tracking
+                                        </ResponsiveNavLink>
+                                        <ResponsiveNavLink href={route("super.construction.equipment.index")} active={route().current("super.construction.equipment.*")}>
+                                            Equipment Allocation
+                                        </ResponsiveNavLink>
+                                        <ResponsiveNavLink href={route("super.construction.billing.index")} active={route().current("super.construction.billing.*")}>
+                                            Accounts & Billing
+                                        </ResponsiveNavLink>
+                                        <ResponsiveNavLink href={route("super.construction.handover.index")} active={route().current("super.construction.handover.*")}>
+                                            Handover & Closure
                                         </ResponsiveNavLink>
                                     </div>
 
@@ -771,5 +711,21 @@ export default function AuthenticatedLayout({ header, children }) {
                     </div>
                 </SettingsProvider>
         </>
+    );
+}
+
+function FlowNavLink({ href, active, children }) {
+    return (
+        <NavLink
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                active
+                    ? "bg-blue-600 text-white shadow-md"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            }`}
+            href={href}
+            active={active}
+        >
+            {children}
+        </NavLink>
     );
 }

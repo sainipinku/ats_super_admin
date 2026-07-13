@@ -64,7 +64,7 @@ class ExecutionController extends Controller
                 ->whereIn('project_id', $projectIds)
                 ->latest()
                 ->get(),
-            'dailyProgressReports' => DailyProgressReport::with(['project', 'executionTask', 'submittedBy', 'reviewedBy', 'items'])
+            'dailyProgressReports' => DailyProgressReport::with(['project', 'executionTask', 'submittedBy', 'reviewedBy', 'items', 'supportingDocument'])
                 ->whereIn('project_id', $projectIds)
                 ->latest('report_date')
                 ->get(),
@@ -192,6 +192,7 @@ class ExecutionController extends Controller
             'longitude' => ['nullable', 'numeric'],
             'gps_accuracy_meters' => ['nullable', 'numeric', 'min:0'],
             'weather_summary' => ['nullable', 'string', 'max:255'],
+            'supporting_document' => ['nullable', 'file', 'max:20480'],
             'items' => ['nullable', 'array'],
             'items.*.execution_task_id' => ['nullable', 'exists:construction_execution_tasks,id'],
             'items.*.title' => ['required_with:items', 'string', 'max:255'],

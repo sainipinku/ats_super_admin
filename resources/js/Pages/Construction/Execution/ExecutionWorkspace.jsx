@@ -18,6 +18,7 @@ export default function ExecutionWorkspace({
     projectTeamMembers,
 }) {
     const routePrefix = variant === "super" ? "super.construction.execution" : "admin.construction.execution";
+    const documentRouteBase = variant === "super" ? "super.construction.documents" : "admin.construction.documents";
     const firstProjectId = projects[0]?.id ? String(projects[0].id) : "";
 
     const planOptionsByProject = useMemo(() => {
@@ -114,6 +115,7 @@ export default function ExecutionWorkspace({
         longitude: "",
         gps_accuracy_meters: "",
         weather_summary: "",
+        supporting_document: null,
         items: [],
     });
 
@@ -498,6 +500,7 @@ export default function ExecutionWorkspace({
 
                             reportForm.transform(() => payload).post(route(`${routePrefix}.reports.store`), {
                                 preserveScroll: true,
+                                forceFormData: true,
                                 onFinish: () => reportForm.transform((data) => data),
                             });
                         }}
@@ -547,6 +550,7 @@ export default function ExecutionWorkspace({
                             <TextInput label="GPS Accuracy (m)" type="number" value={reportForm.data.gps_accuracy_meters} onChange={(value) => reportForm.setData("gps_accuracy_meters", value)} error={reportForm.errors.gps_accuracy_meters} />
                         </div>
                         <TextInput label="Weather Summary" value={reportForm.data.weather_summary} onChange={(value) => reportForm.setData("weather_summary", value)} error={reportForm.errors.weather_summary} />
+                        <FileInput label="Supporting Document" onChange={(file) => reportForm.setData("supporting_document", file)} error={reportForm.errors.supporting_document} />
                         <PrimaryButton disabled={reportForm.processing}>
                             {reportForm.processing ? "Submitting..." : "Submit Daily Progress Report"}
                         </PrimaryButton>
@@ -643,6 +647,25 @@ export default function ExecutionWorkspace({
                                         <MiniMetric label="Submitted By" value={report.submitted_by?.name || "-"} />
                                         <MiniMetric label="Items" value={report.items?.length || 0} />
                                     </div>
+                                    {report.supporting_document ? (
+                                        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                                            <span>{report.supporting_document.original_name}</span>
+                                            <a
+                                                href={route(`${documentRouteBase}.view`, report.supporting_document.id)}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                                            >
+                                                View
+                                            </a>
+                                            <a
+                                                href={route(`${documentRouteBase}.download`, report.supporting_document.id)}
+                                                className="rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-500"
+                                            >
+                                                Download
+                                            </a>
+                                        </div>
+                                    ) : null}
                                     <div className="mt-4 flex flex-wrap gap-2">
                                         <button
                                             type="button"
@@ -757,6 +780,20 @@ function PrimaryButton({ children, disabled = false }) {
         >
             {children}
         </button>
+    );
+}
+
+function FileInput({ label, error, onChange }) {
+    return (
+        <label className="block">
+            <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">{label}</span>
+            <input
+                type="file"
+                onChange={(event) => onChange(event.target.files?.[0] || null)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:file:bg-slate-900 dark:file:text-slate-200"
+            />
+            {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
+        </label>
     );
 }
 

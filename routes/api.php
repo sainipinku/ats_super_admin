@@ -78,5 +78,23 @@ use Illuminate\Support\Facades\Route;
                 ->middleware('construction.permission:execution_task.manage');
             Route::post('/reports', [ConstructionController::class, 'submitDailyProgress'])
                 ->middleware('construction.permission:dpr.manage');
+            Route::get('/projects/{project}/vehicles', [ConstructionController::class, 'vehicles'])
+                ->middleware('construction.permission:vehicle_tracking.manage');
+            Route::post('/projects/{project}/vehicles/pings', [ConstructionController::class, 'vehiclePing'])
+                ->middleware('construction.permission:vehicle_tracking.manage');
+            Route::get('/projects/{project}/equipment', [ConstructionController::class, 'equipment'])
+                ->middleware('construction.permission:equipment_usage.manage,equipment_allocation.manage');
+            Route::post('/projects/{project}/equipment/usage', [ConstructionController::class, 'equipmentUsage'])
+                ->middleware('construction.permission:equipment_usage.manage');
+            Route::post('/projects/{project}/equipment/return', [ConstructionController::class, 'equipmentReturn'])
+                ->middleware('construction.permission:equipment_allocation.manage');
+            Route::get('/projects/{project}/billing', [ConstructionController::class, 'billing'])
+                ->middleware('construction.permission:billing_invoice.manage,billing_payment.manage');
+            Route::get('/projects/{project}/handover', [ConstructionController::class, 'handover'])
+                ->middleware('construction.permission:handover.manage,project_closure.manage');
+            Route::get('/documents/{document}/view', [App\Http\Controllers\Construction\DocumentController::class, 'view'])
+                ->middleware('construction.permission:document.manage');
+            Route::get('/documents/{document}/download', [App\Http\Controllers\Construction\DocumentController::class, 'download'])
+                ->middleware('construction.permission:document.manage');
         });
     });

@@ -111,4 +111,84 @@ class Project extends Model
     {
         return $this->hasMany(AttendanceRecord::class);
     }
+
+    public function vendors(): HasMany
+    {
+        return $this->hasMany(Vendor::class);
+    }
+
+    public function materials(): HasMany
+    {
+        return $this->hasMany(Material::class);
+    }
+
+    public function purchaseRequests(): HasMany
+    {
+        return $this->hasMany(PurchaseRequest::class);
+    }
+
+    public function purchaseOrders(): HasMany
+    {
+        return $this->hasMany(PurchaseOrder::class);
+    }
+
+    public function materialReceipts(): HasMany
+    {
+        return $this->hasMany(MaterialReceipt::class);
+    }
+
+    public function materialIssues(): HasMany
+    {
+        return $this->hasMany(MaterialIssue::class);
+    }
+
+    public function materialStocks(): HasMany
+    {
+        return $this->hasMany(MaterialStock::class);
+    }
+
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class);
+    }
+
+    public function vehicleAssignments(): HasMany
+    {
+        return $this->hasMany(VehicleAssignment::class);
+    }
+
+    public function vehicleLocationPings(): HasMany
+    {
+        return $this->hasMany(VehicleLocationPing::class);
+    }
+
+    public function equipments(): HasMany
+    {
+        return $this->hasMany(Equipment::class);
+    }
+
+    public function equipmentAllocations(): HasMany
+    {
+        return $this->hasMany(EquipmentAllocation::class);
+    }
+
+    public function equipmentUsageLogs(): HasMany
+    {
+        return $this->hasMany(EquipmentUsageLog::class);
+    }
+
+    public function clientInvoices(): HasMany
+    {
+        return $this->hasMany(ClientInvoice::class);
+    }
+
+    public function clientPayments(): HasMany
+    {
+        return $this->hasMany(ClientPayment::class);
+    }
+
+    public function handovers(): HasMany
+    {
+        return $this->hasMany(ProjectHandover::class);
+    }
 }

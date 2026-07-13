@@ -11,9 +11,9 @@ use App\Models\Construction\DrawingRevision;
 use App\Models\Construction\SurveySubmission;
 use App\Models\Member;
 use App\Services\Construction\ConstructionActivityService;
+use App\Services\Construction\ConstructionDocumentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -81,12 +81,19 @@ class DraftingController extends Controller
         return back()->with('success', 'Drafting job created successfully.');
     }
 
-    public function storeRevision(DraftingJob $draftingJob, Request $request, ConstructionActivityService $activityService): RedirectResponse
+    public function storeRevision(
+        DraftingJob $draftingJob,
+        Request $request,
+        ConstructionActivityService $activityService,
+        ConstructionDocumentService $documentService
+    ): RedirectResponse
     {
         $actor = $this->constructionActor();
 
         $validated = $request->validate([
             'notes' => ['nullable', 'string'],
+            'dwg_file' => ['nullable', 'file', 'max:51200'],
+            'pdf_file' => ['nullable', 'file', 'max:51200'],
             'dwg_file_name' => ['nullable', 'string', 'max:255'],
             'pdf_file_name' => ['nullable', 'string', 'max:255'],
             'status' => ['required', 'in:draft,submitted'],
@@ -97,36 +104,46 @@ class DraftingController extends Controller
         $project = $draftingJob->project;
         $actorMemberId = $actor instanceof Member ? $actor->getKey() : null;
 
-        if (!empty($validated['dwg_file_name'])) {
-            $dwgDocument = Document::create([
-                'company_id' => $project->company_id,
-                'project_id' => $project->id,
-                'documentable_type' => DraftingJob::class,
-                'documentable_id' => $draftingJob->id,
-                'folder' => 'drawings/dwg',
-                'file_name' => Str::slug(pathinfo($validated['dwg_file_name'], PATHINFO_FILENAME)) . '.dwg',
-                'original_name' => $validated['dwg_file_name'],
-                'mime_type' => 'application/acad',
-                'path' => 'construction/drawings/dwg/' . $validated['dwg_file_name'],
-                'uploaded_by_type' => $actor ? $actor::class : null,
-                'uploaded_by_id' => $actor?->getKey(),
-            ]);
+        if (!empty($validated['dwg_file'])) {
+            $dwgDocument = $documentService->storeDocument(
+                documentable: $draftingJob,
+                actor: $actor,
+                folder: 'construction/drawings/dwg',
+                file: $validated['dwg_file'],
+                companyId: $project->company_id,
+                projectId: $project->id
+            );
+        } elseif (!empty($validated['dwg_file_name'])) {
+            $dwgDocument = $documentService->createPlaceholderDocument(
+                documentable: $draftingJob,
+                actor: $actor,
+                folder: 'construction/drawings/dwg',
+                originalName: $validated['dwg_file_name'],
+                companyId: $project->company_id,
+                projectId: $project->id,
+                mimeType: 'application/acad'
+            );
         }
 
-        if (!empty($validated['pdf_file_name'])) {
-            $pdfDocument = Document::create([
-                'company_id' => $project->company_id,
-                'project_id' => $project->id,
-                'documentable_type' => DraftingJob::class,
-                'documentable_id' => $draftingJob->id,
-                'folder' => 'drawings/pdf',
-                'file_name' => Str::slug(pathinfo($validated['pdf_file_name'], PATHINFO_FILENAME)) . '.pdf',
-                'original_name' => $validated['pdf_file_name'],
-                'mime_type' => 'application/pdf',
-                'path' => 'construction/drawings/pdf/' . $validated['pdf_file_name'],
-                'uploaded_by_type' => $actor ? $actor::class : null,
-                'uploaded_by_id' => $actor?->getKey(),
-            ]);
+        if (!empty($validated['pdf_file'])) {
+            $pdfDocument = $documentService->storeDocument(
+                documentable: $draftingJob,
+                actor: $actor,
+                folder: 'construction/drawings/pdf',
+                file: $validated['pdf_file'],
+                companyId: $project->company_id,
+                projectId: $project->id
+            );
+        } elseif (!empty($validated['pdf_file_name'])) {
+            $pdfDocument = $documentService->createPlaceholderDocument(
+                documentable: $draftingJob,
+                actor: $actor,
+                folder: 'construction/drawings/pdf',
+                originalName: $validated['pdf_file_name'],
+                companyId: $project->company_id,
+                projectId: $project->id,
+                mimeType: 'application/pdf'
+            );
         }
 
         $revision = DrawingRevision::create([

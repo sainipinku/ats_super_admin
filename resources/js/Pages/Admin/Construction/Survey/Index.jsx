@@ -6,6 +6,7 @@ import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
 
 export default function SurveyIndex({ surveyPlans, surveySubmissions, projects, members }) {
+    const documentRouteBase = "admin.construction.documents";
     const planForm = useForm({
         project_id: projects[0]?.id || "",
         title: "",
@@ -109,7 +110,7 @@ export default function SurveyIndex({ surveyPlans, surveySubmissions, projects, 
                         {surveySubmissions.length ? (
                             <div className="space-y-4">
                                 {surveySubmissions.map((submission) => (
-                                    <SubmissionReviewCard key={submission.id} submission={submission} />
+                                    <SubmissionReviewCard key={submission.id} submission={submission} documentRouteBase={documentRouteBase} />
                                 ))}
                             </div>
                         ) : (
@@ -122,7 +123,7 @@ export default function SurveyIndex({ surveyPlans, surveySubmissions, projects, 
     );
 }
 
-function SubmissionReviewCard({ submission }) {
+function SubmissionReviewCard({ submission, documentRouteBase }) {
     const form = useForm({
         status: submission.status === "submitted" ? "approved" : submission.status,
         review_notes: submission.review_notes || "",
@@ -153,6 +154,35 @@ function SubmissionReviewCard({ submission }) {
                 <MetaPill label="Entries" value={String(visit?.entries?.length || 0)} />
                 <MetaPill label="Measurements" value={String(visit?.measurements?.length || 0)} />
             </div>
+            {visit?.entries?.length ? (
+                <div className="mt-4 space-y-2 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
+                    {visit.entries.map((entry) => (
+                        <div key={entry.id} className="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                            <span>{entry.entry_type} • {entry.title}</span>
+                            {entry.supporting_document ? (
+                                <>
+                                    <a
+                                        href={route(`${documentRouteBase}.view`, entry.supporting_document.id)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                                    >
+                                        View
+                                    </a>
+                                    <a
+                                        href={route(`${documentRouteBase}.download`, entry.supporting_document.id)}
+                                        className="rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-500"
+                                    >
+                                        Download
+                                    </a>
+                                </>
+                            ) : (
+                                <span className="text-xs text-slate-400">No attachment</span>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            ) : null}
             <div className="mt-4 grid gap-3 sm:grid-cols-[180px,1fr,160px]">
                 <select
                     value={form.data.status}

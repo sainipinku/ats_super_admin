@@ -16,6 +16,7 @@ class SurveyEntry extends Model
         'entry_type',
         'title',
         'description',
+        'supporting_document_id',
         'captured_by_member_id',
         'captured_at',
         'sort_order',
@@ -38,5 +39,10 @@ class SurveyEntry extends Model
     public function capturedBy(): BelongsTo
     {
         return $this->belongsTo(Member::class, 'captured_by_member_id');
+    }
+
+    public function supportingDocument(): BelongsTo
+    {
+        return $this->belongsTo(Document::class, 'supporting_document_id');
     }
 }

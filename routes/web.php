@@ -36,7 +36,7 @@ Route::prefix('super')->name('super.')->group(function () {
     // Protected routes (auth required)
     Route::middleware('auth.superadmin')->group(function () {
         // Profile routes
-        Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+        Route::redirect('/dashboard', '/super/construction/dashboard')->name('dashboard');
         Route::post('/logout', [AdminDashboardController::class, 'logout'])->name('logout');
         Route::get('/profile', [AdminDashboardController::class, 'userProfile'])->name('profile');
         Route::post('/profile-update', [AdminDashboardController::class, 'userProfileUpdate'])->name('profile.update');
@@ -96,20 +96,20 @@ Route::prefix('super')->name('super.')->group(function () {
         Route::get('/designations/by-departments', [MemberController::class, 'getByDepartments'])->name('designations.by_departments');
 
         Route::group(['prefix' => 'members', 'as' => 'members.'], function () {
-            Route::get('/list', [MemberController::class, 'index'])->name('list');
+            Route::redirect('/list', '/super/construction/projects')->name('list');
             Route::post('/store', [MemberController::class, 'store'])->name('store');
             Route::put('/update/{id}', [MemberController::class, 'store'])->name('update');
             Route::post('/{member}/assign-admin', [MemberController::class, 'assignAdmin'])->name('assign-admin');
             Route::delete('/{uuid}', [MemberController::class, 'destroy'])->name('destroy');
             Route::post('/update-status/{uuid}', [MemberController::class, 'updateStatus'])->name('status');
             Route::put('/{member}/password', [MemberController::class, 'updatePassword'])->name('password');
-            Route::get('/{uuid}/details', [MemberController::class, 'memberDetails'])->name('details');
+            Route::redirect('/{uuid}/details', '/super/construction/projects')->name('details');
         });
 
         // Job Requests Routes (Super Admin)
         Route::group(['prefix' => 'job-requests', 'as' => 'job.requests.'], function () {
-            Route::get('/', [JobRequestController::class, 'index'])->name('index');
-            Route::get('/all-jobs', [JobRequestController::class, 'allJobs'])->name('all.jobs');
+            Route::redirect('/', '/super/construction/dashboard')->name('index');
+            Route::redirect('/all-jobs', '/super/construction/dashboard')->name('all.jobs');
             Route::get('/api/all', [JobRequestController::class, 'getAllRequests'])->name('api.all');
             Route::get('/api/pending', [JobRequestController::class, 'getPendingRequests'])->name('api.pending');
             Route::get('/api/statistics', [JobRequestController::class, 'getStatistics'])->name('api.statistics');
@@ -126,7 +126,7 @@ Route::prefix('super')->name('super.')->group(function () {
 
         // Job Applications Routes (From Main Branch)
         Route::group(['prefix' => 'job-applications', 'as' => 'job.applications.'], function () {
-            Route::get('/', [JobRequestController::class, 'applicationsIndex'])->name('index');
+            Route::redirect('/', '/super/construction/dashboard')->name('index');
             Route::get('/api/list', [JobRequestController::class, 'listApplications'])->name('api.list');
             Route::patch('/api/{application}/status', [JobRequestController::class, 'updateApplicantStatus'])->name('api.status');
             Route::get('/api/{application}/resume-preview', [JobRequestController::class, 'previewApplicantResume'])->name('api.resume-preview');
@@ -148,11 +148,11 @@ Route::prefix('super')->name('super.')->group(function () {
 /** ADMIN ROUTES START HERE **/
 Route::prefix('admin')->middleware(['admin'])->group(function () {
     // Profile routes
-    Route::get('/dashboard', [App\Http\Controllers\Admin\AdminController::class, 'dashboard'])->name('admin.dashboard');
-    Route::get('/tasks/dashboard', [App\Http\Controllers\Admin\AdminController::class, 'dashboard'])->name('admin.task.dashboard');
-    Route::get('/tasks/tasklist', [App\Http\Controllers\Admin\AdminController::class, 'dashboard'])->name('admin.task.tasklist');
+    Route::redirect('/dashboard', '/admin/construction/dashboard')->name('admin.dashboard');
+    Route::redirect('/tasks/dashboard', '/admin/construction/dashboard')->name('admin.task.dashboard');
+    Route::redirect('/tasks/tasklist', '/admin/construction/dashboard')->name('admin.task.tasklist');
 
-    Route::get('/members/dashboard', [App\Http\Controllers\Admin\AdminMemberController::class, 'dashboard'])->name('admin.members.dashboard');
+    Route::redirect('/members/dashboard', '/admin/construction/projects')->name('admin.members.dashboard');
     Route::post('/members/store', [App\Http\Controllers\Admin\AdminMemberController::class, 'store'])->name('admin.members.store');
     Route::post('/members/{member}/update-status', [App\Http\Controllers\Admin\AdminMemberController::class, 'updateStatus'])->name('admin.members.update-status');
     Route::get('/members/{uuid}/details', [App\Http\Controllers\Admin\AdminMemberController::class, 'memberDetails'])->name('admin.members.details');
@@ -170,15 +170,15 @@ Route::prefix('admin')->middleware(['admin'])->group(function () {
     Route::delete('/resumes/{resume}', [ResumeController::class, 'destroy'])->name('admin.resumes.destroy');
 
     // Job Posts routes
-    Route::get('/job-posts', [JobController::class, 'index'])->name('admin.job.posts.index');
-    Route::get('/job-listing', [JobController::class, 'listing'])->name('admin.job.posts.listing');
+    Route::redirect('/job-posts', '/admin/construction/dashboard')->name('admin.job.posts.index');
+    Route::redirect('/job-listing', '/admin/construction/dashboard')->name('admin.job.posts.listing');
 
     // Job Applicants routes (Your Version)
-    Route::get('/job-applicants', [JobController::class, 'applicants'])->name('admin.job.applicants');
+    Route::redirect('/job-applicants', '/admin/construction/dashboard')->name('admin.job.applicants');
 
     // Job Applications routes (From Main Branch)
-    Route::get('/job-applications', [JobController::class, 'applicationsIndex'])->name('admin.job.applications.index');
-    Route::get('/calling-team', [CallingTeamController::class, 'index'])->name('admin.calling-team.index');
+    Route::redirect('/job-applications', '/admin/construction/dashboard')->name('admin.job.applications.index');
+    Route::redirect('/calling-team', '/admin/construction/dashboard')->name('admin.calling-team.index');
     Route::post('/calling-team', [CallingTeamController::class, 'store'])->name('admin.calling-team.store');
     Route::post('/calling-team/{member}/status', [CallingTeamController::class, 'updateStatus'])->name('admin.calling-team.status');
 
@@ -309,6 +309,92 @@ Route::prefix('super/construction')
         Route::post('/execution/attendance/{attendance}/review', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'reviewAttendance'])
             ->middleware('construction.permission:attendance.review')
             ->name('execution.attendance.review');
+
+        Route::get('/materials', [App\Http\Controllers\SuperAdmin\Construction\MaterialsController::class, 'index'])
+            ->middleware('construction.permission:material.manage,purchase_request.manage,purchase_order.manage,material_receipt.manage,material_issue.manage,material_stock.manage')
+            ->name('materials.index');
+        Route::post('/materials/vendors', [App\Http\Controllers\SuperAdmin\Construction\MaterialsController::class, 'storeVendor'])
+            ->middleware('construction.permission:vendor.manage')
+            ->name('materials.vendors.store');
+        Route::post('/materials/materials', [App\Http\Controllers\SuperAdmin\Construction\MaterialsController::class, 'storeMaterial'])
+            ->middleware('construction.permission:material.manage')
+            ->name('materials.materials.store');
+        Route::post('/materials/purchase-requests', [App\Http\Controllers\SuperAdmin\Construction\MaterialsController::class, 'storePurchaseRequest'])
+            ->middleware('construction.permission:purchase_request.manage')
+            ->name('materials.purchase_requests.store');
+        Route::post('/materials/purchase-requests/{purchaseRequest}/review', [App\Http\Controllers\SuperAdmin\Construction\MaterialsController::class, 'reviewPurchaseRequest'])
+            ->middleware('construction.permission:purchase_request.manage')
+            ->name('materials.purchase_requests.review');
+        Route::post('/materials/purchase-orders', [App\Http\Controllers\SuperAdmin\Construction\MaterialsController::class, 'storePurchaseOrder'])
+            ->middleware('construction.permission:purchase_order.manage')
+            ->name('materials.purchase_orders.store');
+        Route::post('/materials/receipts', [App\Http\Controllers\SuperAdmin\Construction\MaterialsController::class, 'storeReceipt'])
+            ->middleware('construction.permission:material_receipt.manage')
+            ->name('materials.receipts.store');
+        Route::post('/materials/issues', [App\Http\Controllers\SuperAdmin\Construction\MaterialsController::class, 'storeIssue'])
+            ->middleware('construction.permission:material_issue.manage')
+            ->name('materials.issues.store');
+
+        Route::get('/vehicles', [App\Http\Controllers\SuperAdmin\Construction\VehiclesController::class, 'index'])
+            ->middleware('construction.permission:vehicle.manage,vehicle_assignment.manage,vehicle_tracking.manage')
+            ->name('vehicles.index');
+        Route::post('/vehicles', [App\Http\Controllers\SuperAdmin\Construction\VehiclesController::class, 'storeVehicle'])
+            ->middleware('construction.permission:vehicle.manage')
+            ->name('vehicles.store');
+        Route::post('/vehicles/assignments', [App\Http\Controllers\SuperAdmin\Construction\VehiclesController::class, 'storeAssignment'])
+            ->middleware('construction.permission:vehicle_assignment.manage')
+            ->name('vehicles.assignments.store');
+        Route::post('/vehicles/pings', [App\Http\Controllers\SuperAdmin\Construction\VehiclesController::class, 'storePing'])
+            ->middleware('construction.permission:vehicle_tracking.manage')
+            ->name('vehicles.pings.store');
+
+        Route::get('/equipment', [App\Http\Controllers\SuperAdmin\Construction\EquipmentController::class, 'index'])
+            ->middleware('construction.permission:equipment.manage,equipment_allocation.manage,equipment_usage.manage')
+            ->name('equipment.index');
+        Route::post('/equipment', [App\Http\Controllers\SuperAdmin\Construction\EquipmentController::class, 'storeEquipment'])
+            ->middleware('construction.permission:equipment.manage')
+            ->name('equipment.store');
+        Route::post('/equipment/allocations', [App\Http\Controllers\SuperAdmin\Construction\EquipmentController::class, 'storeAllocation'])
+            ->middleware('construction.permission:equipment_allocation.manage')
+            ->name('equipment.allocations.store');
+        Route::post('/equipment/allocations/return', [App\Http\Controllers\SuperAdmin\Construction\EquipmentController::class, 'returnAllocation'])
+            ->middleware('construction.permission:equipment_allocation.manage')
+            ->name('equipment.allocations.return');
+        Route::post('/equipment/usage', [App\Http\Controllers\SuperAdmin\Construction\EquipmentController::class, 'storeUsage'])
+            ->middleware('construction.permission:equipment_usage.manage')
+            ->name('equipment.usage.store');
+
+        Route::get('/billing', [App\Http\Controllers\SuperAdmin\Construction\BillingController::class, 'index'])
+            ->middleware('construction.permission:billing_invoice.manage,billing_payment.manage')
+            ->name('billing.index');
+        Route::post('/billing/invoices', [App\Http\Controllers\SuperAdmin\Construction\BillingController::class, 'storeInvoice'])
+            ->middleware('construction.permission:billing_invoice.manage')
+            ->name('billing.invoices.store');
+        Route::post('/billing/payments', [App\Http\Controllers\SuperAdmin\Construction\BillingController::class, 'storePayment'])
+            ->middleware('construction.permission:billing_payment.manage')
+            ->name('billing.payments.store');
+
+        Route::get('/handover', [App\Http\Controllers\SuperAdmin\Construction\HandoverController::class, 'index'])
+            ->middleware('construction.permission:handover.manage,project_closure.manage')
+            ->name('handover.index');
+        Route::post('/handover', [App\Http\Controllers\SuperAdmin\Construction\HandoverController::class, 'store'])
+            ->middleware('construction.permission:handover.manage')
+            ->name('handover.store');
+        Route::post('/handover/items/{item}', [App\Http\Controllers\SuperAdmin\Construction\HandoverController::class, 'updateItem'])
+            ->middleware('construction.permission:handover.manage')
+            ->name('handover.items.update');
+        Route::post('/handover/{handover}/complete', [App\Http\Controllers\SuperAdmin\Construction\HandoverController::class, 'complete'])
+            ->middleware('construction.permission:handover.manage')
+            ->name('handover.complete');
+        Route::post('/handover/{handover}/close', [App\Http\Controllers\SuperAdmin\Construction\HandoverController::class, 'close'])
+            ->middleware('construction.permission:project_closure.manage')
+            ->name('handover.close');
+        Route::get('/documents/{document}/view', [App\Http\Controllers\Construction\DocumentController::class, 'view'])
+            ->middleware('construction.permission:document.manage')
+            ->name('documents.view');
+        Route::get('/documents/{document}/download', [App\Http\Controllers\Construction\DocumentController::class, 'download'])
+            ->middleware('construction.permission:document.manage')
+            ->name('documents.download');
     });
 
 Route::prefix('admin/construction')
@@ -372,6 +458,83 @@ Route::prefix('admin/construction')
         Route::post('/execution/attendance/{attendance}/review', [App\Http\Controllers\Admin\Construction\ExecutionController::class, 'reviewAttendance'])
             ->middleware('construction.permission:attendance.review')
             ->name('execution.attendance.review');
+
+        Route::get('/materials', [App\Http\Controllers\Admin\Construction\MaterialsController::class, 'index'])
+            ->middleware('construction.permission:material.manage,purchase_request.manage,purchase_order.manage,material_receipt.manage,material_issue.manage,material_stock.manage')
+            ->name('materials.index');
+        Route::post('/materials/purchase-requests', [App\Http\Controllers\Admin\Construction\MaterialsController::class, 'storePurchaseRequest'])
+            ->middleware('construction.permission:purchase_request.manage')
+            ->name('materials.purchase_requests.store');
+        Route::post('/materials/purchase-orders', [App\Http\Controllers\Admin\Construction\MaterialsController::class, 'storePurchaseOrder'])
+            ->middleware('construction.permission:purchase_order.manage')
+            ->name('materials.purchase_orders.store');
+        Route::post('/materials/receipts', [App\Http\Controllers\Admin\Construction\MaterialsController::class, 'storeReceipt'])
+            ->middleware('construction.permission:material_receipt.manage')
+            ->name('materials.receipts.store');
+        Route::post('/materials/issues', [App\Http\Controllers\Admin\Construction\MaterialsController::class, 'storeIssue'])
+            ->middleware('construction.permission:material_issue.manage')
+            ->name('materials.issues.store');
+
+        Route::get('/vehicles', [App\Http\Controllers\Admin\Construction\VehiclesController::class, 'index'])
+            ->middleware('construction.permission:vehicle.manage,vehicle_assignment.manage,vehicle_tracking.manage')
+            ->name('vehicles.index');
+        Route::post('/vehicles', [App\Http\Controllers\Admin\Construction\VehiclesController::class, 'storeVehicle'])
+            ->middleware('construction.permission:vehicle.manage')
+            ->name('vehicles.store');
+        Route::post('/vehicles/assignments', [App\Http\Controllers\Admin\Construction\VehiclesController::class, 'storeAssignment'])
+            ->middleware('construction.permission:vehicle_assignment.manage')
+            ->name('vehicles.assignments.store');
+        Route::post('/vehicles/pings', [App\Http\Controllers\Admin\Construction\VehiclesController::class, 'storePing'])
+            ->middleware('construction.permission:vehicle_tracking.manage')
+            ->name('vehicles.pings.store');
+
+        Route::get('/equipment', [App\Http\Controllers\Admin\Construction\EquipmentController::class, 'index'])
+            ->middleware('construction.permission:equipment.manage,equipment_allocation.manage,equipment_usage.manage')
+            ->name('equipment.index');
+        Route::post('/equipment', [App\Http\Controllers\Admin\Construction\EquipmentController::class, 'storeEquipment'])
+            ->middleware('construction.permission:equipment.manage')
+            ->name('equipment.store');
+        Route::post('/equipment/allocations', [App\Http\Controllers\Admin\Construction\EquipmentController::class, 'storeAllocation'])
+            ->middleware('construction.permission:equipment_allocation.manage')
+            ->name('equipment.allocations.store');
+        Route::post('/equipment/allocations/return', [App\Http\Controllers\Admin\Construction\EquipmentController::class, 'returnAllocation'])
+            ->middleware('construction.permission:equipment_allocation.manage')
+            ->name('equipment.allocations.return');
+        Route::post('/equipment/usage', [App\Http\Controllers\Admin\Construction\EquipmentController::class, 'storeUsage'])
+            ->middleware('construction.permission:equipment_usage.manage')
+            ->name('equipment.usage.store');
+
+        Route::get('/billing', [App\Http\Controllers\Admin\Construction\BillingController::class, 'index'])
+            ->middleware('construction.permission:billing_invoice.manage,billing_payment.manage')
+            ->name('billing.index');
+        Route::post('/billing/invoices', [App\Http\Controllers\Admin\Construction\BillingController::class, 'storeInvoice'])
+            ->middleware('construction.permission:billing_invoice.manage')
+            ->name('billing.invoices.store');
+        Route::post('/billing/payments', [App\Http\Controllers\Admin\Construction\BillingController::class, 'storePayment'])
+            ->middleware('construction.permission:billing_payment.manage')
+            ->name('billing.payments.store');
+
+        Route::get('/handover', [App\Http\Controllers\Admin\Construction\HandoverController::class, 'index'])
+            ->middleware('construction.permission:handover.manage,project_closure.manage')
+            ->name('handover.index');
+        Route::post('/handover', [App\Http\Controllers\Admin\Construction\HandoverController::class, 'store'])
+            ->middleware('construction.permission:handover.manage')
+            ->name('handover.store');
+        Route::post('/handover/items/{item}', [App\Http\Controllers\Admin\Construction\HandoverController::class, 'updateItem'])
+            ->middleware('construction.permission:handover.manage')
+            ->name('handover.items.update');
+        Route::post('/handover/{handover}/complete', [App\Http\Controllers\Admin\Construction\HandoverController::class, 'complete'])
+            ->middleware('construction.permission:handover.manage')
+            ->name('handover.complete');
+        Route::post('/handover/{handover}/close', [App\Http\Controllers\Admin\Construction\HandoverController::class, 'close'])
+            ->middleware('construction.permission:project_closure.manage')
+            ->name('handover.close');
+        Route::get('/documents/{document}/view', [App\Http\Controllers\Construction\DocumentController::class, 'view'])
+            ->middleware('construction.permission:document.manage')
+            ->name('documents.view');
+        Route::get('/documents/{document}/download', [App\Http\Controllers\Construction\DocumentController::class, 'download'])
+            ->middleware('construction.permission:document.manage')
+            ->name('documents.download');
     });
 /** CONSTRUCTION ERP ROUTES END HERE **/
 
@@ -410,9 +573,9 @@ Route::prefix('calling-team')->group(function () {
 /** MEMBER ROUTES START HERE **/
 Route::prefix('member')->middleware(['member'])->group(function () {
     // Profile routes
-    Route::get('/dashboard', [App\Http\Controllers\Admin\AdminController::class, 'dashboard'])->name('member.dashboard');
-    Route::get('/tasks/dashboard', [App\Http\Controllers\Member\MemberTaskController::class, 'dashboard'])->name('member.task.dashboard');
-    Route::get('/tasks/tasklist', [App\Http\Controllers\Member\MemberTaskController::class, 'taskList'])->name('member.task.tasklist');
+    Route::redirect('/dashboard', '/member/construction/dashboard')->name('member.dashboard');
+    Route::redirect('/tasks/dashboard', '/member/construction/execution')->name('member.task.dashboard');
+    Route::redirect('/tasks/tasklist', '/member/construction/execution')->name('member.task.tasklist');
 
     Route::post('/checkin', [App\Http\Controllers\Member\CheckInOutController::class, 'checkIn'])->name('member.checkin');
     Route::post('/checkout', [App\Http\Controllers\Member\CheckInOutController::class, 'checkOut'])->name('member.checkout');
@@ -423,12 +586,78 @@ Route::prefix('member')->middleware(['member'])->group(function () {
     Route::post('/profile/password/update', [App\Http\Controllers\Member\MemberTaskController::class, 'userProfilePasswordUpdate'])->name('member.profile.password.update');
     Route::post('/profile/photo/remove', [App\Http\Controllers\Member\MemberTaskController::class, 'userProfilePhotoRemove'])->name('member.profile.photo.remove');
 
+    Route::prefix('construction')
+        ->name('member.construction.')
+        ->group(function () {
+            Route::get('/dashboard', [App\Http\Controllers\Member\ConstructionController::class, 'dashboard'])
+                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage')
+                ->name('dashboard');
+            Route::get('/projects', [App\Http\Controllers\Member\ConstructionController::class, 'projects'])
+                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage')
+                ->name('projects.index');
+            Route::get('/projects/{project}', [App\Http\Controllers\Member\ConstructionController::class, 'showProject'])
+                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage')
+                ->name('projects.show');
+            Route::get('/execution', [App\Http\Controllers\Member\ConstructionController::class, 'execution'])
+                ->middleware('construction.permission:execution_task.manage,dpr.manage,attendance.manage')
+                ->name('execution.index');
+            Route::post('/attendance/check-in', [App\Http\Controllers\Member\ConstructionController::class, 'attendanceCheckIn'])
+                ->middleware('construction.permission:attendance.manage')
+                ->name('attendance.checkin');
+            Route::post('/attendance/{attendance}/check-out', [App\Http\Controllers\Member\ConstructionController::class, 'attendanceCheckOut'])
+                ->middleware('construction.permission:attendance.manage')
+                ->name('attendance.checkout');
+            Route::post('/tasks/{task}/progress', [App\Http\Controllers\Member\ConstructionController::class, 'updateTaskProgress'])
+                ->middleware('construction.permission:execution_task.manage')
+                ->name('tasks.progress.update');
+            Route::post('/reports', [App\Http\Controllers\Member\ConstructionController::class, 'submitDailyProgress'])
+                ->middleware('construction.permission:dpr.manage')
+                ->name('reports.store');
+
+            Route::get('/materials', [App\Http\Controllers\Member\ConstructionController::class, 'materials'])
+                ->middleware('construction.permission:material_issue.manage,material_stock.manage')
+                ->name('materials.index');
+            Route::post('/materials/issues', [App\Http\Controllers\Member\ConstructionController::class, 'submitMaterialIssue'])
+                ->middleware('construction.permission:material_issue.manage')
+                ->name('materials.issues.store');
+
+            Route::get('/vehicles', [App\Http\Controllers\Member\Construction\VehiclesController::class, 'index'])
+                ->middleware('construction.permission:vehicle_tracking.manage')
+                ->name('vehicles.index');
+            Route::post('/vehicles/pings', [App\Http\Controllers\Member\Construction\VehiclesController::class, 'storePing'])
+                ->middleware('construction.permission:vehicle_tracking.manage')
+                ->name('vehicles.pings.store');
+
+            Route::get('/equipment', [App\Http\Controllers\Member\Construction\EquipmentController::class, 'index'])
+                ->middleware('construction.permission:equipment_allocation.manage,equipment_usage.manage')
+                ->name('equipment.index');
+            Route::post('/equipment/allocations/return', [App\Http\Controllers\Member\Construction\EquipmentController::class, 'returnAllocation'])
+                ->middleware('construction.permission:equipment_allocation.manage')
+                ->name('equipment.allocations.return');
+            Route::post('/equipment/usage', [App\Http\Controllers\Member\Construction\EquipmentController::class, 'storeUsage'])
+                ->middleware('construction.permission:equipment_usage.manage')
+                ->name('equipment.usage.store');
+
+            Route::get('/handover', [App\Http\Controllers\Member\Construction\HandoverController::class, 'index'])
+                ->middleware('construction.permission:handover.manage')
+                ->name('handover.index');
+            Route::post('/handover/items/{item}', [App\Http\Controllers\Member\Construction\HandoverController::class, 'updateItem'])
+                ->middleware('construction.permission:handover.manage')
+                ->name('handover.items.update');
+            Route::get('/documents/{document}/view', [App\Http\Controllers\Construction\DocumentController::class, 'view'])
+                ->middleware('construction.permission:document.manage')
+                ->name('documents.view');
+            Route::get('/documents/{document}/download', [App\Http\Controllers\Construction\DocumentController::class, 'download'])
+                ->middleware('construction.permission:document.manage')
+                ->name('documents.download');
+        });
+
     // Candidate Job Portal Routes
-    Route::get('/jobs', [App\Http\Controllers\Member\CandidateJobController::class, 'index'])->name('member.jobs.index');
-    Route::get('/jobs/{job}', [App\Http\Controllers\Member\CandidateJobController::class, 'show'])->name('member.jobs.show');
+    Route::redirect('/jobs', '/member/construction/dashboard')->name('member.jobs.index');
+    Route::redirect('/jobs/{job}', '/member/construction/dashboard')->name('member.jobs.show');
     Route::post('/jobs/{job}/apply', [App\Http\Controllers\Member\CandidateJobController::class, 'apply'])->name('member.jobs.apply');
     Route::get('/api/profile-completion', [App\Http\Controllers\Member\CandidateJobController::class, 'profileCompletion'])->name('member.api.profile-completion');
-    Route::get('/my-applications', [App\Http\Controllers\Member\CandidateJobController::class, 'myApplications'])->name('member.applications.index');
+    Route::redirect('/my-applications', '/member/construction/dashboard')->name('member.applications.index');
     Route::delete('/applications/{application}/withdraw', [App\Http\Controllers\Member\CandidateJobController::class, 'withdraw'])->name('member.applications.withdraw');
 
     Route::get('/api/notifications/unread-count', [App\Http\Controllers\Admin\AdminController::class, 'notificationsUnreadCount'])->name('member.api.notifications.unread_count');

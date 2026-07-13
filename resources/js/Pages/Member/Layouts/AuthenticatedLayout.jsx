@@ -170,32 +170,51 @@ export default function AuthenticatedLayout({ header, children }) {
                             <div className="hidden xl:flex items-center space-x-8 ms-10">
                                 <NavLink
                                     href={route("member.dashboard")}
-                                    active={route().current("member.dashboard")}
+                                    active={route().current("member.dashboard") || route().current("member.construction.dashboard")}
                                 >
-                                    Dashboard
+                                    Project Dashboard
                                 </NavLink>
                                 <NavLink
-                                    href={route('member.jobs.index')}
-                                    active={route().current('member.jobs.index')}
+                                    href={route("member.construction.projects.index")}
+                                    active={route().current("member.construction.projects.*")}
                                 >
-                                    Browse Jobs
+                                    Assigned Projects
                                 </NavLink>
                                 <NavLink
-                                    href={route("member.applications.index")}
-                                    active={route().current("member.applications.index")}
+                                    href={route("member.construction.execution.index")}
+                                    active={route().current("member.construction.execution.*")}
                                 >
-                                    My Applications
+                                    Site Execution
                                 </NavLink>
                                 <NavLink
-                                    href={route("member.task.dashboard")}
-                                    active={
-                                        route().current(
-                                            "member.task.dashboard"
-                                        ) ||
-                                        route().current("member.task.tasklist")
-                                    }
+                                    href={route("member.construction.materials.index")}
+                                    active={route().current("member.construction.materials.*")}
                                 >
-                                    Tasks
+                                    Material Management
+                                </NavLink>
+                                <NavLink
+                                    href={route("member.construction.vehicles.index")}
+                                    active={route().current("member.construction.vehicles.*")}
+                                >
+                                    Vehicle Tracking
+                                </NavLink>
+                                <NavLink
+                                    href={route("member.construction.equipment.index")}
+                                    active={route().current("member.construction.equipment.*")}
+                                >
+                                    Equipment Allocation
+                                </NavLink>
+                                <NavLink
+                                    href={route("member.construction.handover.index")}
+                                    active={route().current("member.construction.handover.*")}
+                                >
+                                    Handover & Closure
+                                </NavLink>
+                                <NavLink
+                                    href={route("member.profile")}
+                                    active={route().current("member.profile")}
+                                >
+                                    My Profile
                                 </NavLink>
                             </div>
                         </div>
@@ -297,9 +316,45 @@ export default function AuthenticatedLayout({ header, children }) {
                     <div className="space-y-1 pb-3 pt-2">
                         <ResponsiveNavLink
                             href={route("member.dashboard")}
-                            active={route().current("member.dashboard")}
+                            active={route().current("member.dashboard") || route().current("member.construction.dashboard")}
                         >
-                            Dashboard
+                            Project Dashboard
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route("member.construction.projects.index")}
+                            active={route().current("member.construction.projects.*")}
+                        >
+                            Assigned Projects
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route("member.construction.execution.index")}
+                            active={route().current("member.construction.execution.*")}
+                        >
+                            Site Execution
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route("member.construction.materials.index")}
+                            active={route().current("member.construction.materials.*")}
+                        >
+                            Material Management
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route("member.construction.vehicles.index")}
+                            active={route().current("member.construction.vehicles.*")}
+                        >
+                            Vehicle Tracking
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route("member.construction.equipment.index")}
+                            active={route().current("member.construction.equipment.*")}
+                        >
+                            Equipment Allocation
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route("member.construction.handover.index")}
+                            active={route().current("member.construction.handover.*")}
+                        >
+                            Handover & Closure
                         </ResponsiveNavLink>
                     </div>
                     <div className="border-t border-gray-200 pb-1 pt-4 dark:border-gray-600">

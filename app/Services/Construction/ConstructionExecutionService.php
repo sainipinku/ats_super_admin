@@ -11,6 +11,7 @@ use App\Models\Construction\ExecutionTaskAssignee;
 use App\Models\Construction\Project;
 use App\Models\Construction\ProjectTeamMember;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -18,7 +19,8 @@ use Illuminate\Validation\ValidationException;
 class ConstructionExecutionService
 {
     public function __construct(
-        private readonly ConstructionActivityService $activityService
+        private readonly ConstructionActivityService $activityService,
+        private readonly ConstructionDocumentService $documentService
     ) {
     }
 
@@ -173,6 +175,20 @@ class ConstructionExecutionService
                 }
             }
 
+            $supportingDocumentId = null;
+            if (!empty($validated['supporting_document']) && $validated['supporting_document'] instanceof UploadedFile) {
+                $document = $this->documentService->storeDocument(
+                    documentable: $project,
+                    actor: $actor,
+                    folder: 'construction/execution/dprs',
+                    file: $validated['supporting_document'],
+                    companyId: $project->company_id,
+                    projectId: $project->id
+                );
+
+                $supportingDocumentId = $document->id;
+            }
+
             $report = DailyProgressReport::create([
                 'project_id' => $project->id,
                 'execution_task_id' => $validated['execution_task_id'] ?? null,
@@ -187,6 +203,7 @@ class ConstructionExecutionService
                 'longitude' => $validated['longitude'] ?? null,
                 'gps_accuracy_meters' => $validated['gps_accuracy_meters'] ?? null,
                 'weather_summary' => $validated['weather_summary'] ?? null,
+                'supporting_document_id' => $supportingDocumentId,
                 'status' => 'submitted',
             ]);
 
@@ -232,7 +249,7 @@ class ConstructionExecutionService
                 request: $request
             );
 
-            return $report->load('items');
+            return $report->load(['items', 'supportingDocument']);
         });
     }
 

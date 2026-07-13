@@ -31,6 +31,7 @@ class SurveyController extends Controller
                 'reviewedBy',
                 'surveyVisit.checkedInBy',
                 'surveyVisit.entries.capturedBy',
+                'surveyVisit.entries.supportingDocument',
                 'surveyVisit.measurements.capturedBy',
             ])
                 ->latest()

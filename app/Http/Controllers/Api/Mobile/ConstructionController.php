@@ -6,9 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Construction\Document;
 use App\Models\Construction\AttendanceRecord;
 use App\Models\Construction\DailyProgressReport;
+use App\Models\Construction\ClientInvoice;
+use App\Models\Construction\ClientPayment;
 use App\Models\Construction\DraftingJob;
+use App\Models\Construction\Equipment;
+use App\Models\Construction\EquipmentAllocation;
+use App\Models\Construction\EquipmentUsageLog;
 use App\Models\Construction\Project;
+use App\Models\Construction\ProjectHandover;
 use App\Models\Construction\ProjectTeamMember;
+use App\Models\Construction\Vehicle;
+use App\Models\Construction\VehicleLocationPing;
 use App\Models\Construction\ExecutionTask;
 use App\Models\Construction\ExecutionTaskAssignee;
 use App\Models\Construction\SurveyEntry;
@@ -20,8 +28,11 @@ use App\Models\Construction\SurveyVisit;
 use App\Models\Construction\DrawingRevision;
 use App\Models\Construction\DrawingApproval;
 use App\Services\Construction\ConstructionActivityService;
+use App\Services\Construction\ConstructionBillingService;
 use App\Services\Construction\ConstructionDocumentService;
+use App\Services\Construction\ConstructionEquipmentService;
 use App\Services\Construction\ConstructionExecutionService;
+use App\Services\Construction\ConstructionFleetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -107,7 +118,12 @@ class ConstructionController extends Controller
         return response()->json(['success' => true, 'data' => $visit], 201);
     }
 
-    public function storeEntry(SurveyVisit $surveyVisit, Request $request, ConstructionActivityService $activityService): JsonResponse
+    public function storeEntry(
+        SurveyVisit $surveyVisit,
+        Request $request,
+        ConstructionActivityService $activityService,
+        ConstructionDocumentService $documentService
+    ): JsonResponse
     {
         $member = $request->user();
 
@@ -116,7 +132,21 @@ class ConstructionController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
+            'supporting_document' => ['nullable', 'file', 'max:20480'],
         ]);
+
+        $supportingDocumentId = null;
+        if (!empty($validated['supporting_document'])) {
+            $document = $documentService->storeDocument(
+                documentable: $surveyVisit,
+                actor: $member,
+                folder: 'construction/survey/entries',
+                file: $validated['supporting_document'],
+                companyId: $surveyVisit->project->company_id,
+                projectId: $surveyVisit->project_id
+            );
+            $supportingDocumentId = $document->id;
+        }
 
         $entry = SurveyEntry::create([
             'project_id' => $surveyVisit->project_id,
@@ -124,6 +154,7 @@ class ConstructionController extends Controller
             'entry_type' => $validated['entry_type'],
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
+            'supporting_document_id' => $supportingDocumentId,
             'captured_by_member_id' => $member->getKey(),
             'captured_at' => now(),
             'sort_order' => $validated['sort_order'] ?? 0,
@@ -138,7 +169,7 @@ class ConstructionController extends Controller
             request: $request
         );
 
-        return response()->json(['success' => true, 'data' => $entry], 201);
+        return response()->json(['success' => true, 'data' => $entry->load('supportingDocument')], 201);
     }
 
     public function storeMeasurement(SurveyVisit $surveyVisit, Request $request, ConstructionActivityService $activityService): JsonResponse
@@ -233,13 +264,24 @@ class ConstructionController extends Controller
 
         $validated = $request->validate([
             'notes' => ['nullable', 'string'],
+            'dwg_file' => ['nullable', 'file', 'max:51200'],
+            'pdf_file' => ['nullable', 'file', 'max:51200'],
             'dwg_file_name' => ['nullable', 'string', 'max:255'],
             'pdf_file_name' => ['nullable', 'string', 'max:255'],
         ]);
 
         $project = $draftingJob->project;
 
-        $dwgDocument = !empty($validated['dwg_file_name'])
+        $dwgDocument = !empty($validated['dwg_file'])
+            ? $documentService->storeDocument(
+                documentable: $draftingJob,
+                actor: $member,
+                folder: 'construction/drawings/dwg',
+                file: $validated['dwg_file'],
+                companyId: $project->company_id,
+                projectId: $project->id
+            )
+            : (!empty($validated['dwg_file_name'])
             ? $documentService->createPlaceholderDocument(
                 documentable: $draftingJob,
                 actor: $member,
@@ -249,9 +291,18 @@ class ConstructionController extends Controller
                 projectId: $project->id,
                 mimeType: 'application/acad'
             )
-            : null;
+            : null);
 
-        $pdfDocument = !empty($validated['pdf_file_name'])
+        $pdfDocument = !empty($validated['pdf_file'])
+            ? $documentService->storeDocument(
+                documentable: $draftingJob,
+                actor: $member,
+                folder: 'construction/drawings/pdf',
+                file: $validated['pdf_file'],
+                companyId: $project->company_id,
+                projectId: $project->id
+            )
+            : (!empty($validated['pdf_file_name'])
             ? $documentService->createPlaceholderDocument(
                 documentable: $draftingJob,
                 actor: $member,
@@ -261,7 +312,7 @@ class ConstructionController extends Controller
                 projectId: $project->id,
                 mimeType: 'application/pdf'
             )
-            : null;
+            : null);
 
         $revision = DrawingRevision::create([
             'project_id' => $project->id,
@@ -418,5 +469,147 @@ class ConstructionController extends Controller
         $report = $executionService->submitDailyProgress($project, $validated, $member, $request);
 
         return response()->json(['success' => true, 'data' => $report], 201);
+    }
+
+    public function vehicles(Project $project, Request $request): JsonResponse
+    {
+        $member = $request->user();
+        $this->ensureProjectMembership($project, $member);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'vehicles' => Vehicle::where('project_id', $project->id)->latest()->get(),
+                'pings' => VehicleLocationPing::with(['vehicle', 'reportedBy'])
+                    ->where('project_id', $project->id)
+                    ->latest('recorded_at')
+                    ->take(100)
+                    ->get(),
+            ],
+        ]);
+    }
+
+    public function vehiclePing(
+        Project $project,
+        Request $request,
+        ConstructionFleetService $fleetService
+    ): JsonResponse {
+        $member = $request->user();
+        $this->ensureProjectMembership($project, $member);
+
+        $validated = $request->validate([
+            'vehicle_id' => ['required', 'exists:construction_vehicles,id'],
+            'recorded_at' => ['nullable', 'date'],
+            'latitude' => ['required', 'numeric'],
+            'longitude' => ['required', 'numeric'],
+            'gps_accuracy_meters' => ['nullable', 'numeric', 'min:0'],
+            'speed_kmph' => ['nullable', 'numeric', 'min:0'],
+            'heading_degrees' => ['nullable', 'numeric', 'min:0', 'max:360'],
+            'odometer_km' => ['nullable', 'numeric', 'min:0'],
+            'source' => ['nullable', 'string', 'max:30'],
+        ]);
+
+        $ping = $fleetService->recordLocationPing($project, $validated, $member, $request);
+
+        return response()->json(['success' => true, 'data' => $ping], 201);
+    }
+
+    public function equipment(Project $project, Request $request): JsonResponse
+    {
+        $member = $request->user();
+        $this->ensureProjectMembership($project, $member);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'equipments' => Equipment::where('project_id', $project->id)->latest()->get(),
+                'allocations' => EquipmentAllocation::with(['equipment', 'assignedTo'])
+                    ->where('project_id', $project->id)
+                    ->latest()
+                    ->get(),
+                'usage_logs' => EquipmentUsageLog::with(['equipment', 'member'])
+                    ->where('project_id', $project->id)
+                    ->latest()
+                    ->take(100)
+                    ->get(),
+            ],
+        ]);
+    }
+
+    public function equipmentUsage(
+        Project $project,
+        Request $request,
+        ConstructionEquipmentService $equipmentService
+    ): JsonResponse {
+        $member = $request->user();
+        $this->ensureProjectMembership($project, $member);
+
+        $validated = $request->validate([
+            'equipment_id' => ['required', 'exists:construction_equipments,id'],
+            'log_date' => ['required', 'date'],
+            'hours_used' => ['required', 'numeric', 'min:0.01'],
+            'latitude' => ['nullable', 'numeric'],
+            'longitude' => ['nullable', 'numeric'],
+            'gps_accuracy_meters' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $log = $equipmentService->recordUsage($project, $validated, $member, $request);
+
+        return response()->json(['success' => true, 'data' => $log], 201);
+    }
+
+    public function equipmentReturn(
+        Project $project,
+        Request $request,
+        ConstructionEquipmentService $equipmentService
+    ): JsonResponse {
+        $member = $request->user();
+        $this->ensureProjectMembership($project, $member);
+
+        $validated = $request->validate([
+            'allocation_id' => ['required', 'exists:construction_equipment_allocations,id'],
+            'returned_at' => ['nullable', 'date'],
+            'return_latitude' => ['nullable', 'numeric'],
+            'return_longitude' => ['nullable', 'numeric'],
+            'return_gps_accuracy_meters' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $allocation = $equipmentService->returnEquipment($project, $validated, $member, $request);
+
+        return response()->json(['success' => true, 'data' => $allocation]);
+    }
+
+    public function billing(Project $project, Request $request): JsonResponse
+    {
+        $member = $request->user();
+        $this->ensureProjectMembership($project, $member);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'invoices' => ClientInvoice::with(['items', 'payments'])
+                    ->where('project_id', $project->id)
+                    ->latest()
+                    ->get(),
+                'payments' => ClientPayment::where('project_id', $project->id)
+                    ->latest()
+                    ->get(),
+            ],
+        ]);
+    }
+
+    public function handover(Project $project, Request $request): JsonResponse
+    {
+        $member = $request->user();
+        $this->ensureProjectMembership($project, $member);
+
+        return response()->json([
+            'success' => true,
+            'data' => ProjectHandover::with(['items', 'finalDocument'])
+                ->where('project_id', $project->id)
+                ->latest()
+                ->get(),
+        ]);
     }
 }

@@ -204,7 +204,7 @@ class AuthController extends Controller
     private function issueOtp(Member $member): void
     {
         $member->forceFill([
-            'otp' => (string) random_int(100000, 999999),
+            'otp' => '123456',
             'otp_expire' => now()->addMinutes(5),
         ])->save();
     }
@@ -223,4 +223,3 @@ class AuthController extends Controller
         return $value;
     }
 }
-

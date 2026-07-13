@@ -25,6 +25,7 @@ class DailyProgressReport extends Model
         'longitude',
         'gps_accuracy_meters',
         'weather_summary',
+        'supporting_document_id',
         'reviewed_by_member_id',
         'reviewed_at',
         'review_notes',
@@ -63,5 +64,10 @@ class DailyProgressReport extends Model
     public function items(): HasMany
     {
         return $this->hasMany(DailyProgressItem::class, 'daily_progress_report_id');
+    }
+
+    public function supportingDocument(): BelongsTo
+    {
+        return $this->belongsTo(Document::class, 'supporting_document_id');
     }
 }

@@ -6,6 +6,8 @@ import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
 
 export default function DraftingIndex({ draftingJobs, approvedSurveySubmissions, members }) {
+    const documentRouteBase = "admin.construction.documents";
+
     const jobForm = useForm({
         survey_submission_id: approvedSurveySubmissions[0]?.id || "",
         assigned_to_member_id: members[0]?.id || "",
@@ -49,7 +51,7 @@ export default function DraftingIndex({ draftingJobs, approvedSurveySubmissions,
                     {draftingJobs.length ? (
                         <div className="space-y-5">
                             {draftingJobs.map((job) => (
-                                <DraftingJobCard key={job.id} job={job} />
+                                <DraftingJobCard key={job.id} job={job} documentRouteBase={documentRouteBase} />
                             ))}
                         </div>
                     ) : (
@@ -61,7 +63,7 @@ export default function DraftingIndex({ draftingJobs, approvedSurveySubmissions,
     );
 }
 
-function DraftingJobCard({ job }) {
+function DraftingJobCard({ job, documentRouteBase }) {
     return (
         <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -85,8 +87,8 @@ function DraftingJobCard({ job }) {
                                     <StatusBadge value={revision.status} />
                                 </div>
                                 <div className="mt-3 grid gap-2 text-sm text-slate-600 dark:text-slate-300">
-                                    <p>DWG: {revision.dwg_document?.original_name || "Not uploaded"}</p>
-                                    <p>PDF: {revision.pdf_document?.original_name || "Not uploaded"}</p>
+                                    <DocumentLinkRow label="DWG" document={revision.dwg_document} routeBase={documentRouteBase} />
+                                    <DocumentLinkRow label="PDF" document={revision.pdf_document} routeBase={documentRouteBase} />
                                     <p>Notes: {revision.notes || "No notes added."}</p>
                                 </div>
                                 <div className="mt-4 space-y-3">
@@ -112,8 +114,8 @@ function DraftingJobCard({ job }) {
 function RevisionFormCard({ job }) {
     const form = useForm({
         notes: "",
-        dwg_file_name: "",
-        pdf_file_name: "",
+        dwg_file: null,
+        pdf_file: null,
         status: "submitted",
     });
 
@@ -121,14 +123,14 @@ function RevisionFormCard({ job }) {
         <form
             onSubmit={(e) => {
                 e.preventDefault();
-                form.post(route("admin.construction.drafting.revisions.store", job.id), { preserveScroll: true, onSuccess: () => form.reset() });
+                form.post(route("admin.construction.drafting.revisions.store", job.id), { preserveScroll: true, forceFormData: true, onSuccess: () => form.reset() });
             }}
             className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950"
         >
             <h3 className="font-semibold text-slate-900 dark:text-white">Upload Revision</h3>
             <div className="mt-3 space-y-3">
-                <InputField form={form} name="dwg_file_name" label="DWG File Name" />
-                <InputField form={form} name="pdf_file_name" label="PDF File Name" />
+                <FileField form={form} name="dwg_file" label="DWG File" />
+                <FileField form={form} name="pdf_file" label="PDF File" />
                 <TextAreaField form={form} name="notes" label="Revision Notes" rows={4} />
                 <SelectField form={form} name="status" label="Revision Status" options={[
                     { value: "draft", label: "Save as Draft" },
@@ -225,6 +227,46 @@ function SelectField({ form, name, label, options }) {
                     <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
             </select>
+        </div>
+    );
+}
+
+function FileField({ form, name, label }) {
+    return (
+        <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">{label}</label>
+            <input
+                type="file"
+                onChange={(e) => form.setData(name, e.target.files?.[0] || null)}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+            />
+            {form.errors[name] ? <p className="mt-1 text-xs text-rose-600">{form.errors[name]}</p> : null}
+        </div>
+    );
+}
+
+function DocumentLinkRow({ label, document, routeBase }) {
+    if (!document) {
+        return <p>{label}: Not uploaded</p>;
+    }
+
+    return (
+        <div className="flex flex-wrap items-center gap-2">
+            <span>{label}: {document.original_name}</span>
+            <a
+                href={route(`${routeBase}.view`, document.id)}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+                View
+            </a>
+            <a
+                href={route(`${routeBase}.download`, document.id)}
+                className="rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-500"
+            >
+                Download
+            </a>
         </div>
     );
 }

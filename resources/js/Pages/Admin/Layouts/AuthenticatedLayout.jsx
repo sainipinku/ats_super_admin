@@ -355,46 +355,36 @@ export default function AuthenticatedLayout({ header, children }) {
                                     </div>
 
                                     <div className="hidden xl:flex items-center gap-[25px] xl:gap-[40px]">
-                                        <NavLink
-                                            href={route("admin.dashboard")}
-                                            active={route().current("admin.dashboard")}
-                                        >
-                                            Dashboard
-                                        </NavLink>
-
-                                        <NavLink
-                                            href={route("admin.job.posts.listing")}
-                                            active={route().current("admin.job.posts.listing")}
-                                        >
-                                            Job Listing
-                                        </NavLink>
-
-                                        <NavLink
-                                            href={route("admin.job.applications.index")}
-                                            active={
-                                                route().current("admin.job.applications.index") ||
-                                                route().current("admin.job.applicants")
-                                            }
-                                        >
-                                            Job Applications
-                                        </NavLink>
-
-                                        <NavLink
-                                            href={route("admin.calling-team.index")}
-                                            active={route().current("admin.calling-team.index")}
-                                        >
-                                            Calling Team
-                                        </NavLink>
-{/* 
-                                        <NavLink
-                                            href={route("admin.members.dashboard")}
-                                            active={
-                                                route().current("admin.members.dashboard") ||
-                                                route().current("admin.members.details")
-                                            }
-                                        >
-                                            Members
-                                        </NavLink> */}
+                                        <FlowNavLink href={route("admin.dashboard")} active={route().current("admin.dashboard") || route().current("admin.construction.dashboard")}>
+                                            Project Dashboard
+                                        </FlowNavLink>
+                                        <FlowNavLink href={route("admin.construction.projects.index")} active={route().current("admin.construction.projects.*")}>
+                                            Assigned Projects
+                                        </FlowNavLink>
+                                        <FlowNavLink href={route("admin.construction.survey.index")} active={route().current("admin.construction.survey.*")}>
+                                            Survey Workflow
+                                        </FlowNavLink>
+                                        <FlowNavLink href={route("admin.construction.drafting.index")} active={route().current("admin.construction.drafting.*")}>
+                                            Drawing Approval
+                                        </FlowNavLink>
+                                        <FlowNavLink href={route("admin.construction.execution.index")} active={route().current("admin.construction.execution.*")}>
+                                            Construction Execution
+                                        </FlowNavLink>
+                                        <FlowNavLink href={route("admin.construction.materials.index")} active={route().current("admin.construction.materials.*")}>
+                                            Material Management
+                                        </FlowNavLink>
+                                        <FlowNavLink href={route("admin.construction.vehicles.index")} active={route().current("admin.construction.vehicles.*")}>
+                                            Vehicle Tracking
+                                        </FlowNavLink>
+                                        <FlowNavLink href={route("admin.construction.equipment.index")} active={route().current("admin.construction.equipment.*")}>
+                                            Equipment Allocation
+                                        </FlowNavLink>
+                                        <FlowNavLink href={route("admin.construction.billing.index")} active={route().current("admin.construction.billing.*")}>
+                                            Accounts & Billing
+                                        </FlowNavLink>
+                                        <FlowNavLink href={route("admin.construction.handover.index")} active={route().current("admin.construction.handover.*")}>
+                                            Handover & Closure
+                                        </FlowNavLink>
                                     </div>
                                 </div>
 
@@ -633,5 +623,13 @@ export default function AuthenticatedLayout({ header, children }) {
                 <Toaster position="top-right" reverseOrder={false} gutter={8} />
             </div>
         </>
+    );
+}
+
+function FlowNavLink({ href, active, children }) {
+    return (
+        <NavLink href={href} active={active}>
+            {children}
+        </NavLink>
     );
 }
