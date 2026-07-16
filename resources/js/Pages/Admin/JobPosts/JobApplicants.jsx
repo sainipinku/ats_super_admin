@@ -77,6 +77,18 @@ function FilterChip({ active, label, count, color, onClick }) {
     );
 }
 
+function formatScreeningAnswer(answer) {
+    if (Array.isArray(answer)) {
+        return answer.filter(Boolean).join(', ') || 'No answer';
+    }
+
+    if (answer === null || answer === undefined || String(answer).trim() === '') {
+        return 'No answer';
+    }
+
+    return String(answer);
+}
+
 function ApplicantCard({ application, onOpen }) {
     return (
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
@@ -545,6 +557,31 @@ export default function JobApplicants({ callingTeamMembers: initialCallingTeamMe
                                     <div className="rounded-2xl border border-slate-200 p-4">
                                         <p className="text-xs uppercase tracking-wide text-slate-500">Cover Letter</p>
                                         <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{selectedApplication.cover_letter}</p>
+                                    </div>
+                                )}
+
+                                {Array.isArray(selectedApplication.screening_answers) && selectedApplication.screening_answers.length > 0 && (
+                                    <div className="rounded-2xl border border-slate-200 p-4">
+                                        <p className="text-xs uppercase tracking-wide text-slate-500">Screening Answers</p>
+                                        <div className="mt-3 space-y-3">
+                                            {selectedApplication.screening_answers.map((answer, index) => (
+                                                <div key={answer.question_id || index} className="rounded-xl bg-slate-50 p-3">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <p className="text-sm font-semibold text-slate-900">
+                                                            {answer.question || `Question ${index + 1}`}
+                                                        </p>
+                                                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                                            answer.required ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-600'
+                                                        }`}>
+                                                            {answer.required ? 'Required' : 'Optional'}
+                                                        </span>
+                                                    </div>
+                                                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-700">
+                                                        {formatScreeningAnswer(answer.answer)}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
 

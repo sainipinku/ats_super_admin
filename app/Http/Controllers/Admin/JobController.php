@@ -9,6 +9,7 @@ use App\Models\JobApplication;
 use App\Models\Member;
 use App\Models\Notification;
 use App\Models\SiteSetting;
+use App\Support\JobQuestionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -69,6 +70,8 @@ class JobController extends Controller
                     'key_responsibilities' => $job->key_responsibilities,
                     'keyResponsibilities' => $job->key_responsibilities,
                     'qualifications' => $job->qualifications,
+                    'application_questions' => $job->application_questions ?? [],
+                    'applicationQuestions' => $job->application_questions ?? [],
                     'last_date' => $job->last_date,
                     'lastDate' => $job->last_date,
                     'assets' => $job->assets ?? [],
@@ -129,6 +132,7 @@ class JobController extends Controller
             'key_responsibilities' => 'nullable',
             'qualifications' => 'nullable',
             'assets' => 'nullable',
+            'application_questions' => 'nullable',
             'last_date' => 'nullable|date',
             'company_image' => 'nullable|image|max:5120',
             'contact_person' => 'nullable|string|max:255',
@@ -148,6 +152,10 @@ class JobController extends Controller
                 $validated[$arrField] = [];
             }
         }
+
+        $validated['application_questions'] = JobQuestionHelper::normalizeQuestions(
+            $request->input('application_questions')
+        );
 
         // Default openings to 1
         $validated['openings'] = (int) ($validated['openings'] ?? 1);
@@ -202,6 +210,8 @@ class JobController extends Controller
                     'key_responsibilities' => $job->key_responsibilities,
                     'keyResponsibilities' => $job->key_responsibilities,
                     'qualifications' => $job->qualifications,
+                    'application_questions' => $job->application_questions ?? [],
+                    'applicationQuestions' => $job->application_questions ?? [],
                     'last_date' => $job->last_date,
                     'lastDate' => $job->last_date,
                     'assets' => $job->assets ?? [],
@@ -369,6 +379,7 @@ class JobController extends Controller
             'key_responsibilities' => 'nullable',
             'qualifications' => 'nullable',
             'assets' => 'nullable',
+            'application_questions' => 'nullable',
             'last_date' => 'nullable|date',
             'company_image' => 'nullable|image|max:5120',
             'contact_person' => 'nullable|string|max:255',
@@ -388,6 +399,10 @@ class JobController extends Controller
                 $validated[$arrField] = [];
             }
         }
+
+        $validated['application_questions'] = JobQuestionHelper::normalizeQuestions(
+            $request->input('application_questions')
+        );
 
         // Default openings to 1
         $validated['openings'] = (int) ($validated['openings'] ?? 1);

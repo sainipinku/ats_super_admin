@@ -2,6 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from './Layouts/AuthenticatedLayout';
 
+const QUESTION_TYPE_LABELS = {
+    text: 'Text Input',
+    textarea: 'Textarea',
+    single_select: 'Single Select',
+    multi_select: 'Multiple Select',
+};
+
+const isMultiSelectQuestion = (type) => type === 'multi_select';
+
+const normalizeApplicationQuestions = (questions = []) =>
+    (Array.isArray(questions) ? questions : [])
+        .map((question, index) => ({
+            id: question?.id || `question-${index}`,
+            question: String(question?.question || '').trim(),
+            type: question?.type || 'text',
+            required: !!question?.required,
+            options: Array.isArray(question?.options)
+                ? question.options.map((option) => String(option || '').trim()).filter(Boolean)
+                : [],
+        }))
+        .filter((question) => question.question !== '');
+
 // Job Card Component for Candidates
 const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply }) => {
     const getJobTypeBadge = (type) => {
@@ -153,6 +175,7 @@ const CandidateJobCard = ({ job, hasApplied, onViewDetails, onApply }) => {
 // Job Details Modal
 const JobDetailsModal = ({ job, isOpen, onClose, hasApplied, onApply }) => {
     const [activeTab, setActiveTab] = useState('overview');
+    const screeningQuestions = normalizeApplicationQuestions(job?.application_questions);
     
     if (!isOpen || !job) return null;
 
@@ -279,6 +302,40 @@ const JobDetailsModal = ({ job, isOpen, onClose, hasApplied, onApply }) => {
                                                     </svg>
                                                     {perk}
                                                 </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {screeningQuestions.length > 0 && (
+                                    <div>
+                                        <h4 className="text-lg font-semibold text-slate-900 mb-3">Application Questions</h4>
+                                        <div className="space-y-3">
+                                            {screeningQuestions.map((question, index) => (
+                                                <div key={question.id || index} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                                        <p className="text-sm font-semibold text-slate-900">
+                                                            {question.question}
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-2 text-xs">
+                                                            <span className="rounded-full bg-blue-100 px-2.5 py-1 font-medium text-blue-700">
+                                                                {QUESTION_TYPE_LABELS[question.type] || 'Text Input'}
+                                                            </span>
+                                                            <span className={`rounded-full px-2.5 py-1 font-medium ${question.required ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-600'}`}>
+                                                                {question.required ? 'Required' : 'Optional'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    {question.options.length > 0 && (
+                                                        <div className="mt-3 flex flex-wrap gap-2">
+                                                            {question.options.map((option, optionIndex) => (
+                                                                <span key={`${question.id}-option-${optionIndex}`} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700">
+                                                                    {option}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             ))}
                                         </div>
                                     </div>
@@ -410,6 +467,8 @@ const ApplyModal = ({ job, isOpen, onClose, onSubmit, isSubmitting, initialMode 
     const [resume, setResume] = useState(null);
     const [dragActive, setDragActive] = useState(false);
     const [mode, setMode] = useState(initialMode);
+    const [screeningAnswers, setScreeningAnswers] = useState({});
+    const [screeningErrors, setScreeningErrors] = useState({});
     const [details, setDetails] = useState({
         isFresher: true,
         experienceYears: '',
@@ -432,6 +491,7 @@ const ApplyModal = ({ job, isOpen, onClose, onSubmit, isSubmitting, initialMode 
         github: '',
         portfolio: '',
     });
+    const applicationQuestions = normalizeApplicationQuestions(job?.application_questions);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -461,7 +521,14 @@ const ApplyModal = ({ job, isOpen, onClose, onSubmit, isSubmitting, initialMode 
             github: '',
             portfolio: '',
         });
-    }, [isOpen, initialMode]);
+        setScreeningAnswers(
+            normalizeApplicationQuestions(job?.application_questions).reduce((answers, question) => {
+                answers[question.id] = isMultiSelectQuestion(question.type) ? [] : '';
+                return answers;
+            }, {})
+        );
+        setScreeningErrors({});
+    }, [isOpen, initialMode, job]);
 
     if (!isOpen || !job) return null;
 
@@ -490,9 +557,74 @@ const ApplyModal = ({ job, isOpen, onClose, onSubmit, isSubmitting, initialMode 
         }
     };
 
+    const updateScreeningAnswer = (questionId, value) => {
+        setScreeningAnswers((prev) => ({
+            ...prev,
+            [questionId]: value,
+        }));
+        setScreeningErrors((prev) => {
+            if (!prev[questionId]) {
+                return prev;
+            }
+
+            const next = { ...prev };
+            delete next[questionId];
+            return next;
+        });
+    };
+
+    const toggleMultiSelectAnswer = (questionId, option) => {
+        setScreeningAnswers((prev) => {
+            const selectedOptions = Array.isArray(prev[questionId]) ? prev[questionId] : [];
+            const nextValue = selectedOptions.includes(option)
+                ? selectedOptions.filter((item) => item !== option)
+                : [...selectedOptions, option];
+
+            return {
+                ...prev,
+                [questionId]: nextValue,
+            };
+        });
+        setScreeningErrors((prev) => {
+            if (!prev[questionId]) {
+                return prev;
+            }
+
+            const next = { ...prev };
+            delete next[questionId];
+            return next;
+        });
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSubmit({ coverLetter, resume, mode, details });
+        const nextErrors = {};
+
+        applicationQuestions.forEach((question) => {
+            const answer = screeningAnswers[question.id];
+            const isEmpty = isMultiSelectQuestion(question.type)
+                ? !Array.isArray(answer) || answer.length < 1
+                : String(answer || '').trim() === '';
+
+            if (question.required && isEmpty) {
+                nextErrors[question.id] = 'This answer is required.';
+            }
+        });
+
+        if (Object.keys(nextErrors).length > 0) {
+            setScreeningErrors(nextErrors);
+            return;
+        }
+
+        const normalizedScreeningAnswers = applicationQuestions.reduce((answers, question) => {
+            const answer = screeningAnswers[question.id];
+            answers[question.id] = isMultiSelectQuestion(question.type)
+                ? (Array.isArray(answer) ? answer : [])
+                : String(answer || '').trim();
+            return answers;
+        }, {});
+
+        onSubmit({ coverLetter, resume, mode, details, screeningAnswers: normalizedScreeningAnswers });
     };
 
     return (
@@ -571,6 +703,93 @@ const ApplyModal = ({ job, isOpen, onClose, onSubmit, isSubmitting, initialMode 
                             />
                             <p className="text-xs text-slate-500 mt-1">{coverLetter.length}/5000 characters</p>
                         </div>
+
+                        {applicationQuestions.length > 0 && (
+                            <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <div>
+                                    <h4 className="text-base font-semibold text-slate-900">Application Questions</h4>
+                                    <p className="text-sm text-slate-500 mt-1">
+                                        Answer the screening questions before submitting your application.
+                                    </p>
+                                </div>
+
+                                {applicationQuestions.map((question, index) => (
+                                    <div key={question.id || index} className="space-y-2">
+                                        <label className="block text-sm font-medium text-slate-700">
+                                            {question.question} {question.required && <span className="text-red-500">*</span>}
+                                        </label>
+
+                                        {question.type === 'textarea' && (
+                                            <textarea
+                                                value={String(screeningAnswers[question.id] || '')}
+                                                onChange={(e) => updateScreeningAnswer(question.id, e.target.value)}
+                                                rows={4}
+                                                className={`w-full rounded-lg border px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${
+                                                    screeningErrors[question.id] ? 'border-red-300 bg-red-50' : 'border-slate-300'
+                                                }`}
+                                                placeholder="Enter your answer"
+                                            />
+                                        )}
+
+                                        {question.type === 'text' && (
+                                            <input
+                                                type="text"
+                                                value={String(screeningAnswers[question.id] || '')}
+                                                onChange={(e) => updateScreeningAnswer(question.id, e.target.value)}
+                                                className={`w-full rounded-lg border px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                                    screeningErrors[question.id] ? 'border-red-300 bg-red-50' : 'border-slate-300'
+                                                }`}
+                                                placeholder="Enter your answer"
+                                            />
+                                        )}
+
+                                        {question.type === 'single_select' && (
+                                            <select
+                                                value={String(screeningAnswers[question.id] || '')}
+                                                onChange={(e) => updateScreeningAnswer(question.id, e.target.value)}
+                                                className={`w-full rounded-lg border px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                                    screeningErrors[question.id] ? 'border-red-300 bg-red-50' : 'border-slate-300'
+                                                }`}
+                                            >
+                                                <option value="">Select an option</option>
+                                                {question.options.map((option, optionIndex) => (
+                                                    <option key={`${question.id}-option-${optionIndex}`} value={option}>
+                                                        {option}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        )}
+
+                                        {question.type === 'multi_select' && (
+                                            <div className={`space-y-2 rounded-lg border px-4 py-3 ${
+                                                screeningErrors[question.id] ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white'
+                                            }`}>
+                                                {question.options.map((option, optionIndex) => {
+                                                    const selectedOptions = Array.isArray(screeningAnswers[question.id]) ? screeningAnswers[question.id] : [];
+                                                    const checked = selectedOptions.includes(option);
+
+                                                    return (
+                                                        <label key={`${question.id}-option-${optionIndex}`} className="flex items-center gap-3 text-sm text-slate-700">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={checked}
+                                                                onChange={() => toggleMultiSelectAnswer(question.id, option)}
+                                                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                            />
+                                                            <span>{option}</span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {screeningErrors[question.id] && (
+                                            <p className="text-xs font-medium text-red-600">{screeningErrors[question.id]}</p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         {mode === 'resume' ? (
                             <div>
@@ -968,11 +1187,12 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
             });
     };
 
-    const handleApplySubmit = async ({ coverLetter, resume, mode, details }) => {
+    const handleApplySubmit = async ({ coverLetter, resume, mode, details, screeningAnswers }) => {
         setIsSubmitting(true);
 
         const formData = new FormData();
         formData.append('cover_letter', coverLetter);
+        formData.append('screening_answers', JSON.stringify(screeningAnswers || {}));
         if (mode === 'resume' && resume) {
             formData.append('resume', resume);
         }
@@ -1036,15 +1256,19 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
                 body: formData,
             });
 
-            const data = await response.json();
+            const data = await response.json().catch(() => null);
 
-            if (data.success) {
+            if (response.ok && data?.success) {
                 setLocalAppliedIds([...localAppliedIds, selectedJob.id]);
                 setNotification({ type: 'success', message: data.message });
                 setShowApplyModal(false);
                 setSelectedJob(null);
             } else {
-                setNotification({ type: 'error', message: data.message });
+                const firstError = data?.errors ? Object.values(data.errors)[0]?.[0] : null;
+                setNotification({
+                    type: 'error',
+                    message: firstError || data?.message || 'Failed to submit application. Please check your answers and try again.',
+                });
             }
         } catch (error) {
             setNotification({ type: 'error', message: 'Failed to submit application. Please try again.' });

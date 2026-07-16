@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Job;
 use App\Models\JobApplication;
 use App\Models\SavedJob;
+use App\Support\JobQuestionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -395,6 +396,7 @@ class JobController extends Controller
             'cover_letter' => ['nullable', 'string', 'max:5000'],
             'resume' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
             'application_profile' => ['nullable'],
+            'screening_answers' => ['nullable'],
         ]);
 
         $applicationProfile = null;
@@ -406,6 +408,11 @@ class JobController extends Controller
                 $applicationProfile = null;
             }
         }
+
+        $screeningAnswers = JobQuestionHelper::normalizeAnswers(
+            $request->input('screening_answers'),
+            $job->application_questions ?? []
+        );
 
         $resumeUrl = null;
         if ($request->hasFile('resume')) {
@@ -484,6 +491,7 @@ class JobController extends Controller
             'cover_letter' => $validated['cover_letter'] ?? null,
             'resume_url' => $resumeUrl,
             'answers' => $applicationProfile,
+            'screening_answers' => $screeningAnswers,
             'candidate_name' => $member->name,
             'candidate_email' => $member->email,
             'candidate_phone' => $member->phone,
