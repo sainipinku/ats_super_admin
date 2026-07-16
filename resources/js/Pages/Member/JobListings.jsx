@@ -1119,6 +1119,7 @@ const ApplyModal = ({ job, isOpen, onClose, onSubmit, isSubmitting, initialMode 
 export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTypes, locations }) {
     const [searchQuery, setSearchQuery] = useState(filters.search || '');
     const [selectedType, setSelectedType] = useState(filters.job_type || '');
+    const [selectedCategory, setSelectedCategory] = useState(filters.job_category || '');
     const [selectedLocation, setSelectedLocation] = useState(filters.location || '');
     const [selectedDistance, setSelectedDistance] = useState(filters.distance || 20);
     const [selectedJob, setSelectedJob] = useState(null);
@@ -1136,6 +1137,7 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
             router.get(route('member.jobs.index'), {
                 search: searchQuery,
                 job_type: selectedType,
+                job_category: selectedCategory,
                 location: selectedLocation,
                 distance: selectedDistance,
             }, {
@@ -1145,7 +1147,7 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
         }, 500);
 
         return () => clearTimeout(timeout);
-    }, [searchQuery, selectedType, selectedLocation, selectedDistance]);
+    }, [searchQuery, selectedType, selectedCategory, selectedLocation, selectedDistance]);
 
     const handleViewDetails = (job) => {
         setSelectedJob(job);
@@ -1335,21 +1337,35 @@ export default function JobListings({ auth, jobs, appliedJobIds, filters, jobTyp
                             />
                         </div>
 
-                        {/* Job Type Filter */}
-                        <select
-                            value={selectedType}
-                            onChange={(e) => setSelectedType(e.target.value)}
-                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="">All Job Types</option>
-                            {jobTypes?.map((type) => (
-                                <option key={type} value={type}>
-                                    {type?.replace('-', ' ')?.replace(/\b\w/g, l => l.toUpperCase())}
-                                </option>
-                            ))}
-                        </select>
+                         {/* Job Type Filter */}
+                         <select
+                             value={selectedType}
+                             onChange={(e) => setSelectedType(e.target.value)}
+                             className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                         >
+                             <option value="">All Job Types</option>
+                             {jobTypes?.map((type) => (
+                                 <option key={type} value={type}>
+                                     {type?.replace('-', ' ')?.replace(/\b\w/g, l => l.toUpperCase())}
+                                 </option>
+                             ))}
+                         </select>
 
-                        {/* Location Search Filter */}
+                         {/* Job Category Filter */}
+                         <select
+                             value={selectedCategory}
+                             onChange={(e) => setSelectedCategory(e.target.value)}
+                             className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                         >
+                             <option value="">All Categories</option>
+                             {locations?.job_categories?.map((category) => (
+                                 <option key={category} value={category}>
+                                     {category}
+                                 </option>
+                             ))}
+                         </select>
+
+                         {/* Location Search Filter */}
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

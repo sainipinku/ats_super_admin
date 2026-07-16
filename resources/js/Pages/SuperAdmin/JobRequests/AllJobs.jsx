@@ -18,6 +18,19 @@ const ASSETS_OPTIONS = [
     "Yulu / E-Bike"
 ];
 
+const JOB_CATEGORIES = [
+    "Information Technology (IT)",
+    "Sales & Business Development",
+    "Digital Marketing",
+    "Human Resources (HR)",
+    "Finance & Accounting",
+    "Engineering",
+    "Design & Creative",
+    "Customer Support & BPO",
+    "Healthcare",
+    "Operations & Manufacturing"
+];
+
 const parseSalaryRange = (salary) => {
     if (!salary) return { min: '', max: '', period: 'Monthly' };
     const match = String(salary).replace(/\s+/g, ' ').trim().match(/₹?\s*([\d,]+)\s*-\s*₹?\s*([\d,]+)\s*\/\s*(year|month|hour|week)/i);
@@ -564,6 +577,7 @@ export default function AllJobs({ auth }) {
             company: job.company || '',
             location: job.location || '',
             job_type: job.job_type || job.type || 'Full Time',
+            job_category: job.job_category || '',
             openings: job.openings || 1,
             experience: job.experience || '',
             min_salary: salary.min,
@@ -695,6 +709,7 @@ export default function AllJobs({ auth }) {
         formData.append('company', editForm.company);
         formData.append('location', editForm.location);
         formData.append('job_type', editForm.job_type);
+        formData.append('job_category', editForm.job_category || '');
         formData.append('openings', editForm.openings || 1);
         formData.append('experience', editForm.experience);
         const salaryRange = `₹${editForm.min_salary || 0} - ₹${editForm.max_salary || 0}/${editForm.salary_period || 'Monthly'}`;
@@ -1173,25 +1188,41 @@ export default function AllJobs({ auth }) {
                 placeholder="Enter job location"
             />
         </div>
-        <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Job Type</label>
-            <select
-                name="job_type"
-                value={editForm.job_type}
-                onChange={handleEditInputChange}
-                className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
-                required
-            >
-                <option value="Full Time">Full Time</option>
-                <option value="Part Time">Part Time</option>
-                <option value="Contract">Contract</option>
-                <option value="Internship">Internship</option>
-                <option value="Remote">Remote</option>
-                <option value="Hybrid">Hybrid</option>
-            </select>
-        </div>
-        <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Number of Openings</label>
+         <div>
+             <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Job Type</label>
+             <select
+                 name="job_type"
+                 value={editForm.job_type}
+                 onChange={handleEditInputChange}
+                 className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+                 required
+             >
+                 <option value="Full Time">Full Time</option>
+                 <option value="Part Time">Part Time</option>
+                 <option value="Contract">Contract</option>
+                 <option value="Internship">Internship</option>
+                 <option value="Remote">Remote</option>
+                 <option value="Hybrid">Hybrid</option>
+             </select>
+         </div>
+         <div>
+             <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Job Category</label>
+             <select
+                 name="job_category"
+                 value={editForm.job_category || ''}
+                 onChange={handleEditInputChange}
+                 className="w-full border border-slate-300 dark:border-gray-600 rounded-xl px-4 py-3 dark:bg-gray-700 dark:text-white"
+             >
+                 <option value="">Select Category</option>
+                 {JOB_CATEGORIES.map((category) => (
+                     <option key={category} value={category}>
+                         {category}
+                     </option>
+                 ))}
+             </select>
+         </div>
+         <div>
+             <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Number of Openings</label>
             <input
                 type="number"
                 name="openings"

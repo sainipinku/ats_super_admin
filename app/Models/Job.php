@@ -26,6 +26,7 @@ class Job extends Model
         'description',
         'location',
         'job_type',
+        'job_category',
         'openings',
         'experience',
         'salary',
