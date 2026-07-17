@@ -88,6 +88,8 @@ class JobController extends Controller
                     'active' => $job->status === 'active',
                     'status' => $job->status,
                     'applicants' => $job->applicants ?? 0,
+                    'latitude' => $job->latitude,
+                    'longitude' => $job->longitude,
                     'created_at' => $job->created_at,
                     'createdAt' => $job->created_at,
                 ];
@@ -124,6 +126,7 @@ class JobController extends Controller
             'description' => 'nullable|string',
             'location' => 'required|string|max:255',
             'job_type' => 'required|string|max:50',
+            'job_category' => 'nullable|string|max:100',
             'openings' => 'nullable|integer|min:1',
             'experience' => 'nullable|string|max:100',
             'salary' => 'nullable|string|max:100',
@@ -228,6 +231,8 @@ class JobController extends Controller
                     'status' => $job->status,
                     'active' => $job->status === 'active',
                     'applicants' => $job->applicants ?? 0,
+                    'latitude' => $job->latitude,
+                    'longitude' => $job->longitude,
                     'created_at' => $job->created_at,
                     'createdAt' => $job->created_at,
                 ];
@@ -371,6 +376,7 @@ class JobController extends Controller
             'description' => 'nullable|string',
             'location' => 'required|string|max:255',
             'job_type' => 'required|string|max:50',
+            'job_category' => 'nullable|string|max:100',
             'openings' => 'nullable|integer|min:1',
             'experience' => 'nullable|string|max:100',
             'salary' => 'nullable|string|max:100',

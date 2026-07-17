@@ -50,4 +50,8 @@ return [
         'region' => env('REGION'),
     ],
 
+    'google_maps' => [
+        'key' => env('GOOGLE_MAPS_API_KEY'),
+    ],
+
 ];

@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Job;
 use App\Models\JobApplication;
 use App\Models\SavedJob;
+use App\Services\GeocodingService;
 use App\Support\JobQuestionHelper;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -238,7 +240,11 @@ class JobController extends Controller
         $query->where('location', 'like', "%{$location}%");
     }
 
-    
+    if ($request->filled('job_category')) {
+        $category = $request->string('job_category')->toString();
+        $query->where('job_category', $category);
+    }
+
     $perPage = max(1, min((int)$request->input('per_page', 12), 50));
     $jobs = $query->paginate($perPage)->withQueryString();
 
@@ -246,7 +252,7 @@ class JobController extends Controller
     $appliedJobIds = [];
     $savedJobIds = [];
     
-    if ($member) { // Add null check for guest users
+    if ($member) {
         $appliedJobIds = JobApplication::query()
             ->where('candidate_id', $member->id)
             ->pluck('job_id')
@@ -257,13 +263,23 @@ class JobController extends Controller
             ->pluck('job_id')
             ->toArray();
     }
+
+    // Flip for O(1) lookups
+    $appliedMap = array_flip($appliedJobIds);
+    $savedMap = array_flip($savedJobIds);
+
+    // Attach is_saved and is_applied to each job object
+    // Uses hash maps - zero additional queries, O(1) per job
+    $jobs->getCollection()->transform(function ($job) use ($appliedMap, $savedMap) {
+        $job->is_saved = isset($savedMap[$job->id]);
+        $job->is_applied = isset($appliedMap[$job->id]);
+        return $job;
+    });
     
     return response()->json([
         'success' => true,
         'jobs' => $jobs,
-        'applied_job_ids' => $appliedJobIds,
-        'saved_job_ids' => $savedJobIds,
-        'total_jobs' => $jobs->total(), // Add total for debugging
+        'total_jobs' => $jobs->total(),
     ]);
 }
 
@@ -556,6 +572,133 @@ class JobController extends Controller
         'filtered_status' => $status, // Optional: return the current filter
     ]);
 }
+
+    public function categories(Request $request)
+{
+    $query = Job::query()
+        ->where('status', 'active')
+        ->whereNotNull('job_category')
+        ->where('job_category', '!=', '');
+
+    $categories = (clone $query)
+        ->distinct()
+        ->orderBy('job_category')
+        ->pluck('job_category')
+        ->values();
+
+    if ($request->boolean('with_count')) {
+
+        $counts = (clone $query)
+            ->select('job_category', DB::raw('COUNT(*) as count'))
+            ->groupBy('job_category')
+            ->orderBy('job_category')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'categories' => $categories,
+            'counts' => $counts,
+        ]);
+    }
+
+    return response()->json([
+        'success' => true,
+        'categories' => $categories,
+    ]);
+}
+    /**
+     * Search jobs near a given location using haversine distance.
+     *
+     * GET /api/jobs/nearby?latitude=28.6139&longitude=77.2090&radius=50&unit=km
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function nearby(Request $request)
+    {
+        $validated = $request->validate([
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+            'radius' => 'nullable|numeric|min:1|max:500',
+            'unit' => 'nullable|in:km,mi',
+        ]);
+
+        $latitude = (float) $validated['latitude'];
+        $longitude = (float) $validated['longitude'];
+        $radius = (float) ($validated['radius'] ?? 50);
+        $unit = $validated['unit'] ?? 'km';
+        $earthRadius = $unit === 'mi' ? 3959 : 6371;
+
+        $haversineSql = GeocodingService::haversineSql($latitude, $longitude);
+
+        $query = Job::query()
+            ->with(['creator'])
+            ->where('status', 'active')
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->select('job_posts.*')
+            ->selectRaw("{$haversineSql} AS distance")
+            ->having('distance', '<=', $radius)
+            ->orderBy('distance');
+
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('company', 'like', "%{$search}%")
+                    ->orWhere('location', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('job_type')) {
+            $query->where('job_type', $request->string('job_type')->toString());
+        }
+
+        if ($request->filled('job_category')) {
+            $query->where('job_category', $request->string('job_category')->toString());
+        }
+
+        $perPage = max(1, min((int) $request->input('per_page', 12), 50));
+        $jobs = $query->paginate($perPage)->withQueryString();
+
+        $member = $request->user();
+        $appliedJobIds = [];
+        $savedJobIds = [];
+
+        if ($member) {
+            $appliedJobIds = JobApplication::query()
+                ->where('candidate_id', $member->id)
+                ->pluck('job_id')
+                ->toArray();
+
+            $savedJobIds = SavedJob::query()
+                ->where('member_id', $member->id)
+                ->pluck('job_id')
+                ->toArray();
+        }
+
+        $appliedMap = array_flip($appliedJobIds);
+        $savedMap = array_flip($savedJobIds);
+
+        $jobs->getCollection()->transform(function ($job) use ($appliedMap, $savedMap) {
+            $job->is_saved = isset($savedMap[$job->id]);
+            $job->is_applied = isset($appliedMap[$job->id]);
+            $job->distance = round((float) $job->distance, 2);
+            return $job;
+        });
+
+        return response()->json([
+            'success' => true,
+            'jobs' => $jobs,
+            'total_jobs' => $jobs->total(),
+            'filters' => [
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'radius' => $radius,
+                'unit' => $unit,
+            ],
+        ]);
+    }
 
     public function withdraw(Request $request, JobApplication $application)
     {
