@@ -271,13 +271,15 @@ Route::prefix('member')->middleware(['member'])->group(function () {
     Route::post('/profile/password/update', [App\Http\Controllers\Member\MemberTaskController::class, 'userProfilePasswordUpdate'])->name('member.profile.password.update');
     Route::post('/profile/photo/remove', [App\Http\Controllers\Member\MemberTaskController::class, 'userProfilePhotoRemove'])->name('member.profile.photo.remove');
 
-    // Candidate Job Portal Routes
-    Route::get('/jobs', [App\Http\Controllers\Member\CandidateJobController::class, 'index'])->name('member.jobs.index');
-    Route::get('/jobs/{job}', [App\Http\Controllers\Member\CandidateJobController::class, 'show'])->name('member.jobs.show');
-    Route::post('/jobs/{job}/apply', [App\Http\Controllers\Member\CandidateJobController::class, 'apply'])->name('member.jobs.apply');
-    Route::get('/api/profile-completion', [App\Http\Controllers\Member\CandidateJobController::class, 'profileCompletion'])->name('member.api.profile-completion');
-    Route::get('/my-applications', [App\Http\Controllers\Member\CandidateJobController::class, 'myApplications'])->name('member.applications.index');
-    Route::delete('/applications/{application}/withdraw', [App\Http\Controllers\Member\CandidateJobController::class, 'withdraw'])->name('member.applications.withdraw');
+        // Candidate Job Portal Routes
+        Route::get('/jobs', [App\Http\Controllers\Member\CandidateJobController::class, 'index'])->name('member.jobs.index');
+        Route::get('/jobs/{job}', [App\Http\Controllers\Member\CandidateJobController::class, 'show'])->name('member.jobs.show');
+        Route::post('/jobs/{job}/apply', [App\Http\Controllers\Member\CandidateJobController::class, 'apply'])->name('member.jobs.apply');
+        Route::post('/jobs/{job}/save', [App\Http\Controllers\Member\CandidateJobController::class, 'save'])->name('member.jobs.save');
+        Route::post('/jobs/{job}/unsave', [App\Http\Controllers\Member\CandidateJobController::class, 'unsave'])->name('member.jobs.unsave');
+        Route::get('/api/profile-completion', [App\Http\Controllers\Member\CandidateJobController::class, 'profileCompletion'])->name('member.api.profile-completion');
+        Route::get('/my-applications', [App\Http\Controllers\Member\CandidateJobController::class, 'myApplications'])->name('member.applications.index');
+        Route::delete('/applications/{application}/withdraw', [App\Http\Controllers\Member\CandidateJobController::class, 'withdraw'])->name('member.applications.withdraw');
 
     Route::get('/api/notifications/unread-count', [App\Http\Controllers\Admin\AdminController::class, 'notificationsUnreadCount'])->name('member.api.notifications.unread_count');
     Route::get('/api/notifications/list', [App\Http\Controllers\Admin\AdminController::class, 'notificationsList'])->name('member.api.notifications.list');

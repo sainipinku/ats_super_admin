@@ -1,12 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
-const LocationInput = ({ value, onChange, placeholder = "Enter location...", variant = "default" }) => {
+const LocationInput = ({ value, onChange, onLatLngChange, placeholder = "Enter location...", variant = "default" }) => {
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [apiError, setApiError] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [selectedLatLng, setSelectedLatLng] = useState(null);
     const inputRef = useRef(null);
     const autocompleteServiceRef = useRef(null);
+    const geocoderRef = useRef(null);
+    const placesServiceRef = useRef(null);
     const debounceTimerRef = useRef(null);
     const scriptLoadedRef = useRef(false);
 
@@ -29,8 +32,13 @@ const LocationInput = ({ value, onChange, placeholder = "Enter location...", var
         if (existingScript) {
             const checkLoaded = setInterval(() => {
                 if (window.google && window.google.maps && window.google.maps.places) {
-                    autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
-                    setApiError(null);
+                    try {
+                        autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+                        geocoderRef.current = new window.google.maps.Geocoder();
+                        setApiError(null);
+                    } catch (err) {
+                        console.error('LocationInput: Error initializing Google services:', err);
+                    }
                     clearInterval(checkLoaded);
                 }
             }, 500);
@@ -46,6 +54,7 @@ const LocationInput = ({ value, onChange, placeholder = "Enter location...", var
             try {
                 if (window.google && window.google.maps && window.google.maps.places) {
                     autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+                    geocoderRef.current = new window.google.maps.Geocoder();
                     setApiError(null);
                 } else {
                     console.error('Google Maps loaded but Places library not available');
@@ -182,6 +191,40 @@ const LocationInput = ({ value, onChange, placeholder = "Enter location...", var
         onChange(suggestion.display_name);
         setSuggestions([]);
         setShowSuggestions(false);
+
+        // Resolve lat/lng via Geocoder or REST API
+        if (geocoderRef.current) {
+            geocoderRef.current.geocode(
+                { placeId: suggestion.place_id },
+                (results, status) => {
+                    if (status === 'OK' && results?.[0]?.geometry?.location) {
+                        const lat = results[0].geometry.location.lat();
+                        const lng = results[0].geometry.location.lng();
+                        setSelectedLatLng({ lat, lng });
+                        if (onLatLngChange) {
+                            onLatLngChange({ latitude: lat, longitude: lng });
+                        }
+                    }
+                }
+            );
+            return;
+        }
+
+        // Fallback: use REST Geocoding API
+        fetch(
+            `https://maps.googleapis.com/maps/api/geocode/json?place_id=${suggestion.place_id}&key=${GOOGLE_MAPS_API_KEY}`
+        )
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'OK' && data.results?.[0]?.geometry?.location) {
+                const { lat, lng } = data.results[0].geometry.location;
+                setSelectedLatLng({ lat, lng });
+                if (onLatLngChange) {
+                    onLatLngChange({ latitude: lat, longitude: lng });
+                }
+            }
+        })
+        .catch(err => console.error('Geocoding error:', err));
     };
 
     const handleBlur = () => {
@@ -200,10 +243,15 @@ const LocationInput = ({ value, onChange, placeholder = "Enter location...", var
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    const location = `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`;
+                    const { latitude, longitude } = position.coords;
+                    const location = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
                     onChange(location);
                     setSuggestions([]);
                     setShowSuggestions(false);
+                    setSelectedLatLng({ lat: latitude, lng: longitude });
+                    if (onLatLngChange) {
+                        onLatLngChange({ latitude, longitude });
+                    }
                 },
                 (error) => {
                     console.error('Error getting location:', error);

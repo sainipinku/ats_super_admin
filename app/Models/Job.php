@@ -50,6 +50,8 @@ class Job extends Model
         'rejection_reason',
         'resubmitted_at',
         'approval_logs',
+        'latitude',
+        'longitude',
     ];
 
     protected $casts = [

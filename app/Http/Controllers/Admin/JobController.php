@@ -88,6 +88,8 @@ class JobController extends Controller
                     'active' => $job->status === 'active',
                     'status' => $job->status,
                     'applicants' => $job->applicants ?? 0,
+                    'latitude' => $job->latitude,
+                    'longitude' => $job->longitude,
                     'created_at' => $job->created_at,
                     'createdAt' => $job->created_at,
                 ];
@@ -229,6 +231,8 @@ class JobController extends Controller
                     'status' => $job->status,
                     'active' => $job->status === 'active',
                     'applicants' => $job->applicants ?? 0,
+                    'latitude' => $job->latitude,
+                    'longitude' => $job->longitude,
                     'created_at' => $job->created_at,
                     'createdAt' => $job->created_at,
                 ];

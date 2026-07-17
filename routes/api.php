@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Route;
         ]);
     });
 
+   
+
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
@@ -36,6 +38,7 @@ use Illuminate\Support\Facades\Route;
         Route::delete('/profile/resume', [ProfileController::class, 'deleteResume']);
         Route::get('/profile/resume/view', [ProfileController::class, 'viewResume']);
 
+        Route::get('/jobs/nearby', [JobController::class, 'nearby']);
         Route::get('/jobs', [JobController::class, 'index']);
         Route::get('/jobs/{job}', [JobController::class, 'show']);
         Route::post('/jobs/{job}/apply', [JobController::class, 'apply']);
@@ -44,6 +47,10 @@ use Illuminate\Support\Facades\Route;
         Route::get('/saved-jobs', [JobController::class, 'savedIndex']);
         Route::get('/applications', [JobController::class, 'myApplications']);
         Route::delete('/applications/{application}', [JobController::class, 'withdraw']);
+
+         Route::get('/job-categories', [JobController::class, 'categories']);
+
+         
 
         Route::get('/tasks', [TaskController::class, 'index']);
         Route::get('/tasks/{task}', [TaskController::class, 'show']);

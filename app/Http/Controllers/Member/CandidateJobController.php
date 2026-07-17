@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Job;
 use App\Models\JobApplication;
 use App\Models\Member;
+use App\Models\SavedJob;
 use App\Support\JobQuestionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -116,20 +117,47 @@ class CandidateJobController extends Controller
             $query->where('location', 'like', "%{$request->location}%");
         }
 
+        // Filter by job category
+        if ($request->has('job_category') && $request->job_category) {
+            $query->where('job_category', $request->job_category);
+        }
+
         $jobs = $query->paginate(12)->withQueryString();
 
-        // Check which jobs user has already applied to
+        // Check which jobs user has already applied to and saved
         $appliedJobIds = [];
+        $savedJobIds = [];
         if (Auth::guard('member')->check()) {
-            $appliedJobIds = JobApplication::where('candidate_id', Auth::guard('member')->id())
+            $memberId = Auth::guard('member')->id();
+            $appliedJobIds = JobApplication::where('candidate_id', $memberId)
+                ->pluck('job_id')
+                ->toArray();
+
+            $savedJobIds = SavedJob::where('member_id', $memberId)
                 ->pluck('job_id')
                 ->toArray();
         }
+
+        // Attach is_saved and is_applied to each job
+        $appliedMap = array_flip($appliedJobIds);
+        $savedMap = array_flip($savedJobIds);
+        $jobs->getCollection()->transform(function ($job) use ($appliedMap, $savedMap) {
+            $job->is_saved = isset($savedMap[$job->id]);
+            $job->is_applied = isset($appliedMap[$job->id]);
+            return $job;
+        });
 
         // Get unique locations for filters
         $locations = Job::where('status', 'active')
             ->distinct()
             ->pluck('location');
+
+        // Get unique job categories for filters
+        $jobCategories = Job::where('status', 'active')
+            ->whereNotNull('job_category')
+            ->where('job_category', '!=', '')
+            ->distinct()
+            ->pluck('job_category');
 
         // All possible job types from admin form
         $jobTypes = ['Full Time', 'Part Time', 'Contract', 'Internship', 'Freelance', 'Remote'];
@@ -137,12 +165,15 @@ class CandidateJobController extends Controller
         return Inertia::render('Member/JobListings', [
             'jobs' => $jobs,
             'appliedJobIds' => $appliedJobIds,
+            'savedJobIds' => $savedJobIds,
             'filters' => [
                 'search' => $request->search ?? '',
                 'job_type' => $request->job_type ?? '',
+                'job_category' => $request->job_category ?? '',
                 'location' => $request->location ?? '',
             ],
             'jobTypes' => $jobTypes,
+            'jobCategories' => $jobCategories,
             'locations' => $locations,
         ]);
     }
@@ -534,6 +565,50 @@ class CandidateJobController extends Controller
         return Inertia::render('Member/MyApplications', [
             'applications' => $applications,
             'statusCounts' => $statusCounts,
+        ]);
+    }
+
+    /**
+     * Save a job (toggle save)
+     */
+    public function save(Job $job)
+    {
+        $member = Auth::guard('member')->user();
+
+        if ($job->status !== 'active') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This job is not available.',
+            ], 404);
+        }
+
+        SavedJob::firstOrCreate([
+            'member_id' => $member->id,
+            'job_id' => $job->id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Job saved successfully.',
+            'is_saved' => true,
+        ]);
+    }
+
+    /**
+     * Unsave a job (remove from saved)
+     */
+    public function unsave(Job $job)
+    {
+        $member = Auth::guard('member')->user();
+
+        SavedJob::where('member_id', $member->id)
+            ->where('job_id', $job->id)
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Job removed from saved.',
+            'is_saved' => false,
         ]);
     }
 
