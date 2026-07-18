@@ -574,38 +574,34 @@ class JobController extends Controller
 }
 
     public function categories(Request $request)
-{
-    $query = Job::query()
-        ->where('status', 'active')
-        ->whereNotNull('job_category')
-        ->where('job_category', '!=', '');
-
-    $categories = (clone $query)
-        ->distinct()
-        ->orderBy('job_category')
-        ->pluck('job_category')
-        ->values();
-
-    if ($request->boolean('with_count')) {
-
-        $counts = (clone $query)
+    {
+        $categoryRows = Job::query()
+            ->where('status', 'active')
+            ->whereNotNull('job_category')
+            ->where('job_category', '!=', '')
             ->select('job_category', DB::raw('COUNT(*) as count'))
             ->groupBy('job_category')
             ->orderBy('job_category')
-            ->get();
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'job_category' => $row->job_category,
+                    'count' => (int) $row->count,
+                ];
+            })
+            ->values();
 
-        return response()->json([
+        $response = [
             'success' => true,
-            'categories' => $categories,
-            'counts' => $counts,
-        ]);
-    }
+            'categories' => $categoryRows->pluck('job_category')->values(),
+        ];
 
-    return response()->json([
-        'success' => true,
-        'categories' => $categories,
-    ]);
-}
+        if ($request->boolean('with_count')) {
+            $response['counts'] = $categoryRows;
+        }
+
+        return response()->json($response);
+    }
     /**
      * Search jobs near a given location using haversine distance.
      *
