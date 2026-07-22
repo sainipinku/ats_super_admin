@@ -87,6 +87,15 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::post('/update-status/{uuid}', [DesignationController::class, 'updateStatus'])->name('status');
         });
 
+        // Employee Routes
+        Route::group(['prefix' => 'employees', 'as' => 'employees.'], function () {
+            Route::get('/list', [\App\Http\Controllers\SuperAdmin\EmployeeController::class, 'index'])->name('list');
+            Route::post('/store', [\App\Http\Controllers\SuperAdmin\EmployeeController::class, 'store'])->name('store');
+            Route::put('/update/{uuid}', [\App\Http\Controllers\SuperAdmin\EmployeeController::class, 'update'])->name('update');
+            Route::post('/update-status/{uuid}', [\App\Http\Controllers\SuperAdmin\EmployeeController::class, 'updateStatus'])->name('status');
+            Route::delete('/{uuid}', [\App\Http\Controllers\SuperAdmin\EmployeeController::class, 'destroy'])->name('destroy');
+        });
+
         Route::group(['prefix' => 'settings', 'as' => 'settings.'], function () {
             Route::get('/', [SiteSettingController::class, 'index'])->name('index');
             Route::get('/list', [SiteSettingController::class, 'list'])->name('list');
