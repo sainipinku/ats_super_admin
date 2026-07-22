@@ -102,7 +102,7 @@ export default function SettingsIndex({ auth, settings, timezones }) {
             seo: ["meta_title", "meta_description", "meta_keywords"],
         };
 
-        Object.keys(data).forEach((key) => {
+        Object.keys(data).forEach((key) => {favicon
             if (sectionFields[section].includes(key)) {
                 if (key == "dark_logo" || key == "light_logo" || key == "favicon") {
                     if (data[key] instanceof File) {
