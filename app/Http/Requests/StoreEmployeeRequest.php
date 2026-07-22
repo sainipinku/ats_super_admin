@@ -40,7 +40,7 @@ class StoreEmployeeRequest extends FormRequest
             ],
             'password' => [$memberId ? 'nullable' : 'required', 'string', 'min:6', 'same:confirm_password'],
             'confirm_password' => [$memberId ? 'nullable' : 'required', 'string', 'min:6'],
-            'role' => ['required', 'string', Rule::exists('roles', 'slug')->where('status', 1)],
+            'role' => ['required', 'string', 'in:member'],
             'department' => ['required', 'string', 'max:255'],
             'designation' => ['required', 'string', 'max:255'],
             'gender' => ['nullable', 'in:male,female,other'],

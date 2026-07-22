@@ -165,9 +165,15 @@ class EmployeeController extends Controller
             $validated = $request->validated();
 
             DB::transaction(function () use ($validated, $request) {
-                // Convert role slug to ID for Member compatibility
-                $role = \App\Models\Role::where('slug', $validated['role'])->where('status', 1)->firstOrFail();
-                $roleArray = [$role->id];
+                // Convert role slug to ID for Member compatibility (fallback to 'member' if role not in DB)
+                $role = \App\Models\Role::where('slug', $validated['role'])->where('status', 1)->first();
+                if (!$role && $validated['role'] === 'member') {
+                    $role = \App\Models\Role::firstOrCreate(
+                        ['slug' => 'member'],
+                        ['name' => 'Member', 'status' => 1, 'created_by' => auth('superadmin')->id()]
+                    );
+                }
+                $roleArray = $role ? [$role->id] : [];
 
                 // Store department and designation as single-element arrays for Member compatibility
                 $departmentArray = [$validated['department']];
@@ -230,9 +236,15 @@ class EmployeeController extends Controller
             $validated = $request->validated();
 
             DB::transaction(function () use ($validated, $request, $employee) {
-                // Convert role slug to ID for Member compatibility
-                $role = \App\Models\Role::where('slug', $validated['role'])->where('status', 1)->firstOrFail();
-                $roleArray = [$role->id];
+                // Convert role slug to ID for Member compatibility (fallback to 'member' if role not in DB)
+                $role = \App\Models\Role::where('slug', $validated['role'])->where('status', 1)->first();
+                if (!$role && $validated['role'] === 'member') {
+                    $role = \App\Models\Role::firstOrCreate(
+                        ['slug' => 'member'],
+                        ['name' => 'Member', 'status' => 1, 'created_by' => auth('superadmin')->id()]
+                    );
+                }
+                $roleArray = $role ? [$role->id] : [];
                 $departmentArray = [$validated['department']];
                 $designationArray = [$validated['designation']];
 
