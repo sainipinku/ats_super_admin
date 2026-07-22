@@ -271,6 +271,11 @@ class Member extends Authenticatable
             default => 'home',
         };
     }
+    public function employee()
+    {
+        return $this->hasOne(Employee::class, 'member_id');
+    }
+
     public function departmentList()
     {
         return $this->belongsToMany(Department::class, 'member_department', 'member_id', 'department_id')

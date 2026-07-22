@@ -323,23 +323,40 @@ export default function AuthenticatedLayout({ header, children }) {
                                             {/* Logo */}
                                             <button
                                                 onClick={toggleSidebar}
-                                                className="flex xl:hidden items-center justify-center bg-white dark:bg-[#61CC681A] w-[40px] h-[40px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[8px] transition text-[currentColor] dark:text-[currentColor] focus:outline-none hover:bg-gray-100 dark:hover:bg-[#61CC6820]"
+                                                className="flex items-center justify-center bg-white dark:bg-[#61CC681A] w-[40px] h-[40px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[8px] transition text-[currentColor] dark:text-[currentColor] focus:outline-none hover:bg-gray-100 dark:hover:bg-[#61CC6820]"
                                                 aria-label="Toggle sidebar"
                                             >
-                                                <svg
-                                                    className="w-6 h-6"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth={2}
-                                                        d="M4 6h16M4 12h16M4 18h16"
-                                                    />
-                                                </svg>
+                                                {sidebarOpen ? (
+                                                    <svg
+                                                        className="w-6 h-6"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M6 18L18 6M6 6l12 12"
+                                                        />
+                                                    </svg>
+                                                ) : (
+                                                    <svg
+                                                        className="w-6 h-6"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M4 6h16M4 12h16M4 18h16"
+                                                        />
+                                                    </svg>
+                                                )}
                                             </button>
 
                                             {/* Logo */}
@@ -356,7 +373,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                                 </Link>
                                             </div>
 {/* Navigation Links */}
-<div className="hidden xl:flex items-center gap-3 xl:gap-4">
+{/* <div className="hidden xl:flex items-center gap-3 xl:gap-4">
     <FlowNavLink href={route("super.dashboard")} active={route().current("super.dashboard") || route().current("super.construction.dashboard")}>
         Control Tower
     </FlowNavLink>
@@ -393,7 +410,7 @@ export default function AuthenticatedLayout({ header, children }) {
     <FlowNavLink href={route("super.construction.handover.index")} active={route().current("super.construction.handover.*")}>
         Handover & Closure
     </FlowNavLink>
-</div>
+</div> */}
 </div>
 
                                         <div className="flex items-center gap-2 relative">
