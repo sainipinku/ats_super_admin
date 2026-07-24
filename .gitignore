@@ -109,3 +109,5 @@ docker-compose.override.yml
 .php_cs
 .php_cs.dist
 .php-cs-fixer.cache
+
+.git_disabled/

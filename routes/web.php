@@ -142,6 +142,15 @@ Route::prefix('super')->name('super.')->group(function () {
         });
 
 
+        // Vehicle Management Routes
+        Route::group(['prefix' => 'vehicles', 'as' => 'vehicles.'], function () {
+            Route::get('/list', [\App\Http\Controllers\SuperAdmin\VehicleController::class, 'index'])->name('list');
+            Route::post('/store', [\App\Http\Controllers\SuperAdmin\VehicleController::class, 'store'])->name('store');
+            Route::put('/update/{uuid}', [\App\Http\Controllers\SuperAdmin\VehicleController::class, 'update'])->name('update');
+            Route::get('/{uuid}', [\App\Http\Controllers\SuperAdmin\VehicleController::class, 'show'])->name('show');
+            Route::delete('/{uuid}', [\App\Http\Controllers\SuperAdmin\VehicleController::class, 'destroy'])->name('destroy');
+        });
+
         Route::group(['prefix' => 'contact-messages', 'as' => 'contact.messages.'], function () {
             Route::get('/', [ContactMessageController::class, 'index'])->name('index');
             Route::patch('/{message}/toggle-read', [ContactMessageController::class, 'toggleRead'])->name('toggle-read');

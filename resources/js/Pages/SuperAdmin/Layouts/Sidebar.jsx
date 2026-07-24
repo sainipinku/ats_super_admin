@@ -63,6 +63,11 @@ const navigation = [
         active: ["super.construction.materials.*"],
     },
     {
+        label: "Vehicle Management",
+        href: route("super.vehicles.list"),
+        active: ["super.vehicles.*"],
+    },
+    {
         label: "Vehicle Tracking",
         href: route("super.construction.vehicles.index"),
         active: ["super.construction.vehicles.*"],

@@ -123,7 +123,7 @@ class EmployeeController extends Controller
                 $statusValue = $request->status == 'active' ? 1 : 0;
                 $q->whereHas('member', fn($mq) => $mq->where('status', $statusValue));
             })
-            ->latest()
+            ->oldest()
             ->paginate($request->per_page ?? 10);
 
         // Transform employee data to include member fields
@@ -135,7 +135,7 @@ class EmployeeController extends Controller
                 $member->single_department = $departmentVal;
                 $member->single_designation = $designationVal;
                 $member->role_name = is_array($member->roles) && count($member->roles) > 0
-                    ? ((int)$member->roles[0] === 1 ? 'Admin' : 'Member')
+                    ? (Role::find($member->roles[0])?->name ?? 'Member')
                     : '-';
                 $member->role_id = is_array($member->roles) && count($member->roles) > 0 ? (int)$member->roles[0] : null;
                 
