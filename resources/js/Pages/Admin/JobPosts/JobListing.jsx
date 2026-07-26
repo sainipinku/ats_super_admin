@@ -961,6 +961,7 @@ export default function JobListing({ auth }) {
         formData.append('company', createJobForm.company);
         formData.append('location', createJobForm.location);
         formData.append('job_type', createJobForm.job_type || 'Full Time');
+        formData.append('job_category', createJobForm.job_category || '');
         formData.append('openings', createJobForm.openings || 1);
         formData.append('experience', createJobForm.experience);
         const salaryRange = `₹${createJobForm.min_salary || 0} - ₹${createJobForm.max_salary || 0}/${createJobForm.salary_period || 'Monthly'}`;

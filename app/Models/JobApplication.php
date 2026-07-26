@@ -119,6 +119,18 @@ class JobApplication extends Model
                 return;
             }
 
+            // Send job application submission email to candidate
+            if ($application->candidate_email) {
+                \App\Jobs\SendJobApplicationEmail::dispatch(
+                    $application->candidate_name ?? 'Candidate',
+                    $application->candidate_email,
+                    $job->title ?? 'Job Position',
+                    $application->job_id,
+                    now(),
+                    url('/jobs/' . $job->uuid . '/applications/' . $application->uuid)
+                );
+            }
+
             Notification::create([
                 'model' => 'admin',
                 'listing_id' => $job->created_by,
@@ -136,6 +148,43 @@ class JobApplication extends Model
                     'candidate_phone' => $application->candidate_phone,
                 ],
             ]);
+        });
+
+        static::updating(function (JobApplication $application) {
+            // Check if status has changed
+            $original = $application->getOriginal();
+            if (isset($original['status']) && $original['status'] !== $application->status) {
+                // Dispatch status change email to candidate
+                if ($application->candidate_email) {
+                    $job = Job::query()
+                        ->select('id', 'uuid', 'title')
+                        ->where('id', $application->job_id)
+                        ->first();
+
+                    $statusMessages = [
+                        'submitted' => 'Your application has been received and is in our queue for review.',
+                        'reviewing' => 'Your application is currently being reviewed by our team.',
+                        'shortlisted' => 'Congratulations! Your application has been shortlisted. We will be in touch soon.',
+                        'rejected' => 'Thank you for your interest. Unfortunately, your application was not selected at this time.',
+                        'selected' => 'Congratulations! You have been selected to move forward in our process.',
+                        'interview' => 'You have been scheduled for an interview. Details will be sent separately.',
+                        'offer' => 'Congratulations! We are pleased to make you a job offer.',
+                        'hired' => 'Welcome to our team! You have been hired.',
+                    ];
+
+                    $message = $statusMessages[strtolower($application->status)] ?? 'Your application status has been updated. Please check your account for more details.';
+
+                    \App\Jobs\SendJobApplicationStatusEmail::dispatch(
+                        $application->candidate_name ?? 'Candidate',
+                        $application->candidate_email,
+                        $job->title ?? 'Job Position',
+                        $application->status,
+                        $original['status'] ?? 'submitted',
+                        $message,
+                        url('/jobs/' . $job->uuid . '/applications/' . $application->uuid)
+                    );
+                }
+            }
         });
     }
 }

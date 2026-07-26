@@ -122,6 +122,7 @@ class AuthController extends Controller
         $payload = [
             'success' => true,
             'message' => 'OTP sent.',
+            'member' => $member,
         ];
 
         if (config('app.debug')) {

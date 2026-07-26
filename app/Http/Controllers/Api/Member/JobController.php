@@ -209,79 +209,91 @@ class JobController extends Controller
             . '</div></div></div></body></html>';
     }
 
-   public function index(Request $request)
-{
-    $query = Job::query()
-        ->with(['creator'])
-        ->where('status', 'active')
-        // ->where(function ($q) {
-        //     $q->whereNull('last_date')
-        //         ->orWhere('last_date', '>=', date('Y-m-d')); // Fixed format
-        // })
-        ->orderByDesc('created_at');
+    public function index(Request $request, GeocodingService $geocodingService)
+    {
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'job_type' => ['nullable', 'string', 'max:50'],
+            'job_category' => ['nullable', 'string', 'max:100'],
+            'job_location' => ['nullable', 'string', 'max:255'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'distance' => ['nullable', 'numeric', 'min:1', 'max:500'],
+            'latitude' => ['nullable', 'decimal:6,8', 'between:-90,90'],
+            'longitude' => ['nullable', 'decimal:6,8', 'between:-180,180'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
 
-    // Optional: Add debug logging to see total count
+        $member = $request->user();
+        $query = Job::query()
+            ->with(['creator'])
+            ->where('status', 'active');
 
-    if ($request->filled('search')) {
-        $search = $request->string('search')->toString();
-        $query->where(function ($q) use ($search) {
-            $q->where('title', 'like', "%{$search}%")
-                ->orWhere('company', 'like', "%{$search}%")
-                ->orWhere('location', 'like', "%{$search}%");
-        });
+        if (! empty($validated['search'])) {
+            $search = $validated['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('company', 'like', "%{$search}%")
+                    ->orWhere('location', 'like', "%{$search}%");
+            });
+        }
+
+        if (! empty($validated['job_type'])) {
+            $query->where('job_type', $validated['job_type']);
+        }
+
+        if (! empty($validated['job_category'])) {
+            $query->where('job_category', $validated['job_category']);
+        }
+
+        if (! empty($validated['job_location'])) {
+            $query->where('location', 'like', '%' . $validated['job_location'] . '%');
+        }
+
+        $coordinates = $this->resolveCoordinates(
+            $validated['latitude'] ?? null,
+            $validated['longitude'] ?? null,
+            $validated['location'] ?? null,
+            $member,
+            $geocodingService
+        );
+
+        if ($coordinates !== null) {
+            $this->applyDistanceSelection($query, $coordinates['latitude'], $coordinates['longitude']);
+
+            if (! empty($validated['distance'])) {
+                $query->havingRaw('distance_km <= ?', [(float) $validated['distance']]);
+            }
+
+            $query->whereNotNull('latitude')
+                ->whereNotNull('longitude')
+                ->orderBy('distance_km')
+                ->orderByDesc('created_at');
+
+            if ($member && ($request->filled('latitude') || $request->filled('longitude') || $request->filled('location'))) {
+                $this->updateMemberLocation($member, $coordinates['latitude'], $coordinates['longitude'], $geocodingService);
+            }
+        } elseif (! empty($validated['location'])) {
+            $query->where('location', 'like', '%' . $validated['location'] . '%')
+                ->orderByDesc('created_at');
+        } else {
+            $query->orderByDesc('created_at');
+        }
+
+        $perPage = max(1, min((int) ($validated['per_page'] ?? 12), 50));
+        $jobs = $query->paginate($perPage)->withQueryString();
+
+        [$appliedJobIds, $savedJobIds] = $this->getMemberJobState($member);
+        $this->attachJobFlags($jobs->getCollection(), $appliedJobIds, $savedJobIds, $coordinates !== null);
+
+        return response()->json([
+            'success' => true,
+            'jobs' => $jobs,
+            'applied_job_ids' => $appliedJobIds,
+            'saved_job_ids' => $savedJobIds,
+            'total_jobs' => $jobs->total(),
+            'current_address' => $member?->current_address,
+        ]);
     }
-
-    if ($request->filled('job_type')) {
-        $query->where('job_type', $request->string('job_type')->toString());
-    }
-
-    if ($request->filled('location')) {
-        $location = $request->string('location')->toString();
-        $query->where('location', 'like', "%{$location}%");
-    }
-
-    if ($request->filled('job_category')) {
-        $category = $request->string('job_category')->toString();
-        $query->where('job_category', $category);
-    }
-
-    $perPage = max(1, min((int)$request->input('per_page', 12), 50));
-    $jobs = $query->paginate($perPage)->withQueryString();
-
-    $member = $request->user();
-    $appliedJobIds = [];
-    $savedJobIds = [];
-    
-    if ($member) {
-        $appliedJobIds = JobApplication::query()
-            ->where('candidate_id', $member->id)
-            ->pluck('job_id')
-            ->toArray();
-
-        $savedJobIds = SavedJob::query()
-            ->where('member_id', $member->id)
-            ->pluck('job_id')
-            ->toArray();
-    }
-
-    // Flip for O(1) lookups
-    $appliedMap = array_flip($appliedJobIds);
-    $savedMap = array_flip($savedJobIds);
-
-    // Attach is_saved and is_applied to each job object
-    // Uses hash maps - zero additional queries, O(1) per job
-    $jobs->getCollection()->transform(function ($job) use ($appliedMap, $savedMap) {
-        $job->is_saved = isset($savedMap[$job->id]);
-        $job->is_applied = isset($appliedMap[$job->id]);
-        return $job;
-    });
-    
-    return response()->json([
-        'success' => true,
-        'jobs' => $jobs,
-        'total_jobs' => $jobs->total(),
-    ]);
-}
 
     public function show(Request $request, Job $job)
     {
@@ -530,25 +542,25 @@ class JobController extends Controller
    public function myApplications(Request $request)
 {
     $member = $request->user();
-    
+
     $perPage = (int) ($request->input('per_page', 10));
     $status = $request->input('status'); // Get status filter from request
-    
+
     $query = JobApplication::query()
         ->with(['job' => function ($q) {
             $q->select('id', 'title', 'company', 'location', 'job_type', 'salary', 'status as job_status');
         }])
         ->where('candidate_id', $member->id);
-    
+
     // Apply status filter if provided
     if ($status && in_array($status, ['applied', 'viewed', 'shortlisted', 'assigned_to_calling_member', 'calling_in_progress', 'calling_approved', 'calling_rejected', 'admin_review', 'offer_letter_generated', 'waiting_list', 'hired', 'not_selected', 'rejected'])) {
         $query->where('status', $status);
     }
-    
+
     $applications = $query
         ->orderByDesc('created_at')
         ->paginate(max(1, min($perPage, 50)));
-    
+
     $statusCounts = [
         'applied' => JobApplication::where('candidate_id', $member->id)->where('status', 'applied')->count(),
         'viewed' => JobApplication::where('candidate_id', $member->id)->where('status', 'viewed')->count(),
@@ -564,7 +576,7 @@ class JobController extends Controller
         'not_selected' => JobApplication::where('candidate_id', $member->id)->where('status', 'not_selected')->count(),
         'rejected' => JobApplication::where('candidate_id', $member->id)->where('status', 'rejected')->count(),
     ];
-    
+
     return response()->json([
         'success' => true,
         'applications' => $applications,
@@ -573,32 +585,48 @@ class JobController extends Controller
     ]);
 }
 
-    public function categories(Request $request)
+    public function locations(Request $request, GeocodingService $geocodingService)
     {
-        $categoryRows = Job::query()
+        $locationData = $this->buildLocationData($geocodingService);
+
+        return response()->json([
+            'success' => true,
+            'locations' => $locationData['locations'],
+            'neighbourhoods' => $locationData['neighbourhoods'],
+            'suburbs' => $locationData['suburbs'],
+        ]);
+    }
+
+    public function categories(Request $request, GeocodingService $geocodingService)
+    {
+        $query = Job::query()
             ->where('status', 'active')
             ->whereNotNull('job_category')
-            ->where('job_category', '!=', '')
-            ->select('job_category', DB::raw('COUNT(*) as count'))
-            ->groupBy('job_category')
+            ->where('job_category', '!=', '');
+
+        $categories = (clone $query)
+            ->distinct()
             ->orderBy('job_category')
-            ->get()
-            ->map(function ($row) {
-                return [
-                    'job_category' => $row->job_category,
-                    'count' => (int) $row->count,
-                ];
-            })
+            ->pluck('job_category')
             ->values();
 
         $response = [
             'success' => true,
-            'categories' => $categoryRows->pluck('job_category')->values(),
+            'categories' => $categories,
         ];
 
         if ($request->boolean('with_count')) {
-            $response['counts'] = $categoryRows;
+            $response['counts'] = (clone $query)
+                ->select('job_category', DB::raw('COUNT(*) as count'))
+                ->groupBy('job_category')
+                ->orderBy('job_category')
+                ->get();
         }
+
+        $locationData = $this->buildLocationData($geocodingService);
+        $response['locations'] = $locationData['locations'];
+        $response['neighbourhoods'] = $locationData['neighbourhoods'];
+        $response['suburbs'] = $locationData['suburbs'];
 
         return response()->json($response);
     }
@@ -610,35 +638,54 @@ class JobController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function nearby(Request $request)
+    public function nearby(Request $request, GeocodingService $geocodingService)
     {
         $validated = $request->validate([
-            'latitude' => 'required|numeric|between:-90,90',
-            'longitude' => 'required|numeric|between:-180,180',
-            'radius' => 'nullable|numeric|min:1|max:500',
-            'unit' => 'nullable|in:km,mi',
+            'location' => ['nullable', 'string', 'max:255'],
+            'latitude' => ['nullable', 'decimal:6,8', 'between:-90,90'],
+            'longitude' => ['nullable', 'decimal:6,8', 'between:-180,180'],
+            'radius_km' => ['nullable', 'numeric', 'min:1', 'max:500'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'job_type' => ['nullable', 'string', 'max:50'],
+            'job_category' => ['nullable', 'string', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
 
-        $latitude = (float) $validated['latitude'];
-        $longitude = (float) $validated['longitude'];
-        $radius = (float) ($validated['radius'] ?? 50);
-        $unit = $validated['unit'] ?? 'km';
-        $earthRadius = $unit === 'mi' ? 3959 : 6371;
+        $member = $request->user();
+        $coordinates = $this->resolveCoordinates(
+            $validated['latitude'] ?? null,
+            $validated['longitude'] ?? null,
+            $validated['location'] ?? null,
+            $member,
+            $geocodingService
+        );
 
-        $haversineSql = GeocodingService::haversineSql($latitude, $longitude);
+        if ($coordinates === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Latitude and longitude or a location are required.',
+            ], 422);
+        }
+
+        if ($member && ($request->filled('latitude') || $request->filled('longitude') || $request->filled('location'))) {
+            $this->updateMemberLocation($member, $coordinates['latitude'], $coordinates['longitude'], $geocodingService);
+        }
 
         $query = Job::query()
             ->with(['creator'])
             ->where('status', 'active')
             ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->select('job_posts.*')
-            ->selectRaw("{$haversineSql} AS distance")
-            ->having('distance', '<=', $radius)
-            ->orderBy('distance');
+            ->whereNotNull('longitude');
 
-        if ($request->filled('search')) {
-            $search = $request->string('search')->toString();
+        $this->applyDistanceSelection($query, $coordinates['latitude'], $coordinates['longitude']);
+        $query->orderBy('distance_km');
+
+        if (! empty($validated['radius_km'])) {
+            $query->havingRaw('distance_km <= ?', [(float) $validated['radius_km']]);
+        }
+
+        if (! empty($validated['search'])) {
+            $search = $validated['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
                     ->orWhere('company', 'like', "%{$search}%")
@@ -646,54 +693,151 @@ class JobController extends Controller
             });
         }
 
-        if ($request->filled('job_type')) {
-            $query->where('job_type', $request->string('job_type')->toString());
+        if (! empty($validated['job_type'])) {
+            $query->where('job_type', $validated['job_type']);
         }
 
-        if ($request->filled('job_category')) {
-            $query->where('job_category', $request->string('job_category')->toString());
+        if (! empty($validated['job_category'])) {
+            $query->where('job_category', $validated['job_category']);
         }
 
-        $perPage = max(1, min((int) $request->input('per_page', 12), 50));
+        $perPage = max(1, min((int) ($validated['per_page'] ?? 12), 50));
         $jobs = $query->paginate($perPage)->withQueryString();
 
-        $member = $request->user();
-        $appliedJobIds = [];
-        $savedJobIds = [];
-
-        if ($member) {
-            $appliedJobIds = JobApplication::query()
-                ->where('candidate_id', $member->id)
-                ->pluck('job_id')
-                ->toArray();
-
-            $savedJobIds = SavedJob::query()
-                ->where('member_id', $member->id)
-                ->pluck('job_id')
-                ->toArray();
-        }
-
-        $appliedMap = array_flip($appliedJobIds);
-        $savedMap = array_flip($savedJobIds);
-
-        $jobs->getCollection()->transform(function ($job) use ($appliedMap, $savedMap) {
-            $job->is_saved = isset($savedMap[$job->id]);
-            $job->is_applied = isset($appliedMap[$job->id]);
-            $job->distance = round((float) $job->distance, 2);
-            return $job;
-        });
+        [$appliedJobIds, $savedJobIds] = $this->getMemberJobState($member);
+        $this->attachJobFlags($jobs->getCollection(), $appliedJobIds, $savedJobIds, true);
 
         return response()->json([
             'success' => true,
             'jobs' => $jobs,
             'total_jobs' => $jobs->total(),
-            'filters' => [
-                'latitude' => $latitude,
-                'longitude' => $longitude,
-                'radius' => $radius,
-                'unit' => $unit,
-            ],
+            'current_address' => $member?->fresh()?->current_address,
+            'latitude' => $coordinates['latitude'],
+            'longitude' => $coordinates['longitude'],
         ]);
+    }
+
+    private function resolveCoordinates(
+        mixed $latitude,
+        mixed $longitude,
+        ?string $location,
+        $member,
+        GeocodingService $geocodingService
+    ): ?array {
+        if ($latitude !== null && $longitude !== null && $latitude !== '' && $longitude !== '') {
+            return [
+                'latitude' => round((float) $latitude, 6),
+                'longitude' => round((float) $longitude, 6),
+            ];
+        }
+
+        $location = trim((string) $location);
+        if ($location !== '') {
+            $geoResult = $geocodingService->geocodeAddress($location);
+            if (is_array($geoResult) && isset($geoResult['latitude'], $geoResult['longitude'])) {
+                return [
+                    'latitude' => round((float) $geoResult['latitude'], 6),
+                    'longitude' => round((float) $geoResult['longitude'], 6),
+                ];
+            }
+        }
+
+        if ($member && $member->latitude !== null && $member->longitude !== null) {
+            return [
+                'latitude' => round((float) $member->latitude, 6),
+                'longitude' => round((float) $member->longitude, 6),
+            ];
+        }
+
+        return null;
+    }
+
+    private function applyDistanceSelection($query, float $latitude, float $longitude): void
+    {
+        $haversineSql = GeocodingService::haversineSql($latitude, $longitude, 'job_posts.latitude', 'job_posts.longitude');
+
+        $query->select('job_posts.*')
+            ->selectRaw("{$haversineSql} AS distance_km");
+    }
+
+    private function getMemberJobState($member): array
+    {
+        if (! $member) {
+            return [[], []];
+        }
+
+        $appliedJobIds = JobApplication::query()
+            ->where('candidate_id', $member->id)
+            ->pluck('job_id')
+            ->toArray();
+
+        $savedJobIds = SavedJob::query()
+            ->where('member_id', $member->id)
+            ->pluck('job_id')
+            ->toArray();
+
+        return [$appliedJobIds, $savedJobIds];
+    }
+
+    private function attachJobFlags($collection, array $appliedJobIds, array $savedJobIds, bool $hasDistance = false): void
+    {
+        $appliedMap = array_flip($appliedJobIds);
+        $savedMap = array_flip($savedJobIds);
+
+        $collection->transform(function ($job) use ($appliedMap, $savedMap, $hasDistance) {
+            $job->is_saved = isset($savedMap[$job->id]);
+            $job->is_applied = isset($appliedMap[$job->id]);
+
+            if ($hasDistance && isset($job->distance_km)) {
+                $job->distance_km = round((float) $job->distance_km, 2);
+            }
+
+            return $job;
+        });
+    }
+
+    private function buildLocationData(GeocodingService $geocodingService): array
+    {
+        $locations = Job::query()
+            ->where('status', 'active')
+            ->whereNotNull('location')
+            ->where('location', '!=', '')
+            ->selectRaw('location, MIN(latitude) as latitude, MIN(longitude) as longitude, COUNT(*) as jobs_count')
+            ->groupBy('location')
+            ->orderBy('location')
+            ->get()
+            ->map(function ($location) use ($geocodingService) {
+                $latitude = $location->latitude !== null ? round((float) $location->latitude, 6) : null;
+                $longitude = $location->longitude !== null ? round((float) $location->longitude, 6) : null;
+                $area = $geocodingService->getAreaDetailsFromCoordinates($latitude, $longitude);
+
+                return [
+                    'location' => $location->location,
+                    'latitude' => $latitude,
+                    'longitude' => $longitude,
+                    'jobs_count' => (int) $location->jobs_count,
+                    'formatted_address' => $area['formatted_address'],
+                    'neighbourhood' => $area['neighbourhood'],
+                    'neighborhood' => $area['neighbourhood'],
+                    'suburb' => $area['suburb'],
+                ];
+            })
+            ->values();
+
+        return [
+            'locations' => $locations,
+            'neighbourhoods' => $locations->pluck('neighbourhood')->filter()->unique()->sort()->values(),
+            'suburbs' => $locations->pluck('suburb')->filter()->unique()->sort()->values(),
+        ];
+    }
+
+    private function updateMemberLocation($member, float $latitude, float $longitude, GeocodingService $geocodingService): void
+    {
+        $member->forceFill([
+            'latitude' => round($latitude, 6),
+            'longitude' => round($longitude, 6),
+            'current_address' => $geocodingService->reverseGeocode($latitude, $longitude),
+        ])->save();
     }
 
     public function withdraw(Request $request, JobApplication $application)

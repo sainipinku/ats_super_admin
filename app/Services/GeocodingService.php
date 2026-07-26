@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -14,7 +15,7 @@ class GeocodingService
 
     public function __construct()
     {
-        $this->apiKey = config('services.google_maps.api_key', '');
+        $this->apiKey = (string) (config('services.google_maps.key') ?: config('services.google_maps.api_key', ''));
     }
 
     /**
@@ -25,54 +26,30 @@ class GeocodingService
      */
     public function geocode(string $address): ?array
     {
-        if (empty($this->apiKey)) {
-            Log::warning('GeocodingService: Google Maps API key not configured.');
+        $result = $this->geocodeAddress($address);
+
+        if (! is_array($result)) {
             return null;
         }
 
-        if (empty(trim($address))) {
+        return [
+            'latitude' => isset($result['latitude']) ? (float) $result['latitude'] : null,
+            'longitude' => isset($result['longitude']) ? (float) $result['longitude'] : null,
+        ];
+    }
+
+    public function geocodeAddress(string $address): ?array
+    {
+        $address = trim($address);
+        if ($address === '') {
             return null;
         }
 
-        try {
-            $response = Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
-                'address' => $address,
-                'key' => $this->apiKey,
-                'region' => 'in',
-                'language' => 'en',
-            ]);
-
-            if (!$response->successful()) {
-                Log::warning('GeocodingService: API request failed.', [
-                    'status' => $response->status(),
-                    'address' => $address,
-                ]);
-                return null;
-            }
-
-            $data = $response->json();
-
-            if (($data['status'] ?? '') !== 'OK' || empty($data['results'][0]['geometry']['location'])) {
-                Log::warning('GeocodingService: No results found.', [
-                    'status' => $data['status'] ?? 'UNKNOWN',
-                    'address' => $address,
-                ]);
-                return null;
-            }
-
-            $location = $data['results'][0]['geometry']['location'];
-
-            return [
-                'latitude' => (float) $location['lat'],
-                'longitude' => (float) $location['lng'],
-            ];
-        } catch (\Exception $e) {
-            Log::error('GeocodingService: Exception occurred.', [
-                'message' => $e->getMessage(),
-                'address' => $address,
-            ]);
-            return null;
-        }
+        return $this->callGeocodeApi([
+            'address' => $address,
+            'region' => 'in',
+            'language' => 'en',
+        ], 'address:' . mb_strtolower($address));
     }
 
     /**
@@ -84,35 +61,72 @@ class GeocodingService
      */
     public function reverseGeocode(float $latitude, float $longitude): ?string
     {
-        if (empty($this->apiKey)) {
-            Log::warning('GeocodingService: Google Maps API key not configured.');
-            return null;
-        }
+        $result = $this->reverseGeocodeResult($latitude, $longitude);
 
-        try {
-            $response = Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
-                'latlng' => "{$latitude},{$longitude}",
-                'key' => $this->apiKey,
-                'language' => 'en',
-            ]);
+        return $result['formatted_address'] ?? null;
+    }
 
-            if (!$response->successful()) {
-                return null;
+    public function reverseGeocodeResult(float $latitude, float $longitude): ?array
+    {
+        return $this->callGeocodeApi([
+            'latlng' => "{$latitude},{$longitude}",
+            'language' => 'en',
+        ], 'latlng:' . round($latitude, 6) . ',' . round($longitude, 6));
+    }
+
+    public function extractAddressComponent(array $components, array $types): ?string
+    {
+        foreach ($components as $component) {
+            $componentTypes = $component['types'] ?? [];
+            if (! is_array($componentTypes)) {
+                continue;
             }
 
-            $data = $response->json();
-
-            if (($data['status'] ?? '') !== 'OK' || empty($data['results'][0]['formatted_address'])) {
-                return null;
+            foreach ($types as $type) {
+                if (in_array($type, $componentTypes, true)) {
+                    $value = trim((string) ($component['long_name'] ?? ''));
+                    if ($value !== '') {
+                        return $value;
+                    }
+                }
             }
-
-            return $data['results'][0]['formatted_address'];
-        } catch (\Exception $e) {
-            Log::error('GeocodingService: Reverse geocode exception.', [
-                'message' => $e->getMessage(),
-            ]);
-            return null;
         }
+
+        return null;
+    }
+
+    public function getAreaDetailsFromCoordinates(?float $latitude, ?float $longitude): array
+    {
+        if ($latitude === null || $longitude === null) {
+            return [
+                'formatted_address' => null,
+                'neighbourhood' => null,
+                'suburb' => null,
+            ];
+        }
+
+        $result = $this->reverseGeocodeResult($latitude, $longitude);
+        $components = is_array($result['address_components'] ?? null) ? $result['address_components'] : [];
+
+        $neighbourhood = $this->extractAddressComponent($components, [
+            'neighborhood',
+            'sublocality_level_2',
+            'sublocality_level_1',
+            'sublocality',
+        ]);
+
+        $suburb = $this->extractAddressComponent($components, [
+            'sublocality_level_1',
+            'sublocality',
+            'locality',
+            'administrative_area_level_2',
+        ]);
+
+        return [
+            'formatted_address' => $result['formatted_address'] ?? null,
+            'neighbourhood' => $neighbourhood,
+            'suburb' => $suburb,
+        ];
     }
 
     /**
@@ -169,5 +183,60 @@ class GeocodingService
         $lng = (float) $longitude;
 
         return "(6371 * acos(cos(radians({$lat})) * cos(radians({$latColumn})) * cos(radians({$lngColumn}) - radians({$lng})) + sin(radians({$lat})) * sin(radians({$latColumn}))))";
+    }
+
+    private function callGeocodeApi(array $params, string $cacheSuffix): ?array
+    {
+        if (empty($this->apiKey)) {
+            Log::warning('GeocodingService: Google Maps API key not configured.');
+            return null;
+        }
+
+        $cacheKey = 'google_geocode:' . md5($cacheSuffix);
+
+        return Cache::remember($cacheKey, now()->addDays(7), function () use ($params) {
+            try {
+                $response = Http::timeout(10)->acceptJson()->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                    ...$params,
+                    'key' => $this->apiKey,
+                ]);
+
+                if (! $response->successful()) {
+                    Log::warning('GeocodingService: API request failed.', [
+                        'status' => $response->status(),
+                        'params' => $params,
+                    ]);
+
+                    return null;
+                }
+
+                $data = $response->json();
+                $result = $data['results'][0] ?? null;
+
+                if (($data['status'] ?? '') !== 'OK' || ! is_array($result)) {
+                    Log::warning('GeocodingService: No results found.', [
+                        'status' => $data['status'] ?? 'UNKNOWN',
+                        'params' => $params,
+                    ]);
+
+                    return null;
+                }
+
+                return [
+                    'formatted_address' => $result['formatted_address'] ?? null,
+                    'place_id' => $result['place_id'] ?? null,
+                    'address_components' => $result['address_components'] ?? [],
+                    'latitude' => $result['geometry']['location']['lat'] ?? null,
+                    'longitude' => $result['geometry']['location']['lng'] ?? null,
+                ];
+            } catch (\Throwable $e) {
+                Log::error('GeocodingService: Exception occurred.', [
+                    'message' => $e->getMessage(),
+                    'params' => $params,
+                ]);
+
+                return null;
+            }
+        });
     }
 }

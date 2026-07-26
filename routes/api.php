@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Route;
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::put('/profile', [ProfileController::class, 'update']);
         Route::get('/profile/completion', [ProfileController::class, 'completion']);
+        Route::post('/profile/location', [ProfileController::class, 'updateLocation']);
         Route::post('/profile/photo', [ProfileController::class, 'updatePhoto']);
         Route::delete('/profile/photo', [ProfileController::class, 'removePhoto']);
         Route::get('/profile/resume', [ProfileController::class, 'resume']);
@@ -39,6 +40,7 @@ use Illuminate\Support\Facades\Route;
         Route::get('/profile/resume/view', [ProfileController::class, 'viewResume']);
 
         Route::get('/jobs/nearby', [JobController::class, 'nearby']);
+        Route::get('/jobs/locations', [JobController::class, 'locations']);
         Route::get('/jobs', [JobController::class, 'index']);
         Route::get('/jobs/{job}', [JobController::class, 'show']);
         Route::post('/jobs/{job}/apply', [JobController::class, 'apply']);
@@ -48,7 +50,7 @@ use Illuminate\Support\Facades\Route;
         Route::get('/applications', [JobController::class, 'myApplications']);
         Route::delete('/applications/{application}', [JobController::class, 'withdraw']);
 
-         Route::get('/job-categories', [JobController::class, 'categories']);
+        Route::get('/job-categories', [JobController::class, 'categories']);
 
          
 

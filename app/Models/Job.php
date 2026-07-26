@@ -66,6 +66,8 @@ class Job extends Model
         'approved_at' => 'datetime',
         'resubmitted_at' => 'datetime',
         'last_date' => 'date',
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 
     public function getCompanyImageAttribute($value)

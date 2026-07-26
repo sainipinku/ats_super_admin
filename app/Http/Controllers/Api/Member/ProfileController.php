@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Member;
 
 use App\Http\Controllers\Controller;
+use App\Services\GeocodingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -74,7 +75,7 @@ class ProfileController extends Controller
         ]);
     }
 
-    public function update(Request $request)
+    public function update(Request $request, GeocodingService $geocodingService)
     {
         $member = $request->user();
 
@@ -105,8 +106,9 @@ class ProfileController extends Controller
             'is_fresher' => ['sometimes', 'boolean'],
             'skills' => ['sometimes', 'array'],
             'skills.*' => ['string', 'max:50'],
-            'latitude' => ['sometimes', 'nullable', 'decimal:8,6', 'between:-90,90'],
-            'longitude' => ['sometimes', 'nullable', 'decimal:9,6', 'between:-180,180'],
+            'latitude' => ['sometimes', 'nullable', 'decimal:6,8', 'between:-90,90'],
+            'longitude' => ['sometimes', 'nullable', 'decimal:6,8', 'between:-180,180'],
+            'current_address' => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
 
         if ($request->hasFile('image')) {
@@ -144,6 +146,12 @@ class ProfileController extends Controller
         if (array_key_exists('phone', $validated) && $validated['phone'] !== $member->phone) {
             $validated['phone_verify_at'] = null;
         }
+
+        $this->syncLocationPayload(
+            $validated,
+            $geocodingService,
+            $validated['current_address'] ?? $validated['location'] ?? null
+        );
 
         $member->fill($validated)->save();
 
@@ -315,6 +323,34 @@ class ProfileController extends Controller
         ]);
     }
 
+    public function updateLocation(Request $request, GeocodingService $geocodingService)
+    {
+        $member = $request->user();
+
+        $validated = $request->validate([
+            'latitude' => ['required', 'decimal:6,8', 'between:-90,90'],
+            'longitude' => ['required', 'decimal:6,8', 'between:-180,180'],
+            'address' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $validated['current_address'] = $validated['address'] ?? null;
+        unset($validated['address']);
+
+        $this->syncLocationPayload($validated, $geocodingService, $validated['current_address'] ?? null);
+
+        $member->forceFill([
+            'latitude' => $validated['latitude'],
+            'longitude' => $validated['longitude'],
+            'current_address' => $validated['current_address'] ?? null,
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'member' => $member->fresh(),
+            'current_address' => $member->current_address,
+        ]);
+    }
+
     private function deleteMemberImage(?string $image): void
     {
         if (empty($image)) {
@@ -355,5 +391,56 @@ class ProfileController extends Controller
         $base = rtrim($request->getSchemeAndHttpHost(), '/');
 
         return $base . '/api/profile/resume/view';
+    }
+
+    private function syncLocationPayload(array &$payload, GeocodingService $geocodingService, ?string $address = null): void
+    {
+        $this->normalizeCoordinateFields($payload);
+
+        $hasCoordinates = isset($payload['latitude'], $payload['longitude'])
+            && $payload['latitude'] !== null
+            && $payload['longitude'] !== null;
+
+        $address = trim((string) $address);
+
+        if ($hasCoordinates) {
+            $geoResult = $geocodingService->reverseGeocodeResult((float) $payload['latitude'], (float) $payload['longitude']);
+            if (! empty($geoResult['formatted_address'])) {
+                $payload['current_address'] = $geoResult['formatted_address'];
+            } elseif ($address !== '') {
+                $payload['current_address'] = $address;
+            }
+
+            return;
+        }
+
+        if ($address === '') {
+            return;
+        }
+
+        $geoResult = $geocodingService->geocodeAddress($address);
+        if (! is_array($geoResult)) {
+            $payload['current_address'] = $address;
+            return;
+        }
+
+        if (isset($geoResult['latitude'], $geoResult['longitude'])) {
+            $payload['latitude'] = round((float) $geoResult['latitude'], 6);
+            $payload['longitude'] = round((float) $geoResult['longitude'], 6);
+        }
+
+        $payload['current_address'] = $geoResult['formatted_address'] ?? $address;
+    }
+
+    private function normalizeCoordinateFields(array &$payload): void
+    {
+        foreach (['latitude', 'longitude'] as $field) {
+            if (! array_key_exists($field, $payload)) {
+                continue;
+            }
+
+            $value = $payload[$field];
+            $payload[$field] = ($value === null || $value === '') ? null : round((float) $value, 6);
+        }
     }
 }
