@@ -1102,7 +1102,7 @@ export default function AllJobs({ auth }) {
                                                                             <td className="py-2">
                                                                                 {app.resume_url ? (
                                                                                     <a
-                                                                                        href={(String(app.resume_url).startsWith('/') ? app.resume_url : `/${app.resume_url}`)}
+                                                                                        href={(String(app.resume_url).startsWith('http') || String(app.resume_url).startsWith('/') ? app.resume_url : `/${app.resume_url}`)}
                                                                                         target="_blank"
                                                                                         rel="noreferrer"
                                                                                         className="text-[#5146E6] hover:underline"

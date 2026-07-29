@@ -360,4 +360,12 @@ class Job extends Model
             'data' => $data,
         ]);
     }
+
+    /**
+     * Use UUID for route model binding so public URLs with job UUIDs resolve correctly.
+     */
+    public function getRouteKeyName()
+    {
+        return 'uuid';
+    }
 }

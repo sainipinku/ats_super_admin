@@ -422,7 +422,7 @@ class JobController extends Controller
 
         $validated = $request->validate([
             'cover_letter' => ['nullable', 'string', 'max:5000'],
-            'resume' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
+            'resume' => ['nullable', 'file', 'mimes:pdf,doc,docx'],
             'application_profile' => ['nullable'],
             'screening_answers' => ['nullable'],
         ]);
@@ -445,9 +445,24 @@ class JobController extends Controller
         $resumeUrl = null;
         if ($request->hasFile('resume')) {
             $file = $request->file('resume');
-            $filename = 'resumes/' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-            $stored = $file->storeAs('public', $filename);
-            $resumeUrl = str_replace('public/', 'storage/', $stored);
+            $extension = $file->getClientOriginalExtension() ?: 'pdf';
+            $relativeDir = 'member-resumes/' . ($member->uuid ?? Str::uuid());
+            $filename = Str::uuid() . '.' . $extension;
+            $path = $relativeDir . '/' . $filename;
+            Storage::disk('public')->putFileAs($relativeDir, $file, $filename);
+            $resumeUrl = 'storage/' . $path;
+
+            $member->forceFill([
+                'resume_path' => $path,
+                'resume_original_name' => $file->getClientOriginalName(),
+                'resume_mime' => $file->getClientMimeType(),
+                'resume_size' => $file->getSize(),
+                'resume_uploaded_at' => now(),
+            ])->save();
+        } elseif (!empty($member->resume_path)) {
+            $resumeUrl = Str::startsWith($member->resume_path, ['http://', 'https://', 'storage/'])
+                ? $member->resume_path
+                : 'storage/' . ltrim($member->resume_path, '/');
         }
 
         if (!$resumeUrl) {
@@ -539,51 +554,60 @@ class JobController extends Controller
         ]);
     }
 
-   public function myApplications(Request $request)
-{
-    $member = $request->user();
+    public function myApplications(Request $request)
+    {
+        $member = $request->user();
+        if (! $member) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
 
-    $perPage = (int) ($request->input('per_page', 10));
-    $status = $request->input('status'); // Get status filter from request
+        $validStatuses = ['all', 'applied', 'viewed', 'shortlisted', 'assigned_to_calling_member', 'calling_in_progress', 'calling_approved', 'calling_rejected', 'admin_review', 'offer_letter_generated', 'waiting_list', 'hired', 'not_selected', 'rejected'];
+        $countedStatuses = array_filter($validStatuses, fn ($status) => $status !== 'all');
 
-    $query = JobApplication::query()
-        ->with(['job' => function ($q) {
-            $q->select('id', 'title', 'company', 'location', 'job_type', 'salary', 'status as job_status');
-        }])
-        ->where('candidate_id', $member->id);
+        $validated = $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'status' => ['nullable', 'string', 'in:' . implode(',', $validStatuses)],
+        ]);
 
-    // Apply status filter if provided
-    if ($status && in_array($status, ['applied', 'viewed', 'shortlisted', 'assigned_to_calling_member', 'calling_in_progress', 'calling_approved', 'calling_rejected', 'admin_review', 'offer_letter_generated', 'waiting_list', 'hired', 'not_selected', 'rejected'])) {
-        $query->where('status', $status);
+        $perPage = (int) ($validated['per_page'] ?? 10);
+        $status = $validated['status'] ?? 'all';
+
+        $query = JobApplication::query()
+            ->with(['job' => function ($q) {
+                $q->select('id', 'title', 'company', 'location', 'job_type', 'salary', 'status as job_status');
+            }])
+            ->where('candidate_id', $member->id);
+
+        if ($status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        $applications = $query
+            ->orderByDesc('created_at')
+            ->paginate(max(1, min($perPage, 50)))
+            ->withQueryString();
+
+        $statusCounts = JobApplication::query()
+            ->where('candidate_id', $member->id)
+            ->whereIn('status', $countedStatuses)
+            ->select('status', DB::raw('COUNT(*) as count'))
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->toArray();
+
+        $statusCounts = array_merge(array_fill_keys($countedStatuses, 0), $statusCounts);
+        $statusCounts = ['all' => array_sum($statusCounts)] + $statusCounts;
+
+        return response()->json([
+            'success' => true,
+            'applications' => $applications,
+            'status_counts' => $statusCounts,
+            'filtered_status' => $status,
+        ]);
     }
-
-    $applications = $query
-        ->orderByDesc('created_at')
-        ->paginate(max(1, min($perPage, 50)));
-
-    $statusCounts = [
-        'applied' => JobApplication::where('candidate_id', $member->id)->where('status', 'applied')->count(),
-        'viewed' => JobApplication::where('candidate_id', $member->id)->where('status', 'viewed')->count(),
-        'shortlisted' => JobApplication::where('candidate_id', $member->id)->where('status', 'shortlisted')->count(),
-        'assigned_to_calling_member' => JobApplication::where('candidate_id', $member->id)->where('status', 'assigned_to_calling_member')->count(),
-        'calling_in_progress' => JobApplication::where('candidate_id', $member->id)->where('status', 'calling_in_progress')->count(),
-        'calling_approved' => JobApplication::where('candidate_id', $member->id)->where('status', 'calling_approved')->count(),
-        'calling_rejected' => JobApplication::where('candidate_id', $member->id)->where('status', 'calling_rejected')->count(),
-        'admin_review' => JobApplication::where('candidate_id', $member->id)->where('status', 'admin_review')->count(),
-        'offer_letter_generated' => JobApplication::where('candidate_id', $member->id)->where('status', 'offer_letter_generated')->count(),
-        'waiting_list' => JobApplication::where('candidate_id', $member->id)->where('status', 'waiting_list')->count(),
-        'hired' => JobApplication::where('candidate_id', $member->id)->where('status', 'hired')->count(),
-        'not_selected' => JobApplication::where('candidate_id', $member->id)->where('status', 'not_selected')->count(),
-        'rejected' => JobApplication::where('candidate_id', $member->id)->where('status', 'rejected')->count(),
-    ];
-
-    return response()->json([
-        'success' => true,
-        'applications' => $applications,
-        'status_counts' => $statusCounts,
-        'filtered_status' => $status, // Optional: return the current filter
-    ]);
-}
 
     public function locations(Request $request, GeocodingService $geocodingService)
     {

@@ -299,9 +299,24 @@ class CandidateJobController extends Controller
         $resumeUrl = null;
         if ($request->hasFile('resume')) {
             $file = $request->file('resume');
-            $filename = 'resumes/' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-            $resumeUrl = $file->storeAs('public', $filename);
-            $resumeUrl = str_replace('public/', 'storage/', $resumeUrl);
+            $extension = $file->getClientOriginalExtension() ?: 'pdf';
+            $relativeDir = 'member-resumes/' . ($candidate->uuid ?? Str::uuid());
+            $filename = Str::uuid() . '.' . $extension;
+            $path = $relativeDir . '/' . $filename;
+            Storage::disk('public')->putFileAs($relativeDir, $file, $filename);
+            $resumeUrl = 'storage/' . $path;
+
+            $candidate->forceFill([
+                'resume_path' => $path,
+                'resume_original_name' => $file->getClientOriginalName(),
+                'resume_mime' => $file->getClientMimeType(),
+                'resume_size' => $file->getSize(),
+                'resume_uploaded_at' => now(),
+            ])->save();
+        } elseif (!empty($candidate->resume_path)) {
+            $resumeUrl = Str::startsWith($candidate->resume_path, ['http://', 'https://', 'storage/'])
+                ? $candidate->resume_path
+                : 'storage/' . ltrim($candidate->resume_path, '/');
         }
 
         if (!$resumeUrl) {

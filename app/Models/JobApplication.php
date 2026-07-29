@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class JobApplication extends Model
 {
@@ -66,6 +69,53 @@ class JobApplication extends Model
         'offer_joining_date' => 'date',
         'offer_letter_sent_at' => 'datetime',
     ];
+
+    public function resumeUrl(): Attribute
+    {
+        return Attribute::make(
+            get: function (?string $value): ?string {
+                if (empty($value)) {
+                    return null;
+                }
+
+                if (Str::startsWith($value, ['http://', 'https://'])) {
+                    return $value;
+                }
+
+                $rawPath = ltrim($value, '/');
+
+                $diskRelativePath = Str::startsWith($rawPath, 'storage/')
+                    ? substr($rawPath, strlen('storage/'))
+                    : $rawPath;
+
+                if (Storage::disk('public')->exists($diskRelativePath)) {
+                    return Storage::disk('public')->url($diskRelativePath);
+                }
+
+                if (!empty($this->candidate_id)) {
+                    $candidate = $this->candidate;
+                    if ($candidate && !empty($candidate->uuid)) {
+                        $folder = 'member-resumes/' . $candidate->uuid;
+                        $filename = basename($diskRelativePath);
+
+                        $candidatePath = $folder . '/' . $filename;
+                        if (Storage::disk('public')->exists($candidatePath)) {
+                            return Storage::disk('public')->url($candidatePath);
+                        }
+
+                        if (!Str::startsWith($diskRelativePath, 'generated-resumes/')) {
+                            $files = Storage::disk('public')->files($folder);
+                            if (!empty($files)) {
+                                return Storage::disk('public')->url($files[0]);
+                            }
+                        }
+                    }
+                }
+
+                return url($rawPath);
+            },
+        );
+    }
 
     /**
      * Get the job associated with this application.
@@ -186,5 +236,13 @@ class JobApplication extends Model
                 }
             }
         });
+    }
+
+    /**
+     * Use UUID for route model binding so URLs containing application UUIDs resolve correctly.
+     */
+    public function getRouteKeyName()
+    {
+        return 'uuid';
     }
 }
