@@ -52,24 +52,24 @@ const navigation = [
         active: ["super.construction.survey.*"],
         icon: FaClipboardList,
     },
-    {
-        label: "Drawing Approval",
-        href: route("super.construction.drafting.index"),
-        active: ["super.construction.drafting.*"],
-        icon: FaDraftingCompass,
-    },
-    {
-        label: "Construction Execution",
-        href: route("super.construction.execution.index"),
-        active: ["super.construction.execution.*"],
-        icon: FaHardHat,
-    },
-    {
-        label: "Material Management",
-        href: route("super.construction.materials.index"),
-        active: ["super.construction.materials.*"],
-        icon: FaBoxes,
-    },
+    // {
+    //     label: "Drawing Approval",
+    //     href: route("super.construction.drafting.index"),
+    //     active: ["super.construction.drafting.*"],
+    //     icon: FaDraftingCompass,
+    // },
+    // {
+    //     label: "Construction Execution",
+    //     href: route("super.construction.execution.index"),
+    //     active: ["super.construction.execution.*"],
+    //     icon: FaHardHat,
+    // },
+    // {
+    //     label: "Material Management",
+    //     href: route("super.construction.materials.index"),
+    //     active: ["super.construction.materials.*"],
+    //     icon: FaBoxes,
+    // },
     {
         label: "Vehicle Management",
         href: route("super.vehicles.list"),
@@ -81,10 +81,22 @@ const navigation = [
         active: ["super.construction.vehicles.*"],
         icon: FaTruck,
     },
+     // {
+    //     label: "Equipment Allocation",
+    //     href: route("super.construction.equipment.index"),
+    //     active: ["super.construction.equipment.*"],
+    //     icon: FaCogs,
+    // },
     {
-        label: "Equipment Allocation",
-        href: route("super.construction.equipment.index"),
-        active: ["super.construction.equipment.*"],
+        label: "Equipment Categories",
+        href: route("super.equipment.categories.list"),
+        active: ["super.equipment.categories.*"],
+        icon: FaCogs,
+    },
+    {
+        label: "Equipment Management",
+        href: route("super.equipment.list"),
+        active: ["super.equipment.*"],
         icon: FaCogs,
     },
     {

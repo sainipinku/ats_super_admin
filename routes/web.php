@@ -151,6 +151,24 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::delete('/{uuid}', [\App\Http\Controllers\SuperAdmin\VehicleController::class, 'destroy'])->name('destroy');
         });
 
+        // Equipment Category Routes
+        Route::group(['prefix' => 'equipment-categories', 'as' => 'equipment.categories.'], function () {
+            Route::get('/list', [\App\Http\Controllers\SuperAdmin\EquipmentCategoryController::class, 'index'])->name('list');
+            Route::post('/store', [\App\Http\Controllers\SuperAdmin\EquipmentCategoryController::class, 'store'])->name('store');
+            Route::put('/update/{id}', [\App\Http\Controllers\SuperAdmin\EquipmentCategoryController::class, 'update'])->name('update');
+            Route::get('/{id}', [\App\Http\Controllers\SuperAdmin\EquipmentCategoryController::class, 'show'])->name('show');
+            Route::delete('/{id}', [\App\Http\Controllers\SuperAdmin\EquipmentCategoryController::class, 'destroy'])->name('destroy');
+        });
+
+        // Equipment Master Routes
+        Route::group(['prefix' => 'equipment', 'as' => 'equipment.'], function () {
+            Route::get('/list', [\App\Http\Controllers\SuperAdmin\EquipmentMasterController::class, 'index'])->name('list');
+            Route::post('/store', [\App\Http\Controllers\SuperAdmin\EquipmentMasterController::class, 'store'])->name('store');
+            Route::put('/update/{id}', [\App\Http\Controllers\SuperAdmin\EquipmentMasterController::class, 'update'])->name('update');
+            Route::get('/{id}', [\App\Http\Controllers\SuperAdmin\EquipmentMasterController::class, 'show'])->name('show');
+            Route::delete('/{id}', [\App\Http\Controllers\SuperAdmin\EquipmentMasterController::class, 'destroy'])->name('destroy');
+        });
+
         Route::group(['prefix' => 'contact-messages', 'as' => 'contact.messages.'], function () {
             Route::get('/', [ContactMessageController::class, 'index'])->name('index');
             Route::patch('/{message}/toggle-read', [ContactMessageController::class, 'toggleRead'])->name('toggle-read');
