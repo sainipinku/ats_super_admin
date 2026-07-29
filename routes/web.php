@@ -279,6 +279,9 @@ Route::prefix('super/construction')
         Route::post('/projects/{project}/team', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'assignTeam'])
             ->middleware('construction.permission:project_team.manage')
             ->name('projects.team.assign');
+        Route::delete('/projects/{project}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'destroy'])
+            ->middleware('construction.permission:project.manage')
+            ->name('projects.destroy');
 
         Route::get('/survey', [App\Http\Controllers\SuperAdmin\Construction\SurveyController::class, 'index'])
             ->middleware('construction.permission:survey_plan.manage,survey_submission.review')

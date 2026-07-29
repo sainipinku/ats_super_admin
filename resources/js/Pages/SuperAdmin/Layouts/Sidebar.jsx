@@ -1,31 +1,33 @@
 import React from "react";
 import { Link, usePage } from "@inertiajs/react";
+import {
+    FaBuilding,
+    FaUsers,
+    FaProjectDiagram,
+    FaClipboardList,
+    FaDraftingCompass,
+    FaHardHat,
+    FaBoxes,
+    FaTruck,
+    FaCogs,
+    FaFileInvoiceDollar,
+    FaHandshake,
+    FaTachometerAlt,
+    FaCity,
+} from "react-icons/fa";
 
 const navigation = [
     {
         label: "ERP Dashboard",
         href: route("super.dashboard"),
         active: ["super.dashboard", "super.construction.dashboard"],
+        icon: FaTachometerAlt,
     },
     {
         label: "Company Setup",
         href: route("super.construction.companies.index"),
         active: ["super.construction.companies.*"],
-    },
-    {
-        label: "Roles & Access",
-        href: route("super.role.list"),
-        active: ["super.role.*"],
-    },
-    {
-        label: "Departments",
-        href: route("super.departments"),
-        active: ["super.departments"],
-    },
-    {
-        label: "Employee Assignment",
-        href: route("super.construction.projects.index"),
-        active: ["super.construction.projects.*"],
+        icon: FaBuilding,
     },
     {
         label: "Employee Management",
@@ -36,31 +38,37 @@ const navigation = [
         label: "Client Registration",
         href: route("super.construction.clients.index"),
         active: ["super.construction.clients.*"],
+        icon: FaCity,
     },
     {
         label: "Projects & Budget",
         href: route("super.construction.projects.index"),
         active: ["super.construction.projects.*"],
+        icon: FaProjectDiagram,
     },
     {
         label: "Survey Planning",
         href: route("super.construction.survey.index"),
         active: ["super.construction.survey.*"],
+        icon: FaClipboardList,
     },
     {
         label: "Drawing Approval",
         href: route("super.construction.drafting.index"),
         active: ["super.construction.drafting.*"],
+        icon: FaDraftingCompass,
     },
     {
         label: "Construction Execution",
         href: route("super.construction.execution.index"),
         active: ["super.construction.execution.*"],
+        icon: FaHardHat,
     },
     {
         label: "Material Management",
         href: route("super.construction.materials.index"),
         active: ["super.construction.materials.*"],
+        icon: FaBoxes,
     },
     {
         label: "Vehicle Management",
@@ -71,21 +79,25 @@ const navigation = [
         label: "Vehicle Tracking",
         href: route("super.construction.vehicles.index"),
         active: ["super.construction.vehicles.*"],
+        icon: FaTruck,
     },
     {
         label: "Equipment Allocation",
         href: route("super.construction.equipment.index"),
         active: ["super.construction.equipment.*"],
+        icon: FaCogs,
     },
     {
         label: "Accounts & Billing",
         href: route("super.construction.billing.index"),
         active: ["super.construction.billing.*"],
+        icon: FaFileInvoiceDollar,
     },
     {
         label: "Handover & Closure",
         href: route("super.construction.handover.index"),
         active: ["super.construction.handover.*"],
+        icon: FaHandshake,
     },
 ];
 

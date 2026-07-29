@@ -215,4 +215,85 @@ class ProjectController extends Controller
 
         return back()->with('success', 'Project team member assigned successfully.');
     }
+
+    public function destroy(Project $project, Request $request, ConstructionActivityService $activityService): RedirectResponse
+    {
+        $actor = $this->constructionActor();
+
+        try {
+            $projectId = $project->id;
+            $companyId = $project->company_id;
+            $projectCode = $project->project_code;
+
+            \DB::transaction(function () use ($project) {
+                $projectId = $project->id;
+
+                \App\Models\Construction\ActivityLog::where('project_id', $projectId)->delete();
+                \App\Models\Construction\MemberRoleAssignment::where('project_id', $projectId)->delete();
+                \App\Models\Construction\ProjectTeamMember::where('project_id', $projectId)->delete();
+                \App\Models\Construction\ProjectBudget::where('project_id', $projectId)->delete();
+                \App\Models\Construction\VehicleAssignment::where('project_id', $projectId)->delete();
+                \App\Models\Construction\VehicleLocationPing::where('project_id', $projectId)->delete();
+                \App\Models\Construction\EquipmentAllocation::where('project_id', $projectId)->delete();
+                \App\Models\Construction\EquipmentUsageLog::where('project_id', $projectId)->delete();
+                \App\Models\Construction\ProjectHandoverItem::whereIn(
+                    'handover_id',
+                    \App\Models\Construction\ProjectHandover::where('project_id', $projectId)->select('id')
+                )->delete();
+                \App\Models\Construction\ProjectHandover::where('project_id', $projectId)->delete();
+                \App\Models\Construction\ClientPayment::where('project_id', $projectId)->delete();
+                \App\Models\Construction\ClientInvoice::where('project_id', $projectId)->delete();
+                \App\Models\Construction\MaterialIssue::where('project_id', $projectId)->delete();
+                \App\Models\Construction\MaterialReceipt::where('project_id', $projectId)->delete();
+                \App\Models\Construction\MaterialStock::where('project_id', $projectId)->delete();
+                \App\Models\Construction\PurchaseOrder::where('project_id', $projectId)->delete();
+                \App\Models\Construction\PurchaseRequest::where('project_id', $projectId)->delete();
+                \App\Models\Construction\DrawingApproval::where('project_id', $projectId)->delete();
+                \App\Models\Construction\DrawingRevision::where('project_id', $projectId)->delete();
+                \App\Models\Construction\DraftingJob::where('project_id', $projectId)->delete();
+                \App\Models\Construction\Document::where('project_id', $projectId)->delete();
+                \App\Models\Construction\AttendanceRecord::where('project_id', $projectId)->delete();
+                \App\Models\Construction\DailyProgressItem::whereIn(
+                    'daily_progress_report_id',
+                    \App\Models\Construction\DailyProgressReport::where('project_id', $projectId)->select('id')
+                )->delete();
+                \App\Models\Construction\DailyProgressReport::where('project_id', $projectId)->delete();
+                \App\Models\Construction\ExecutionTaskAssignee::where('project_id', $projectId)->delete();
+                \App\Models\Construction\ExecutionTask::where('project_id', $projectId)->delete();
+                \App\Models\Construction\ExecutionPlan::where('project_id', $projectId)->delete();
+                \App\Models\Construction\SurveyMeasurement::where('project_id', $projectId)->delete();
+                \App\Models\Construction\SurveyEntry::where('project_id', $projectId)->delete();
+                \App\Models\Construction\SurveySubmission::where('project_id', $projectId)->delete();
+                \App\Models\Construction\SurveyVisit::where('project_id', $projectId)->delete();
+                \App\Models\Construction\SurveyPlan::where('project_id', $projectId)->delete();
+
+                \App\Models\Construction\Vehicle::where('project_id', $projectId)->update(['project_id' => null]);
+                \App\Models\Construction\Equipment::where('project_id', $projectId)->update(['project_id' => null]);
+                \App\Models\Construction\Material::where('project_id', $projectId)->update(['project_id' => null]);
+                \App\Models\Construction\Vendor::where('project_id', $projectId)->update(['project_id' => null]);
+
+                $project->delete();
+            });
+
+            $activityService->log(
+                module: 'project',
+                action: 'deleted',
+                actor: $actor,
+                reference: null,
+                companyId: $companyId,
+                projectId: null,
+                meta: ['project_code' => $projectCode, 'project_id' => $projectId],
+                request: $request
+            );
+
+            $fallback = route('super.construction.projects.index');
+            $intended = redirect()->getIntendedUrl();
+            $target = $intended && $intended !== route('super.construction.projects.show', $projectId ?? 0) ? $intended : $fallback;
+
+            return redirect()->to($target)->with('success', 'Project and all related data deleted successfully.');
+        } catch (\Throwable $e) {
+            report($e);
+            return back()->with('error', 'Failed to delete project. ' . $e->getMessage());
+        }
+    }
 }

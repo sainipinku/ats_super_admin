@@ -1,44 +1,32 @@
 import { useAlerts } from "@/Components/Alerts";
 import ApplicationLogo from "@/Components/ApplicationLogo";
-import Dropdown from "@/Components/Dropdown";
-import { useHelpers } from "@/Components/Helpers";
-import NavLink from "@/Components/NavLink";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink";
 import { Link, usePage } from "@inertiajs/react";
 import { useEffect, useRef, useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { IoMoon } from "react-icons/io5";
-import { FaChevronDown, FaSun } from "react-icons/fa6";
-import { FaBell } from "react-icons/fa";
+import { FaSun, FaBell, FaProjectDiagram, FaHardHat, FaTruck, FaBoxes } from "react-icons/fa";
 import { IoSettings } from "react-icons/io5";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { route } from "ziggy-js";
-import UserDropdown from "./UserDropdown";
 import Sidebar from "./Sidebar";
 
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import NavDropdown from "@/Components/NavDropdown";
 
 export default function AuthenticatedLayout({ header, children }) {
-    const { hasPermissionLike, hasPermission, hasAnyPermission } = useHelpers();
     const user = usePage().props;
-    const guard = user?.auth?.guard;
-    const permissions = usePage().props.auth?.permissions ?? [];
     const { successAlert, errorAlert, warningAlert, infoAlert } = useAlerts();
-    const { ziggy, flash, errors, messages } = usePage().props;
-    const { url } = usePage();
+    const { flash, errors, messages } = usePage().props;
+
     useEffect(() => {
         if (errors) {
-            Object.entries(errors).forEach(([key, value]) => {
-                errorAlert(value);
-            });
+            Object.entries(errors).forEach(([, value]) => errorAlert(value));
         }
         if (flash?.success) successAlert(flash.success);
         if (flash?.error) errorAlert(flash.error);
@@ -59,15 +47,12 @@ export default function AuthenticatedLayout({ header, children }) {
                     case "info":
                         infoAlert(message);
                         break;
-                    default:
-                        console.warn("Unknown message type:", type);
                 }
             });
         }
     }, [messages, flash, errors]);
 
-    const [showingNavigationDropdown, setShowingNavigationDropdown] =
-        useState(false);
+    const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
     const [darkMode, setDarkMode] = useState(
         () =>
             localStorage.theme == "dark" ||
@@ -86,301 +71,265 @@ export default function AuthenticatedLayout({ header, children }) {
         }
     }, [darkMode]);
 
-    const [openMenu, setOpenMenu] = useState(null);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const setFromWidth = () => setSidebarOpen(window.innerWidth >= 1280);
+        setFromWidth();
+        window.addEventListener("resize", setFromWidth);
+        return () => window.removeEventListener("resize", setFromWidth);
+    }, []);
 
-    const handleMouseEnter = (menu) => setOpenMenu(menu);
-    const handleMouseLeave = () => setOpenMenu(null);
-
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const handleToggle = () => {
-        setIsMenuOpen((prev) => !prev);
-    };
     const toggleSidebar = () => setSidebarOpen((prev) => !prev);
-    const dropdownRef = useRef(null);
+    const closeSidebar = () => setSidebarOpen(false);
+
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
     useEffect(() => {
         function handleClickOutside(event) {
-            if (
-                dropdownRef.current &&
-                !dropdownRef.current.contains(event.target)
-            ) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setDropdownOpen(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
-        return () =>
-            document.removeEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
-    const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    const closeSidebar = () => setSidebarOpen(false);
-    const [settings, setSettings] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const logoutCsrfToken = () =>
+        document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "";
 
-    const isInitialMount = useRef(true);
-
-    // useEffect(() => {
-    //     const fetchSettings = async () => {
-    //         try {
-
-    //             const response = await axios.get(route("super.settings.list"));
-    //             setSettings(response.data.settings);
-    //         } catch (error) {
-    //             console.error("Error fetching settings:", error);
-    //         } finally {
-    //             setLoading(false);
-    //         }
-    //     };
-
-    //     if (isInitialMount.current || settings == null) {
-    //         fetchSettings();
-    //         isInitialMount.current = false;
-    //     }
-    // }, [settings]);
     return (
         <>
-                    <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
+            <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
+            <div className="min-h-screen mainbg xl:pl-[288px]">
+                <nav className="headerbg fixed top-0 left-0 right-0 z-50 py-[10px] px-[12px] print:hidden xl:left-[288px] xl:right-0">
+                    <div className="navbg rounded-[12px] border border-[1px] borderbx shadow-sm">
+                        <div className="mx-auto max-w-full px-[12px] py-0">
+                            <div className="flex h-14 items-center justify-between gap-4">
+                                {/* LEFT SECTION: Hamburger + Logo + Quick Nav */}
+                                <div className="flex items-center gap-4 min-w-0 flex-1">
+                                    <button
+                                        onClick={toggleSidebar}
+                                        className="flex shrink-0 items-center justify-center bg-white dark:bg-[#61CC681A] w-[40px] h-[40px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[10px] transition text-[currentColor] dark:text-[currentColor] focus:outline-none hover:bg-gray-50 dark:hover:bg-[#61CC6820]"
+                                        aria-label="Toggle sidebar"
+                                    >
+                                        <GiHamburgerMenu size={20} />
+                                    </button>
 
-        <div className="min-h-screen dark:bg-[#0a0e25] bg-gray-100">
-            <nav className="border-b border-gray-300 dark:border-blue-950 dark:bg-[#0a0e25] bg-gray-100 fixed top-0 left-0 right-0 z-50 print:hidden">
-                <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8 ">
-                    <div className="flex h-16 justify-between border-gray-200 dark:border-gray-700 ">
-                        <div className="flex items-center gap-[45px] ">
-                             <button
-                                            onClick={toggleSidebar}
-                                            className="flex xl:hidden items-center justify-center bg-white dark:bg-[#61CC681A] w-[48px] h-[38px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[8px] transition md:flex text-current focus:outline-none"
+                                    <div className="shrink-0 items-center hidden sm:flex">
+                                        <Link href={route("member.dashboard")}>
+                                            <ApplicationLogo props={null} className="block w-auto h-8 fill-current" />
+                                        </Link>
+                                    </div>
+
+                                    <div className="hidden xl:flex items-center gap-2 ml-2 border-l border-gray-200 dark:border-gray-700 pl-4 min-w-0">
+                                        <QuickPill
+                                            href={route("member.construction.projects.index")}
+                                            active={route().current("member.construction.projects.*")}
+                                            icon={<FaProjectDiagram size={14} />}
                                         >
-                                            <svg
-                                                className="w-6 h-6"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                            >
-                                                <path
-                                                    d="M4 6h16M4 12h16M4 18h16"
-                                                />{" "}
-                                            </svg>
-                                        </button>
-                            <div className="flex shrink-0 items-center">
-                                <Link href={route("member.dashboard")}>
-                                    <ApplicationLogo  props={settings} className="block w-auto fill-current text-gray-800 dark:text-gray-200" />
-                                </Link>
-                            </div>
-                            <div className="hidden xl:flex items-center space-x-8 ms-10">
-                                <NavLink
-                                    href={route("member.dashboard")}
-                                    active={route().current("member.dashboard") || route().current("member.construction.dashboard")}
-                                >
-                                    Project Dashboard
-                                </NavLink>
-                                <NavLink
-                                    href={route("member.construction.projects.index")}
-                                    active={route().current("member.construction.projects.*")}
-                                >
-                                    Assigned Projects
-                                </NavLink>
-                                <NavLink
-                                    href={route("member.construction.execution.index")}
-                                    active={route().current("member.construction.execution.*")}
-                                >
-                                    Site Execution
-                                </NavLink>
-                                <NavLink
-                                    href={route("member.construction.materials.index")}
-                                    active={route().current("member.construction.materials.*")}
-                                >
-                                    Material Management
-                                </NavLink>
-                                <NavLink
-                                    href={route("member.construction.vehicles.index")}
-                                    active={route().current("member.construction.vehicles.*")}
-                                >
-                                    Vehicle Tracking
-                                </NavLink>
-                                <NavLink
-                                    href={route("member.construction.equipment.index")}
-                                    active={route().current("member.construction.equipment.*")}
-                                >
-                                    Equipment Allocation
-                                </NavLink>
-                                <NavLink
-                                    href={route("member.construction.handover.index")}
-                                    active={route().current("member.construction.handover.*")}
-                                >
-                                    Handover & Closure
-                                </NavLink>
-                                <NavLink
-                                    href={route("member.profile")}
-                                    active={route().current("member.profile")}
-                                >
-                                    My Profile
-                                </NavLink>
-                            </div>
-                        </div>
-
-
-
-                         <div className="flex items-center gap-2 relative">
-                                    <div className="flex items-center gap-2 relative">
-
-
-                                        <button
-                                            onClick={() =>
-                                                setDarkMode(!darkMode)
-                                            }
-                                            className="flex  items-center justify-center bg-white  dark:bg-[#61CC681A] w-[48px] h-[38px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[8px]  transition md:flex text-[currentColor] dark:text-[currentColor] "
+                                            Projects
+                                        </QuickPill>
+                                        <QuickPill
+                                            href={route("member.construction.execution.index")}
+                                            active={route().current("member.construction.execution.*")}
+                                            icon={<FaHardHat size={14} />}
                                         >
-                                            {darkMode ? (
-                                                <FaSun
-                                                    size={18}
-                                                    className="text-gray-200"
-                                                />
-                                            ) : (
-                                                <svg
-                                                    width="24"
-                                                    height="24"
-                                                    viewBox="0 0 24 24"
-                                                    fill="none"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                >
-                                                    <path
-                                                        d="M12.0015 2L14.6365 4.635H19.365V9.363L22 11.998L19.365 14.637V19.365H14.637L12.002 22L9.363 19.365H4.635V14.637L2 11.9985L4.635 9.3635V4.635H9.363L12.0015 2Z"
-                                                        stroke="currentColor"
-                                                        stroke-width="2"
-                                                        stroke-miterlimit="10"
-                                                        stroke-linecap="round"
-                                                        stroke-linejoin="round"
-                                                    />
-                                                    <path
-                                                        d="M13.5 8.5C13.5 12.5 11 13 8.5 13C8.5 15 11.75 17 14.5 15C17.25 13 15.5 8.5 13.5 8.5Z"
-                                                        stroke="currentColor"
-                                                        stroke-width="2"
-                                                        stroke-miterlimit="10"
-                                                        stroke-linecap="round"
-                                                        stroke-linejoin="round"
-                                                    />
-                                                </svg>
-                                            )}
-                                            <span className="text-gray-800 dark:text-gray-100">
-                                                {darkMode ? "" : ""}
-                                            </span>
-                                        </button>
-
-                                        <div
-                                            className="relative"
-                                            ref={dropdownRef}
+                                            Execution
+                                        </QuickPill>
+                                        <QuickPill
+                                            href={route("member.construction.materials.index")}
+                                            active={route().current("member.construction.materials.*")}
+                                            icon={<FaBoxes size={14} />}
                                         >
-                                            <button
-                                                onClick={() =>
-                                                    setDropdownOpen(
-                                                        !dropdownOpen
-                                                    )
-                                                }
-                                                className="w-[40px] h-[40px] rounded-[70px] bg-none p-0 mt-[5px] focus:outline-none"
-                                            >
-                                                <img
-                                                    src={
-                                                        user?.auth?.user
-                                                            ?.profile_photo_url
-                                                    }
-                                                    alt="User"
-                                                />
-                                            </button>
-                                            <UserDropdown open={dropdownOpen} />
-                                        </div>
+                                            Materials
+                                        </QuickPill>
+                                        <QuickPill
+                                            href={route("member.construction.vehicles.index")}
+                                            active={route().current("member.construction.vehicles.*")}
+                                            icon={<FaTruck size={14} />}
+                                        >
+                                            Vehicles
+                                        </QuickPill>
                                     </div>
                                 </div>
-                        <div className="-me-2 flex items-center sm:hidden gap-2">
-                            <div className="flex items-center gap-2 bg-gray-200 dark:bg-gray-700 px-1 rounded-xl text-xl text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition cursor-pointer ">
+
+                                {/* RIGHT SECTION: Actions + Avatar */}
+                                <div className="flex items-center gap-2">
+                                    <div className="hidden sm:flex items-center gap-2 mr-2">
+                                        <Link
+                                            href={route("member.construction.execution.index")}
+                                            className="inline-flex items-center gap-2 rounded-[10px] bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-[13px] font-medium text-white shadow-sm hover:from-emerald-500 hover:to-teal-500 transition"
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M9 11l3 3L22 4" />
+                                                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                                            </svg>
+                                            Today's DPR
+                                        </Link>
+                                    </div>
+
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                type="button"
+                                                className="relative flex shrink-0 items-center justify-center bg-white dark:bg-[#61CC681A] w-[40px] h-[40px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[10px] transition text-[currentColor] dark:text-[currentColor] hover:bg-gray-50 dark:hover:bg-[#61CC6820]"
+                                            >
+                                                <FaBell size={17} />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-[320px] p-0">
+                                            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            <div className="p-4 text-sm text-gray-500">No new notifications</div>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+
+                                    <button
+                                        onClick={() => setDarkMode(!darkMode)}
+                                        className="flex shrink-0 items-center justify-center bg-white dark:bg-[#61CC681A] w-[40px] h-[40px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[10px] transition text-[currentColor] dark:text-[currentColor] hover:bg-gray-50 dark:hover:bg-[#61CC6820]"
+                                        aria-label="Toggle theme"
+                                    >
+                                        {darkMode ? (
+                                            <FaSun size={17} className="text-yellow-300" />
+                                        ) : (
+                                            <IoMoon size={17} className="text-slate-600" />
+                                        )}
+                                    </button>
+
+                                    <Link
+                                        href={route("member.profile")}
+                                        className="flex shrink-0 items-center justify-center bg-white dark:bg-[#61CC681A] w-[40px] h-[40px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[10px] transition text-slate-700 dark:text-[currentColor] hover:bg-gray-50 dark:hover:bg-[#61CC6820]"
+                                        aria-label="Settings"
+                                    >
+                                        <IoSettings size={18} />
+                                    </Link>
+
+                                    <div className="relative" ref={dropdownRef}>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setDropdownOpen(!dropdownOpen);
+                                            }}
+                                            className="w-[40px] h-[40px] rounded-full bg-none p-0 focus:outline-none overflow-hidden border-2 border-emerald-100 dark:border-emerald-900 hover:border-emerald-300 dark:hover:border-emerald-700 transition shrink-0"
+                                        >
+                                            <img
+                                                src={
+                                                    user?.auth?.user?.profile_photo_url ||
+                                                    user?.auth?.profile_photo_url ||
+                                                    "/images/profileimg.png"
+                                                }
+                                                alt="User"
+                                                className="w-full h-full object-cover rounded-full"
+                                                onError={(e) => {
+                                                    e.currentTarget.src = "/images/profileimg.png";
+                                                }}
+                                            />
+                                        </button>
+
+                                        {dropdownOpen && (
+                                            <div
+                                                className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-slate-800 dark:to-slate-800">
+                                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                        {user?.auth?.user?.name || "Site Member"}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        {user?.auth?.user?.email || user?.auth?.email || "member@cadmax.in"}
+                                                    </p>
+                                                </div>
+                                                <ul className="py-1">
+                                                    <li>
+                                                        <Link
+                                                            href={route("member.profile")}
+                                                            className="block w-full text-left px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                                                        >
+                                                            Profile Settings
+                                                        </Link>
+                                                    </li>
+                                                    <li className="border-t border-gray-100 dark:border-gray-700 mt-1 pt-1">
+                                                        <form method="POST" action={route("member.logout")}>
+                                                            <input type="hidden" name="_token" value={logoutCsrfToken()} />
+                                                            <button
+                                                                type="submit"
+                                                                className="block w-full text-left px-4 py-2.5 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                                                            >
+                                                                Sign Out
+                                                            </button>
+                                                        </form>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                            <button
-                                onClick={() =>
-                                    setShowingNavigationDropdown(
-                                        (previousState) => !previousState
-                                    )
-                                }
-                                className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 transition duration-150 ease-in-out hover:bg-gray-100 hover:text-gray-500 focus:bg-gray-100 focus:text-gray-500 focus:outline-none dark:text-gray-500 dark:hover:bg-gray-900 dark:hover:text-gray-400 dark:focus:bg-gray-900 dark:focus:text-gray-400"
-                            >
-                                <GiHamburgerMenu className="h-6 w-6 text-gray-700 dark:text-gray-200" />
-                            </button>
+                        </div>
+
+                        {/* Mobile Nav */}
+                        <div
+                            className={
+                                (showingNavigationDropdown ? "block" : "hidden") +
+                                " sm:hidden border-t border-gray-200 dark:border-gray-700"
+                            }
+                        >
+                            <div className="space-y-1 pb-4 pt-3 px-3">
+                                <ResponsiveNavLink href={route("member.dashboard")} active={route().current("member.dashboard") || route().current("member.construction.dashboard")}>
+                                    Project Dashboard
+                                </ResponsiveNavLink>
+                                <ResponsiveNavLink href={route("member.construction.projects.index")} active={route().current("member.construction.projects.*")}>
+                                    Assigned Projects
+                                </ResponsiveNavLink>
+                                <ResponsiveNavLink href={route("member.construction.execution.index")} active={route().current("member.construction.execution.*")}>
+                                    Site Execution
+                                </ResponsiveNavLink>
+                                <ResponsiveNavLink href={route("member.construction.materials.index")} active={route().current("member.construction.materials.*")}>
+                                    Material Management
+                                </ResponsiveNavLink>
+                                <ResponsiveNavLink href={route("member.construction.vehicles.index")} active={route().current("member.construction.vehicles.*")}>
+                                    Vehicle Tracking
+                                </ResponsiveNavLink>
+                                <ResponsiveNavLink href={route("member.construction.equipment.index")} active={route().current("member.construction.equipment.*")}>
+                                    Equipment Allocation
+                                </ResponsiveNavLink>
+                                <ResponsiveNavLink href={route("member.construction.handover.index")} active={route().current("member.construction.handover.*")}>
+                                    Handover &amp; Closure
+                                </ResponsiveNavLink>
+                                <ResponsiveNavLink href={route("member.profile")} active={route().current("member.profile")}>
+                                    My Profile
+                                </ResponsiveNavLink>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div
-                    className={
-                        (showingNavigationDropdown ? "block" : "hidden") +
-                        " sm:hidden"
-                    }
-                >
-                    <div className="space-y-1 pb-3 pt-2">
-                        <ResponsiveNavLink
-                            href={route("member.dashboard")}
-                            active={route().current("member.dashboard") || route().current("member.construction.dashboard")}
-                        >
-                            Project Dashboard
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink
-                            href={route("member.construction.projects.index")}
-                            active={route().current("member.construction.projects.*")}
-                        >
-                            Assigned Projects
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink
-                            href={route("member.construction.execution.index")}
-                            active={route().current("member.construction.execution.*")}
-                        >
-                            Site Execution
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink
-                            href={route("member.construction.materials.index")}
-                            active={route().current("member.construction.materials.*")}
-                        >
-                            Material Management
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink
-                            href={route("member.construction.vehicles.index")}
-                            active={route().current("member.construction.vehicles.*")}
-                        >
-                            Vehicle Tracking
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink
-                            href={route("member.construction.equipment.index")}
-                            active={route().current("member.construction.equipment.*")}
-                        >
-                            Equipment Allocation
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink
-                            href={route("member.construction.handover.index")}
-                            active={route().current("member.construction.handover.*")}
-                        >
-                            Handover & Closure
-                        </ResponsiveNavLink>
-                    </div>
-                    <div className="border-t border-gray-200 pb-1 pt-4 dark:border-gray-600">
-                        <div className="px-4">
-                            <div className="text-base font-medium text-gray-800 dark:text-gray-200">
-                                {user?.name}
-                            </div>
-                            <div className="text-sm font-medium text-gray-500">
-                                {user?.email}
-                            </div>
-                        </div>
-                        <div className="mt-3 space-y-1">
-                        </div>
-                    </div>
-                </div>
-            </nav>
-            {header && (
-                <header className="bg-white shadow dark:bg-gray-800">
-                    <div className="mx-auto max-w-full px-4 py-6 sm:px-6 lg:px-8">
-                        {header}
-                    </div>
-                </header>
-            )}
-            <main>{children}</main>
-            <Toaster position="top-right" reverseOrder={false} gutter={8} />
-        </div>
+                </nav>
+
+                {header && (
+                    <header className="bg-white shadow dark:bg-gray-800">
+                        <div className="mx-auto max-w-full px-4 py-6 sm:px-6 lg:px-8">{header}</div>
+                    </header>
+                )}
+
+                <main className="pt-[72px] px-3 sm:px-6 lg:px-8 pb-8">{children}</main>
+                <Toaster position="top-right" reverseOrder={false} gutter={8} />
+            </div>
         </>
+    );
+}
+
+function QuickPill({ href, active, icon, children }) {
+    return (
+        <Link
+            href={href}
+            className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[13px] font-medium transition-all duration-200 ${
+                active
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-800"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            }`}
+        >
+            {icon}
+            <span>{children}</span>
+        </Link>
     );
 }
