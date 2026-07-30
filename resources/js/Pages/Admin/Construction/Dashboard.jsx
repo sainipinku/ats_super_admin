@@ -55,12 +55,12 @@ export default function Dashboard({ stats, projects }) {
                             note="Drawing work and approvals still in flight."
                             badge="drafting_in_progress"
                         />
-                        <Row
+                        {/* <Row
                             label="Construction Execution to Daily Progress"
                             value={stats.dprPending}
                             note="Execution reports needing follow-up."
                             badge="in_progress"
-                        />
+                        /> */}
                     </div>
                 </SectionCard>
 

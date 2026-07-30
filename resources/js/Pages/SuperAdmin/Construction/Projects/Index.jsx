@@ -21,7 +21,7 @@ import {
     FaEye,
     FaEdit,
     FaTrashAlt,
-} from "react-icons/fa6";
+} from "react-icons/fa";
 
 const projectStatusFlow = [
     { value: "planning", label: "Planning", color: "indigo", icon: FaLayerGroup, description: "Setup, budget, team" },

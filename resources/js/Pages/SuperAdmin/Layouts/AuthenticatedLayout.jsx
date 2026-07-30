@@ -282,8 +282,18 @@ export default function AuthenticatedLayout({ header, children }) {
         <>
             <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
             <SettingsProvider>
-                <div className="min-h-screen mainbg xl:pl-[288px]">
-                    <nav className="headerbg fixed top-0 left-0 right-0 z-50 py-[10px] px-[12px] print:hidden xl:left-[288px] xl:right-0">
+                <div
+                    className={`min-h-screen mainbg transition-[padding] duration-300 ease-in-out ${
+                        sidebarOpen ? "xl:pl-[288px]" : "xl:pl-0"
+                    }`}
+                >
+                    <nav
+                        className={`headerbg fixed top-0 z-50 py-[10px] px-[12px] print:hidden transition-[left,right] duration-300 ease-in-out ${
+                            sidebarOpen
+                                ? "left-0 right-0 xl:left-[288px] xl:right-0"
+                                : "left-0 right-0"
+                        }`}
+                    >
                         <div className="navbg rounded-[12px] border border-[1px] borderbx shadow-sm">
                             <div className="mx-auto max-w-full px-[12px] py-0">
                                 <div className="flex h-14 items-center justify-between gap-4">
@@ -337,8 +347,8 @@ export default function AuthenticatedLayout({ header, children }) {
                                         </div>
                                     </div>
 
-                                    {/* RIGHT SECTION: QuickPills */}
-                                    <div className="hidden xl:flex items-center gap-2 ml-2 border-l border-gray-200 dark:border-gray-700 pl-4 min-w-0">
+                                    {/* MIDDLE SECTION: QuickPills */}
+                                    <div className="hidden lg:flex items-center gap-2 mx-2 border-l border-gray-200 dark:border-gray-700 pl-4 min-w-0">
                                         <QuickPill
                                             href={route("super.construction.projects.index")}
                                             active={route().current("super.construction.projects.*")}
@@ -372,7 +382,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                     </div>
 
                                     {/* RIGHT SECTION: Actions + Avatar */}
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 shrink-0">
                                         <div className="hidden sm:flex items-center gap-2 mr-2">
                                             <Link
                                                 href={route("super.construction.projects.index")}
@@ -618,12 +628,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                     <ResponsiveNavLink href={route("super.construction.drafting.index")} active={route().current("super.construction.drafting.*")}>
                                         Drawing Approval
                                     </ResponsiveNavLink>
-                                    <ResponsiveNavLink href={route("super.construction.execution.index")} active={route().current("super.construction.execution.*")}>
+                                    {/* <ResponsiveNavLink href={route("super.construction.execution.index")} active={route().current("super.construction.execution.*")}>
                                         Construction Execution
-                                    </ResponsiveNavLink>
-                                    <ResponsiveNavLink href={route("super.construction.materials.index")} active={route().current("super.construction.materials.*")}>
+                                    </ResponsiveNavLink> */}
+                                    {/* <ResponsiveNavLink href={route("super.construction.materials.index")} active={route().current("super.construction.materials.*")}>
                                         Material Management
-                                    </ResponsiveNavLink>
+                                    </ResponsiveNavLink> */}
                                     <ResponsiveNavLink href={route("super.construction.vehicles.index")} active={route().current("super.construction.vehicles.*")}>
                                         Vehicle Tracking
                                     </ResponsiveNavLink>

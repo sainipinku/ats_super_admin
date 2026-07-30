@@ -35,7 +35,8 @@ import {
     FaRulerCombined,
     FaHandshake,
     FaFlagCheckered,
-} from "react-icons/fa6";
+} from "react-icons/fa";
+
 import { useState, useMemo } from "react";
 
 const projectStatusFlow = [

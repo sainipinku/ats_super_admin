@@ -101,8 +101,18 @@ export default function AuthenticatedLayout({ header, children }) {
     return (
         <>
             <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
-            <div className="min-h-screen mainbg xl:pl-[288px]">
-                <nav className="headerbg fixed top-0 left-0 right-0 z-50 py-[10px] px-[12px] print:hidden xl:left-[288px] xl:right-0">
+            <div
+                className={`min-h-screen mainbg transition-[padding] duration-300 ease-in-out ${
+                    sidebarOpen ? "xl:pl-[288px]" : "xl:pl-0"
+                }`}
+            >
+                <nav
+                    className={`headerbg fixed top-0 z-50 py-[10px] px-[12px] print:hidden transition-[left,right] duration-300 ease-in-out ${
+                        sidebarOpen
+                            ? "left-0 right-0 xl:left-[288px] xl:right-0"
+                            : "left-0 right-0"
+                    }`}
+                >
                     <div className="navbg rounded-[12px] border border-[1px] borderbx shadow-sm">
                         <div className="mx-auto max-w-full px-[12px] py-0">
                             <div className="flex h-14 items-center justify-between gap-4">
@@ -122,7 +132,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                         </Link>
                                     </div>
 
-                                    <div className="hidden xl:flex items-center gap-2 ml-2 border-l border-gray-200 dark:border-gray-700 pl-4 min-w-0">
+                                    <div className="hidden lg:flex items-center gap-2 ml-2 border-l border-gray-200 dark:border-gray-700 pl-4 min-w-0">
                                         <QuickPill
                                             href={route("member.construction.projects.index")}
                                             active={route().current("member.construction.projects.*")}
@@ -155,7 +165,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                 </div>
 
                                 {/* RIGHT SECTION: Actions + Avatar */}
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 shrink-0">
                                     <div className="hidden sm:flex items-center gap-2 mr-2">
                                         <Link
                                             href={route("member.construction.execution.index")}
@@ -285,9 +295,9 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <ResponsiveNavLink href={route("member.construction.execution.index")} active={route().current("member.construction.execution.*")}>
                                     Site Execution
                                 </ResponsiveNavLink>
-                                <ResponsiveNavLink href={route("member.construction.materials.index")} active={route().current("member.construction.materials.*")}>
+                                {/* <ResponsiveNavLink href={route("member.construction.materials.index")} active={route().current("member.construction.materials.*")}>
                                     Material Management
-                                </ResponsiveNavLink>
+                                </ResponsiveNavLink> */}
                                 <ResponsiveNavLink href={route("member.construction.vehicles.index")} active={route().current("member.construction.vehicles.*")}>
                                     Vehicle Tracking
                                 </ResponsiveNavLink>
