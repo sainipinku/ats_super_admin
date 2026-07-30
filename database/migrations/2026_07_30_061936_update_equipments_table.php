@@ -6,10 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Switch the equipments.category_id foreign key to restrictOnDelete
-     * so a category cannot be deleted while equipments still reference it.
-     */
+   
     public function up(): void
     {
         Schema::table('equipments', function (Blueprint $table) {

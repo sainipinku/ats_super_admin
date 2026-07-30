@@ -52,21 +52,12 @@ const navigation = [
         active: ["super.construction.survey.*"],
         icon: FaClipboardList,
     },
-<<<<<<< HEAD
-    // {
-    //     label: "Drawing Approval",
-    //     href: route("super.construction.drafting.index"),
-    //     active: ["super.construction.drafting.*"],
-    //     icon: FaDraftingCompass,
-    // },
-=======
     {
         label: "Drawing Approval",
         href: route("super.construction.drafting.index"),
         active: ["super.construction.drafting.*"],
         icon: FaDraftingCompass,
     },
->>>>>>> f6f2c925bbd48012c5fb55f9fbaec76cd1f7c215
     // {
     //     label: "Construction Execution",
     //     href: route("super.construction.execution.index"),
