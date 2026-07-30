@@ -18,6 +18,8 @@ export default function VehicleFilters({
     handleSearchChange,
     filterSelectClass,
     handleCreate,
+    statusOptions,
+    insuranceStatusOptions,
 }) {
     return (
         <div className="flex justify-between flex-wrap md:flex-nowrap px-[15px] pt-[5px] pb-[15px]">
@@ -38,15 +40,15 @@ export default function VehicleFilters({
 
                 <select value={statusFilter} onChange={handleStatusFilterChange} className={filterSelectClass}>
                     <option value="">All Status</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="sold">Sold</option>
+                    {statusOptions && statusOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                 </select>
 
                 <select value={insuranceStatusFilter} onChange={handleInsuranceStatusFilterChange} className={filterSelectClass}>
-                    <option value="">All Insurance</option>
-                    <option value="Active">Active</option>
-                    <option value="Expired">Expired</option>
+                    {insuranceStatusOptions && insuranceStatusOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                 </select>
 
                 <select value={sortFilter} onChange={handleSortChange} className={filterSelectClass}>

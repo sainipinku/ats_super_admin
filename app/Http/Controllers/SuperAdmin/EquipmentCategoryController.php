@@ -7,49 +7,61 @@ use App\Http\Requests\StoreEquipmentCategoryRequest;
 use App\Models\EquipmentCategory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Throwable;
 
 class EquipmentCategoryController extends Controller
 {
     public function index(Request $request)
     {
-        $categories = EquipmentCategory::query()
-            ->when($request->search, function ($q) use ($request) {
+        $categories = EquipmentCategory::when($request->filled('search'), function ($q) use ($request) {
                 $q->where(function ($query) use ($request) {
-                    $query->where('category_id', 'like', "%{$request->search}%")
-                        ->orWhere('category_name', 'like', "%{$request->search}%")
-                        ->orWhere('description', 'like', "%{$request->search}%");
+                    $query->where('category_id', 'like', '%' . $request->search . '%')
+                        ->orWhere('category_name', 'like', '%' . $request->search . '%')
+                        ->orWhere('description', 'like', '%' . $request->search . '%');
                 });
             })
-            ->when($request->status, function ($q) use ($request) {
+            ->when($request->filled('status'), function ($q) use ($request) {
                 $q->where('status', (int) $request->status);
             })
-            ->when($request->sort, function ($q) use ($request) {
+            ->when($request->filled('sort'), function ($q) use ($request) {
                 switch ($request->sort) {
                     case 'newest':
                         $q->latest();
                         break;
+
                     case 'oldest':
                         $q->oldest();
                         break;
+
                     case 'name':
                         $q->orderBy('category_name');
                         break;
+
                     default:
                         $q->latest();
+                        break;
                 }
-            }, fn ($q) => $q->latest())
+            }, function ($q) {
+                $q->latest();
+            })
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
         return Inertia::render('SuperAdmin/EquipmentCategories/List', [
             'categories' => $categories,
-            'filters' => (object) $request->only(['search', 'status', 'sort', 'per_page']),
+            'filters' => (object) $request->only([
+                'search',
+                'status',
+                'sort',
+                'per_page',
+            ]),
         ]);
     }
 
     public function show($id)
     {
         $category = EquipmentCategory::withCount('equipments')->findOrFail($id);
+
         return response()->json([
             'success' => true,
             'category' => $category,
@@ -58,31 +70,58 @@ class EquipmentCategoryController extends Controller
 
     public function store(StoreEquipmentCategoryRequest $request)
     {
-        $validated = $request->validated();
+        try {
+            EquipmentCategory::create($request->validated());
 
-        EquipmentCategory::create($validated);
-
-        return redirect()->back()->with('success', 'Equipment category created successfully!');
+            return redirect()
+                ->route('super.equipment.categories.list')
+                ->with('success', 'Equipment category created successfully.');
+        } catch (Throwable $e) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Unable to create equipment category.');
+        }
     }
 
     public function update(StoreEquipmentCategoryRequest $request, $id)
     {
-        $category = EquipmentCategory::findOrFail($id);
-        $category->update($request->validated());
+        try {
+            $category = EquipmentCategory::findOrFail($id);
 
-        return redirect()->back()->with('success', 'Equipment category updated successfully!');
+            $category->update($request->validated());
+
+            return redirect()
+                ->route('super.equipment.categories.list')
+                ->with('success', 'Equipment category updated successfully.');
+        } catch (Throwable $e) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'Unable to update equipment category.');
+        }
     }
 
     public function destroy($id)
     {
-        $category = EquipmentCategory::findOrFail($id);
+        try {
+            $category = EquipmentCategory::findOrFail($id);
 
-        if ($category->equipments()->exists()) {
-            return redirect()->back()->with('error', 'Cannot delete category because it has equipments assigned to it.');
+            if ($category->equipments()->exists()) {
+                return redirect()
+                    ->back()
+                    ->with('error', 'Cannot delete category because it has equipments assigned to it.');
+            }
+
+            $category->delete();
+
+            return redirect()
+                ->back()
+                ->with('success', 'Equipment category deleted successfully.');
+        } catch (Throwable $e) {
+            return redirect()
+                ->back()
+                ->with('error', 'Unable to delete equipment category.');
         }
-
-        $category->delete();
-
-        return redirect()->back()->with('success', 'Equipment category deleted successfully!');
     }
 }

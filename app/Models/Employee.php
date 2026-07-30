@@ -36,9 +36,8 @@ class Employee extends Model
         return $this->belongsTo(Member::class, 'member_id');
     }
 
-    public static function boot(): void
+    protected static function booted(): void
     {
-        parent::boot();
         static::creating(function ($v) {
             if (empty($v->employee_id)) {
                 $v->employee_id = static::generateEmployeeId();

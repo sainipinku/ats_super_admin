@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Equipment;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -14,58 +15,149 @@ class StoreEquipmentRequest extends FormRequest
 
     public function rules(): array
     {
-        $equipmentId = $this->route('id');
-        $equipment = null;
-
-        if ($equipmentId) {
-            $equipment = \App\Models\Equipment::find($equipmentId);
-        }
+        $equipment = $this->route('id')
+            ? Equipment::find($this->route('id'))
+            : null;
 
         return [
-            'category_id' => ['required', 'exists:equipment_categories,id'],
-            'equipment_name' => ['required', 'string', 'max:255'],
-            'company' => ['nullable', 'string', 'max:255'],
-            'brand' => ['nullable', 'string', 'max:255'],
-            'model' => ['nullable', 'string', 'max:255'],
+            'category_id' => [
+                'bail',
+                'required',
+                'exists:equipment_categories,id',
+            ],
+
+            'equipment_name' => [
+                'bail',
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'company' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'brand' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'model' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
             'serial_number' => [
                 'nullable',
                 'string',
                 'max:255',
-                Rule::unique('equipments', 'serial_number')->ignore($equipment?->id)->whereNull('deleted_at'),
+                Rule::unique('equipments', 'serial_number')
+                    ->ignore($equipment?->id)
+                    ->whereNull('deleted_at'),
             ],
+
             'asset_tag' => [
                 'nullable',
                 'string',
                 'max:255',
-                Rule::unique('equipments', 'asset_tag')->ignore($equipment?->id)->whereNull('deleted_at'),
+                Rule::unique('equipments', 'asset_tag')
+                    ->ignore($equipment?->id)
+                    ->whereNull('deleted_at'),
             ],
-            'purchase_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
-            'purchase_cost' => ['nullable', 'numeric', 'min:0'],
-            'vendor' => ['nullable', 'string', 'max:255'],
-            'warranty_till' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:purchase_date'],
-            'photo' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
-            'status' => ['required', 'integer', 'in:0,1,2,3,4,5'],
-            'assigned_employee_id' => ['nullable', 'exists:employees,id'],
-            'assigned_project_id' => ['nullable', 'exists:construction_projects,id'],
-            'assigned_date' => ['nullable', 'date_format:Y-m-d'],
+
+            'purchase_date' => [
+                'nullable',
+                'date',
+                'before_or_equal:today',
+            ],
+
+            'purchase_cost' => [
+                'nullable',
+                'numeric',
+                'decimal:0,2',
+                'min:0',
+            ],
+
+            'vendor' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'warranty_till' => [
+                'nullable',
+                'date',
+                'after_or_equal:purchase_date',
+            ],
+
+            'photo' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,gif,webp',
+                'max:5120',
+            ],
+
+            'status' => [
+                'required',
+                'integer',
+                'in:0,1,2,3,4,5',
+            ],
+
+            'assigned_employee_id' => [
+                'nullable',
+                'exists:employees,id',
+            ],
+
+            'assigned_project_id' => [
+                'nullable',
+                'exists:construction_projects,id',
+            ],
+
+            'assigned_date' => [
+                'nullable',
+                'required_if:status,1',
+                'date',
+            ],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'category_id.required' => 'Please select a category.',
-            'category_id.exists' => 'Please select a valid category.',
+            'category_id.required' => 'Please select an equipment category.',
+            'category_id.exists' => 'Selected equipment category is invalid.',
+
             'equipment_name.required' => 'Equipment name is required.',
-            'serial_number.unique' => 'This serial number is already registered.',
-            'status.required' => 'Please select a status.',
-            'status.in' => 'Please select a valid status.',
-            'photo.image' => 'File must be an image.',
-            'photo.max' => 'Image must not exceed 5MB.',
-            'purchase_date.date_format' => 'Please enter a valid purchase date (YYYY-MM-DD).',
-            'warranty_till.after_or_equal' => 'Warranty till date must be after purchase date.',
-            'assigned_employee_id.exists' => 'Please select a valid employee.',
-            'assigned_project_id.exists' => 'Please select a valid project.',
+
+            'serial_number.unique' => 'This serial number already exists.',
+            'asset_tag.unique' => 'This asset tag already exists.',
+
+            'purchase_date.date' => 'Please enter a valid purchase date.',
+            'purchase_date.before_or_equal' => 'Purchase date cannot be in the future.',
+
+            'purchase_cost.numeric' => 'Purchase cost must be a valid number.',
+            'purchase_cost.decimal' => 'Purchase cost can contain up to 2 decimal places.',
+            'purchase_cost.min' => 'Purchase cost cannot be negative.',
+
+            'warranty_till.date' => 'Please enter a valid warranty date.',
+            'warranty_till.after_or_equal' => 'Warranty date must be on or after the purchase date.',
+
+            'photo.image' => 'Please upload a valid image.',
+            'photo.mimes' => 'The image must be a JPG, JPEG, PNG, GIF, or WEBP file.',
+            'photo.max' => 'The image size must not exceed 5 MB.',
+
+            'status.required' => 'Please select the equipment status.',
+            'status.in' => 'Please select a valid equipment status.',
+
+            'assigned_employee_id.exists' => 'Selected employee is invalid.',
+            'assigned_project_id.exists' => 'Selected project is invalid.',
+
+            'assigned_date.required_if' => 'Assigned date is required when equipment status is Assigned.',
+            'assigned_date.date' => 'Please enter a valid assigned date.',
         ];
     }
 }

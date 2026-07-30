@@ -54,31 +54,45 @@ class Vehicle extends Model
         'vehicle_image_url',
     ];
 
+    protected $casts = [
+        'purchase_date' => 'date',
+        'purchase_amount' => 'decimal:2',
+        'insurance_start_date' => 'date',
+        'insurance_end_date' => 'date',
+        'puc_issue_date' => 'date',
+        'puc_expiry_date' => 'date',
+        'challan_date' => 'date',
+        'fine_amount' => 'decimal:2',
+        'status' => 'integer',
+        'insurance_status' => 'integer',
+        'puc_status' => 'integer',
+        'payment_status' => 'integer',
+    ];
+
     public function uniqueIds()
     {
         return ['uuid'];
     }
 
-    public static function boot(): void
+    protected static function booted(): void
     {
-        parent::boot();
         static::creating(function ($v) {
             if (empty($v->vehicle_id)) {
                 $v->vehicle_id = static::generateVehicleId();
             }
             if ($v->insurance_end_date) {
-                $v->insurance_status = now()->lessThanOrEqualTo($v->insurance_end_date) ? 'Active' : 'Expired';
+                $v->insurance_status = now()->lessThanOrEqualTo($v->insurance_end_date) ? 1 : 0;
             }
             if ($v->puc_expiry_date) {
-                $v->puc_status = now()->lessThanOrEqualTo($v->puc_expiry_date) ? 'Valid' : 'Expired';
+                $v->puc_status = now()->lessThanOrEqualTo($v->puc_expiry_date) ? 1 : 0;
             }
         });
         static::updating(function ($v) {
             if ($v->insurance_end_date) {
-                $v->insurance_status = now()->lessThanOrEqualTo($v->insurance_end_date) ? 'Active' : 'Expired';
+                $v->insurance_status = now()->lessThanOrEqualTo($v->insurance_end_date) ? 1 : 0;
             }
             if ($v->puc_expiry_date) {
-                $v->puc_status = now()->lessThanOrEqualTo($v->puc_expiry_date) ? 'Valid' : 'Expired';
+                $v->puc_status = now()->lessThanOrEqualTo($v->puc_expiry_date) ? 1 : 0;
             }
         });
     }
@@ -111,6 +125,40 @@ class Vehicle extends Model
                 return asset('images/common/data_not_found.png');
             }
         );
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->status) {
+            0 => 'Active',
+            1 => 'Inactive',
+            2 => 'Sold',
+            default => 'Unknown',
+        };
+    }
+
+    public function getInsuranceStatusLabelAttribute(): string
+    {
+        if ($this->insurance_status === null) {
+            return 'N/A';
+        }
+        return $this->insurance_status === 1 ? 'Active' : 'Expired';
+    }
+
+    public function getPucStatusLabelAttribute(): string
+    {
+        if ($this->puc_status === null) {
+            return 'N/A';
+        }
+        return $this->puc_status === 1 ? 'Valid' : 'Expired';
+    }
+
+    public function getPaymentStatusLabelAttribute(): string
+    {
+        if ($this->payment_status === null) {
+            return 'N/A';
+        }
+        return $this->payment_status === 1 ? 'Paid' : 'Unpaid';
     }
 
     public function scopeNewestFirst($query)
