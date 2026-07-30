@@ -27,7 +27,14 @@ export default function List({ equipments, categories, employees, projects, filt
     const fileInputRef = useRef(null);
     const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
-    const statusOptions = ["available", "assigned", "under_maintenance", "damaged", "lost", "disposed"];
+    const statusOptions = [
+        { value: 0, label: "Available" },
+        { value: 1, label: "Assigned" },
+        { value: 2, label: "Under Maintenance" },
+        { value: 3, label: "Damaged" },
+        { value: 4, label: "Lost" },
+        { value: 5, label: "Disposed" },
+    ];
 
     const [formData, setFormData] = useState({
         category_id: "",
@@ -42,7 +49,7 @@ export default function List({ equipments, categories, employees, projects, filt
         vendor: "",
         warranty_till: "",
         photo: null,
-        status: "available",
+        status: 0,
         assigned_employee_id: "",
         assigned_project_id: "",
         assigned_date: "",
@@ -92,7 +99,7 @@ export default function List({ equipments, categories, employees, projects, filt
                 vendor: currentEquipment.vendor || "",
                 warranty_till: currentEquipment.warranty_till || "",
                 photo: null,
-                status: currentEquipment.status || "available",
+                status: currentEquipment.status ?? 0,
                 assigned_employee_id: currentEquipment.assigned_employee_id || "",
                 assigned_project_id: currentEquipment.assigned_project_id || "",
                 assigned_date: currentEquipment.assigned_date || "",
@@ -106,7 +113,7 @@ export default function List({ equipments, categories, employees, projects, filt
         setFormData({
             category_id: "", equipment_name: "", company: "", brand: "", model: "",
             serial_number: "", asset_tag: "", purchase_date: "", purchase_cost: "",
-            vendor: "", warranty_till: "", photo: null, status: "available",
+            vendor: "", warranty_till: "", photo: null, status: 0,
             assigned_employee_id: "", assigned_project_id: "", assigned_date: "",
         });
         setPhotoPreview(null);
@@ -204,14 +211,14 @@ export default function List({ equipments, categories, employees, projects, filt
 
     const getStatusDisplay = (status) => {
         const statusMap = {
-            available: { text: "Available", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
-            assigned: { text: "Assigned", class: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
-            under_maintenance: { text: "Under Maintenance", class: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
-            damaged: { text: "Damaged", class: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400" },
-            lost: { text: "Lost", class: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
-            disposed: { text: "Disposed", class: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400" },
+            0: { text: "Available", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
+            1: { text: "Assigned", class: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
+            2: { text: "Under Maintenance", class: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
+            3: { text: "Damaged", class: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400" },
+            4: { text: "Lost", class: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
+            5: { text: "Disposed", class: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400" },
         };
-        return statusMap[status] || { text: status, class: "bg-gray-100 text-gray-800" };
+        return statusMap[status] || { text: "Unknown", class: "bg-gray-100 text-gray-800" };
     };
 
     const handleClose = () => {
@@ -304,7 +311,7 @@ export default function List({ equipments, categories, employees, projects, filt
                                 <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setHasUserInteracted(true); }} className={filterSelectClass}>
                                     <option value="">All Status</option>
                                     {statusOptions.map((opt) => (
-                                        <option key={opt} value={opt}>{opt.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
                                     ))}
                                 </select>
                                 <select value={sortFilter} onChange={(e) => { setSortFilter(e.target.value); setHasUserInteracted(true); }} className={filterSelectClass}>
@@ -634,7 +641,7 @@ export default function List({ equipments, categories, employees, projects, filt
                                     <label className="block text-gray-700 dark:text-gray-300 mb-1 text-sm">Status <em className="text-red-500">*</em></label>
                                     <select name="status" value={formData.status} onChange={handleChange} className={selectClass('status')}>
                                         {statusOptions.map((opt) => (
-                                            <option key={opt} value={opt}>{opt.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
                                         ))}
                                     </select>
                                     {errors.status && <p className="text-red-500 text-xs mt-1">{errors.status}</p>}

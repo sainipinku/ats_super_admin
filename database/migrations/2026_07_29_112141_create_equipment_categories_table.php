@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('category_id')->unique();
             $table->string('category_name');
             $table->text('description')->nullable();
-            $table->string('status')->default('active');
+           $table->tinyInteger('status')->default(1)->comment('0 = Inactive, 1 = Active');
             $table->timestamps();
             $table->softDeletes();
         });

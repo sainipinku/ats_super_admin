@@ -26,7 +26,7 @@ export default function List({ categories, filters }) {
     const [formData, setFormData] = useState({
         category_name: "",
         description: "",
-        status: "active",
+        status: 1,
     });
 
     const updateUrl = (newPage = 1) => {
@@ -62,14 +62,14 @@ export default function List({ categories, filters }) {
             setFormData({
                 category_name: currentCategory.category_name || "",
                 description: currentCategory.description || "",
-                status: currentCategory.status || "active",
+                status: currentCategory.status ?? 1,
             });
         }
     }, [currentCategory]);
 
     const handleCreate = () => {
         setCurrentCategory(null);
-        setFormData({ category_name: "", description: "", status: "active" });
+        setFormData({ category_name: "", description: "", status: 1 });
         setErrors({});
         setIsOpen(true);
     };
@@ -124,10 +124,10 @@ export default function List({ categories, filters }) {
 
     const getStatusDisplay = (status) => {
         const statusMap = {
-            active: { text: "Active", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
-            inactive: { text: "Inactive", class: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
+            1: { text: "Active", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
+            0: { text: "Inactive", class: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
         };
-        return statusMap[status] || { text: status, class: "bg-gray-100 text-gray-800" };
+        return statusMap[status] || { text: "Unknown", class: "bg-gray-100 text-gray-800" };
     };
 
     const handleClose = () => {
@@ -209,8 +209,8 @@ export default function List({ categories, filters }) {
                                 </div>
                                 <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setHasUserInteracted(true); }} className={filterSelectClass}>
                                     <option value="">All Status</option>
-                                    <option value="active">Active</option>
-                                    <option value="inactive">Inactive</option>
+                                    <option value="1">Active</option>
+                                    <option value="0">Inactive</option>
                                 </select>
                                 <select value={sortFilter} onChange={(e) => { setSortFilter(e.target.value); setHasUserInteracted(true); }} className={filterSelectClass}>
                                     <option value="newest">Newest First</option>
@@ -410,10 +410,10 @@ export default function List({ categories, filters }) {
                             </div>
                             <div>
                                 <label className="block text-gray-700 dark:text-gray-300 mb-1 text-sm">Status <em className="text-red-500">*</em></label>
-                                <select name="status" value={formData.status} onChange={handleChange} className={selectClass('status')}>
-                                    <option value="active">Active</option>
-                                    <option value="inactive">Inactive</option>
-                                </select>
+                                    <select name="status" value={formData.status} onChange={handleChange} className={selectClass('status')}>
+                                        <option value="1">Active</option>
+                                        <option value="0">Inactive</option>
+                                    </select>
                                 {errors.status && <p className="text-red-500 text-xs mt-1">{errors.status}</p>}
                             </div>
                         </div>

@@ -14,7 +14,7 @@ class StoreEquipmentCategoryRequest extends FormRequest
 
     public function rules(): array
     {
-        $categoryId = $this->route('uuid');
+        $categoryId = $this->route('id');
         $category = null;
         $id = null;
 
@@ -31,7 +31,7 @@ class StoreEquipmentCategoryRequest extends FormRequest
                 Rule::unique('equipment_categories', 'category_name')->ignore($id)->whereNull('deleted_at'),
             ],
             'description' => ['nullable', 'string', 'max:1000'],
-            'status' => ['required', 'string', 'in:active,inactive'],
+            'status' => ['required', 'integer', 'in:0,1'],
         ];
     }
 

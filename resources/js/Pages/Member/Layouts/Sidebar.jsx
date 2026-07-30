@@ -30,12 +30,12 @@ const navigation = [
         active: ["member.construction.execution.*"],
         icon: FaHardHat,
     },
-    {
-        label: "Material Management",
-        href: route("member.construction.materials.index"),
-        active: ["member.construction.materials.*"],
-        icon: FaBoxes,
-    },
+    // {
+    //     label: "Material Management",
+    //     href: route("member.construction.materials.index"),
+    //     active: ["member.construction.materials.*"],
+    //     icon: FaBoxes,
+    // },
     {
         label: "Vehicle Tracking",
         href: route("member.construction.vehicles.index"),
@@ -73,11 +73,11 @@ export default function Sidebar({ isOpen, onClose }) {
 
     return (
         <aside
-            className={`fixed top-0 left-0 z-[99] h-full w-[288px] bg-white text-slate-900 shadow-md transition-transform duration-300 dark:bg-[#03011C] dark:text-white overflow-y-auto xl:translate-x-0 ${
+            className={`fixed left-0 z-40 h-[calc(100vh-62px)] w-[288px] bg-white text-slate-900 shadow-md transition-transform duration-300 dark:bg-[#03011C] dark:text-white overflow-y-auto ${
                 isOpen ? "translate-x-0" : "-translate-x-full"
             }`}
         >
-            <div className="border-b border-gray-200 p-4 dark:border-b-[#5146e64a]">
+            <div className="border-b border-gray-200 px-4 py-3 dark:border-b-[#5146e64a]">
                 <div className="flex items-center justify-between">
                     <div>
                         <div className="block dark:hidden">
@@ -89,7 +89,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     </div>
                     <button
                         onClick={onClose}
-                        className="flex h-[38px] w-[48px] items-center justify-center rounded-[8px] border border-[#0000001A] bg-white text-[#000] transition focus:outline-none dark:border-[#61CC681A] dark:bg-[#61CC681A] dark:text-[#fff] md:flex xl:hidden"
+                        className="flex h-[38px] w-[48px] items-center justify-center rounded-[8px] border border-[#0000001A] bg-white text-[#000] transition focus:outline-none dark:border-[#61CC681A] dark:bg-[#61CC681A] dark:text-[#fff] xl:hidden"
                     >
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -98,7 +98,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 </div>
             </div>
 
-            <div className="border-b border-gray-200 px-4 py-4 dark:border-b-[#5146e64a]">
+            <div className="border-b border-gray-200 px-4 py-3 dark:border-b-[#5146e64a]">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-600 dark:text-emerald-400">
                     Site Member Workspace
                 </p>

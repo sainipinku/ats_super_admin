@@ -5,13 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EquipmentCategory extends Model
 {
     use HasFactory, SoftDeletes;
-
-    protected $table = 'equipment_categories';
 
     protected $fillable = [
         'category_id',
@@ -20,10 +18,13 @@ class EquipmentCategory extends Model
         'status',
     ];
 
-    public static function boot(): void
+    protected $casts = [
+        'status' => 'integer',
+    ];
+
+    protected static function booted(): void
     {
-        parent::boot();
-        static::creating(function ($category) {
+        static::creating(function (EquipmentCategory $category) {
             if (empty($category->category_id)) {
                 $category->category_id = static::generateCategoryId();
             }
@@ -41,8 +42,17 @@ class EquipmentCategory extends Model
         return $categoryId;
     }
 
-    public function equipments()
+    public function equipments(): HasMany
     {
         return $this->hasMany(Equipment::class, 'category_id');
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->status) {
+            1 => 'Active',
+            0 => 'Inactive',
+            default => 'Unknown',
+        };
     }
 }

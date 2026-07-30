@@ -14,13 +14,11 @@ class StoreEquipmentRequest extends FormRequest
 
     public function rules(): array
     {
-        $equipmentUuid = $this->route('uuid');
+        $equipmentId = $this->route('id');
         $equipment = null;
-        $equipmentId = null;
 
-        if ($equipmentUuid) {
-            $equipment = \App\Models\Equipment::where('equipment_id', $equipmentUuid)->orWhere('id', $equipmentUuid)->first();
-            $equipmentId = $equipment?->id;
+        if ($equipmentId) {
+            $equipment = \App\Models\Equipment::find($equipmentId);
         }
 
         return [
@@ -33,15 +31,20 @@ class StoreEquipmentRequest extends FormRequest
                 'nullable',
                 'string',
                 'max:255',
-                Rule::unique('equipments', 'serial_number')->ignore($equipmentId)->whereNull('deleted_at'),
+                Rule::unique('equipments', 'serial_number')->ignore($equipment?->id)->whereNull('deleted_at'),
             ],
-            'asset_tag' => ['nullable', 'string', 'max:255'],
+            'asset_tag' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('equipments', 'asset_tag')->ignore($equipment?->id)->whereNull('deleted_at'),
+            ],
             'purchase_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
             'purchase_cost' => ['nullable', 'numeric', 'min:0'],
             'vendor' => ['nullable', 'string', 'max:255'],
             'warranty_till' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:purchase_date'],
             'photo' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
-            'status' => ['required', 'string', 'in:available,assigned,under_maintenance,damaged,lost,disposed'],
+            'status' => ['required', 'integer', 'in:0,1,2,3,4,5'],
             'assigned_employee_id' => ['nullable', 'exists:employees,id'],
             'assigned_project_id' => ['nullable', 'exists:construction_projects,id'],
             'assigned_date' => ['nullable', 'date_format:Y-m-d'],
