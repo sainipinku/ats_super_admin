@@ -488,16 +488,20 @@ export default function AllJobs({ auth }) {
                 },
             });
             const data = await response.json();
-            if (data.success) {
+            if (response.ok && data.success) {
                 setSelectedJob(data.data);
             } else {
-                errorAlert(data.message || 'Failed to load job details.');
-                setSelectedJob(job);
+                const message = (response.status === 404 || data.message?.includes('No query results'))
+                    ? 'This job post no longer exists or has been deleted.'
+                    : (data.message || 'Failed to load job details.');
+                errorAlert(message);
+                if (response.status === 404 || !data.data) {
+                    setJobs(prev => prev.filter(j => j.id !== job.id));
+                }
             }
         } catch (error) {
             console.error('Error fetching job details:', error);
             errorAlert('Failed to load job details.');
-            setSelectedJob(job);
         } finally {
             setDetailsLoading(false);
         }
