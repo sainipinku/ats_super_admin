@@ -3,14 +3,19 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\Member;
 use App\Models\SuperAdmin;
+use App\Enums\ActionTypeEnum;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
+    /**
+     * Register a new member
+     */
     public function register(Request $request)
     {
         $validated = $request->validate([
@@ -41,7 +46,7 @@ class AuthController extends Controller
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'],
             'password' => Str::random(32),
-            'status' => '1',
+            'status' => 1,
             'roles' => [3],
             'slug' => $slug,
         ]);
@@ -50,7 +55,7 @@ class AuthController extends Controller
 
         $payload = [
             'success' => true,
-            'message' => 'Registered. OTP sent.',
+            'message' => 'Registered successfully. OTP sent to your phone.',
             'member_id' => $member->id,
         ];
 
@@ -59,9 +64,12 @@ class AuthController extends Controller
             $payload['otp_expire_at'] = optional($member->otp_expire)->toISOString();
         }
 
-        return response()->json($payload);
+        return response()->json($payload, 201);
     }
 
+    /**
+     * Login with identifier (email/phone/username) and password
+     */
     public function login(Request $request)
     {
         $validated = $request->validate([
@@ -78,13 +86,39 @@ class AuthController extends Controller
             ->orWhere('username', $identifier)
             ->first();
 
-        if (! $member || $member->status != 1) {
+        // Member not found
+        if (! $member) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid credentials.',
             ], 422);
         }
 
+        // Check if account is active
+        if ((int) ($member->status ?? 1) !== 1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account is inactive. Please contact admin.',
+            ], 403);
+        }
+
+        // Block calling team members from logging in via member API
+        if ($member->is_calling_team) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Use the calling team portal to access your account.',
+            ], 403);
+        }
+
+        // Check if member has at least one valid role assigned
+        $roles = is_array($member->roles) ? $member->roles : [];
+        if (empty($roles)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No role assigned. Please contact admin.',
+            ], 403);
+        }
+        // Verify password
         if (! Hash::check($validated['password'], $member->password)) {
             return response()->json([
                 'success' => false,
@@ -92,16 +126,37 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $tokenName = $validated['device_name'] ?? ($request->userAgent() ?: 'api');
+        // Revoke old tokens for this device to maintain security
+        // Only keep the latest token per device
+        $tokenName = $validated['device_name'] ?? ($request->userAgent() ?: 'api-token');
+        $member->tokens()->where('name', $tokenName)->delete();
+
+        // Create new Sanctum token
         $token = $member->createToken($tokenName)->plainTextToken;
+
+        // Log activity
+        ActivityLog::create([
+            'user_id'     => $member->id,
+            'user_role'   => 'doer',
+            'action_type' => ActionTypeEnum::LOGIN,
+            'description' => 'Member logged in via API (' . $tokenName . ')',
+            'ip_address'  => $request->ip(),
+            'user_agent'  => $request->userAgent(),
+            'action_time' => now(),
+        ]);
 
         return response()->json([
             'success' => true,
+            'message' => 'Login successful.',
             'token' => $token,
+            'token_type' => 'Bearer',
             'member' => $member,
         ]);
     }
 
+    /**
+     * Send OTP to member's phone
+     */
     public function sendOtp(Request $request)
     {
         $validated = $request->validate([
@@ -110,10 +165,10 @@ class AuthController extends Controller
 
         $member = Member::query()->where('phone', $validated['phone'])->first();
 
-        if (! $member || $member->status != 1) {
+        if (! $member || (int) ($member->status ?? 1) !== 1) {
             return response()->json([
                 'success' => false,
-                'message' => 'Account not found.',
+                'message' => 'Account not found or inactive.',
             ], 404);
         }
 
@@ -121,7 +176,7 @@ class AuthController extends Controller
 
         $payload = [
             'success' => true,
-            'message' => 'OTP sent.',
+            'message' => 'OTP sent successfully.',
         ];
 
         if (config('app.debug')) {
@@ -132,6 +187,9 @@ class AuthController extends Controller
         return response()->json($payload);
     }
 
+    /**
+     * Verify OTP and get token
+     */
     public function verifyOtp(Request $request)
     {
         $validated = $request->validate([
@@ -142,17 +200,17 @@ class AuthController extends Controller
 
         $member = Member::query()->where('phone', $validated['phone'])->first();
 
-        if (! $member || $member->status != 1) {
+        if (! $member || (int) ($member->status ?? 1) !== 1) {
             return response()->json([
                 'success' => false,
-                'message' => 'Account not found.',
+                'message' => 'Account not found or inactive.',
             ], 404);
         }
 
         if (! $member->otp || ! $member->otp_expire || $member->otp_expire->isPast()) {
             return response()->json([
                 'success' => false,
-                'message' => 'OTP expired.',
+                'message' => 'OTP expired. Please request a new OTP.',
             ], 422);
         }
 
@@ -163,52 +221,97 @@ class AuthController extends Controller
             ], 422);
         }
 
+        // Clear OTP and mark phone as verified
         $member->forceFill([
             'otp' => null,
             'otp_expire' => null,
             'phone_verify_at' => now(),
         ])->save();
 
-        $tokenName = $validated['device_name'] ?? ($request->userAgent() ?: 'api');
+        // Create token
+        $tokenName = $validated['device_name'] ?? ($request->userAgent() ?: 'api-token');
         $token = $member->createToken($tokenName)->plainTextToken;
+
+        // Log activity
+        ActivityLog::create([
+            'user_id'     => $member->id,
+            'user_role'   => 'doer',
+            'action_type' => ActionTypeEnum::LOGIN,
+            'description' => 'Member logged in via OTP verification (' . $tokenName . ')',
+            'ip_address'  => $request->ip(),
+            'user_agent'  => $request->userAgent(),
+            'action_time' => now(),
+        ]);
 
         return response()->json([
             'success' => true,
+            'message' => 'OTP verified successfully.',
             'token' => $token,
+            'token_type' => 'Bearer',
             'member' => $member,
         ]);
     }
 
+    /**
+     * Get authenticated member profile
+     */
     public function me(Request $request)
     {
+        $member = $request->user();
+        $member->loadMissing(['employee', 'fcm_token']);
+
         return response()->json([
             'success' => true,
-            'member' => $request->user(),
+            'member' => $member,
         ]);
     }
 
+    /**
+     * Logout - Revoke current token
+     */
     public function logout(Request $request)
     {
-        $token = $request->user()?->currentAccessToken();
+        $member = $request->user();
+        $token = $member?->currentAccessToken();
 
         if ($token) {
+            $tokenName = $token->name;
+
+            // Log activity before revoking token
+            ActivityLog::create([
+                'user_id'     => $member->id,
+                'user_role'   => 'doer',
+                'action_type' => ActionTypeEnum::LOGOUT,
+                'description' => 'Member logged out from API (' . $tokenName . ')',
+                'ip_address'  => $request->ip(),
+                'user_agent'  => $request->userAgent(),
+                'action_time' => now(),
+            ]);
+
             $token->delete();
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Logged out.',
+            'message' => 'Logged out successfully.',
         ]);
     }
 
+    /**
+     * Issue OTP to member (random 6-digit OTP, in debug mode returns 123456)
+     */
     private function issueOtp(Member $member): void
     {
+        $otp = config('app.debug') ? '123456' : (string) random_int(100000, 999999);
         $member->forceFill([
-            'otp' => '123456',
+            'otp' => $otp,
             'otp_expire' => now()->addMinutes(5),
         ])->save();
     }
 
+    /**
+     * Make unique value for table column
+     */
     private function makeUnique(string $table, string $column, string $base): string
     {
         $value = $base;
