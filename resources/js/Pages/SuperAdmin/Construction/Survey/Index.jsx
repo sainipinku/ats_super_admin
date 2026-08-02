@@ -72,7 +72,9 @@ export default function SurveyIndex({ surveyPlans, surveySubmissions, projects, 
                                 className="min-h-40 w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                             >
                                 {members.map((member) => (
-                                    <option key={member.id} value={member.id}>{member.name}{member.email ? ` • ${member.email}` : ""}</option>
+                                    <option key={member.id} value={member.id}>
+                                        {member.name}{member.designation_text ? ` (${member.designation_text})` : ""}{member.email ? ` • ${member.email}` : ""}
+                                    </option>
                                 ))}
                             </select>
                             {planForm.errors.member_ids ? <p className="mt-1 text-xs text-rose-600">{planForm.errors.member_ids}</p> : null}

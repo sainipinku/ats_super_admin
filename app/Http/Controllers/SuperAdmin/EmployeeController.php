@@ -102,6 +102,75 @@ class EmployeeController extends Controller
         ];
     }
 
+    public static function getDepartmentDesignationsMap(): array
+    {
+        $staticMap = [
+            'Administration' => [
+                'CEO', 'Director', 'General Manager', 'Manager (Admin)',
+                'Admin Executive', 'Receptionist', 'Office Assistant', 'Assistant', 'Office Boy'
+            ],
+            'Architecture' => [
+                'Architect', 'Senior Architect', 'AutoCAD Designer'
+            ],
+            'Planning' => [
+                'Manager (Planning)', 'Planning Engineer'
+            ],
+            'Engineering' => [
+                'Manager (Engineering)', 'Civil Engineer', 'Junior Civil Engineer',
+                'Site Engineer', 'CAD Engineer', 'Supervisor', 'Site Supervisor'
+            ],
+            'Survey' => [
+                'Manager (Survey)', 'Surveyor', 'Senior Surveyor', 'Assistant Surveyor', 'Quantity Surveyor'
+            ],
+            'Drafting' => [
+                'Manager (Drawings)', 'Draftsman', 'Senior Draftsman', 'Junior Draftsman'
+            ],
+            'Accounts' => [
+                'Manager (Accounts)', 'Accountant', 'Senior Accountant'
+            ],
+            'HR' => [
+                'HR Manager', 'HR Executive'
+            ],
+            'GIS & Mapping' => [
+                'GIS Engineer', 'GIS Analyst'
+            ],
+            'Data Collection' => [
+                'Manager (Data Collection)'
+            ],
+            'Development' => [
+                'Senior Consultant', 'Team Leader', 'Project Manager'
+            ],
+            'Project Management' => [
+                'Project Manager', 'Team Leader'
+            ],
+            'Operations' => [
+                'Store Keeper', 'Driver'
+            ]
+        ];
+
+        try {
+            $departments = Department::where('status', 1)
+                ->with(['designationList' => fn($q) => $q->where('status', 1)])
+                ->get();
+
+            foreach ($departments as $dept) {
+                $deptName = $dept->name;
+                $desigNames = $dept->designationList->pluck('name')->toArray();
+                if (!empty($desigNames)) {
+                    if (!isset($staticMap[$deptName])) {
+                        $staticMap[$deptName] = $desigNames;
+                    } else {
+                        $staticMap[$deptName] = array_values(array_unique(array_merge($staticMap[$deptName], $desigNames)));
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Ignore DB errors and use static map
+        }
+
+        return $staticMap;
+    }
+
     public function index(Request $request)
     {
         $employees = Employee::query()
@@ -154,6 +223,7 @@ class EmployeeController extends Controller
             'employees' => $employees,
             'departmentOptions' => static::getDepartmentOptions(),
             'designationOptions' => static::getDesignationOptions(),
+            'departmentDesignationMap' => static::getDepartmentDesignationsMap(),
             'roleOptions' => static::getRoleOptions(),
             'filters' => $request->only(['search', 'department', 'designation', 'status', 'per_page']),
         ]);

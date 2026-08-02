@@ -20,13 +20,59 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
     });
 
     const teamForm = useForm({
-        member_id: members[0]?.id || "",
-        role_id: roles[0]?.id || "",
+        member_id: "",
+        role_id: "",
         assigned_from: "",
         assigned_to: "",
         assignment_scope: "",
         is_primary: false,
     });
+
+    const handleRoleChange = (roleId) => {
+        const roleObj = roles.find((r) => String(r.id) === String(roleId));
+        let defaultScope = teamForm.data.assignment_scope;
+        if (roleObj) {
+            const slug = (roleObj.slug || roleObj.name || "").toLowerCase();
+            if (slug.includes('survey')) defaultScope = "Field Survey & Site Data Collection";
+            else if (slug.includes('draft')) defaultScope = "Drawing Revisions & CAD Drafting";
+            else if (slug.includes('driver')) defaultScope = "Vehicle Transport & Site Movement";
+            else if (slug.includes('admin')) defaultScope = "Project Oversight & Workflow Coordination";
+            else if (slug.includes('approv')) defaultScope = "Drawing & Progress Approvals";
+            else if (slug.includes('site')) defaultScope = "Site Work & Daily Execution";
+        }
+        teamForm.setData((prev) => ({
+            ...prev,
+            role_id: roleId,
+            assignment_scope: defaultScope,
+        }));
+    };
+
+    const selectedRole = roles.find((r) => String(r.id) === String(teamForm.data.role_id));
+    const roleSlug = selectedRole ? (selectedRole.slug || selectedRole.name || "").toLowerCase() : "";
+
+    const sortedMembers = useMemo(() => {
+        if (!roleSlug) return members;
+        let targetKeyword = "";
+        if (roleSlug.includes("survey")) targetKeyword = "survey";
+        else if (roleSlug.includes("draft")) targetKeyword = "draft";
+        else if (roleSlug.includes("driver")) targetKeyword = "driver";
+        else if (roleSlug.includes("admin")) targetKeyword = "admin";
+        else if (roleSlug.includes("approv")) targetKeyword = "review";
+
+        if (!targetKeyword) return members;
+
+        const matching = [];
+        const others = [];
+        members.forEach((m) => {
+            const desig = (m.designation_text || "").toLowerCase();
+            if (desig.includes(targetKeyword)) {
+                matching.push(m);
+            } else {
+                others.push(m);
+            }
+        });
+        return [...matching, ...others];
+    }, [members, roleSlug]);
 
     const metrics = useMemo(
         () => ({
@@ -63,8 +109,8 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                     <dl className="mt-5 grid gap-4 sm:grid-cols-2">
                         <Field label="Client" value={project.client?.name} />
                         <Field label="Company" value={project.company?.name} />
-                        <Field label="Start Date" value={project.start_date} />
-                        <Field label="Expected End" value={project.expected_end_date} />
+                        <Field label="Start Date" value={formatDate(project.start_date)} />
+                        <Field label="Expected End" value={formatDate(project.expected_end_date)} />
                         <Field label="Address" value={project.project_address} span="sm:col-span-2" />
                         <Field label="Description" value={project.description} span="sm:col-span-2" />
                     </dl>
@@ -110,13 +156,36 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
-                            teamForm.post(route("super.construction.projects.team.assign", project.id), { preserveScroll: true });
+                            teamForm.post(route("super.construction.projects.team.assign", project.id), {
+                                preserveScroll: true,
+                                onSuccess: () => teamForm.reset("member_id", "role_id", "assigned_from", "assigned_to", "assignment_scope", "is_primary"),
+                            });
                         }}
                         className="grid gap-4"
                     >
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <SelectField form={teamForm} name="member_id" label="Member" options={members.map((member) => ({ value: member.id, label: `${member.name}${member.email ? ` • ${member.email}` : ""}` }))} />
-                            <SelectField form={teamForm} name="role_id" label="Construction Role" options={roles.map((role) => ({ value: role.id, label: role.name }))} />
+                            <SelectField
+                                form={teamForm}
+                                name="role_id"
+                                label="Construction Role"
+                                options={[
+                                    { value: "", label: "-- Select Construction Role --" },
+                                    ...roles.map((role) => ({ value: role.id, label: role.name })),
+                                ]}
+                                onChangeCustom={(val) => handleRoleChange(val)}
+                            />
+                            <SelectField
+                                form={teamForm}
+                                name="member_id"
+                                label="Member"
+                                options={[
+                                    { value: "", label: "-- Select Member --" },
+                                    ...sortedMembers.map((member) => ({
+                                        value: member.id,
+                                        label: `${member.name}${member.designation_text ? ` (${member.designation_text})` : ""}${member.email ? ` • ${member.email}` : ""}`,
+                                    })),
+                                ]}
+                            />
                             <InputField form={teamForm} name="assigned_from" label="Assigned From" type="date" />
                             <InputField form={teamForm} name="assigned_to" label="Assigned To" type="date" />
                         </div>
@@ -166,7 +235,7 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                                         <div>
                                             <p className="font-semibold text-slate-900 dark:text-white">{item.module}</p>
                                             <p className="text-sm text-slate-500">
-                                                {item.actor?.name || item.actor?.email || "System"} • {item.created_at}
+                                                {item.actor?.name || item.actor?.email || "System"} • {formatDate(item.created_at)}
                                             </p>
                                         </div>
                                         <StatusBadge value={item.action} />
@@ -318,6 +387,17 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
     );
 }
 
+function formatDate(dateString) {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
+}
+
 function Field({ label, value, span = "" }) {
     return (
         <div className={span}>
@@ -372,13 +452,16 @@ function TextAreaField({ form, name, label, rows = 4 }) {
     );
 }
 
-function SelectField({ form, name, label, options }) {
+function SelectField({ form, name, label, options, onChangeCustom }) {
     return (
         <div>
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">{label}</label>
             <select
                 value={form.data[name]}
-                onChange={(e) => form.setData(name, e.target.value)}
+                onChange={(e) => {
+                    form.setData(name, e.target.value);
+                    if (onChangeCustom) onChangeCustom(e.target.value);
+                }}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             >
                 {options.map((option) => (

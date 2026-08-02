@@ -10,7 +10,7 @@ import EmployeeFormModal from "./Components/EmployeeFormModal";
 import EmployeeFilters from "./Components/EmployeeFilters";
 import EmployeeTable from "./Components/EmployeeTable";
 
-export default function List({ employees, departmentOptions, designationOptions, roleOptions, filters }) {
+export default function List({ employees, departmentOptions, designationOptions, departmentDesignationMap, roleOptions, filters }) {
     const [isOpen, setIsOpen] = useState(false);
     const [currentEmployee, setCurrentEmployee] = useState(null);
     const [searchTerm, setSearchTerm] = useState(filters.search || "");
@@ -142,7 +142,16 @@ export default function List({ employees, departmentOptions, designationOptions,
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        setFormData((prev) => {
+            const updated = { ...prev, [name]: value };
+            if (name === "department") {
+                const available = departmentDesignationMap && departmentDesignationMap[value] ? departmentDesignationMap[value] : [];
+                if (!available.includes(prev.designation)) {
+                    updated.designation = "";
+                }
+            }
+            return updated;
+        });
     };
 
     const handleFileChange = (e) => {
@@ -312,6 +321,7 @@ export default function List({ employees, departmentOptions, designationOptions,
                         handleCreate={handleCreate}
                         departmentOptions={departmentOptions}
                         designationOptions={designationOptions}
+                        departmentDesignationMap={departmentDesignationMap}
                     />
 
                     <EmployeeTable
@@ -388,6 +398,7 @@ export default function List({ employees, departmentOptions, designationOptions,
                 profilePreview={profilePreview}
                 departmentOptions={departmentOptions}
                 designationOptions={designationOptions}
+                departmentDesignationMap={departmentDesignationMap}
                 roleOptions={roleOptions}
             />
         </AuthenticatedLayout>

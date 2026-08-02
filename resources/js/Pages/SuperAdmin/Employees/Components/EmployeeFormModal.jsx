@@ -18,8 +18,30 @@ export default function EmployeeFormModal({
     profilePreview,
     departmentOptions,
     designationOptions,
+    departmentDesignationMap,
     roleOptions,
 }) {
+    const DEFAULT_DEPT_DESIG_MAP = {
+        'Administration': ['CEO', 'Director', 'General Manager', 'Manager (Admin)', 'Admin Executive', 'Receptionist', 'Office Assistant', 'Assistant', 'Office Boy'],
+        'Architecture': ['Architect', 'Senior Architect', 'AutoCAD Designer'],
+        'Planning': ['Manager (Planning)', 'Planning Engineer'],
+        'Engineering': ['Manager (Engineering)', 'Civil Engineer', 'Junior Civil Engineer', 'Site Engineer', 'CAD Engineer', 'Supervisor', 'Site Supervisor'],
+        'Survey': ['Manager (Survey)', 'Surveyor', 'Senior Surveyor', 'Assistant Surveyor', 'Quantity Surveyor'],
+        'Drafting': ['Manager (Drawings)', 'Draftsman', 'Senior Draftsman', 'Junior Draftsman'],
+        'Accounts': ['Manager (Accounts)', 'Accountant', 'Senior Accountant'],
+        'HR': ['HR Manager', 'HR Executive'],
+        'GIS & Mapping': ['GIS Engineer', 'GIS Analyst'],
+        'Data Collection': ['Manager (Data Collection)'],
+        'Development': ['Senior Consultant', 'Team Leader', 'Project Manager'],
+        'Project Management': ['Project Manager', 'Team Leader'],
+        'Operations': ['Store Keeper', 'Driver']
+    };
+
+    const deptMap = departmentDesignationMap || DEFAULT_DEPT_DESIG_MAP;
+    const currentDesignationOptions = formData.department
+        ? (deptMap[formData.department] || designationOptions)
+        : [];
+
     return (
         <Modal show={isOpen} onClose={onClose} maxWidth="4xl" topCloseButton={true} handleTopClose={onClose}>
             <div className="p-2 md:p-4 dark:bg-[#080626]">
@@ -138,9 +160,17 @@ export default function EmployeeFormModal({
                         {/* Designation */}
                         <div>
                             <label className="block text-gray-700 dark:text-gray-300 mb-1 text-sm">Designation <em className="text-red-500">*</em></label>
-                            <select name="designation" value={formData.designation} onChange={handleChange} className={selectClass('designation')}>
-                                <option value="">Select Designation</option>
-                                {designationOptions.map((desig) => (
+                            <select
+                                name="designation"
+                                value={formData.designation}
+                                onChange={handleChange}
+                                className={`${selectClass('designation')} ${!formData.department ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-gray-700' : ''}`}
+                                disabled={!formData.department}
+                            >
+                                <option value="">
+                                    {!formData.department ? "Select Department First" : "Select Designation"}
+                                </option>
+                                {currentDesignationOptions.map((desig) => (
                                     <option key={desig} value={desig}>{desig}</option>
                                 ))}
                             </select>

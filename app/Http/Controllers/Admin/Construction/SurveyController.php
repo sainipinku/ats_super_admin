@@ -26,6 +26,28 @@ class SurveyController extends Controller
         $actor = $this->constructionActor();
         $projectIds = ProjectTeamMember::where('member_id', $actor?->getKey())->pluck('project_id');
 
+        $members = Member::where('status', 1)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'departments', 'designation']);
+
+        $members->transform(function ($member) {
+            $desigStr = '';
+            if (!empty($member->designation)) {
+                if (is_array($member->designation)) {
+                    $desigValues = array_values($member->designation);
+                    if (isset($desigValues[0]) && is_numeric($desigValues[0])) {
+                        $desigStr = \App\Models\Designation::whereIn('id', $desigValues)->pluck('name')->implode(', ');
+                    } else {
+                        $desigStr = implode(', ', $desigValues);
+                    }
+                } else {
+                    $desigStr = (string)$member->designation;
+                }
+            }
+            $member->designation_text = $desigStr;
+            return $member;
+        });
+
         return Inertia::render('Admin/Construction/Survey/Index', [
             'surveyPlans' => SurveyPlan::with(['project', 'planMembers.member'])
                 ->whereIn('project_id', $projectIds)
@@ -46,7 +68,7 @@ class SurveyController extends Controller
             'projects' => Project::whereIn('id', $projectIds)
                 ->orderBy('name')
                 ->get(['id', 'name', 'project_code']),
-            'members' => Member::orderBy('name')->get(['id', 'name', 'email']),
+            'members' => $members,
         ]);
     }
 

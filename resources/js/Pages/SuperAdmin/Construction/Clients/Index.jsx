@@ -10,7 +10,6 @@ export default function ClientsIndex({ clients, companies }) {
         company_id: companies[0]?.id || "",
         client_type: "individual",
         name: "",
-        contact_person: "",
         email: "",
         phone: "",
         alternate_phone: "",
@@ -37,7 +36,7 @@ export default function ClientsIndex({ clients, companies }) {
                             e.preventDefault();
                             form.post(route("super.construction.clients.store"), {
                                 preserveScroll: true,
-                                onSuccess: () => form.reset("name", "contact_person", "email", "phone", "alternate_phone", "gst_number", "billing_address", "site_address", "notes"),
+                                onSuccess: () => form.reset("name", "email", "phone", "alternate_phone", "gst_number", "billing_address", "site_address", "notes"),
                             });
                         }}
                         className="space-y-4"
@@ -49,7 +48,6 @@ export default function ClientsIndex({ clients, companies }) {
                             { value: "government", label: "Government" },
                         ]} />
                         <InputField form={form} name="name" label="Client Name" />
-                        <InputField form={form} name="contact_person" label="Contact Person" />
                         <InputField form={form} name="email" label="Email" />
                         <InputField form={form} name="phone" label="Phone" />
                         <InputField form={form} name="alternate_phone" label="Alternate Phone" />
@@ -71,7 +69,7 @@ export default function ClientsIndex({ clients, companies }) {
                                     <tr>
                                         <th className="pb-3">Client</th>
                                         <th className="pb-3">Company</th>
-                                        <th className="pb-3">Contact</th>
+                                        <th className="pb-3">Phone</th>
                                         <th className="pb-3">Status</th>
                                     </tr>
                                 </thead>
@@ -84,8 +82,7 @@ export default function ClientsIndex({ clients, companies }) {
                                             </td>
                                             <td className="py-3 text-slate-600 dark:text-slate-300">{client.company?.name || "-"}</td>
                                             <td className="py-3 text-slate-600 dark:text-slate-300">
-                                                <div>{client.contact_person || "-"}</div>
-                                                <div className="text-xs text-slate-500">{client.phone || "-"}</div>
+                                                <div>{client.phone || "-"}</div>
                                             </td>
                                             <td className="py-3"><StatusBadge value={client.status} /></td>
                                         </tr>
