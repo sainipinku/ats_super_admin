@@ -28,6 +28,28 @@ class VehiclesController extends Controller
             ->where('status', 'active')
             ->pluck('project_id');
 
+        $members = Member::where('status', 1)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'departments', 'designation']);
+
+        $members->transform(function ($member) {
+            $desigStr = '';
+            if (!empty($member->designation)) {
+                if (is_array($member->designation)) {
+                    $desigValues = array_values($member->designation);
+                    if (isset($desigValues[0]) && is_numeric($desigValues[0])) {
+                        $desigStr = \App\Models\Designation::whereIn('id', $desigValues)->pluck('name')->implode(', ');
+                    } else {
+                        $desigStr = implode(', ', $desigValues);
+                    }
+                } else {
+                    $desigStr = (string)$member->designation;
+                }
+            }
+            $member->designation_text = $desigStr;
+            return $member;
+        });
+
         return Inertia::render('Admin/Construction/Vehicles/Index', [
             'projects' => Project::whereIn('id', $projectIds)->orderByDesc('id')->get(['id', 'project_code', 'name']),
             'vehicles' => Vehicle::with('project')->whereIn('project_id', $projectIds)->latest()->take(60)->get(),
@@ -41,6 +63,7 @@ class VehiclesController extends Controller
                 ->latest('recorded_at')
                 ->take(120)
                 ->get(),
+            'members' => $members,
         ]);
     }
 

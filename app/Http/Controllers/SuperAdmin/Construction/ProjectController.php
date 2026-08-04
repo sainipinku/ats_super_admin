@@ -60,9 +60,45 @@ class ProjectController extends Controller
             'drawingApprovals.drawingRevision',
         ]);
 
+        // Ensure core construction roles exist
+        $defaultRoles = [
+            ['name' => 'Project Admin', 'slug' => 'project_admin', 'description' => 'Project scoped ERP access', 'is_system_role' => true, 'status' => 'active'],
+            ['name' => 'Surveyor', 'slug' => 'surveyor', 'description' => 'Field survey execution', 'is_system_role' => true, 'status' => 'active'],
+            ['name' => 'Draft Person', 'slug' => 'draft_person', 'description' => 'Drafting and revisions', 'is_system_role' => true, 'status' => 'active'],
+            ['name' => 'Vehicle Driver', 'slug' => 'vehicle_driver', 'description' => 'Vehicle transport and site movement', 'is_system_role' => true, 'status' => 'active'],
+            ['name' => 'Review Approver', 'slug' => 'review_approver', 'description' => 'Workflow approvals', 'is_system_role' => true, 'status' => 'active'],
+            ['name' => 'Site Employee', 'slug' => 'site_employee', 'description' => 'Construction execution updates and attendance', 'is_system_role' => true, 'status' => 'active'],
+        ];
+
+        foreach ($defaultRoles as $rData) {
+            Role::firstOrCreate(['slug' => $rData['slug']], $rData);
+        }
+
+        $members = Member::where('status', 1)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'departments', 'designation']);
+
+        $members->transform(function ($member) {
+            $desigStr = '';
+            if (!empty($member->designation)) {
+                if (is_array($member->designation)) {
+                    $desigValues = array_values($member->designation);
+                    if (isset($desigValues[0]) && is_numeric($desigValues[0])) {
+                        $desigStr = \App\Models\Designation::whereIn('id', $desigValues)->pluck('name')->implode(', ');
+                    } else {
+                        $desigStr = implode(', ', $desigValues);
+                    }
+                } else {
+                    $desigStr = (string)$member->designation;
+                }
+            }
+            $member->designation_text = $desigStr;
+            return $member;
+        });
+
         return Inertia::render('SuperAdmin/Construction/Projects/Show', [
             'project' => $project,
-            'members' => Member::orderBy('name')->get(['id', 'name', 'email']),
+            'members' => $members,
             'roles' => Role::where('status', 'active')->orderBy('name')->get(['id', 'name', 'slug']),
             'activityLog' => ActivityLog::with('actor')
                 ->where('project_id', $project->id)

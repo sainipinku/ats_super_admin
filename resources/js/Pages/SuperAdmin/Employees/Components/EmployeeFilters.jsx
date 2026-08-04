@@ -33,7 +33,29 @@ export default function EmployeeFilters({
     handleCreate,
     departmentOptions: deptOptions,
     designationOptions: desigOptions,
+    departmentDesignationMap,
 }) {
+    const DEFAULT_DEPT_DESIG_MAP = {
+        'Administration': ['CEO', 'Director', 'General Manager', 'Manager (Admin)', 'Admin Executive', 'Receptionist', 'Office Assistant', 'Assistant', 'Office Boy'],
+        'Architecture': ['Architect', 'Senior Architect', 'AutoCAD Designer'],
+        'Planning': ['Manager (Planning)', 'Planning Engineer'],
+        'Engineering': ['Manager (Engineering)', 'Civil Engineer', 'Junior Civil Engineer', 'Site Engineer', 'CAD Engineer', 'Supervisor', 'Site Supervisor'],
+        'Survey': ['Manager (Survey)', 'Surveyor', 'Senior Surveyor', 'Assistant Surveyor', 'Quantity Surveyor'],
+        'Drafting': ['Manager (Drawings)', 'Draftsman', 'Senior Draftsman', 'Junior Draftsman'],
+        'Accounts': ['Manager (Accounts)', 'Accountant', 'Senior Accountant'],
+        'HR': ['HR Manager', 'HR Executive'],
+        'GIS & Mapping': ['GIS Engineer', 'GIS Analyst'],
+        'Data Collection': ['Manager (Data Collection)'],
+        'Development': ['Senior Consultant', 'Team Leader', 'Project Manager'],
+        'Project Management': ['Project Manager', 'Team Leader'],
+        'Operations': ['Store Keeper', 'Driver']
+    };
+
+    const deptMap = departmentDesignationMap || DEFAULT_DEPT_DESIG_MAP;
+    const filteredDesigOptions = departmentFilter && deptMap[departmentFilter]
+        ? deptMap[departmentFilter]
+        : desigOptions;
+
     return (
         <div className="flex justify-between flex-wrap md:flex-nowrap px-[15px] pt-[5px] pb-[15px]">
             <div className="flex items-center flex-col md:flex-row gap-[15px] w-full md:w-auto">
@@ -46,7 +68,7 @@ export default function EmployeeFilters({
 
                 <select value={designationFilter} onChange={handleDesignationFilterChange} className={filterSelectClass}>
                     <option value="">All Designations</option>
-                    {desigOptions.map((desig) => (
+                    {filteredDesigOptions.map((desig) => (
                         <option key={desig} value={desig}>{desig}</option>
                     ))}
                 </select>

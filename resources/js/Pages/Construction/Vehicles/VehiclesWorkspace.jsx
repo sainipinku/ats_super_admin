@@ -12,6 +12,7 @@ export default function VehiclesWorkspace({
     vehicles = [],
     assignments = [],
     pings = [],
+    members = [],
 }) {
     const routeBase =
         variant === "super"
@@ -233,10 +234,17 @@ export default function VehiclesWorkspace({
                                 ]}
                                 error={assignmentForm.errors.vehicle_id}
                             />
-                            <TextInput
-                                label="Driver Member ID (optional)"
+                            <SelectInput
+                                label="Driver (Member)"
                                 value={assignmentForm.data.driver_member_id}
                                 onChange={(value) => assignmentForm.setData("driver_member_id", value)}
+                                options={[
+                                    { value: "", label: "Select driver" },
+                                    ...members.map((member) => ({
+                                        value: String(member.id),
+                                        label: `${member.name}${member.designation_text ? ` (${member.designation_text})` : ""}${member.email ? ` • ${member.email}` : ""}`,
+                                    })),
+                                ]}
                                 error={assignmentForm.errors.driver_member_id}
                             />
                             <div className="grid gap-4 md:grid-cols-2">

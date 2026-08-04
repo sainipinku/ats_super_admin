@@ -48,7 +48,7 @@ export default function DraftingIndex({ draftingJobs, approvedSurveySubmissions,
                         }))} />
                         <SelectField form={jobForm} name="assigned_to_member_id" label="Assign Draft Person" options={members.map((member) => ({
                             value: member.id,
-                            label: `${member.name}${member.email ? ` • ${member.email}` : ""}`,
+                            label: `${member.name}${member.designation_text ? ` (${member.designation_text})` : ""}${member.email ? ` • ${member.email}` : ""}`,
                         }))} />
                         <InputField form={jobForm} name="due_date" label="Due Date" type="date" />
                         <button type="submit" disabled={jobForm.processing} className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
