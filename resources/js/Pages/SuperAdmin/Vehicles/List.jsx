@@ -32,6 +32,18 @@ export default function List({ vehicles, filters }) {
     const fileInputRef = useRef(null);
     const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
+    const statusOptions = [
+        { value: 0, label: "Active" },
+        { value: 1, label: "Inactive" },
+        { value: 2, label: "Sold" },
+    ];
+
+    const insuranceStatusOptions = [
+        { value: "", label: "All Insurance" },
+        { value: 1, label: "Active" },
+        { value: 0, label: "Expired" },
+    ];
+
     const updateUrl = (newPage = 1) => {
         const params = {
             search: searchTerm,
@@ -109,7 +121,7 @@ export default function List({ vehicles, filters }) {
                 purchase_amount: currentVehicle.purchase_amount || "",
                 current_km_reading: currentVehicle.current_km_reading || "",
                 vehicle_image: null,
-                status: currentVehicle.status || "active",
+                status: currentVehicle.status ?? 0,
 
                 insurance_provider: currentVehicle.insurance_provider || "",
                 policy_number: currentVehicle.policy_number || "",
@@ -125,7 +137,7 @@ export default function List({ vehicles, filters }) {
                 challan_date: currentVehicle.challan_date || "",
                 violation_type: currentVehicle.violation_type || "",
                 fine_amount: currentVehicle.fine_amount || "",
-                payment_status: currentVehicle.payment_status || "",
+                payment_status: currentVehicle.payment_status ?? "",
             });
             setVehicleImagePreview(currentVehicle.vehicle_image_url || null);
         }
@@ -145,7 +157,7 @@ export default function List({ vehicles, filters }) {
         purchase_amount: "",
         current_km_reading: "",
         vehicle_image: null,
-        status: "active",
+        status: 0,
 
         // Insurance
         insurance_provider: "",
@@ -173,7 +185,7 @@ export default function List({ vehicles, filters }) {
             vehicle_type: "", vehicle_number: "", vehicle_name: "", brand: "",
             fuel_type: "", color: "", manufacturing_year: "", engine_number: "",
             chassis_number: "", purchase_date: "", purchase_amount: "", current_km_reading: "",
-            vehicle_image: null, status: "active",
+            vehicle_image: null, status: 0,
             insurance_provider: "", policy_number: "", insurance_type: "",
             insurance_start_date: "", insurance_end_date: "",
             puc_certificate_number: "", puc_issue_date: "", puc_expiry_date: "",
@@ -280,18 +292,18 @@ export default function List({ vehicles, filters }) {
 
     const getStatusDisplay = (status) => {
         const statusMap = {
-            active: { text: "Active", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
-            inactive: { text: "Inactive", class: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
-            sold: { text: "Sold", class: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
+            0: { text: "Active", class: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
+            1: { text: "Inactive", class: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
+            2: { text: "Sold", class: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
         };
-        return statusMap[status] || { text: status, class: "bg-gray-100 text-gray-800" };
+        return statusMap[status] || { text: "Unknown", class: "bg-gray-100 text-gray-800" };
     };
 
     const getInsuranceStatusDisplay = (status) => {
-        if (!status) return { text: "N/A", class: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400" };
-        const isActive = status === "Active";
+        if (status === null || status === undefined || status === "") return { text: "N/A", class: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400" };
+        const isActive = status === 1;
         return {
-            text: status,
+            text: isActive ? "Active" : "Expired",
             class: isActive
                 ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                 : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
@@ -299,10 +311,10 @@ export default function List({ vehicles, filters }) {
     };
 
     const getPucStatusDisplay = (status) => {
-        if (!status) return { text: "N/A", class: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400" };
-        const isValid = status === "Valid";
+        if (status === null || status === undefined || status === "") return { text: "N/A", class: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400" };
+        const isValid = status === 1;
         return {
-            text: status,
+            text: isValid ? "Valid" : "Expired",
             class: isValid
                 ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                 : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
@@ -399,6 +411,8 @@ export default function List({ vehicles, filters }) {
                         handleSearchChange={handleSearchChange}
                         filterSelectClass={filterSelectClass}
                         handleCreate={handleCreate}
+                        statusOptions={statusOptions}
+                        insuranceStatusOptions={insuranceStatusOptions}
                     />
 
                     <VehicleTable
@@ -483,6 +497,7 @@ export default function List({ vehicles, filters }) {
                 handleSubmit={handleSubmit}
                 fileInputRef={fileInputRef}
                 vehicleImagePreview={vehicleImagePreview}
+                statusOptions={statusOptions}
             />
         </AuthenticatedLayout>
     );

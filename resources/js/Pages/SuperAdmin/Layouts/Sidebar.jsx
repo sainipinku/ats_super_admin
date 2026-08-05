@@ -81,10 +81,22 @@ const navigation = [
         active: ["super.construction.vehicles.*"],
         icon: FaTruck,
     },
+     // {
+    //     label: "Equipment Allocation",
+    //     href: route("super.construction.equipment.index"),
+    //     active: ["super.construction.equipment.*"],
+    //     icon: FaCogs,
+    // },
     {
-        label: "Equipment Allocation",
-        href: route("super.construction.equipment.index"),
-        active: ["super.construction.equipment.*"],
+        label: "Equipment Categories",
+        href: route("super.equipment.categories.list"),
+        active: ["super.equipment.categories.*"],
+        icon: FaCogs,
+    },
+    {
+        label: "Equipment Management",
+        href: route("super.equipment.list"),
+        active: ["super.equipment.*"],
         icon: FaCogs,
     },
     {

@@ -35,14 +35,14 @@ class StoreVehicleRequest extends FormRequest
             'brand' => ['nullable', 'string', 'max:255'],
             'fuel_type' => ['required', 'string', 'in:Petrol,Diesel,CNG,Electric,Hybrid'],
             'color' => ['nullable', 'string', 'max:100'],
-            'manufacturing_year' => ['nullable', 'string', 'max:4', 'regex:/^\d{4}$/'],
+            'manufacturing_year' => ['nullable', 'string', 'regex:/^\d{4}$/'],
             'engine_number' => ['nullable', 'string', 'max:255'],
             'chassis_number' => ['nullable', 'string', 'max:255'],
             'purchase_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
             'purchase_amount' => ['nullable', 'numeric', 'min:0'],
             'current_km_reading' => ['nullable', 'string', 'max:50'],
             'vehicle_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
-            'status' => ['required', 'string', 'in:active,inactive,sold'],
+            'status' => ['required', 'integer', 'in:0,1,2'],
 
             'insurance_provider' => ['nullable', 'string', 'max:255'],
             'policy_number' => ['nullable', 'string', 'max:255'],
@@ -58,7 +58,7 @@ class StoreVehicleRequest extends FormRequest
             'challan_date' => ['nullable', 'date_format:Y-m-d'],
             'violation_type' => ['nullable', 'string', 'max:255'],
             'fine_amount' => ['nullable', 'numeric', 'min:0'],
-            'payment_status' => ['nullable', 'string', 'in:paid,unpaid'],
+            'payment_status' => ['nullable', 'integer', 'in:0,1'],
         ];
     }
 

@@ -10,9 +10,11 @@ return new class extends Migration
     {
         Schema::create('vehicles', function (Blueprint $table) {
             $table->id();
+
             $table->uuid('uuid')->unique();
+
             $table->string('vehicle_id')->unique();
-            
+
             // Basic Information
             $table->string('vehicle_type')->nullable();
             $table->string('vehicle_number')->unique();
@@ -27,8 +29,11 @@ return new class extends Migration
             $table->decimal('purchase_amount', 12, 2)->nullable();
             $table->string('current_km_reading')->nullable();
             $table->string('vehicle_image')->nullable();
-            $table->enum('status', ['active', 'inactive', 'sold'])->default('active');
-            
+
+            $table->tinyInteger('status')
+                ->default(0)
+                ->comment('0 = Active, 1 = Inactive, 2 = Sold');
+
             // Insurance Details
             $table->string('insurance_provider')->nullable();
             $table->string('policy_number')->nullable();
@@ -36,21 +41,25 @@ return new class extends Migration
             $table->date('insurance_start_date')->nullable();
             $table->date('insurance_end_date')->nullable();
             $table->string('insurance_status')->nullable();
-            
+
             // PUC Details
             $table->string('puc_certificate_number')->nullable();
             $table->date('puc_issue_date')->nullable();
             $table->date('puc_expiry_date')->nullable();
             $table->string('puc_status')->nullable();
-            
+
             // Challan Details
             $table->string('challan_number')->nullable();
             $table->date('challan_date')->nullable();
             $table->string('violation_type')->nullable();
             $table->decimal('fine_amount', 10, 2)->nullable();
-            $table->enum('payment_status', ['paid', 'unpaid'])->nullable();
-            
+
+            $table->tinyInteger('payment_status')
+                ->nullable()
+                ->comment('0 = Unpaid, 1 = Paid');
+
             $table->timestamps();
+
             $table->softDeletes();
         });
     }

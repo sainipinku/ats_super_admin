@@ -17,7 +17,7 @@ export default function SurveyIndex({ surveyPlans, surveySubmissions, projects, 
         planned_date: "",
         planned_start_time: "",
         planned_end_time: "",
-        member_ids: [],
+        member_ids: "",
     });
 
     const stats = {
@@ -66,11 +66,11 @@ export default function SurveyIndex({ surveyPlans, surveySubmissions, projects, 
                         <div>
                             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Survey Team</label>
                             <select
-                                multiple
                                 value={planForm.data.member_ids}
-                                onChange={(e) => planForm.setData("member_ids", Array.from(e.target.selectedOptions, (option) => option.value))}
-                                className="min-h-40 w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                onChange={(e) => planForm.setData("member_ids", e.target.value)}
+                                className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                             >
+                                <option value="">Select a team member</option>
                                 {members.map((member) => (
                                     <option key={member.id} value={member.id}>
                                         {member.name}{member.designation_text ? ` (${member.designation_text})` : ""}{member.email ? ` • ${member.email}` : ""}

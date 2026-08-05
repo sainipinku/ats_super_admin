@@ -36,9 +36,8 @@ class Employee extends Model
         return $this->belongsTo(Member::class, 'member_id');
     }
 
-    public static function boot(): void
+    protected static function booted(): void
     {
-        parent::boot();
         static::creating(function ($v) {
             if (empty($v->employee_id)) {
                 $v->employee_id = static::generateEmployeeId();
@@ -49,19 +48,12 @@ class Employee extends Model
     public static function generateEmployeeId(): string
     {
         $prefix = 'EMP-';
-        $lastEmployee = static::withTrashed()
-            ->where('employee_id', 'like', $prefix . '%')
-            ->orderByRaw('CAST(SUBSTRING(employee_id, 5) AS UNSIGNED) DESC')
-            ->first();
+        do {
+            $random = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            $employeeId = $prefix . $random;
+        } while (static::withTrashed()->where('employee_id', $employeeId)->exists());
 
-        if ($lastEmployee) {
-            $lastNumber = (int) substr($lastEmployee->employee_id, 4);
-            $newNumber = $lastNumber + 1;
-        } else {
-            $newNumber = 1;
-        }
-
-        return $prefix . str_pad($newNumber, 6, '0', STR_PAD_LEFT);
+        return $employeeId;
     }
 
     /**

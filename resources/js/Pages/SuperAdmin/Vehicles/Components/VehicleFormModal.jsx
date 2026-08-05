@@ -23,6 +23,7 @@ export default function VehicleFormModal({
     handleSubmit,
     fileInputRef,
     vehicleImagePreview,
+    statusOptions,
 }) {
     return (
         <Modal show={isOpen} onClose={onClose} maxWidth="6xl" topCloseButton={true} handleTopClose={onClose}>
@@ -120,9 +121,9 @@ export default function VehicleFormModal({
                             <div>
                                 <label className="block text-gray-700 dark:text-gray-300 mb-1 text-sm">Status <em className="text-red-500">*</em></label>
                                 <select name="status" value={formData.status} onChange={handleChange} className={selectClass('status')}>
-                                    <option value="active">Active</option>
-                                    <option value="inactive">Inactive</option>
-                                    <option value="sold">Sold</option>
+                                    {statusOptions.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
                                 </select>
                                 {errors.status && <p className="text-red-500 text-xs mt-1">{errors.status}</p>}
                             </div>
@@ -287,8 +288,8 @@ export default function VehicleFormModal({
                                 <label className="block text-gray-700 dark:text-gray-300 mb-1 text-sm">Payment Status</label>
                                 <select name="payment_status" value={formData.payment_status} onChange={handleChange} className={selectClass('payment_status')}>
                                     <option value="">Select Payment Status</option>
-                                    <option value="paid">Paid</option>
-                                    <option value="unpaid">Unpaid</option>
+                                    <option value={1}>Paid</option>
+                                    <option value={0}>Unpaid</option>
                                 </select>
                                 {errors.payment_status && <p className="text-red-500 text-xs mt-1">{errors.payment_status}</p>}
                             </div>
