@@ -72,7 +72,9 @@ export default function SurveyIndex({ surveyPlans, surveySubmissions, projects, 
                             >
                                 <option value="">Select a team member</option>
                                 {members.map((member) => (
-                                    <option key={member.id} value={member.id}>{member.name}{member.email ? ` • ${member.email}` : ""}</option>
+                                    <option key={member.id} value={member.id}>
+                                        {member.name}{member.designation_text ? ` (${member.designation_text})` : ""}{member.email ? ` • ${member.email}` : ""}
+                                    </option>
                                 ))}
                             </select>
                             {planForm.errors.member_ids ? <p className="mt-1 text-xs text-rose-600">{planForm.errors.member_ids}</p> : null}

@@ -32,6 +32,8 @@ export default function ProjectShow({ project, activityLog }) {
                     <dl className="mt-5 grid gap-4 sm:grid-cols-2">
                         <Field label="Client" value={project.client?.name} />
                         <Field label="Company" value={project.company?.name} />
+                        <Field label="Start Date" value={formatDate(project.start_date)} />
+                        <Field label="Expected End" value={formatDate(project.expected_end_date)} />
                         <Field label="Address" value={project.project_address} span="sm:col-span-2" />
                         <Field label="Description" value={project.description} span="sm:col-span-2" />
                     </dl>
@@ -91,7 +93,7 @@ export default function ProjectShow({ project, activityLog }) {
                                         <StatusBadge value={item.action} />
                                     </div>
                                     <p className="mt-2 text-sm text-slate-500">{item.actor?.name || item.actor?.email || "System"}</p>
-                                    <p className="mt-1 text-xs text-slate-500">{item.created_at}</p>
+                                    <p className="mt-1 text-xs text-slate-500">{formatDate(item.created_at)}</p>
                                 </div>
                             ))}
                         </div>
@@ -102,6 +104,17 @@ export default function ProjectShow({ project, activityLog }) {
             </div>
         </ConstructionShell>
     );
+}
+
+function formatDate(dateString) {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
 }
 
 function Field({ label, value, span = "" }) {

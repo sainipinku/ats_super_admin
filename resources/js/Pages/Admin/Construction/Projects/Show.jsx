@@ -139,7 +139,7 @@ export default function ProjectShow({ project, activityLog }) {
                                     <StatusBadge value={item.action} />
                                 </div>
                                 <p className="mt-2 text-sm text-slate-500">{item.actor?.name || item.actor?.email || "System"}</p>
-                                <p className="mt-1 text-xs text-slate-500">{formatDateTime(item.created_at)}</p>
+                                <p className="mt-1 text-xs text-slate-500">{formatDate(item.created_at)}</p>
                             </div>
                         ))}
                     </div>
@@ -152,26 +152,13 @@ export default function ProjectShow({ project, activityLog }) {
 }
 
 function formatDate(dateString) {
-    if (!dateString) return null;
+    if (!dateString) return "-";
     const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return dateString;
-    return date.toLocaleDateString("en-IN", {
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
-    });
-}
-
-function formatDateTime(dateString) {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return dateString;
-    return date.toLocaleString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
     });
 }
 

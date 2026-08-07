@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { useMemo } from "react";
-import { useForm } from "@inertiajs/react";
+import { useForm, router } from "@inertiajs/react";
 import ConstructionShell from "@/Pages/Construction/Components/ConstructionShell";
 import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
 import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
 import WorkflowTracker from "@/Pages/Construction/Components/WorkflowTracker";
+import Modal from "@/Components/Modal";
 
 export default function ProjectShow({ project, members, roles, activityLog }) {
     const latestSubmission = project.survey_submissions?.[0] ?? null;
@@ -20,13 +22,59 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
     });
 
     const teamForm = useForm({
-        member_id: members[0]?.id || "",
-        role_id: roles[0]?.id || "",
+        member_id: "",
+        role_id: "",
         assigned_from: "",
         assigned_to: "",
         assignment_scope: "",
         is_primary: false,
     });
+
+    const handleRoleChange = (roleId) => {
+        const roleObj = roles.find((r) => String(r.id) === String(roleId));
+        let defaultScope = teamForm.data.assignment_scope;
+        if (roleObj) {
+            const slug = (roleObj.slug || roleObj.name || "").toLowerCase();
+            if (slug.includes('survey')) defaultScope = "Field Survey & Site Data Collection";
+            else if (slug.includes('draft')) defaultScope = "Drawing Revisions & CAD Drafting";
+            else if (slug.includes('driver')) defaultScope = "Vehicle Transport & Site Movement";
+            else if (slug.includes('admin')) defaultScope = "Project Oversight & Workflow Coordination";
+            else if (slug.includes('approv')) defaultScope = "Drawing & Progress Approvals";
+            else if (slug.includes('site')) defaultScope = "Site Work & Daily Execution";
+        }
+        teamForm.setData((prev) => ({
+            ...prev,
+            role_id: roleId,
+            assignment_scope: defaultScope,
+        }));
+    };
+
+    const selectedRole = roles.find((r) => String(r.id) === String(teamForm.data.role_id));
+    const roleSlug = selectedRole ? (selectedRole.slug || selectedRole.name || "").toLowerCase() : "";
+
+    const sortedMembers = useMemo(() => {
+        if (!roleSlug) return members;
+        let targetKeyword = "";
+        if (roleSlug.includes("survey")) targetKeyword = "survey";
+        else if (roleSlug.includes("draft")) targetKeyword = "draft";
+        else if (roleSlug.includes("driver")) targetKeyword = "driver";
+        else if (roleSlug.includes("admin")) targetKeyword = "admin";
+        else if (roleSlug.includes("approv")) targetKeyword = "review";
+
+        if (!targetKeyword) return members;
+
+        const matching = [];
+        const others = [];
+        members.forEach((m) => {
+            const desig = (m.designation_text || "").toLowerCase();
+            if (desig.includes(targetKeyword)) {
+                matching.push(m);
+            } else {
+                others.push(m);
+            }
+        });
+        return [...matching, ...others];
+    }, [members, roleSlug]);
 
     const metrics = useMemo(
         () => ({
@@ -110,15 +158,38 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
-                            teamForm.post(route("super.construction.projects.team.assign", project.id), { preserveScroll: true });
+                            teamForm.post(route("super.construction.projects.team.assign", project.id), {
+                                preserveScroll: true,
+                                onSuccess: () => teamForm.reset("member_id", "role_id", "assigned_from", "assigned_to", "assignment_scope", "is_primary"),
+                            });
                         }}
                         className="grid gap-4"
                     >
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <SelectField form={teamForm} name="member_id" label="Member" options={members.map((member) => ({ value: member.id, label: `${member.name}${member.email ? ` • ${member.email}` : ""}` }))} />
-                            <SelectField form={teamForm} name="role_id" label="Construction Role" options={roles.map((role) => ({ value: role.id, label: role.name }))} />
+                            <SelectField
+                                form={teamForm}
+                                name="role_id"
+                                label="Construction Role"
+                                options={[
+                                    { value: "", label: "-- Select Construction Role --" },
+                                    ...roles.map((role) => ({ value: role.id, label: role.name })),
+                                ]}
+                                onChangeCustom={(val) => handleRoleChange(val)}
+                            />
+                            <SelectField
+                                form={teamForm}
+                                name="member_id"
+                                label="Member"
+                                options={[
+                                    { value: "", label: "-- Select Member --" },
+                                    ...sortedMembers.map((member) => ({
+                                        value: member.id,
+                                        label: `${member.name}${member.designation_text ? ` (${member.designation_text})` : ""}${member.email ? ` • ${member.email}` : ""}`,
+                                    })),
+                                ]}
+                            />
                             {/* <InputField form={teamForm} name="assigned_from" label="Assigned From" type="date" />
-                            <InputField form={teamForm} name="assigned_to" label="Assigned To" type="date" /> */}
+                            <InputField form={teamForm} name="assigned_to" label="Assigned To" type="date" placeholder="dd-mm-yyyy" /> */}
                         </div>
                         <InputField form={teamForm} name="assignment_scope" label="Assignment Scope" placeholder="Survey, drafting, approvals, coordination..." />
                         <label className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-200">
@@ -137,19 +208,12 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                     {project.team_members?.length ? (
                         <div className="space-y-3">
                             {project.team_members.map((teamMember) => (
-                                <div key={teamMember.id} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                                    <div className="flex flex-wrap items-center justify-between gap-3">
-                                        <div>
-                                            <p className="font-semibold text-slate-900 dark:text-white">{teamMember.member?.name || "Unknown member"}</p>
-                                            <p className="text-sm text-slate-500">{teamMember.role?.name || "No role assigned"}</p>
-                                            <p className="mt-1 text-xs text-slate-500">{teamMember.assignment_scope || "General project support"}</p>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {teamMember.is_primary ? <StatusBadge value="active" /> : null}
-                                            <StatusBadge value={teamMember.status} />
-                                        </div>
-                                    </div>
-                                </div>
+                                <TeamMemberRow 
+                                    key={teamMember.id} 
+                                    teamMember={teamMember} 
+                                    project={project}
+                                    roles={roles}
+                                />
                             ))}
                         </div>
                     ) : (
@@ -166,7 +230,7 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                                         <div>
                                             <p className="font-semibold text-slate-900 dark:text-white">{item.module}</p>
                                             <p className="text-sm text-slate-500">
-                                                {item.actor?.name || item.actor?.email || "System"} • {formatDateTime(item.created_at)}
+                                                {item.actor?.name || item.actor?.email || "System"} • {formatDate(item.created_at)}
                                             </p>
                                         </div>
                                         <StatusBadge value={item.action} />
@@ -319,26 +383,13 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
 }
 
 function formatDate(dateString) {
-    if (!dateString) return null;
+    if (!dateString) return "-";
     const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return dateString;
-    return date.toLocaleDateString("en-IN", {
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
-    });
-}
-
-function formatDateTime(dateString) {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return dateString;
-    return date.toLocaleString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
     });
 }
 
@@ -396,13 +447,16 @@ function TextAreaField({ form, name, label, rows = 4 }) {
     );
 }
 
-function SelectField({ form, name, label, options }) {
+function SelectField({ form, name, label, options, onChangeCustom }) {
     return (
         <div>
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">{label}</label>
             <select
                 value={form.data[name]}
-                onChange={(e) => form.setData(name, e.target.value)}
+                onChange={(e) => {
+                    form.setData(name, e.target.value);
+                    if (onChangeCustom) onChangeCustom(e.target.value);
+                }}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             >
                 {options.map((option) => (
@@ -413,5 +467,178 @@ function SelectField({ form, name, label, options }) {
             </select>
             {form.errors[name] ? <p className="mt-1 text-xs text-rose-600">{form.errors[name]}</p> : null}
         </div>
+    );
+}
+
+function TeamMemberRow({ teamMember, project, roles }) {
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [showRemoveModal, setShowRemoveModal] = useState(false);
+    
+    const editForm = useForm({
+        member_id: teamMember.member_id,
+        role_id: teamMember.role_id || "",
+        assignment_scope: teamMember.assignment_scope || "",
+        is_primary: teamMember.is_primary,
+        status: teamMember.status,
+    });
+
+    const handleEditSubmit = (e) => {
+        e.preventDefault();
+        editForm.put(route("super.construction.projects.team.update", [project.id, teamMember.id]), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowEditModal(false);
+                editForm.reset();
+            },
+        });
+    };
+
+    const handleRemove = () => {
+        setShowRemoveModal(false);
+        router.delete(route("super.construction.projects.team.destroy", [project.id, teamMember.id]), {
+            preserveScroll: true,
+        });
+    };
+
+    const handleStatusToggle = () => {
+        router.patch(route("super.construction.projects.team.status", [project.id, teamMember.id]), {}, {
+            preserveScroll: true,
+        });
+    };
+
+    return (
+        <>
+            <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                            <p className="font-semibold text-slate-900 dark:text-white">{teamMember.member?.name || "Unknown member"}</p>
+                            {teamMember.is_primary && (
+                                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
+                                    Primary
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-sm text-slate-500">{teamMember.role?.name || "No role assigned"}</p>
+                        <p className="mt-1 text-xs text-slate-500">{teamMember.assignment_scope || "General project support"}</p>
+                        <div className="mt-2">
+                            <StatusBadge value={teamMember.status} />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={() => router.visit(route("super.construction.projects.team.show", [project.id, teamMember.id]))}
+                            className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/30"
+                        >
+                            View Details
+                        </button>
+                        <button
+                            onClick={() => setShowEditModal(true)}
+                            className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
+                        >
+                            Edit
+                        </button>
+                        <button
+                            onClick={handleStatusToggle}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
+                                teamMember.status === 'active'
+                                    ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/30'
+                                    : 'bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-300 dark:hover:bg-green-900/30'
+                            }`}
+                        >
+                            {teamMember.status === 'active' ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                            onClick={() => setShowRemoveModal(true)}
+                            className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30"
+                        >
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Edit Modal */}
+            <Modal show={showEditModal} onClose={() => setShowEditModal(false)}>
+                <div className="p-6">
+                    <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">Edit Team Member Assignment</h3>
+                    <form onSubmit={handleEditSubmit} className="grid gap-4">
+                        <SelectField
+                            form={editForm}
+                            name="role_id"
+                            label="Construction Role"
+                            options={[
+                                { value: "", label: "-- Select Construction Role --" },
+                                ...roles.map((role) => ({ value: role.id, label: role.name })),
+                            ]}
+                        />
+                        <InputField
+                            form={editForm}
+                            name="assignment_scope"
+                            label="Assignment Scope"
+                            placeholder="Survey, drafting, approvals, coordination..."
+                        />
+                        <label className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-200">
+                            <input
+                                type="checkbox"
+                                checked={editForm.data.is_primary}
+                                onChange={(e) => editForm.setData("is_primary", e.target.checked)}
+                            />
+                            Mark this assignment as primary
+                        </label>
+                        <SelectField
+                            form={editForm}
+                            name="status"
+                            label="Status"
+                            options={[
+                                { value: "active", label: "Active" },
+                                { value: "inactive", label: "Inactive" },
+                            ]}
+                        />
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowEditModal(false)}
+                                className="flex-1 rounded-xl border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={editForm.processing}
+                                className="flex-1 rounded-xl bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+                            >
+                                {editForm.processing ? "Saving..." : "Save Changes"}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </Modal>
+
+            {/* Remove Confirmation Modal */}
+            <Modal show={showRemoveModal} onClose={() => setShowRemoveModal(false)}>
+                <div className="p-6">
+                    <h3 className="mb-2 text-lg font-semibold text-slate-900 dark:text-white">Remove Team Member</h3>
+                    <p className="mb-6 text-sm text-slate-600 dark:text-slate-400">
+                        Are you sure you want to remove <strong>{teamMember.member?.name}</strong> from this project? This action cannot be undone.
+                    </p>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => setShowRemoveModal(false)}
+                            className="flex-1 rounded-xl border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleRemove}
+                            disabled={editForm.processing}
+                            className="flex-1 rounded-xl bg-rose-600 px-4 py-2 font-medium text-white hover:bg-rose-500 disabled:opacity-60"
+                        >
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+        </>
     );
 }
