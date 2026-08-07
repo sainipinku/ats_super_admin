@@ -49,104 +49,87 @@ export default function HomepageLayout({ children }) {
         <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-[#0f172a]' : 'bg-gray-50'}`}>
             {/* Navbar */}
             <nav
-                className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-300 ${
-                    isScrolled
-                        ? isDark
-                            ? 'bg-gray-900/95 border-b border-gray-800'
-                            : 'bg-white border-b border-gray-200 shadow-sm'
-                        : isDark ? 'bg-[#0f172a]' : 'bg-gray-50'
-                }`}
+                className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-300 ${isScrolled
+                    ? isDark
+                        ? 'bg-gray-900/95 border-b border-gray-800'
+                        : 'bg-white border-b border-gray-200 shadow-sm'
+                    : isDark ? 'bg-[#0f172a]' : 'bg-gray-50'
+                    }`}
             >
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16 lg:h-20">
-                        {/* Logo */}
-                        <Link href={route('homepage')} className="flex items-center gap-2 group">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-500`}>
-                                <Building2 className="w-6 h-6 text-white" />
-                            </div>
-                            <span className={`text-xl font-bold transition-colors duration-300 ${
-                                isDark ? 'text-white' : 'text-slate-900'
-                            }`}>
-                                ATS
-                            </span>
-                        </Link>
+                    <div className="flex h-28 items-center justify-between">
 
-                        {/* Desktop Navigation */}
-                        <div className="hidden lg:flex items-center gap-1">
-                            {navLinks.map((link) => (
-                                <Link
-                                    key={link.name}
-                                    href={link.href}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                                        isDark
-                                            ? 'text-slate-300 hover:text-white hover:bg-white/10'
-                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                                    }`}
-                                >
-                                    {link.name}
-                                </Link>
-                            ))}
+                        {/* Logo */}
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-2xl font-bold text-white shadow-lg shadow-blue-600/30">
+                                ◈
+                            </div>
+
+                            <div>
+                                <div className="text-2xl font-bold tracking-wide text-black">
+                                    CADMAX
+                                </div>
+
+                                <div className="text-[11px] font-semibold tracking-[0.35em] text-blue-300">
+                                    CONSULTANCY
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Right Side Actions */}
-                        <div className="flex items-center gap-2 sm:gap-4">
-                            {/* Theme Toggle */}
-                            <button
-                                onClick={toggleTheme}
-                                className={`p-2 rounded-lg transition-colors ${
-                                    isDark
-                                        ? 'text-gray-400 hover:text-white hover:bg-gray-800'
-                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                                }`}
-                                aria-label="Toggle theme"
+                        {/* Navigation */}
+                        {/* <nav className="hidden items-center gap-10 md:flex">
+                            <a
+                                href="/"
+                                className="relative py-2 text-sm font-medium text-white"
                             >
-                                {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                                Home
+                                <span className="absolute bottom-0 left-0 h-0.5 w-full bg-blue-500" />
+                            </a>
+
+                            <a
+                                href="/services"
+                                className="text-sm font-medium text-slate-300 transition hover:text-white"
+                            >
+                                Services
+                            </a>
+
+                            <a
+                                href="/about"
+                                className="text-sm font-medium text-slate-300 transition hover:text-white"
+                            >
+                                About Us
+                            </a>
+
+                            <a
+                                href="/contact"
+                                className="text-sm font-medium text-slate-300 transition hover:text-white"
+                            >
+                                Contact
+                            </a>
+                        </nav> */}
+
+                        {/* Right buttons */}
+                        <div className="flex items-center gap-4">
+                            <button
+                                type="button"
+                                className="hidden h-10 w-10 items-center justify-center rounded-full bg-white/10 text-xl text-white backdrop-blur-sm transition hover:bg-white/20 sm:flex"
+                            >
+                                ☾
                             </button>
 
-                            {/* Auth Buttons - Desktop */}
-                            <div className="hidden sm:flex items-center gap-3">
-                                {isAuthenticated ? (
-                                    <Link
-                                        href={route(({
-                                            superadmin: 'super.dashboard',
-                                            admin: 'admin.dashboard',
-                                            member: 'member.dashboard',
-                                        })[auth?.guard] ?? 'home')}
-                                        className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors"
-                                    >
-                                        Dashboard
-                                    </Link>
-                                ) : (
-                                    <>
-                                        <Link
-                                            href={route('login')}
-                                            className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                                                isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
-                                            }`}
-                                        >
-                                            Sign In
-                                        </Link>
-                                        <Link
-                                            href={route('register')}
-                                            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors"
-                                        >
-                                            Sign Up
-                                        </Link>
-                                    </>
-                                )}
-                            </div>
-
-                            {/* Mobile Menu Button */}
-                            <button
-                                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                                className={`lg:hidden p-2.5 rounded-xl transition-all duration-300 ${
-                                    isDark
-                                        ? 'text-slate-300 hover:text-white hover:bg-white/10'
-                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                                }`}
+                            <a
+                                href="/login"
+                                className="hidden text-sm font-medium text-black sm:block"
                             >
-                                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-                            </button>
+                                Sign In
+                            </a>
+
+                            <a
+                                href="/register"
+                                className="rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-700"
+                            >
+                                Sign Up
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -159,11 +142,10 @@ export default function HomepageLayout({ children }) {
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
                             transition={{ duration: 0.3 }}
-                            className={`lg:hidden border-t ${
-                                isDark
-                                    ? 'bg-slate-900/95 border-slate-800 backdrop-blur-xl'
-                                    : 'bg-white/95 border-slate-200 backdrop-blur-xl'
-                            }`}
+                            className={`lg:hidden border-t ${isDark
+                                ? 'bg-slate-900/95 border-slate-800 backdrop-blur-xl'
+                                : 'bg-white/95 border-slate-200 backdrop-blur-xl'
+                                }`}
                         >
                             <div className="px-4 py-4 space-y-2">
                                 {navLinks.map((link) => (
@@ -171,11 +153,10 @@ export default function HomepageLayout({ children }) {
                                         key={link.name}
                                         href={link.href}
                                         onClick={() => setMobileMenuOpen(false)}
-                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
-                                            isDark
-                                                ? 'text-slate-300 hover:text-white hover:bg-white/10'
-                                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                                        }`}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${isDark
+                                            ? 'text-slate-300 hover:text-white hover:bg-white/10'
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                                            }`}
                                     >
                                         <link.icon className="w-5 h-5" />
                                         {link.name}
@@ -189,11 +170,10 @@ export default function HomepageLayout({ children }) {
                                                 admin: 'admin.dashboard',
                                                 member: 'member.dashboard',
                                             })[auth?.guard] ?? 'home')}
-                                            className={`block w-full text-center px-4 py-3 rounded-xl text-sm font-semibold ${
-                                                isDark
-                                                    ? 'bg-gradient-to-r from-brand-500 to-accent-purple text-white'
-                                                    : 'bg-gradient-to-r from-brand-600 to-brand-700 text-white'
-                                            }`}
+                                            className={`block w-full text-center px-4 py-3 rounded-xl text-sm font-semibold ${isDark
+                                                ? 'bg-gradient-to-r from-brand-500 to-accent-purple text-white'
+                                                : 'bg-gradient-to-r from-brand-600 to-brand-700 text-white'
+                                                }`}
                                         >
                                             Dashboard
                                         </Link>
@@ -201,21 +181,19 @@ export default function HomepageLayout({ children }) {
                                         <>
                                             <Link
                                                 href={route('login')}
-                                                className={`block w-full text-center px-4 py-3 rounded-xl text-sm font-medium ${
-                                                    isDark
-                                                        ? 'text-slate-300 hover:text-white'
-                                                        : 'text-slate-600 hover:text-slate-900'
-                                                }`}
+                                                className={`block w-full text-center px-4 py-3 rounded-xl text-sm font-medium ${isDark
+                                                    ? 'text-slate-300 hover:text-white'
+                                                    : 'text-slate-600 hover:text-slate-900'
+                                                    }`}
                                             >
                                                 Sign In
                                             </Link>
                                             <Link
                                                 href={route('register')}
-                                                className={`block w-full text-center px-4 py-3 rounded-xl text-sm font-semibold ${
-                                                    isDark
-                                                        ? 'bg-gradient-to-r from-brand-500 to-accent-purple text-white'
-                                                        : 'bg-gradient-to-r from-brand-600 to-brand-700 text-white'
-                                                }`}
+                                                className={`block w-full text-center px-4 py-3 rounded-xl text-sm font-semibold ${isDark
+                                                    ? 'bg-gradient-to-r from-brand-500 to-accent-purple text-white'
+                                                    : 'bg-gradient-to-r from-brand-600 to-brand-700 text-white'
+                                                    }`}
                                             >
                                                 Get Started
                                             </Link>
