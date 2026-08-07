@@ -63,8 +63,8 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                     <dl className="mt-5 grid gap-4 sm:grid-cols-2">
                         <Field label="Client" value={project.client?.name} />
                         <Field label="Company" value={project.company?.name} />
-                        <Field label="Start Date" value={project.start_date} />
-                        <Field label="Expected End" value={project.expected_end_date} />
+                        <Field label="Start Date" value={formatDate(project.start_date)} />
+                        <Field label="Expected End" value={formatDate(project.expected_end_date)} />
                         <Field label="Address" value={project.project_address} span="sm:col-span-2" />
                         <Field label="Description" value={project.description} span="sm:col-span-2" />
                     </dl>
@@ -117,8 +117,8 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                         <div className="grid gap-4 sm:grid-cols-2">
                             <SelectField form={teamForm} name="member_id" label="Member" options={members.map((member) => ({ value: member.id, label: `${member.name}${member.email ? ` • ${member.email}` : ""}` }))} />
                             <SelectField form={teamForm} name="role_id" label="Construction Role" options={roles.map((role) => ({ value: role.id, label: role.name }))} />
-                            <InputField form={teamForm} name="assigned_from" label="Assigned From" type="date" />
-                            <InputField form={teamForm} name="assigned_to" label="Assigned To" type="date" />
+                            {/* <InputField form={teamForm} name="assigned_from" label="Assigned From" type="date" />
+                            <InputField form={teamForm} name="assigned_to" label="Assigned To" type="date" /> */}
                         </div>
                         <InputField form={teamForm} name="assignment_scope" label="Assignment Scope" placeholder="Survey, drafting, approvals, coordination..." />
                         <label className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-200">
@@ -166,7 +166,7 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                                         <div>
                                             <p className="font-semibold text-slate-900 dark:text-white">{item.module}</p>
                                             <p className="text-sm text-slate-500">
-                                                {item.actor?.name || item.actor?.email || "System"} • {item.created_at}
+                                                {item.actor?.name || item.actor?.email || "System"} • {formatDateTime(item.created_at)}
                                             </p>
                                         </div>
                                         <StatusBadge value={item.action} />
@@ -189,7 +189,7 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                             <p className="font-semibold text-slate-900 dark:text-white">{plan.title}</p>
-                                            <p className="text-sm text-slate-500">{plan.survey_code} • {plan.planned_date || "No planned date"}</p>
+                                            <p className="text-sm text-slate-500">{plan.survey_code} • {formatDate(plan.planned_date) || "No planned date"}</p>
                                             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{plan.site_address || "No site address recorded."}</p>
                                         </div>
                                         <StatusBadge value={plan.status} />
@@ -211,7 +211,7 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                                                         <StatusBadge value={visit.gps_verified ? "approved" : "revision_requested"} />
                                                     </div>
                                                 </div>
-                                                <p className="mt-2 text-sm text-slate-500">Check-in by {visit.checked_in_by?.name || "Unknown"} • {visit.check_in_at || "No timestamp"}</p>
+                                                <p className="mt-2 text-sm text-slate-500">Check-in by {visit.checked_in_by?.name || "Unknown"} • {formatDateTime(visit.check_in_at) || "No timestamp"}</p>
                                                 <p className="mt-1 text-sm text-slate-500">Entries: {visit.entries?.length || 0} • Measurements: {visit.measurements?.length || 0}</p>
                                                 {visit.submission ? (
                                                     <div className="mt-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-900">
@@ -264,7 +264,7 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                                         <div>
                                             <p className="font-semibold text-slate-900 dark:text-white">Drafting Job #{job.id}</p>
                                             <p className="text-sm text-slate-500">
-                                                Assigned to {job.assigned_to?.name || "Unassigned"} • Due {job.due_date || "Not set"}
+                                                Assigned to {job.assigned_to?.name || "Unassigned"} • Due {formatDate(job.due_date) || "Not set"}
                                             </p>
                                         </div>
                                         <StatusBadge value={job.status} />
@@ -275,7 +275,7 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                                     <div>
                                                         <p className="font-medium text-slate-900 dark:text-white">Revision {revision.revision_no}</p>
-                                                        <p className="text-sm text-slate-500">Uploaded by {revision.uploaded_by?.name || "Unknown"} • {revision.uploaded_at || "No upload time"}</p>
+                                                        <p className="text-sm text-slate-500">Uploaded by {revision.uploaded_by?.name || "Unknown"} • {formatDateTime(revision.uploaded_at) || "No upload time"}</p>
                                                     </div>
                                                     <StatusBadge value={revision.status} />
                                                 </div>
@@ -316,6 +316,30 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
             </div>
         </ConstructionShell>
     );
+}
+
+function formatDate(dateString) {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
+}
+
+function formatDateTime(dateString) {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return dateString;
+    return date.toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
 }
 
 function Field({ label, value, span = "" }) {

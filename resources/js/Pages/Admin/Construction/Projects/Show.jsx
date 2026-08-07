@@ -29,8 +29,8 @@ export default function ProjectShow({ project, activityLog }) {
                     <dl className="mt-5 grid gap-4 sm:grid-cols-2">
                         <Field label="Client" value={project.client?.name} />
                         <Field label="Company" value={project.company?.name} />
-                        <Field label="Start Date" value={project.start_date} />
-                        <Field label="Expected End" value={project.expected_end_date} />
+                        <Field label="Start Date" value={formatDate(project.start_date)} />
+                        <Field label="Expected End" value={formatDate(project.expected_end_date)} />
                         <Field label="Address" value={project.project_address} span="sm:col-span-2" />
                         <Field label="Description" value={project.description} span="sm:col-span-2" />
                     </dl>
@@ -66,7 +66,7 @@ export default function ProjectShow({ project, activityLog }) {
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
                                             <p className="font-semibold text-slate-900 dark:text-white">{plan.title}</p>
-                                            <p className="text-sm text-slate-500">{plan.survey_code} • {plan.planned_date || "No date"}</p>
+                                            <p className="text-sm text-slate-500">{plan.survey_code} • {formatDate(plan.planned_date) || "No date"}</p>
                                             <p className="mt-1 text-sm text-slate-500">{plan.site_address || "No site address"}</p>
                                         </div>
                                         <StatusBadge value={plan.status} />
@@ -105,7 +105,7 @@ export default function ProjectShow({ project, activityLog }) {
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
                                             <p className="font-semibold text-slate-900 dark:text-white">Drafting Job #{job.id}</p>
-                                            <p className="text-sm text-slate-500">Assigned to {job.assigned_to?.name || "Unassigned"} • Due {job.due_date || "Not set"}</p>
+                                            <p className="text-sm text-slate-500">Assigned to {job.assigned_to?.name || "Unassigned"} • Due {formatDate(job.due_date) || "Not set"}</p>
                                         </div>
                                         <StatusBadge value={job.status} />
                                     </div>
@@ -139,7 +139,7 @@ export default function ProjectShow({ project, activityLog }) {
                                     <StatusBadge value={item.action} />
                                 </div>
                                 <p className="mt-2 text-sm text-slate-500">{item.actor?.name || item.actor?.email || "System"}</p>
-                                <p className="mt-1 text-xs text-slate-500">{item.created_at}</p>
+                                <p className="mt-1 text-xs text-slate-500">{formatDateTime(item.created_at)}</p>
                             </div>
                         ))}
                     </div>
@@ -149,6 +149,30 @@ export default function ProjectShow({ project, activityLog }) {
             </SectionCard>
         </ConstructionShell>
     );
+}
+
+function formatDate(dateString) {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
+}
+
+function formatDateTime(dateString) {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return dateString;
+    return date.toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
 }
 
 function Field({ label, value, span = "" }) {
