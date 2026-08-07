@@ -100,7 +100,10 @@ class ProjectController extends Controller
         return Inertia::render('SuperAdmin/Construction/Projects/Show', [
             'project' => $project,
             'members' => $members,
-            'roles' => Role::where('status', 'active')->orderBy('name')->get(['id', 'name', 'slug']),
+            'roles' => Role::where('status', 'active')
+                ->where('slug', '!=', 'super_admin')
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug']),
             'activityLog' => ActivityLog::with('actor')
                 ->where('project_id', $project->id)
                 ->latest('created_at')

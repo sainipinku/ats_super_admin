@@ -14,11 +14,24 @@ class AssignTeamMemberRequest extends FormRequest
 
     public function rules(): array
     {
+        $project = $this->route('project');
+        $projectId = $project instanceof \App\Models\Construction\Project
+            ? $project->id
+            : $project;
+
+        $teamMember = $this->route('teamMember');
+        $teamMemberId = $teamMember instanceof \App\Models\Construction\ProjectTeamMember
+            ? $teamMember->id
+            : $teamMember;
+
         return [
             'member_id' => [
                 'required',
                 'integer',
                 'exists:members,id',
+                Rule::unique('construction_project_team_members')
+                    ->where('project_id', $projectId)
+                    ->ignore($teamMemberId),
             ],
             'role_id' => [
                 'nullable',
@@ -43,7 +56,7 @@ class AssignTeamMemberRequest extends FormRequest
                 'boolean',
             ],
             'status' => [
-                'required',
+                'nullable',
                 Rule::in(['active', 'inactive']),
             ],
         ];
@@ -54,6 +67,7 @@ class AssignTeamMemberRequest extends FormRequest
         return [
             'member_id.required' => 'Please select a team member.',
             'member_id.exists' => 'The selected member does not exist.',
+            'member_id.unique' => 'This member is already assigned to this project. Each member can only be assigned once per project.',
             'role_id.exists' => 'The selected role does not exist.',
             'assigned_to.after_or_equal' => 'The assignment end date must be after or equal to the start date.',
             'status.in' => 'The status must be either active or inactive.',

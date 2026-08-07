@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMemo } from "react";
 import { useForm, router } from "@inertiajs/react";
+import { toast } from "react-hot-toast";
 import ConstructionShell from "@/Pages/Construction/Components/ConstructionShell";
 import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
@@ -28,6 +29,7 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
         assigned_to: "",
         assignment_scope: "",
         is_primary: false,
+        status: "active",
     });
 
     const handleRoleChange = (roleId) => {
@@ -161,6 +163,14 @@ export default function ProjectShow({ project, members, roles, activityLog }) {
                             teamForm.post(route("super.construction.projects.team.assign", project.id), {
                                 preserveScroll: true,
                                 onSuccess: () => teamForm.reset("member_id", "role_id", "assigned_from", "assigned_to", "assignment_scope", "is_primary"),
+                                onError: (errors) => {
+                                    if (errors.member_id) {
+                                        toast.error(errors.member_id);
+                                    } else {
+                                        const firstError = Object.values(errors)[0];
+                                        if (firstError) toast.error(firstError);
+                                    }
+                                },
                             });
                         }}
                         className="grid gap-4"
@@ -482,13 +492,33 @@ function TeamMemberRow({ teamMember, project, roles }) {
         status: teamMember.status,
     });
 
+    // Re-sync form data whenever modal opens or teamMember updates
+    useEffect(() => {
+        if (showEditModal) {
+            editForm.setData({
+                member_id: teamMember.member_id,
+                role_id: teamMember.role_id || "",
+                assignment_scope: teamMember.assignment_scope || "",
+                is_primary: teamMember.is_primary,
+                status: teamMember.status,
+            });
+        }
+    }, [showEditModal, teamMember]);
+
+    const openEditModal = () => {
+        setShowEditModal(true);
+    };
+
     const handleEditSubmit = (e) => {
         e.preventDefault();
         editForm.put(route("super.construction.projects.team.update", [project.id, teamMember.id]), {
             preserveScroll: true,
             onSuccess: () => {
                 setShowEditModal(false);
-                editForm.reset();
+            },
+            onError: (errors) => {
+                const firstError = Object.values(errors)[0];
+                if (firstError) toast.error(firstError);
             },
         });
     };
@@ -497,12 +527,20 @@ function TeamMemberRow({ teamMember, project, roles }) {
         setShowRemoveModal(false);
         router.delete(route("super.construction.projects.team.destroy", [project.id, teamMember.id]), {
             preserveScroll: true,
+            onError: (errors) => {
+                const firstError = Object.values(errors)[0];
+                if (firstError) toast.error(firstError);
+            },
         });
     };
 
     const handleStatusToggle = () => {
         router.patch(route("super.construction.projects.team.status", [project.id, teamMember.id]), {}, {
             preserveScroll: true,
+            onError: (errors) => {
+                const firstError = Object.values(errors)[0];
+                if (firstError) toast.error(firstError);
+            },
         });
     };
 
@@ -533,7 +571,7 @@ function TeamMemberRow({ teamMember, project, roles }) {
                             View Details
                         </button>
                         <button
-                            onClick={() => setShowEditModal(true)}
+                            onClick={openEditModal}
                             className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
                         >
                             Edit
