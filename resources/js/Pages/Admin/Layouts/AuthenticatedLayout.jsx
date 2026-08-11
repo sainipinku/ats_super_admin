@@ -25,7 +25,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/Components/ui/dropdown-menu";
 
 export default function AuthenticatedLayout({ header, children }) {
     const user = usePage().props;
@@ -147,7 +147,7 @@ export default function AuthenticatedLayout({ header, children }) {
             });
             const payload = await res.json();
             if (payload?.success) setUnreadCount(Number(payload.unread ?? 0));
-        } catch {}
+        } catch { }
     };
 
     const fetchNotifications = async () => {
@@ -184,7 +184,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     "X-CSRF-TOKEN": getCsrfToken(),
                 },
             });
-        } catch {}
+        } catch { }
     };
 
     const markAllRead = async () => {
@@ -206,7 +206,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     prev.map((n) => ({ ...n, status: "read", viewed_at: n.viewed_at ?? new Date().toISOString() }))
                 );
             }
-        } catch {}
+        } catch { }
     };
 
     const notificationText = (notification) => {
@@ -288,16 +288,14 @@ export default function AuthenticatedLayout({ header, children }) {
         <>
             <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
             <div
-                className={`min-h-screen mainbg transition-[padding] duration-300 ease-in-out ${
-                    sidebarOpen ? "xl:pl-[288px]" : "xl:pl-0"
-                }`}
+                className={`min-h-screen mainbg transition-[padding] duration-300 ease-in-out ${sidebarOpen ? "xl:pl-[288px]" : "xl:pl-0"
+                    }`}
             >
                 <nav
-                    className={`headerbg fixed top-0 z-50 py-[10px] px-[12px] print:hidden transition-[left,right] duration-300 ease-in-out ${
-                        sidebarOpen
+                    className={`headerbg fixed top-0 z-50 py-[10px] px-[12px] print:hidden transition-[left,right] duration-300 ease-in-out ${sidebarOpen
                             ? "left-0 right-0 xl:left-[288px] xl:right-0"
                             : "left-0 right-0"
-                    }`}
+                        }`}
                 >
                     <div className="navbg rounded-[12px] border border-[1px] borderbx shadow-sm">
                         <div className="mx-auto max-w-full px-[12px] py-0">
@@ -647,11 +645,10 @@ function QuickPill({ href, active, icon, children }) {
     return (
         <Link
             href={href}
-            className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[13px] font-medium transition-all duration-200 ${
-                active
+            className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[13px] font-medium transition-all duration-200 ${active
                     ? "bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 ring-1 ring-violet-200 dark:ring-violet-800"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-            }`}
+                }`}
         >
             {icon}
             <span>{children}</span>
