@@ -350,10 +350,12 @@ public function assignTeam(
     Request $request,
     ConstructionActivityService $activityService
 ): RedirectResponse {
+
     // Verify that this team-member assignment belongs to this project
-    if ($teamMember->project_id !== $project->id) {
-        abort(404);
-    }
+    
+    if ((int) $teamMember->project_id !== (int) $project->id) {
+    abort(404);
+}
 
     $actor = $this->constructionActor();
 
