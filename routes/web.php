@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\JobController;
 use App\Http\Controllers\Admin\CallingTeamController;
 use App\Http\Controllers\CallingTeam\AuthController as CallingTeamAuthController;
 use App\Http\Controllers\CallingTeam\PortalController as CallingTeamPortalController;
+use App\Http\Controllers\SuperAdmin\Construction\ProjectController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -297,16 +298,17 @@ Route::prefix('super/construction')
         Route::post('/projects/{project}/team', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'assignTeam'])
             ->middleware('construction.permission:project_team.manage')
             ->name('projects.team.assign');
-        Route::put('/projects/{project}/team/{teamMember}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'updateTeamMember'])
+            
+        Route::put('/projects/{project}/team/{teamMember}', [ProjectController::class, 'updateTeamMember'])
             ->middleware('construction.permission:project_team.manage')
             ->name('projects.team.update');
-        Route::patch('/projects/{project}/team/{teamMember}/status', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'toggleTeamMemberStatus'])
+        Route::patch('/projects/{project}/team/{teamMember}/status', [ProjectController::class, 'toggleTeamMemberStatus'])
             ->middleware('construction.permission:project_team.manage')
             ->name('projects.team.status');
-        Route::delete('/projects/{project}/team/{teamMember}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'destroyTeamMember'])
+        Route::delete('/projects/{project}/team/{teamMember}', [ProjectController::class, 'destroyTeamMember'])
             ->middleware('construction.permission:project_team.manage')
             ->name('projects.team.destroy');
-        Route::get('/projects/{project}/team/{teamMember}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'showTeamMember'])
+        Route::get('/projects/{project}/team/{teamMember}', [ProjectController::class, 'showTeamMember'])
             ->middleware('construction.permission:project_team.manage')
             ->name('projects.team.show');
         Route::delete('/projects/{project}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'destroy'])

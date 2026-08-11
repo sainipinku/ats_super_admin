@@ -4,7 +4,6 @@ namespace App\Http\Controllers\SuperAdmin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\AssignTeamMemberRequest;
 use App\Models\Construction\Client;
 use App\Models\Construction\Company;
 use App\Models\Construction\ActivityLog;
@@ -13,11 +12,18 @@ use App\Models\Construction\Project;
 use App\Models\Construction\ProjectBudget;
 use App\Models\Construction\ProjectTeamMember;
 use App\Models\Construction\Role;
+use App\Models\Construction\AttendanceRecord;
+use App\Models\Construction\DailyProgressReport;
+use App\Models\Construction\ExecutionTask;
+use App\Models\Construction\SurveyPlan;
+use App\Models\Construction\SurveySubmission;
+use App\Models\Construction\SurveyVisit;
 use App\Models\Member;
 use App\Services\Construction\ConstructionActivityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -232,11 +238,53 @@ $members->transform(function ($member) use ($designationNames) {
     }
 public function assignTeam(
     Project $project,
-    AssignTeamMemberRequest $request,
+    Request $request,
     ConstructionActivityService $activityService
 ): RedirectResponse {
     $actor = $this->constructionActor();
-    $validated = $request->validated();
+
+    $validated = $request->validate([
+        'member_id' => [
+            'required',
+            'integer',
+            'exists:members,id',
+            Rule::unique('construction_project_team_members')
+                ->where('project_id', $project->id),
+        ],
+        'role_id' => [
+            'nullable',
+            'integer',
+            'exists:construction_roles,id',
+        ],
+        'assigned_from' => [
+            'nullable',
+            'date',
+        ],
+        'assigned_to' => [
+            'nullable',
+            'date',
+            'after_or_equal:assigned_from',
+        ],
+        'assignment_scope' => [
+            'nullable',
+            'string',
+            'max:500',
+        ],
+        'is_primary' => [
+            'boolean',
+        ],
+        'status' => [
+            'nullable',
+            Rule::in(['active', 'inactive']),
+        ],
+    ], [
+        'member_id.required' => 'Please select a team member.',
+        'member_id.exists' => 'The selected member does not exist.',
+        'member_id.unique' => 'This member is already assigned to this project. Each member can only be assigned once per project.',
+        'role_id.exists' => 'The selected role does not exist.',
+        'assigned_to.after_or_equal' => 'The assignment end date must be after or equal to the start date.',
+        'status.in' => 'The status must be either active or inactive.',
+    ]);
 
     try {
         $teamMember = ProjectTeamMember::create([
@@ -299,7 +347,7 @@ public function assignTeam(
 }public function updateTeamMember(
     Project $project,
     ProjectTeamMember $teamMember,
-    AssignTeamMemberRequest $request,
+    Request $request,
     ConstructionActivityService $activityService
 ): RedirectResponse {
     // Verify that this team-member assignment belongs to this project
@@ -308,7 +356,50 @@ public function assignTeam(
     }
 
     $actor = $this->constructionActor();
-    $validated = $request->validated();
+
+    $validated = $request->validate([
+        'member_id' => [
+            'required',
+            'integer',
+            'exists:members,id',
+            Rule::unique('construction_project_team_members')
+                ->where('project_id', $project->id)
+                ->ignore($teamMember->id),
+        ],
+        'role_id' => [
+            'nullable',
+            'integer',
+            'exists:construction_roles,id',
+        ],
+        'assigned_from' => [
+            'nullable',
+            'date',
+        ],
+        'assigned_to' => [
+            'nullable',
+            'date',
+            'after_or_equal:assigned_from',
+        ],
+        'assignment_scope' => [
+            'nullable',
+            'string',
+            'max:500',
+        ],
+        'is_primary' => [
+            'boolean',
+        ],
+        'status' => [
+            'nullable',
+            Rule::in(['active', 'inactive']),
+        ],
+    ], [
+        'member_id.required' => 'Please select a team member.',
+        'member_id.exists' => 'The selected member does not exist.',
+        'member_id.unique' => 'This member is already assigned to this project. Each member can only be assigned once per project.',
+        'role_id.exists' => 'The selected role does not exist.',
+        'assigned_to.after_or_equal' => 'The assignment end date must be after or equal to the start date.',
+        'status.in' => 'The status must be either active or inactive.',
+    ]);
 
     try {
         $teamMember->update([
@@ -431,7 +522,7 @@ public function assignTeam(
         // Load actual project work/submissions by this team member for this project
         
         // 1. Survey submissions submitted by this member
-        $surveySubmissions = \App\Models\Construction\SurveySubmission::with([
+        $surveySubmissions = SurveySubmission::with([
             'surveyVisit.checkedInBy',
             'submittedBy',
             'reviewedBy',
@@ -442,7 +533,7 @@ public function assignTeam(
             ->get();
 
         // 2. Survey visits where this member checked in
-        $surveyVisits = \App\Models\Construction\SurveyVisit::with([
+        $surveyVisits = SurveyVisit::with([
             'checkedInBy',
             'entries.capturedBy',
             'measurements.capturedBy',
@@ -454,7 +545,7 @@ public function assignTeam(
             ->get();
 
         // 3. Survey plans where this member is assigned
-        $surveyPlans = \App\Models\Construction\SurveyPlan::with([
+        $surveyPlans = SurveyPlan::with([
             'planMembers.member',
         ])
             ->where('project_id', $project->id)
@@ -465,7 +556,7 @@ public function assignTeam(
             ->get();
 
         // 4. Execution tasks supervised by this member
-        $supervisedTasks = \App\Models\Construction\ExecutionTask::with([
+        $supervisedTasks = ExecutionTask::with([
             'assignees.member',
             'progressReports',
             'attendanceRecords',
@@ -476,7 +567,7 @@ public function assignTeam(
             ->get();
 
         // 5. Execution tasks where this member is assigned as assignee
-        $assignedTasks = \App\Models\Construction\ExecutionTask::with([
+        $assignedTasks = ExecutionTask::with([
             'supervisor',
             'assignees.member',
             'progressReports',
@@ -489,7 +580,7 @@ public function assignTeam(
             ->get();
 
         // 6. Daily progress reports submitted by this member
-        $progressReports = \App\Models\Construction\DailyProgressReport::with([
+        $progressReports = DailyProgressReport::with([
             'submittedBy',
             'reviewedBy',
         ])
@@ -499,7 +590,7 @@ public function assignTeam(
             ->get();
 
         // 7. Attendance records for this member
-        $attendanceRecords = \App\Models\Construction\AttendanceRecord::with([
+        $attendanceRecords = AttendanceRecord::with([
             'checkedInBy',
             'checkedOutBy',
         ])
