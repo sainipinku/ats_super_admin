@@ -56,7 +56,7 @@ class CompanyApiController extends Controller
 
     public function store(Request $request)
     {
-        $actor = $request->user('superadmin-api');
+        $actor = $request->user();
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],

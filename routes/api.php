@@ -8,7 +8,6 @@ use App\Http\Controllers\Api\Member\JobController;
 use App\Http\Controllers\Api\Member\ProfileController;
 use App\Http\Controllers\Api\Member\TaskController;
 use App\Http\Controllers\Api\ProjectApiController;
-use App\Http\Controllers\Api\SuperAdminAuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -18,7 +17,7 @@ Route::get('/', function () {
         'version' => '2.0',
         'endpoints' => [
             'auth' => '/api/auth/*',
-            'super_admin_auth' => '/api/super-admin/auth/*',
+            'profile' => '/api/profile',
             'projects' => '/api/construction/projects/*',
             'companies' => '/api/construction/companies/*',
             'clients' => '/api/construction/clients/*',
@@ -35,22 +34,12 @@ Route::prefix('auth')->group(function () {
     Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 });
 
-Route::prefix('super-admin/auth')->group(function () {
-    Route::post('/login', [SuperAdminAuthController::class, 'login']);
-
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::post('/logout', [SuperAdminAuthController::class, 'logout']);
-        Route::get('/profile', [SuperAdminAuthController::class, 'profile']);
-        Route::match(['put', 'post'], '/profile/update', [SuperAdminAuthController::class, 'updateProfile']);
-        Route::post('/change-password', [SuperAdminAuthController::class, 'changePassword']);
-    });
-});
-
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
 
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);
+    Route::post('/profile/change-password', [ProfileController::class, 'changePassword']);
     Route::get('/profile/completion', [ProfileController::class, 'completion']);
     Route::post('/profile/photo', [ProfileController::class, 'updatePhoto']);
     Route::delete('/profile/photo', [ProfileController::class, 'removePhoto']);

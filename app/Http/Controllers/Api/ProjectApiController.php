@@ -93,7 +93,7 @@ class ProjectApiController extends Controller
 
     public function store(Request $request)
     {
-        $actor = $request->user('superadmin-api');
+        $actor = $request->user();
 
         $validated = $request->validate([
             'company_id' => ['required', 'exists:construction_companies,id'],
@@ -244,7 +244,7 @@ class ProjectApiController extends Controller
 
     public function storeBudget(Request $request, Project $project)
     {
-        $actor = $request->user('superadmin-api');
+        $actor = $request->user();
 
         $validated = $request->validate([
             'estimated_amount' => ['required', 'numeric', 'min:0'],
@@ -289,7 +289,7 @@ class ProjectApiController extends Controller
 
     public function assignTeam(Request $request, Project $project)
     {
-        $actor = $request->user('superadmin-api');
+        $actor = $request->user();
 
         $validated = $request->validate([
             'member_id' => ['required', 'exists:members,id'],
