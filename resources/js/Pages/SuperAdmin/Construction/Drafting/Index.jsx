@@ -4,6 +4,8 @@ import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
 import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
+import Modal from "@/Components/Modal";
+import { useState } from "react";
 
 export default function DraftingIndex({ draftingJobs, approvedSurveySubmissions, members }) {
     const jobForm = useForm({
@@ -11,6 +13,36 @@ export default function DraftingIndex({ draftingJobs, approvedSurveySubmissions,
         assigned_to_member_id: members[0]?.id || "",
         due_date: "",
     });
+
+    const [editingJob, setEditingJob] = useState(null);
+
+    const editForm = useForm({
+        assigned_to_member_id: "",
+        due_date: "",
+    });
+
+    const openEditModal = (job) => {
+        editForm.clearErrors();
+        editForm.setData({
+            assigned_to_member_id: job.assigned_to_member_id ? String(job.assigned_to_member_id) : "",
+            due_date: job.due_date || "",
+        });
+        setEditingJob(job);
+    };
+
+    const closeEditModal = () => {
+        editForm.clearErrors();
+        editForm.reset();
+        setEditingJob(null);
+    };
+
+    const submitEdit = (e) => {
+        e.preventDefault();
+        editForm.put(route("super.construction.drafting.jobs.update", editingJob.id), {
+            preserveScroll: true,
+            onSuccess: () => closeEditModal(),
+        });
+    };
 
     const stats = {
         queue: draftingJobs.filter((job) => ["queued", "in_progress", "submitted"].includes(job.status)).length,
@@ -61,7 +93,7 @@ export default function DraftingIndex({ draftingJobs, approvedSurveySubmissions,
                     {draftingJobs.length ? (
                         <div className="space-y-5">
                             {draftingJobs.map((job) => (
-                                <DraftingJobCard key={job.id} job={job} members={members} variant="super" documentRouteBase={documentRouteBase} />
+                                <DraftingJobCard key={job.id} job={job} members={members} variant="super" documentRouteBase={documentRouteBase} onEdit={() => openEditModal(job)} />
                             ))}
                         </div>
                     ) : (
@@ -69,11 +101,42 @@ export default function DraftingIndex({ draftingJobs, approvedSurveySubmissions,
                     )}
                 </SectionCard>
             </div>
+
+            <Modal show={editingJob !== null} onClose={closeEditModal} maxWidth="lg">
+                <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Edit Drafting Job</h3>
+                    <p className="mt-1 text-sm text-slate-500">Reassign the drafting owner or update the due date. Approval workflow and revision history are unchanged.</p>
+                </div>
+                <form onSubmit={submitEdit} className="space-y-4 p-5">
+                    <SelectField form={editForm} name="assigned_to_member_id" label="Assign Draft Person" options={members.map((member) => ({
+                        value: String(member.id),
+                        label: `${member.name}${member.designation_text ? ` (${member.designation_text})` : ""}${member.email ? ` • ${member.email}` : ""}`,
+                    }))} />
+                    <InputField form={editForm} name="due_date" label="Due Date" type="date" />
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={closeEditModal}
+                            disabled={editForm.processing}
+                            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={editForm.processing}
+                            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-60"
+                        >
+                            {editForm.processing ? "Updating..." : "Update Drafting Job"}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </ConstructionShell>
     );
 }
 
-function DraftingJobCard({ job, variant, documentRouteBase }) {
+function DraftingJobCard({ job, variant, documentRouteBase, onEdit }) {
     return (
         <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -82,7 +145,16 @@ function DraftingJobCard({ job, variant, documentRouteBase }) {
                     <p className="text-sm text-slate-500">Assigned to {job.assigned_to?.name || "Unassigned"} • Due {job.due_date || "Not set"}</p>
                     <p className="mt-1 text-sm text-slate-500">Source submission #{job.survey_submission_id} • Submitted by {job.survey_submission?.submitted_by?.name || "Unknown"}</p>
                 </div>
-                <StatusBadge value={job.status} />
+                <div className="flex items-center gap-2">
+                    <StatusBadge value={job.status} />
+                    <button
+                        type="button"
+                        onClick={onEdit}
+                        className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                        Edit
+                    </button>
+                </div>
             </div>
 
             <div className="mt-4 grid gap-4 xl:grid-cols-[360px,1fr]">

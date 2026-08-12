@@ -1,10 +1,11 @@
 import { router, useForm } from "@inertiajs/react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import ConstructionShell from "@/Pages/Construction/Components/ConstructionShell";
 import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
 import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
+import Modal from "@/Components/Modal";
 
 export default function ExecutionWorkspace({
     variant = "super",
@@ -68,6 +69,90 @@ export default function ExecutionWorkspace({
         planned_end_date: "",
         status: "planned",
     });
+
+    const [editingPlan, setEditingPlan] = useState(null);
+
+    const editPlanForm = useForm({
+        title: "",
+        description: "",
+        planned_start_date: "",
+        planned_end_date: "",
+    });
+
+    const openEditPlanModal = (plan) => {
+        editPlanForm.clearErrors();
+        editPlanForm.setData({
+            title: plan.title || "",
+            description: plan.description || "",
+            planned_start_date: plan.planned_start_date || "",
+            planned_end_date: plan.planned_end_date || "",
+        });
+        setEditingPlan(plan);
+    };
+
+    const closeEditPlanModal = () => {
+        editPlanForm.clearErrors();
+        editPlanForm.reset();
+        setEditingPlan(null);
+    };
+
+    const submitEditPlan = (e) => {
+        e.preventDefault();
+        editPlanForm.put(route(`${routePrefix}.plans.update`, editingPlan.id), {
+            preserveScroll: true,
+            onSuccess: () => closeEditPlanModal(),
+        });
+    };
+
+    const [editingTask, setEditingTask] = useState(null);
+
+    const editTaskForm = useForm({
+        title: "",
+        description: "",
+        planned_start_date: "",
+        planned_end_date: "",
+        priority: "medium",
+        planned_quantity: "",
+        unit: "",
+        supervisor_member_id: "",
+        assignee_member_ids: [],
+        primary_assignment_role: "worker",
+    });
+
+    const openEditTaskModal = (task) => {
+        editTaskForm.clearErrors();
+        editTaskForm.setData({
+            title: task.title || "",
+            description: task.description || "",
+            planned_start_date: task.planned_start_date || "",
+            planned_end_date: task.planned_end_date || "",
+            priority: task.priority || "medium",
+            planned_quantity: task.planned_quantity ?? "",
+            unit: task.unit || "",
+            supervisor_member_id: task.supervisor_member_id ? String(task.supervisor_member_id) : "",
+            assignee_member_ids: (task.assignees || []).map((assignee) => String(assignee.member_id)),
+            primary_assignment_role: "worker",
+        });
+        setEditingTask(task);
+    };
+
+    const closeEditTaskModal = () => {
+        editTaskForm.clearErrors();
+        editTaskForm.reset();
+        setEditingTask(null);
+    };
+
+    const submitEditTask = (e) => {
+        e.preventDefault();
+        editTaskForm.put(route(`${routePrefix}.tasks.update`, editingTask.id), {
+            preserveScroll: true,
+            onSuccess: () => closeEditTaskModal(),
+        });
+    };
+
+    const editTaskTeamOptions = editingTask
+        ? (teamOptionsByProject[String(editingTask.project_id)] ?? [])
+        : [];
 
     const taskForm = useForm({
         project_id: firstProjectId,
@@ -582,6 +667,15 @@ export default function ExecutionWorkspace({
                                         <MiniMetric label="Planned End" value={formatDate(plan.planned_end_date) || "-"} />
                                         <MiniMetric label="Progress" value={`${plan.actual_progress_percent || 0}%`} />
                                     </div>
+                                    <div className="mt-4 flex justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() => openEditPlanModal(plan)}
+                                            className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                        >
+                                            Edit
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -620,6 +714,15 @@ export default function ExecutionWorkspace({
                                             ))}
                                         </div>
                                     ) : null}
+                                    <div className="mt-4 flex justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() => openEditTaskModal(task)}
+                                            className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                        >
+                                            Edit
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -767,6 +870,109 @@ export default function ExecutionWorkspace({
                     )}
                 </SectionCard>
             </div>
+
+            <Modal show={editingTask !== null} onClose={closeEditTaskModal} maxWidth="3xl">
+                <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Edit Execution Task</h3>
+                    <p className="mt-1 text-sm text-slate-500">Update task master data and team assignment. Progress and workflow status are managed through execution.</p>
+                </div>
+                <form onSubmit={submitEditTask} className="space-y-4 p-5">
+                    <TextInput label="Task Title" value={editTaskForm.data.title} onChange={(value) => editTaskForm.setData("title", value)} error={editTaskForm.errors.title} />
+                    <TextAreaInput label="Description" value={editTaskForm.data.description} onChange={(value) => editTaskForm.setData("description", value)} error={editTaskForm.errors.description} rows={3} />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <TextInput label="Planned Start" type="date" value={editTaskForm.data.planned_start_date} onChange={(value) => editTaskForm.setData("planned_start_date", value)} error={editTaskForm.errors.planned_start_date} />
+                        <TextInput label="Planned End" type="date" value={editTaskForm.data.planned_end_date} onChange={(value) => editTaskForm.setData("planned_end_date", value)} error={editTaskForm.errors.planned_end_date} />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <SelectInput
+                            label="Priority"
+                            value={editTaskForm.data.priority}
+                            onChange={(value) => editTaskForm.setData("priority", value)}
+                            options={[
+                                { value: "low", label: "Low" },
+                                { value: "medium", label: "Medium" },
+                                { value: "high", label: "High" },
+                                { value: "critical", label: "Critical" },
+                            ]}
+                            error={editTaskForm.errors.priority}
+                        />
+                        <SelectInput
+                            label="Supervisor"
+                            value={editTaskForm.data.supervisor_member_id}
+                            onChange={(value) => editTaskForm.setData("supervisor_member_id", value)}
+                            options={editTaskTeamOptions.map((item) => ({
+                                value: String(item.member_id),
+                                label: item.member?.name || `Member #${item.member_id}`,
+                            }))}
+                            error={editTaskForm.errors.supervisor_member_id}
+                        />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <TextInput label="Planned Quantity" type="number" value={editTaskForm.data.planned_quantity} onChange={(value) => editTaskForm.setData("planned_quantity", value)} error={editTaskForm.errors.planned_quantity} />
+                        <TextInput label="Unit" value={editTaskForm.data.unit} onChange={(value) => editTaskForm.setData("unit", value)} error={editTaskForm.errors.unit} placeholder="sqm, nos, ft..." />
+                    </div>
+                    <MultiSelectInput
+                        label="Assignees"
+                        value={editTaskForm.data.assignee_member_ids}
+                        onChange={(value) => editTaskForm.setData("assignee_member_ids", value)}
+                        options={editTaskTeamOptions.map((item) => ({
+                            value: String(item.member_id),
+                            label: item.member?.name || `Member #${item.member_id}`,
+                        }))}
+                        error={editTaskForm.errors.assignee_member_ids}
+                    />
+                    <TextInput label="Assignment Role" value={editTaskForm.data.primary_assignment_role} onChange={(value) => editTaskForm.setData("primary_assignment_role", value)} error={editTaskForm.errors.primary_assignment_role} />
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={closeEditTaskModal}
+                            disabled={editTaskForm.processing}
+                            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={editTaskForm.processing}
+                            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-60"
+                        >
+                            {editTaskForm.processing ? "Updating..." : "Update Execution Task"}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            <Modal show={editingPlan !== null} onClose={closeEditPlanModal} maxWidth="lg">
+                <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Edit Execution Plan</h3>
+                    <p className="mt-1 text-sm text-slate-500">Update the plan master data. Workflow status and progress are managed through execution.</p>
+                </div>
+                <form onSubmit={submitEditPlan} className="space-y-4 p-5">
+                    <TextInput label="Plan Title" value={editPlanForm.data.title} onChange={(value) => editPlanForm.setData("title", value)} error={editPlanForm.errors.title} />
+                    <TextAreaInput label="Description" value={editPlanForm.data.description} onChange={(value) => editPlanForm.setData("description", value)} error={editPlanForm.errors.description} rows={4} />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <TextInput label="Planned Start" type="date" value={editPlanForm.data.planned_start_date} onChange={(value) => editPlanForm.setData("planned_start_date", value)} error={editPlanForm.errors.planned_start_date} />
+                        <TextInput label="Planned End" type="date" value={editPlanForm.data.planned_end_date} onChange={(value) => editPlanForm.setData("planned_end_date", value)} error={editPlanForm.errors.planned_end_date} />
+                    </div>
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={closeEditPlanModal}
+                            disabled={editPlanForm.processing}
+                            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={editPlanForm.processing}
+                            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-60"
+                        >
+                            {editPlanForm.processing ? "Updating..." : "Update Execution Plan"}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </ConstructionShell>
     );
 }

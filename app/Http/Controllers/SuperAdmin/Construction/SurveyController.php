@@ -113,6 +113,66 @@ class SurveyController extends Controller
         return back()->with('success', 'Survey plan created successfully.');
     }
 
+    public function updatePlan(SurveyPlan $surveyPlan, Request $request, ConstructionActivityService $activityService): RedirectResponse
+    {
+        $actor = $this->constructionActor();
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'site_address' => ['nullable', 'string'],
+            'site_latitude' => ['nullable', 'numeric'],
+            'site_longitude' => ['nullable', 'numeric'],
+            'planned_date' => ['nullable', 'date'],
+            'planned_start_time' => ['nullable', 'date_format:H:i'],
+            'planned_end_time' => ['nullable', 'date_format:H:i'],
+            'member_ids' => ['nullable', 'array'],
+            'member_ids.*' => ['exists:members,id'],
+        ]);
+
+        $project = $surveyPlan->project;
+
+        $surveyPlan->update([
+            'title' => $validated['title'],
+            'description' => $validated['description'] ?? null,
+            'site_address' => $validated['site_address'] ?? null,
+            'site_latitude' => $validated['site_latitude'] ?? null,
+            'site_longitude' => $validated['site_longitude'] ?? null,
+            'planned_date' => $validated['planned_date'] ?? null,
+            'planned_start_time' => $validated['planned_start_time'] ?? null,
+            'planned_end_time' => $validated['planned_end_time'] ?? null,
+        ]);
+
+        // Sync the SurveyPlanMember pivot without touching member master data
+        // or global/project role assignments.
+        $currentMemberIds = $surveyPlan->planMembers()->pluck('member_id')->all();
+        $newMemberIds = $validated['member_ids'] ?? [];
+
+        foreach (array_diff($currentMemberIds, $newMemberIds) as $removeId) {
+            $surveyPlan->planMembers()->where('member_id', $removeId)->delete();
+        }
+
+        foreach ($newMemberIds as $memberId) {
+            SurveyPlanMember::updateOrCreate(
+                ['survey_plan_id' => $surveyPlan->id, 'member_id' => $memberId],
+                ['role_in_survey' => 'surveyor', 'status' => 'assigned']
+            );
+        }
+
+        $activityService->log(
+            module: 'survey_plan',
+            action: 'updated',
+            actor: $actor,
+            reference: $surveyPlan,
+            companyId: $project->company_id,
+            projectId: $project->id,
+            meta: ['assigned_members' => $newMemberIds],
+            request: $request
+        );
+
+        return back()->with('success', 'Survey plan updated successfully.');
+    }
+
     public function reviewSubmission(SurveySubmission $submission, Request $request, ConstructionActivityService $activityService): RedirectResponse
     {
         $actor = $this->constructionActor();

@@ -4,6 +4,8 @@ import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
 import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
+import Modal from "@/Components/Modal";
+import { useState } from "react";
 
 export default function SurveyIndex({ surveyPlans, surveySubmissions, projects, members }) {
     const documentRouteBase = "super.construction.documents";
@@ -19,6 +21,50 @@ export default function SurveyIndex({ surveyPlans, surveySubmissions, projects, 
         planned_end_time: "",
         member_ids: "",
     });
+
+    const [editingPlan, setEditingPlan] = useState(null);
+
+    const editForm = useForm({
+        title: "",
+        description: "",
+        site_address: "",
+        site_latitude: "",
+        site_longitude: "",
+        planned_date: "",
+        planned_start_time: "",
+        planned_end_time: "",
+        member_ids: [],
+    });
+
+    const openEditModal = (plan) => {
+        editForm.clearErrors();
+        editForm.setData({
+            title: plan.title || "",
+            description: plan.description || "",
+            site_address: plan.site_address || "",
+            site_latitude: plan.site_latitude ?? "",
+            site_longitude: plan.site_longitude ?? "",
+            planned_date: plan.planned_date || "",
+            planned_start_time: plan.planned_start_time || "",
+            planned_end_time: plan.planned_end_time || "",
+            member_ids: (plan.plan_members || []).map((item) => String(item.member_id)),
+        });
+        setEditingPlan(plan);
+    };
+
+    const closeEditModal = () => {
+        editForm.clearErrors();
+        editForm.reset();
+        setEditingPlan(null);
+    };
+
+    const submitEdit = (e) => {
+        e.preventDefault();
+        editForm.put(route("super.construction.survey.plans.update", editingPlan.id), {
+            preserveScroll: true,
+            onSuccess: () => closeEditModal(),
+        });
+    };
 
     const stats = {
         totalPlans: surveyPlans.length,
@@ -110,6 +156,15 @@ export default function SurveyIndex({ surveyPlans, surveySubmissions, projects, 
                                                 </span>
                                             ))}
                                         </div>
+                                        <div className="mt-4 flex justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => openEditModal(plan)}
+                                                className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                            >
+                                                Edit
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -131,6 +186,61 @@ export default function SurveyIndex({ surveyPlans, surveySubmissions, projects, 
                     </SectionCard>
                 </div>
             </div>
+
+            <Modal show={editingPlan !== null} onClose={closeEditModal} maxWidth="2xl">
+                <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Edit Survey Plan</h3>
+                    <p className="mt-1 text-sm text-slate-500">Update the survey plan master data and team assignment.</p>
+                </div>
+                <form onSubmit={submitEdit} className="space-y-4 p-5">
+                    <InputField form={editForm} name="title" label="Survey Title" />
+                    <TextAreaField form={editForm} name="description" label="Survey Scope" rows={4} />
+                    <TextAreaField form={editForm} name="site_address" label="Site Address" rows={3} />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <InputField form={editForm} name="site_latitude" label="Latitude" />
+                        <InputField form={editForm} name="site_longitude" label="Longitude" />
+                        <InputField form={editForm} name="planned_date" label="Planned Date" type="date" />
+                        <InputField form={editForm} name="planned_start_time" label="Start Time" type="time" />
+                    </div>
+                    <InputField form={editForm} name="planned_end_time" label="End Time" type="time" />
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Survey Team</label>
+                        <select
+                            multiple
+                            value={editForm.data.member_ids}
+                            onChange={(e) => {
+                                const selected = Array.from(e.target.selectedOptions, (option) => option.value);
+                                editForm.setData("member_ids", selected);
+                            }}
+                            className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                        >
+                            {members.map((member) => (
+                                <option key={member.id} value={String(member.id)}>
+                                    {member.name}{member.designation_text ? ` (${member.designation_text})` : ""}{member.email ? ` • ${member.email}` : ""}
+                                </option>
+                            ))}
+                        </select>
+                        {editForm.errors.member_ids ? <p className="mt-1 text-xs text-rose-600">{editForm.errors.member_ids}</p> : null}
+                    </div>
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={closeEditModal}
+                            disabled={editForm.processing}
+                            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={editForm.processing}
+                            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-60"
+                        >
+                            {editForm.processing ? "Updating..." : "Update Survey Plan"}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </ConstructionShell>
     );
 }

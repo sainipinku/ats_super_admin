@@ -103,6 +103,37 @@ class DraftingController extends Controller
         return back()->with('success', 'Drafting job created successfully.');
     }
 
+    public function updateJob(DraftingJob $draftingJob, Request $request, ConstructionActivityService $activityService): RedirectResponse
+    {
+        $actor = $this->constructionActor();
+
+        $validated = $request->validate([
+            'assigned_to_member_id' => ['nullable', 'exists:members,id'],
+            'due_date' => ['nullable', 'date'],
+        ]);
+
+        $project = $draftingJob->project;
+
+        // Only reassign member and due date. Drawing approval workflow, revision
+        // history, and approval status are workflow-controlled and untouched.
+        $draftingJob->update([
+            'assigned_to_member_id' => $validated['assigned_to_member_id'] ?? null,
+            'due_date' => $validated['due_date'] ?? null,
+        ]);
+
+        $activityService->log(
+            module: 'drafting',
+            action: 'job_updated',
+            actor: $actor,
+            reference: $draftingJob,
+            companyId: $project->company_id,
+            projectId: $project->id,
+            request: $request
+        );
+
+        return back()->with('success', 'Drafting job updated successfully.');
+    }
+
     public function storeRevision(
         DraftingJob $draftingJob,
         Request $request,

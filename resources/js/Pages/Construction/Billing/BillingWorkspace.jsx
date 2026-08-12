@@ -5,6 +5,7 @@ import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
 import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
+import Modal from "@/Components/Modal";
 
 export default function BillingWorkspace({ variant = "super", projects = [], invoices = [], payments = [] }) {
     const routeBase = variant === "super" ? "super.construction.billing" : "admin.construction.billing";
@@ -37,6 +38,61 @@ export default function BillingWorkspace({ variant = "super", projects = [], inv
     });
 
     const [invoiceItems, setInvoiceItems] = useState([{ description: "", quantity: "1", unit: "", rate: "", gst_percent: "18" }]);
+
+    const [editingInvoice, setEditingInvoice] = useState(null);
+
+    const editInvoiceForm = useForm({
+        invoice_date: "",
+        due_date: "",
+        tax_type: "intra",
+        notes: "",
+    });
+
+    const [editInvoiceItems, setEditInvoiceItems] = useState([{ description: "", quantity: "1", unit: "", rate: "", gst_percent: "18" }]);
+
+    const openEditInvoiceModal = (invoice) => {
+        editInvoiceForm.clearErrors();
+        editInvoiceForm.setData({
+            invoice_date: invoice.invoice_date || "",
+            due_date: invoice.due_date || "",
+            tax_type: invoice.tax_type || "intra",
+            notes: invoice.notes || "",
+        });
+        setEditInvoiceItems(
+            (invoice.items || []).map((item) => ({
+                description: item.description || "",
+                quantity: String(item.quantity ?? ""),
+                unit: item.unit || "",
+                rate: String(item.rate ?? ""),
+                gst_percent: String(item.gst_percent ?? ""),
+            }))
+        );
+        setEditingInvoice(invoice);
+    };
+
+    const closeEditInvoiceModal = () => {
+        editInvoiceForm.clearErrors();
+        editInvoiceForm.reset();
+        setEditingInvoice(null);
+    };
+
+    const submitEditInvoice = (e) => {
+        e.preventDefault();
+        editInvoiceForm.transform((data) => ({
+            ...data,
+            items: editInvoiceItems.map((item) => ({
+                description: item.description,
+                quantity: item.quantity,
+                unit: item.unit,
+                rate: item.rate,
+                gst_percent: item.gst_percent,
+            })),
+        }));
+        editInvoiceForm.put(route(`${routeBase}.invoices.update`, editingInvoice.id), {
+            preserveScroll: true,
+            onSuccess: () => closeEditInvoiceModal(),
+        });
+    };
 
     const paymentForm = useForm({
         project_id: firstProjectId,
@@ -292,6 +348,7 @@ export default function BillingWorkspace({ variant = "super", projects = [], inv
                                         <th className="py-2 pr-4">Paid</th>
                                         <th className="py-2 pr-4">Balance</th>
                                         <th className="py-2 pr-4">Status</th>
+                                        <th className="py-2 pr-4">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -322,6 +379,17 @@ export default function BillingWorkspace({ variant = "super", projects = [], inv
                                             </td>
                                             <td className="py-3 pr-4">
                                                 <StatusBadge value={invoice.status} />
+                                            </td>
+                                            <td className="py-3 pr-4">
+                                                {invoice.status === "draft" ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openEditInvoiceModal(invoice)}
+                                                        className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                ) : null}
                                             </td>
                                         </tr>
                                     ))}
@@ -377,6 +445,65 @@ export default function BillingWorkspace({ variant = "super", projects = [], inv
                     )}
                 </SectionCard>
             </div>
+
+            <Modal show={editingInvoice !== null} onClose={closeEditInvoiceModal} maxWidth="3xl">
+                <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Edit Draft Invoice</h3>
+                    <p className="mt-1 text-sm text-slate-500">Only draft invoices can be edited. Issued invoices are immutable.</p>
+                </div>
+                <form onSubmit={submitEditInvoice} className="space-y-4 p-5">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <TextInput
+                            label="Invoice Date"
+                            type="date"
+                            value={editInvoiceForm.data.invoice_date}
+                            onChange={(value) => editInvoiceForm.setData("invoice_date", value)}
+                            error={editInvoiceForm.errors.invoice_date}
+                        />
+                        <TextInput
+                            label="Due Date"
+                            type="date"
+                            value={editInvoiceForm.data.due_date}
+                            onChange={(value) => editInvoiceForm.setData("due_date", value)}
+                            error={editInvoiceForm.errors.due_date}
+                        />
+                        <SelectInput
+                            label="Tax Type"
+                            value={editInvoiceForm.data.tax_type}
+                            onChange={(value) => editInvoiceForm.setData("tax_type", value)}
+                            options={[
+                                { value: "intra", label: "Intra-state (CGST+SGST)" },
+                                { value: "inter", label: "Inter-state (IGST)" },
+                            ]}
+                            error={editInvoiceForm.errors.tax_type}
+                        />
+                    </div>
+                    <LineItemsEditor items={editInvoiceItems} onChange={setEditInvoiceItems} errors={editInvoiceForm.errors} />
+                    <TextAreaInput
+                        label="Notes"
+                        value={editInvoiceForm.data.notes}
+                        onChange={(value) => editInvoiceForm.setData("notes", value)}
+                        error={editInvoiceForm.errors.notes}
+                    />
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={closeEditInvoiceModal}
+                            disabled={editInvoiceForm.processing}
+                            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={editInvoiceForm.processing}
+                            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-60"
+                        >
+                            {editInvoiceForm.processing ? "Updating..." : "Update Draft Invoice"}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </ConstructionShell>
     );
 }

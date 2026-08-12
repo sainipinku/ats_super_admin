@@ -62,4 +62,37 @@ class ClientController extends Controller
 
         return back()->with('success', 'Client created successfully.');
     }
+
+    public function update(Request $request, Client $client, ConstructionActivityService $activityService): RedirectResponse
+    {
+        $actor = $this->constructionActor();
+
+        $validated = $request->validate([
+            'company_id' => ['required', 'exists:construction_companies,id'],
+            'client_type' => ['required', 'in:individual,company,government'],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'alternate_phone' => ['nullable', 'string', 'max:30'],
+            'gst_number' => ['nullable', 'string', 'max:50'],
+            'billing_address' => ['nullable', 'string'],
+            'site_address' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
+            'status' => ['required', 'in:active,inactive'],
+        ]);
+
+        $client->update($validated);
+
+        $activityService->log(
+            module: 'client',
+            action: 'updated',
+            actor: $actor,
+            reference: $client,
+            companyId: $client->company_id,
+            meta: ['name' => $client->name],
+            request: $request
+        );
+
+        return back()->with('success', 'Client updated successfully.');
+    }
 }
