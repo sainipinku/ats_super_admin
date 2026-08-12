@@ -12,11 +12,18 @@ use App\Models\Construction\Project;
 use App\Models\Construction\ProjectBudget;
 use App\Models\Construction\ProjectTeamMember;
 use App\Models\Construction\Role;
+use App\Models\Construction\AttendanceRecord;
+use App\Models\Construction\DailyProgressReport;
+use App\Models\Construction\ExecutionTask;
+use App\Models\Construction\SurveyPlan;
+use App\Models\Construction\SurveySubmission;
+use App\Models\Construction\SurveyVisit;
 use App\Models\Member;
 use App\Services\Construction\ConstructionActivityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -74,32 +81,66 @@ class ProjectController extends Controller
             Role::firstOrCreate(['slug' => $rData['slug']], $rData);
         }
 
-        $members = Member::where('status', 1)
-            ->orderBy('name')
-            ->get(['id', 'name', 'email', 'departments', 'designation']);
+       $members = Member::where('status', 1)
+    ->orderBy('name')
+    ->get([
+        'id',
+        'name',
+        'email',
+        'departments',
+        'designation',
+    ]);
 
-        $members->transform(function ($member) {
-            $desigStr = '';
-            if (!empty($member->designation)) {
-                if (is_array($member->designation)) {
-                    $desigValues = array_values($member->designation);
-                    if (isset($desigValues[0]) && is_numeric($desigValues[0])) {
-                        $desigStr = \App\Models\Designation::whereIn('id', $desigValues)->pluck('name')->implode(', ');
-                    } else {
-                        $desigStr = implode(', ', $desigValues);
-                    }
-                } else {
-                    $desigStr = (string)$member->designation;
-                }
+// Collect all numeric designation IDs from all members
+$designationIds = $members
+    ->flatMap(function ($member) {
+        if (!is_array($member->designation)) {
+            return [];
+        }
+
+        return array_values($member->designation);
+    })
+    ->filter(fn ($id) => is_numeric($id))
+    ->map(fn ($id) => (int) $id)
+    ->unique()
+    ->values();
+
+// Fetch all required designations in ONE query
+$designationNames = \App\Models\Designation::whereIn('id', $designationIds)
+    ->pluck('name', 'id');
+
+// Build display text without additional database queries
+$members->transform(function ($member) use ($designationNames) {
+    $desigStr = '';
+
+    if (!empty($member->designation)) {
+        if (is_array($member->designation)) {
+            $desigValues = array_values($member->designation);
+
+            if (isset($desigValues[0]) && is_numeric($desigValues[0])) {
+                $desigStr = collect($desigValues)
+                    ->map(fn ($id) => $designationNames[(int) $id] ?? null)
+                    ->filter()
+                    ->implode(', ');
+            } else {
+                $desigStr = implode(', ', $desigValues);
             }
-            $member->designation_text = $desigStr;
-            return $member;
-        });
+        } else {
+            $desigStr = (string) $member->designation;
+        }
+    }
 
+    $member->designation_text = $desigStr;
+
+    return $member;
+});
         return Inertia::render('SuperAdmin/Construction/Projects/Show', [
             'project' => $project,
             'members' => $members,
-            'roles' => Role::where('status', 'active')->orderBy('name')->get(['id', 'name', 'slug']),
+            'roles' => Role::where('status', 'active')
+                ->where('slug', '!=', 'super_admin')
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug']),
             'activityLog' => ActivityLog::with('actor')
                 ->where('project_id', $project->id)
                 ->latest('created_at')
@@ -195,36 +236,69 @@ class ProjectController extends Controller
 
         return back()->with('success', 'Project budget saved successfully.');
     }
+public function assignTeam(
+    Project $project,
+    Request $request,
+    ConstructionActivityService $activityService
+): RedirectResponse {
+    $actor = $this->constructionActor();
 
-    public function assignTeam(Project $project, Request $request, ConstructionActivityService $activityService): RedirectResponse
-    {
-        $actor = $this->constructionActor();
+    $validated = $request->validate([
+        'member_id' => [
+            'required',
+            'integer',
+            'exists:members,id',
+            Rule::unique('construction_project_team_members')
+                ->where('project_id', $project->id),
+        ],
+        'role_id' => [
+            'nullable',
+            'integer',
+            'exists:construction_roles,id',
+        ],
+        'assigned_from' => [
+            'nullable',
+            'date',
+        ],
+        'assigned_to' => [
+            'nullable',
+            'date',
+            'after_or_equal:assigned_from',
+        ],
+        'assignment_scope' => [
+            'nullable',
+            'string',
+            'max:500',
+        ],
+        'is_primary' => [
+            'boolean',
+        ],
+        'status' => [
+            'nullable',
+            Rule::in(['active', 'inactive']),
+        ],
+    ], [
+        'member_id.required' => 'Please select a team member.',
+        'member_id.exists' => 'The selected member does not exist.',
+        'member_id.unique' => 'This member is already assigned to this project. Each member can only be assigned once per project.',
+        'role_id.exists' => 'The selected role does not exist.',
+        'assigned_to.after_or_equal' => 'The assignment end date must be after or equal to the start date.',
+        'status.in' => 'The status must be either active or inactive.',
+    ]);
 
-        $validated = $request->validate([
-            'member_id' => ['required', 'exists:members,id'],
-            'role_id' => ['nullable', 'exists:construction_roles,id'],
-            'assigned_from' => ['nullable', 'date'],
-            'assigned_to' => ['nullable', 'date'],
-            'assignment_scope' => ['nullable', 'string', 'max:255'],
-            'is_primary' => ['nullable', 'boolean'],
+    try {
+        $teamMember = ProjectTeamMember::create([
+            'project_id' => $project->id,
+            'member_id' => $validated['member_id'],
+            'role_id' => $validated['role_id'] ?? null,
+            'assigned_from' => $validated['assigned_from'] ?? null,
+            'assigned_to' => $validated['assigned_to'] ?? null,
+            'assignment_scope' => $validated['assignment_scope'] ?? null,
+            'is_primary' => (bool) ($validated['is_primary'] ?? false),
+            'status' => $validated['status'] ?? 'active',
+            'assigned_by_type' => $actor ? $actor::class : null,
+            'assigned_by_id' => $actor?->getKey(),
         ]);
-
-        $teamMember = ProjectTeamMember::updateOrCreate(
-            [
-                'project_id' => $project->id,
-                'member_id' => $validated['member_id'],
-            ],
-            [
-                'role_id' => $validated['role_id'] ?? null,
-                'assigned_from' => $validated['assigned_from'] ?? null,
-                'assigned_to' => $validated['assigned_to'] ?? null,
-                'assignment_scope' => $validated['assignment_scope'] ?? null,
-                'is_primary' => (bool) ($validated['is_primary'] ?? false),
-                'status' => 'active',
-                'assigned_by_type' => $actor ? $actor::class : null,
-                'assigned_by_id' => $actor?->getKey(),
-            ]
-        );
 
         if (!empty($validated['role_id'])) {
             MemberRoleAssignment::updateOrCreate([
@@ -235,7 +309,9 @@ class ProjectController extends Controller
         }
 
         if ($project->current_stage === 'budget_approved') {
-            $project->update(['current_stage' => 'team_assigned']);
+            $project->update([
+                'current_stage' => 'team_assigned',
+            ]);
         }
 
         $activityService->log(
@@ -245,11 +321,309 @@ class ProjectController extends Controller
             reference: $teamMember,
             companyId: $project->company_id,
             projectId: $project->id,
-            meta: ['member_id' => $teamMember->member_id],
+            meta: [
+                'member_id' => $teamMember->member_id,
+            ],
             request: $request
         );
 
-        return back()->with('success', 'Project team member assigned successfully.');
+        return back()->with(
+            'success',
+            'Project team member assigned successfully.'
+        );
+
+    } catch (\Illuminate\Database\QueryException $e) {
+
+        // Database-level protection against duplicate assignment
+        if (str_contains($e->getMessage(), 'construction_project_team_unique')) {
+            return back()->with(
+                'error',
+                'This member is already assigned to this project. Please refresh and try again.'
+            );
+        }
+
+        throw $e;
+    }
+}public function updateTeamMember(
+    Project $project,
+    ProjectTeamMember $teamMember,
+    Request $request,
+    ConstructionActivityService $activityService
+): RedirectResponse {
+
+    // Verify that this team-member assignment belongs to this project
+    
+    if ((int) $teamMember->project_id !== (int) $project->id) {
+    abort(404);
+}
+
+    $actor = $this->constructionActor();
+
+    $validated = $request->validate([
+        'member_id' => [
+            'required',
+            'integer',
+            'exists:members,id',
+            Rule::unique('construction_project_team_members')
+                ->where('project_id', $project->id)
+                ->ignore($teamMember->id),
+        ],
+        'role_id' => [
+            'nullable',
+            'integer',
+            'exists:construction_roles,id',
+        ],
+        'assigned_from' => [
+            'nullable',
+            'date',
+        ],
+        'assigned_to' => [
+            'nullable',
+            'date',
+            'after_or_equal:assigned_from',
+        ],
+        'assignment_scope' => [
+            'nullable',
+            'string',
+            'max:500',
+        ],
+        'is_primary' => [
+            'boolean',
+        ],
+        'status' => [
+            'nullable',
+            Rule::in(['active', 'inactive']),
+        ],
+    ], [
+        'member_id.required' => 'Please select a team member.',
+        'member_id.exists' => 'The selected member does not exist.',
+        'member_id.unique' => 'This member is already assigned to this project. Each member can only be assigned once per project.',
+        'role_id.exists' => 'The selected role does not exist.',
+        'assigned_to.after_or_equal' => 'The assignment end date must be after or equal to the start date.',
+        'status.in' => 'The status must be either active or inactive.',
+    ]);
+
+    try {
+        $teamMember->update([
+            'member_id' => $validated['member_id'],
+            'role_id' => $validated['role_id'] ?? null,
+            'assigned_from' => $validated['assigned_from'] ?? null,
+            'assigned_to' => $validated['assigned_to'] ?? null,
+            'assignment_scope' => $validated['assignment_scope'] ?? null,
+            'is_primary' => (bool) ($validated['is_primary'] ?? false),
+            'status' => $validated['status'] ?? $teamMember->status,
+        ]);
+
+        // Sync member role assignment
+        if (!empty($validated['role_id'])) {
+            MemberRoleAssignment::updateOrCreate([
+                'member_id' => $validated['member_id'],
+                'role_id' => $validated['role_id'],
+                'project_id' => $project->id,
+            ]);
+        }
+
+        $activityService->log(
+            module: 'project_team',
+            action: 'updated',
+            actor: $actor,
+            reference: $teamMember,
+            companyId: $project->company_id,
+            projectId: $project->id,
+            meta: [
+                'member_id' => $teamMember->member_id,
+            ],
+            request: $request
+        );
+
+        return back()->with(
+            'success',
+            'Team member assignment updated successfully.'
+        );
+
+    } catch (\Illuminate\Database\QueryException $e) {
+
+        // Database-level protection against duplicate assignment
+        if (str_contains($e->getMessage(), 'construction_project_team_unique')) {
+            return back()->with(
+                'error',
+                'This member is already assigned to this project. Please refresh and try again.'
+            );
+        }
+
+        throw $e;
+    }
+}
+    public function toggleTeamMemberStatus(Project $project, ProjectTeamMember $teamMember, ConstructionActivityService $activityService): RedirectResponse
+    {
+        // Verify assignment belongs to project
+        if ($teamMember->project_id !== $project->id) {
+            abort(404);
+        }
+
+        $actor = $this->constructionActor();
+        $newStatus = $teamMember->status === 'active' ? 'inactive' : 'active';
+
+        $teamMember->update(['status' => $newStatus]);
+
+        $activityService->log(
+            module: 'project_team',
+            action: $newStatus === 'active' ? 'activated' : 'deactivated',
+            actor: $actor,
+            reference: $teamMember,
+            companyId: $project->company_id,
+            projectId: $project->id,
+            meta: ['member_id' => $teamMember->member_id, 'status' => $newStatus],
+            request: request()
+        );
+
+        return back()->with('success', "Team member {$newStatus} successfully.");
+    }
+
+    public function destroyTeamMember(Project $project, ProjectTeamMember $teamMember, ConstructionActivityService $activityService): RedirectResponse
+    {
+        // Verify assignment belongs to project
+        if ($teamMember->project_id !== $project->id) {
+            abort(404);
+        }
+
+        $actor = $this->constructionActor();
+        $memberName = $teamMember->member?->name ?? 'Unknown';
+        $memberId = $teamMember->member_id;
+
+        $teamMember->delete();
+
+        $activityService->log(
+            module: 'project_team',
+            action: 'removed',
+            actor: $actor,
+            reference: null,
+            companyId: $project->company_id,
+            projectId: $project->id,
+            meta: ['member_id' => $memberId, 'member_name' => $memberName],
+            request: request()
+        );
+
+        return back()->with('success', "Team member '{$memberName}' removed from project successfully.");
+    }
+
+    public function showTeamMember(Project $project, ProjectTeamMember $teamMember): Response
+    {
+        // Verify assignment belongs to project
+        if ($teamMember->project_id !== $project->id) {
+            abort(404);
+        }
+
+        $teamMember->load([
+            'member',
+            'role',
+        ]);
+
+        $memberId = $teamMember->member_id;
+
+        // Load actual project work/submissions by this team member for this project
+        
+        // 1. Survey submissions submitted by this member
+        $surveySubmissions = SurveySubmission::with([
+            'surveyVisit.checkedInBy',
+            'submittedBy',
+            'reviewedBy',
+        ])
+            ->where('project_id', $project->id)
+            ->where('submitted_by_member_id', $memberId)
+            ->latest('submitted_at')
+            ->get();
+
+        // 2. Survey visits where this member checked in
+        $surveyVisits = SurveyVisit::with([
+            'checkedInBy',
+            'entries.capturedBy',
+            'measurements.capturedBy',
+            'submission',
+        ])
+            ->where('project_id', $project->id)
+            ->where('checked_in_by_member_id', $memberId)
+            ->latest('check_in_at')
+            ->get();
+
+        // 3. Survey plans where this member is assigned
+        $surveyPlans = SurveyPlan::with([
+            'planMembers.member',
+        ])
+            ->where('project_id', $project->id)
+            ->whereHas('planMembers', function ($query) use ($memberId) {
+                $query->where('member_id', $memberId);
+            })
+            ->latest('planned_date')
+            ->get();
+
+        // 4. Execution tasks supervised by this member
+        $supervisedTasks = ExecutionTask::with([
+            'assignees.member',
+            'progressReports',
+            'attendanceRecords',
+        ])
+            ->where('project_id', $project->id)
+            ->where('supervisor_member_id', $memberId)
+            ->latest('created_at')
+            ->get();
+
+        // 5. Execution tasks where this member is assigned as assignee
+        $assignedTasks = ExecutionTask::with([
+            'supervisor',
+            'assignees.member',
+            'progressReports',
+        ])
+            ->where('project_id', $project->id)
+            ->whereHas('assignees', function ($query) use ($memberId) {
+                $query->where('member_id', $memberId);
+            })
+            ->latest('created_at')
+            ->get();
+
+        // 6. Daily progress reports submitted by this member
+        $progressReports = DailyProgressReport::with([
+            'submittedBy',
+            'reviewedBy',
+        ])
+            ->where('project_id', $project->id)
+            ->where('submitted_by_member_id', $memberId)
+            ->latest('report_date')
+            ->get();
+
+        // 7. Attendance records for this member
+        $attendanceRecords = AttendanceRecord::with([
+            'checkedInBy',
+            'checkedOutBy',
+        ])
+            ->where('project_id', $project->id)
+            ->where('member_id', $memberId)
+            ->latest('attendance_date')
+            ->get();
+
+        // 8. Activity logs for this member in this project
+        $activityLog = ActivityLog::with('actor')
+            ->where('project_id', $project->id)
+            ->where(function ($query) use ($memberId, $teamMember) {
+                $query->where('meta->member_id', $memberId)
+                      ->orWhere('reference_id', $teamMember->id);
+            })
+            ->latest('created_at')
+            ->take(20)
+            ->get();
+
+        return Inertia::render('SuperAdmin/Construction/Projects/TeamMemberShow', [
+            'project' => $project,
+            'teamMember' => $teamMember,
+            'surveySubmissions' => $surveySubmissions,
+            'surveyVisits' => $surveyVisits,
+            'surveyPlans' => $surveyPlans,
+            'supervisedTasks' => $supervisedTasks,
+            'assignedTasks' => $assignedTasks,
+            'progressReports' => $progressReports,
+            'attendanceRecords' => $attendanceRecords,
+            'activityLog' => $activityLog,
+        ]);
     }
 
     public function destroy(Project $project, Request $request, ConstructionActivityService $activityService): RedirectResponse
