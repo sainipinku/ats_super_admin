@@ -58,6 +58,28 @@ class BillingController extends Controller
         return back()->with('success', 'Invoice saved successfully.');
     }
 
+    public function updateInvoice(ClientInvoice $invoice, Request $request, ConstructionBillingService $billingService): RedirectResponse
+    {
+        $actor = $this->constructionActor();
+
+        $validated = $request->validate([
+            'invoice_date' => ['required', 'date'],
+            'due_date' => ['nullable', 'date'],
+            'tax_type' => ['required', 'in:intra,inter'],
+            'notes' => ['nullable', 'string'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.description' => ['required', 'string', 'max:255'],
+            'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
+            'items.*.unit' => ['nullable', 'string', 'max:30'],
+            'items.*.rate' => ['required', 'numeric', 'min:0'],
+            'items.*.gst_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+        ]);
+
+        $billingService->updateDraftInvoice($invoice, $validated, $actor, $request);
+
+        return back()->with('success', 'Draft invoice updated successfully.');
+    }
+
     public function storePayment(Request $request, ConstructionBillingService $billingService): RedirectResponse
     {
         $actor = $this->constructionActor();

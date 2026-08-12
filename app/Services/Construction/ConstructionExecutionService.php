@@ -62,6 +62,34 @@ class ConstructionExecutionService
         });
     }
 
+    public function updatePlan(ExecutionPlan $plan, array $validated, ?Model $actor, ?Request $request = null): ExecutionPlan
+    {
+        return DB::transaction(function () use ($plan, $validated, $actor, $request) {
+            $project = $plan->project;
+
+            // Only update master-data fields. Workflow status, progress, and
+            // lifecycle state are intentionally excluded and remain untouched.
+            $plan->update([
+                'title' => $validated['title'],
+                'description' => $validated['description'] ?? null,
+                'planned_start_date' => $validated['planned_start_date'] ?? null,
+                'planned_end_date' => $validated['planned_end_date'] ?? null,
+            ]);
+
+            $this->activityService->log(
+                module: 'execution_plan',
+                action: 'updated',
+                actor: $actor,
+                reference: $plan,
+                companyId: $project->company_id,
+                projectId: $project->id,
+                request: $request
+            );
+
+            return $plan;
+        });
+    }
+
     public function createTask(Project $project, array $validated, ?Model $actor, ?Request $request = null): ExecutionTask
     {
         return DB::transaction(function () use ($project, $validated, $actor, $request) {
@@ -118,6 +146,68 @@ class ConstructionExecutionService
                 companyId: $project->company_id,
                 projectId: $project->id,
                 meta: ['assignee_count' => count($validated['assignee_member_ids'] ?? [])],
+                request: $request
+            );
+
+            return $task;
+        });
+    }
+
+    public function updateTask(ExecutionTask $task, array $validated, ?Model $actor, ?Request $request = null): ExecutionTask
+    {
+        return DB::transaction(function () use ($task, $validated, $actor, $request) {
+            $project = $task->project;
+
+            if (!empty($validated['supervisor_member_id'])) {
+                $this->ensureMemberBelongsToProject($project, (int) $validated['supervisor_member_id'], 'supervisor_member_id');
+            }
+
+            // Only update master-data fields. Workflow-controlled fields such as
+            // progress_percent, completed_quantity, status, and actual dates are
+            // intentionally excluded and remain untouched.
+            $task->update([
+                'title' => $validated['title'],
+                'description' => $validated['description'] ?? null,
+                'planned_start_date' => $validated['planned_start_date'] ?? null,
+                'planned_end_date' => $validated['planned_end_date'] ?? null,
+                'priority' => $validated['priority'],
+                'planned_quantity' => $validated['planned_quantity'] ?? null,
+                'unit' => $validated['unit'] ?? null,
+                'supervisor_member_id' => $validated['supervisor_member_id'] ?? null,
+            ]);
+
+            // Sync assignee pivot without touching member master data or roles.
+            $currentAssigneeIds = $task->assignees()->pluck('member_id')->all();
+            $newAssigneeIds = $validated['assignee_member_ids'] ?? [];
+
+            foreach (array_diff($currentAssigneeIds, $newAssigneeIds) as $removeId) {
+                $task->assignees()->where('member_id', $removeId)->delete();
+            }
+
+            foreach ($newAssigneeIds as $memberId) {
+                $this->ensureMemberBelongsToProject($project, (int) $memberId, 'assignee_member_ids');
+                $this->assignTask(
+                    $task,
+                    [
+                        'member_id' => $memberId,
+                        'assignment_role' => $validated['primary_assignment_role'] ?? 'worker',
+                        'assigned_from' => $validated['planned_start_date'] ?? null,
+                        'assigned_to' => $validated['planned_end_date'] ?? null,
+                        'is_primary' => count($newAssigneeIds) === 1,
+                    ],
+                    $actor,
+                    $request
+                );
+            }
+
+            $this->activityService->log(
+                module: 'execution_task',
+                action: 'updated',
+                actor: $actor,
+                reference: $task,
+                companyId: $project->company_id,
+                projectId: $project->id,
+                meta: ['assignee_count' => count($newAssigneeIds)],
                 request: $request
             );
 

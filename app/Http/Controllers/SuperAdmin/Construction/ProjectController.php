@@ -195,6 +195,55 @@ $members->transform(function ($member) use ($designationNames) {
             ->with('success', 'Project created successfully.');
     }
 
+    public function update(Project $project, Request $request, ConstructionActivityService $activityService): RedirectResponse
+    {
+        $actor = $this->constructionActor();
+
+        $validated = $request->validate([
+            'company_id' => ['required', 'exists:construction_companies,id'],
+            'client_id' => ['required', 'exists:construction_clients,id'],
+            'name' => ['required', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'description' => ['nullable', 'string'],
+            'project_address' => ['nullable', 'string'],
+            'latitude' => ['nullable', 'numeric'],
+            'longitude' => ['nullable', 'numeric'],
+            'start_date' => ['nullable', 'date'],
+            'expected_end_date' => ['nullable', 'date'],
+            'priority' => ['required', 'in:low,medium,high,critical'],
+        ]);
+
+        // Only update editable master-data fields.
+        // project_code, slug, status, current_stage and all workflow/lifecycle
+        // fields are intentionally excluded and remain untouched.
+        $project->update([
+            'company_id' => $validated['company_id'],
+            'client_id' => $validated['client_id'],
+            'name' => $validated['name'],
+            'category' => $validated['category'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'project_address' => $validated['project_address'] ?? null,
+            'latitude' => $validated['latitude'] ?? null,
+            'longitude' => $validated['longitude'] ?? null,
+            'start_date' => $validated['start_date'] ?? null,
+            'expected_end_date' => $validated['expected_end_date'] ?? null,
+            'priority' => $validated['priority'],
+        ]);
+
+        $activityService->log(
+            module: 'project',
+            action: 'updated',
+            actor: $actor,
+            reference: $project,
+            companyId: $project->company_id,
+            projectId: $project->id,
+            meta: ['project_code' => $project->project_code],
+            request: $request
+        );
+
+        return back()->with('success', 'Project updated successfully.');
+    }
+
     public function storeBudget(Project $project, Request $request, ConstructionActivityService $activityService): RedirectResponse
     {
         $actor = $this->constructionActor();

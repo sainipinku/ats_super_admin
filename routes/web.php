@@ -275,6 +275,9 @@ Route::prefix('super/construction')
         Route::post('/companies', [App\Http\Controllers\SuperAdmin\Construction\CompanyController::class, 'store'])
             ->middleware('construction.permission:company.manage')
             ->name('companies.store');
+        Route::put('/companies/{company}', [App\Http\Controllers\SuperAdmin\Construction\CompanyController::class, 'update'])
+            ->middleware('construction.permission:company.manage')
+            ->name('companies.update');
 
         Route::get('/clients', [App\Http\Controllers\SuperAdmin\Construction\ClientController::class, 'index'])
             ->middleware('construction.permission:client.manage')
@@ -282,6 +285,9 @@ Route::prefix('super/construction')
         Route::post('/clients', [App\Http\Controllers\SuperAdmin\Construction\ClientController::class, 'store'])
             ->middleware('construction.permission:client.manage')
             ->name('clients.store');
+        Route::put('/clients/{client}', [App\Http\Controllers\SuperAdmin\Construction\ClientController::class, 'update'])
+            ->middleware('construction.permission:client.manage')
+            ->name('clients.update');
 
         Route::get('/projects', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'index'])
             ->middleware('construction.permission:project.manage')
@@ -289,6 +295,9 @@ Route::prefix('super/construction')
         Route::post('/projects', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'store'])
             ->middleware('construction.permission:project.manage')
             ->name('projects.store');
+        Route::put('/projects/{project}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'update'])
+            ->middleware('construction.permission:project.manage')
+            ->name('projects.update');
         Route::get('/projects/{project}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'show'])
             ->middleware('construction.permission:project.manage')
             ->name('projects.show');
@@ -321,6 +330,9 @@ Route::prefix('super/construction')
         Route::post('/survey/plans', [App\Http\Controllers\SuperAdmin\Construction\SurveyController::class, 'storePlan'])
             ->middleware('construction.permission:survey_plan.manage')
             ->name('survey.plans.store');
+        Route::put('/survey/plans/{surveyPlan}', [App\Http\Controllers\SuperAdmin\Construction\SurveyController::class, 'updatePlan'])
+            ->middleware('construction.permission:survey_plan.manage')
+            ->name('survey.plans.update');
         Route::post('/survey/submissions/{submission}/review', [App\Http\Controllers\SuperAdmin\Construction\SurveyController::class, 'reviewSubmission'])
             ->middleware('construction.permission:survey_submission.review')
             ->name('survey.submissions.review');
@@ -331,6 +343,9 @@ Route::prefix('super/construction')
         Route::post('/drafting/jobs', [App\Http\Controllers\SuperAdmin\Construction\DraftingController::class, 'createJob'])
             ->middleware('construction.permission:drafting.manage')
             ->name('drafting.jobs.store');
+        Route::put('/drafting/jobs/{draftingJob}', [App\Http\Controllers\SuperAdmin\Construction\DraftingController::class, 'updateJob'])
+            ->middleware('construction.permission:drafting.manage')
+            ->name('drafting.jobs.update');
         Route::post('/drafting/jobs/{draftingJob}/revisions', [App\Http\Controllers\SuperAdmin\Construction\DraftingController::class, 'storeRevision'])
             ->middleware('construction.permission:drafting.manage')
             ->name('drafting.revisions.store');
@@ -344,9 +359,15 @@ Route::prefix('super/construction')
         Route::post('/execution/plans', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'storePlan'])
             ->middleware('construction.permission:execution.manage')
             ->name('execution.plans.store');
+        Route::put('/execution/plans/{executionPlan}', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'updatePlan'])
+            ->middleware('construction.permission:execution.manage')
+            ->name('execution.plans.update');
         Route::post('/execution/tasks', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'storeTask'])
             ->middleware('construction.permission:execution_task.manage')
             ->name('execution.tasks.store');
+        Route::put('/execution/tasks/{task}', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'updateTask'])
+            ->middleware('construction.permission:execution_task.manage')
+            ->name('execution.tasks.update');
         Route::post('/execution/tasks/{task}/assign', [App\Http\Controllers\SuperAdmin\Construction\ExecutionController::class, 'assignTask'])
             ->middleware('construction.permission:execution_task.manage')
             ->name('execution.tasks.assign');
@@ -423,6 +444,9 @@ Route::prefix('super/construction')
         Route::post('/billing/invoices', [App\Http\Controllers\SuperAdmin\Construction\BillingController::class, 'storeInvoice'])
             ->middleware('construction.permission:billing_invoice.manage')
             ->name('billing.invoices.store');
+        Route::put('/billing/invoices/{invoice}', [App\Http\Controllers\SuperAdmin\Construction\BillingController::class, 'updateInvoice'])
+            ->middleware('construction.permission:billing_invoice.manage')
+            ->name('billing.invoices.update');
         Route::post('/billing/payments', [App\Http\Controllers\SuperAdmin\Construction\BillingController::class, 'storePayment'])
             ->middleware('construction.permission:billing_payment.manage')
             ->name('billing.payments.store');

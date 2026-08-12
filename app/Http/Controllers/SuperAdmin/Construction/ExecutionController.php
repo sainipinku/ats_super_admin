@@ -72,6 +72,22 @@ class ExecutionController extends Controller
         return back()->with('success', 'Execution plan created successfully.');
     }
 
+    public function updatePlan(ExecutionPlan $executionPlan, Request $request, ConstructionExecutionService $executionService): RedirectResponse
+    {
+        $actor = $this->constructionActor();
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'planned_start_date' => ['nullable', 'date'],
+            'planned_end_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
+        ]);
+
+        $executionService->updatePlan($executionPlan, $validated, $actor, $request);
+
+        return back()->with('success', 'Execution plan updated successfully.');
+    }
+
     public function storeTask(Request $request, ConstructionExecutionService $executionService): RedirectResponse
     {
         $actor = $this->constructionActor();
@@ -103,6 +119,29 @@ class ExecutionController extends Controller
         $executionService->createTask($project, $validated, $actor, $request);
 
         return back()->with('success', 'Execution task created successfully.');
+    }
+
+    public function updateTask(ExecutionTask $task, Request $request, ConstructionExecutionService $executionService): RedirectResponse
+    {
+        $actor = $this->constructionActor();
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'planned_start_date' => ['nullable', 'date'],
+            'planned_end_date' => ['nullable', 'date', 'after_or_equal:planned_start_date'],
+            'priority' => ['required', 'in:low,medium,high,critical'],
+            'planned_quantity' => ['nullable', 'numeric', 'min:0'],
+            'unit' => ['nullable', 'string', 'max:50'],
+            'supervisor_member_id' => ['nullable', 'exists:members,id'],
+            'assignee_member_ids' => ['nullable', 'array'],
+            'assignee_member_ids.*' => ['exists:members,id'],
+            'primary_assignment_role' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $executionService->updateTask($task, $validated, $actor, $request);
+
+        return back()->with('success', 'Execution task updated successfully.');
     }
 
     public function assignTask(ExecutionTask $task, Request $request, ConstructionExecutionService $executionService): RedirectResponse

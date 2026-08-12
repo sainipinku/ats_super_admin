@@ -4,6 +4,7 @@ import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
 import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
+import Modal from "@/Components/Modal";
 import { useMemo, useState } from "react";
 import {
     FaProjectDiagram,
@@ -48,12 +49,65 @@ export default function ProjectsIndex({ projects, companies, clients }) {
         priority: "medium",
     });
 
+    const [editingProject, setEditingProject] = useState(null);
+
+    const editForm = useForm({
+        company_id: "",
+        client_id: "",
+        name: "",
+        category: "",
+        description: "",
+        project_address: "",
+        latitude: "",
+        longitude: "",
+        start_date: "",
+        expected_end_date: "",
+        priority: "medium",
+    });
+
     const [stageFilter, setStageFilter] = useState("all");
     const [search, setSearch] = useState("");
+
+    const openEditModal = (project) => {
+        editForm.clearErrors();
+        editForm.setData({
+            company_id: project.company_id || "",
+            client_id: project.client_id || "",
+            name: project.name || "",
+            category: project.category || "",
+            description: project.description || "",
+            project_address: project.project_address || "",
+            latitude: project.latitude ?? "",
+            longitude: project.longitude ?? "",
+            start_date: project.start_date || "",
+            expected_end_date: project.expected_end_date || "",
+            priority: project.priority || "medium",
+        });
+        setEditingProject(project);
+    };
+
+    const closeEditModal = () => {
+        editForm.clearErrors();
+        editForm.reset();
+        setEditingProject(null);
+    };
+
+    const submitEdit = (e) => {
+        e.preventDefault();
+        editForm.put(route("super.construction.projects.update", editingProject.id), {
+            preserveScroll: true,
+            onSuccess: () => closeEditModal(),
+        });
+    };
 
     const filteredClients = useMemo(
         () => clients.filter((client) => String(client.company_id) === String(form.data.company_id)),
         [clients, form.data.company_id]
+    );
+
+    const editFilteredClients = useMemo(
+        () => clients.filter((client) => String(client.company_id) === String(editForm.data.company_id)),
+        [clients, editForm.data.company_id]
     );
 
     const projectList = useMemo(() => projects || [], [projects]);
@@ -284,7 +338,7 @@ export default function ProjectsIndex({ projects, companies, clients }) {
                                             <td className="px-3 py-3">
                                                 <div className="flex items-center justify-end gap-1">
                                                     <RowAction href={route("super.construction.projects.show", project.id)} icon={FaEye} color="indigo" label="View details" />
-                                                    <RowAction href={route("super.construction.projects.show", project.id)} icon={FaEdit} color="sky" label="Edit" />
+                                                    <RowAction icon={FaEdit} color="sky" label="Edit" onClick={() => openEditModal(project)} />
                                                     <RowAction
                                                         color="rose"
                                                         icon={FaTrashAlt}
@@ -317,6 +371,62 @@ export default function ProjectsIndex({ projects, companies, clients }) {
                     )}
                 </SectionCard>
             </div>
+
+            <Modal show={editingProject !== null} onClose={closeEditModal} maxWidth="3xl">
+                <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Edit Project</h3>
+                    <p className="mt-1 text-sm text-slate-500">Update the project master data. Lifecycle stage and status are managed through the workflow.</p>
+                </div>
+                <form onSubmit={submitEdit} className="space-y-4 p-5">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <SelectField form={editForm} name="company_id" label="Company" options={companies.map((company) => ({ value: company.id, label: company.name }))} />
+                        <SelectField
+                            form={editForm}
+                            name="client_id"
+                            label="Client"
+                            options={editFilteredClients.length > 0 ? editFilteredClients.map((client) => ({ value: client.id, label: client.name })) : [{ value: "", label: "— No clients for this company —" }]}
+                        />
+                    </div>
+                    <InputField form={editForm} name="name" label="Project Name" />
+                    <InputField form={editForm} name="category" label="Category (Residential / Commercial / Road / Bridge)" />
+                    <TextAreaField form={editForm} name="description" label="Description" rows={3} />
+                    <TextAreaField form={editForm} name="project_address" label="Project Address" rows={2} />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <InputField form={editForm} name="latitude" label="Latitude" type="number" step="any" />
+                        <InputField form={editForm} name="longitude" label="Longitude" type="number" step="any" />
+                        <InputField form={editForm} name="start_date" label="Start Date" type="date" />
+                        <InputField form={editForm} name="expected_end_date" label="Expected End Date" type="date" />
+                    </div>
+                    <SelectField
+                        form={editForm}
+                        name="priority"
+                        label="Priority"
+                        options={[
+                            { value: "low", label: "Low" },
+                            { value: "medium", label: "Medium" },
+                            { value: "high", label: "High" },
+                            { value: "critical", label: "Critical" },
+                        ]}
+                    />
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={closeEditModal}
+                            disabled={editForm.processing}
+                            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={editForm.processing}
+                            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-60"
+                        >
+                            {editForm.processing ? "Updating..." : "Update Project"}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </ConstructionShell>
     );
 }
