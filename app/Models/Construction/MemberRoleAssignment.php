@@ -14,6 +14,11 @@ class MemberRoleAssignment extends Model
         'member_id',
         'role_id',
         'project_id',
+        'status',
+    ];
+
+    protected $casts = [
+        'status' => 'string',
     ];
 
     public function member(): BelongsTo
