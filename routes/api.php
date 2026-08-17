@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\AdminDashboardApiController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientApiController;
 use App\Http\Controllers\Api\CompanyApiController;
+use App\Http\Controllers\Api\MemberDashboardController;
 use App\Http\Controllers\Api\Mobile\ConstructionController;
 use App\Http\Controllers\Api\Member\JobController;
 use App\Http\Controllers\Api\Member\ProfileController;
@@ -18,6 +20,8 @@ Route::get('/', function () {
         'endpoints' => [
             'auth' => '/api/auth/*',
             'profile' => '/api/profile',
+            'member_dashboard' => '/api/member/dashboard',
+            'admin_dashboard' => '/api/admin/dashboard',
             'projects' => '/api/construction/projects/*',
             'companies' => '/api/construction/companies/*',
             'clients' => '/api/construction/clients/*',
@@ -62,6 +66,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/tasks/{task}/notes', [TaskController::class, 'notesIndex']);
     Route::post('/tasks/{task}/notes', [TaskController::class, 'notesStore']);
     Route::delete('/notes/{note}', [TaskController::class, 'notesDestroy']);
+
+    Route::prefix('member')->name('member.')->group(function () {
+        Route::get('/dashboard', [MemberDashboardController::class, 'index']);
+        Route::get('/dashboard/projects', [MemberDashboardController::class, 'myProjects']);
+        Route::get('/dashboard/surveys', [MemberDashboardController::class, 'mySurveys']);
+        Route::get('/dashboard/tasks', [MemberDashboardController::class, 'myTasks']);
+        Route::get('/dashboard/attendance', [MemberDashboardController::class, 'myAttendance']);
+        Route::get('/dashboard/projects/{project}', [MemberDashboardController::class, 'projectDetail']);
+    });
+
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('/dashboard', [AdminDashboardApiController::class, 'index']);
+    });
 });
 
 Route::prefix('construction')->middleware('auth:sanctum')->group(function () {
