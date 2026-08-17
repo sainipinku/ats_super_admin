@@ -462,9 +462,19 @@ class ConstructionController extends Controller
 
     private function serializeContext(array $context): array
     {
+        /** @var ConstructionAuthorizationService $authorization */
+        $authorization = app(ConstructionAuthorizationService::class);
+
+        $activeProject = $context['active_project'];
+
+        $availableRoles = $activeProject !== null
+            ? $authorization->getRoles($context['member'], $activeProject->getKey())
+            : $authorization->getGlobalRoles($context['member']);
+
         return [
             'member' => $context['member'],
             'roles' => $context['roles'],
+            'available_roles' => $availableRoles,
             'projects' => $context['projects']->load(['company', 'client']),
             'permissions' => $context['permissions'],
             'active_role' => $context['active_role'],

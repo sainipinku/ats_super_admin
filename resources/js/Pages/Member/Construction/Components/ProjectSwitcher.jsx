@@ -1,23 +1,20 @@
 import { router } from "@inertiajs/react";
 
-export default function ProjectSwitcher({ projects, activeProject, activeRole }) {
+export default function ProjectSwitcher({ projects, activeProject }) {
     if (!projects?.length) return null;
 
     const handleChange = (e) => {
         const projectId = e.target.value;
         const params = new URLSearchParams(window.location.search);
 
+        // Always clear role when switching projects.
+        // The backend will resolve the valid role for the new project.
+        params.delete("role");
+
         if (projectId) {
             params.set("project", projectId);
         } else {
             params.delete("project");
-        }
-
-        // Clear role context when switching projects; it may not be valid.
-        params.delete("role");
-
-        if (activeRole) {
-            params.set("role", activeRole.slug);
         }
 
         const query = params.toString();

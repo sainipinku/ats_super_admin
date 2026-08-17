@@ -58,7 +58,15 @@ export default function ConstructionShell({
 }) {
     const config = variantConfig[variant];
     const Layout = config.layout;
-    const permissions = usePage().props.auth?.permissions ?? [];
+    const page = usePage();
+
+    // Member navigation is driven by the active-role context permissions.
+    // SuperAdmin/Admin navigation keeps the existing auth permission source.
+    const permissions =
+        variant === "member"
+            ? page.props.permissions ?? page.props.auth?.permissions ?? []
+            : page.props.auth?.permissions ?? page.props.permissions ?? [];
+
     const navItems = config.items.filter((item) =>
         !item.permissions || item.permissions.some((permission) => permissions.includes(permission))
     );

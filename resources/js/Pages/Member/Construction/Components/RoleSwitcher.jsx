@@ -1,7 +1,7 @@
 import { router } from "@inertiajs/react";
 
-export default function RoleSwitcher({ roles, activeRole, activeProject }) {
-    if (!roles?.length) return null;
+export default function RoleSwitcher({ available_roles, activeRole, activeProject }) {
+    if (!available_roles?.length) return null;
 
     const handleChange = (e) => {
         const role = e.target.value;
@@ -36,7 +36,7 @@ export default function RoleSwitcher({ roles, activeRole, activeProject }) {
                 className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             >
                 <option value="">Select role</option>
-                {roles.map((role) => (
+                {available_roles.map((role) => (
                     <option key={role.id} value={role.slug}>
                         {role.name}
                     </option>
