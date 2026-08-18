@@ -101,12 +101,11 @@ class MobileConstructionWorkAssignmentTest extends TestCase
         Member $member,
         Role $role,
         Project $project,
-        array $permissionSlugs = [],
-        string $surface = 'mobile'
+        array $permissionSlugs = []
     ): void {
         foreach ($permissionSlugs as $slug) {
             $role->permissions()->syncWithoutDetaching(
-                [Permission::firstOrCreate(['slug' => $slug], ['name' => $slug, 'module' => 'test'])->id => ['surface' => $surface]]
+                [Permission::firstOrCreate(['slug' => $slug], ['name' => $slug, 'module' => 'test'])->id]
             );
         }
 

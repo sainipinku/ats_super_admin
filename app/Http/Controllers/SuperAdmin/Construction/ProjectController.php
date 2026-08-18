@@ -334,47 +334,32 @@ public function assignTeam(
         'status.in' => 'The status must be either active or inactive.',
     ]);
 
-    try {
-        $teamMember = $teamAssignmentService->assign($project, $validated, $actor);
+    $teamMember = $teamAssignmentService->assign($project, $validated, $actor);
 
-        if ($project->current_stage === 'budget_approved') {
-            $project->update([
-                'current_stage' => 'team_assigned',
-            ]);
-        }
-
-        $activityService->log(
-            module: 'project_team',
-            action: 'assigned',
-            actor: $actor,
-            reference: $teamMember,
-            companyId: $project->company_id,
-            projectId: $project->id,
-            meta: [
-                'member_id' => $teamMember->member_id,
-                'role_id' => $teamMember->role_id,
-            ],
-            request: $request
-        );
-
-        return back()->with(
-            'success',
-            'Project team member assigned successfully.'
-        );
-
-    } catch (\Illuminate\Validation\ValidationException $e) {
-        return back()->withErrors($e->errors())->with('error', $e->getMessage());
-    } catch (\Illuminate\Database\QueryException $e) {
-        // Database-level protection against duplicate assignment
-        if (str_contains($e->getMessage(), 'construction_project_team_role_unique')) {
-            return back()->with(
-                'error',
-                'This member is already assigned this role on this project. Please refresh and try again.'
-            );
-        }
-
-        throw $e;
+    if ($project->current_stage === 'budget_approved') {
+        $project->update([
+            'current_stage' => 'team_assigned',
+        ]);
     }
+
+    $activityService->log(
+        module: 'project_team',
+        action: 'assigned',
+        actor: $actor,
+        reference: $teamMember,
+        companyId: $project->company_id,
+        projectId: $project->id,
+        meta: [
+            'member_id' => $teamMember->member_id,
+            'role_id' => $teamMember->role_id,
+        ],
+        request: $request
+    );
+
+    return back()->with(
+        'success',
+        'Project team member assigned successfully.'
+    );
 }
 
 public function updateTeamMember(
@@ -385,9 +370,11 @@ public function updateTeamMember(
     ConstructionTeamAssignmentService $teamAssignmentService
 ): RedirectResponse {
 
-    // Verify that this team-member assignment belongs to this project
     if ((int) $teamMember->project_id !== (int) $project->id) {
-        abort(404);
+        return back()->with(
+            'error',
+            'The selected team member assignment does not belong to this project.'
+        );
     }
 
     $actor = $this->constructionActor();
@@ -432,41 +419,26 @@ public function updateTeamMember(
         'status.in' => 'The status must be either active or inactive.',
     ]);
 
-    try {
-        $teamMember = $teamAssignmentService->update($project, $teamMember, $validated, $actor);
+    $teamMember = $teamAssignmentService->update($project, $teamMember, $validated, $actor);
 
-        $activityService->log(
-            module: 'project_team',
-            action: 'updated',
-            actor: $actor,
-            reference: $teamMember,
-            companyId: $project->company_id,
-            projectId: $project->id,
-            meta: [
-                'member_id' => $teamMember->member_id,
-                'role_id' => $teamMember->role_id,
-            ],
-            request: $request
-        );
+    $activityService->log(
+        module: 'project_team',
+        action: 'updated',
+        actor: $actor,
+        reference: $teamMember,
+        companyId: $project->company_id,
+        projectId: $project->id,
+        meta: [
+            'member_id' => $teamMember->member_id,
+            'role_id' => $teamMember->role_id,
+        ],
+        request: $request
+    );
 
-        return back()->with(
-            'success',
-            'Team member assignment updated successfully.'
-        );
-
-    } catch (\Illuminate\Validation\ValidationException $e) {
-        return back()->withErrors($e->errors())->with('error', $e->getMessage());
-    } catch (\Illuminate\Database\QueryException $e) {
-        // Database-level protection against duplicate assignment
-        if (str_contains($e->getMessage(), 'construction_project_team_role_unique')) {
-            return back()->with(
-                'error',
-                'This member is already assigned this role on this project. Please refresh and try again.'
-            );
-        }
-
-        throw $e;
-    }
+    return back()->with(
+        'success',
+        'Team member assignment updated successfully.'
+    );
 }
 
 public function toggleTeamMemberStatus(
@@ -475,9 +447,11 @@ public function toggleTeamMemberStatus(
     ConstructionActivityService $activityService,
     ConstructionTeamAssignmentService $teamAssignmentService
 ): RedirectResponse {
-    // Verify assignment belongs to project
     if ((int) $teamMember->project_id !== (int) $project->id) {
-        abort(404);
+        return back()->with(
+            'error',
+            'The selected team member assignment does not belong to this project.'
+        );
     }
 
     $actor = $this->constructionActor();
@@ -505,9 +479,11 @@ public function destroyTeamMember(
     ConstructionActivityService $activityService,
     ConstructionTeamAssignmentService $teamAssignmentService
 ): RedirectResponse {
-    // Verify assignment belongs to project
     if ((int) $teamMember->project_id !== (int) $project->id) {
-        abort(404);
+        return back()->with(
+            'error',
+            'The selected team member assignment does not belong to this project.'
+        );
     }
 
     $actor = $this->constructionActor();
@@ -533,11 +509,6 @@ public function destroyTeamMember(
 
     public function showTeamMember(Project $project, ProjectTeamMember $teamMember): Response
     {
-        // Verify assignment belongs to project
-        if ($teamMember->project_id !== $project->id) {
-            abort(404);
-        }
-
         $teamMember->load([
             'member',
             'role',

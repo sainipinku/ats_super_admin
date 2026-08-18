@@ -14,19 +14,12 @@ class EnsureConstructionPermission
     ) {
     }
 
-    public function handle(Request $request, Closure $next, string ...$tokens): Response
+    public function handle(Request $request, Closure $next, string ...$permissionTokens): Response
     {
-        $surface = null;
-
-        // Last token is a surface when it matches web|mobile|both.
-        if ($tokens !== [] && in_array(end($tokens), ['web', 'mobile', 'both'], true)) {
-            $surface = array_pop($tokens);
-        }
-
         $actor = $this->authorizationService->resolveActor($request);
         $projectId = $this->authorizationService->inferProjectId($request);
 
-        if (!$this->authorizationService->hasAnyPermission($actor, $tokens, $projectId, $surface)) {
+        if (!$this->authorizationService->hasAnyPermission($actor, $permissionTokens, $projectId)) {
             $message = 'Unauthorized: Missing required construction permission.';
 
             if ($request->expectsJson()) {

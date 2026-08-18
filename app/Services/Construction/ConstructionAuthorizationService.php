@@ -36,7 +36,7 @@ class ConstructionAuthorizationService
     /**
      * @return array<int, string>
      */
-    public function permissionsFor(?Model $actor, ?int $projectId = null, ?string $surface = null): array
+    public function permissionsFor(?Model $actor, ?int $projectId = null): array
     {
         if (!$actor) {
             return [];
@@ -65,7 +65,6 @@ class ConstructionAuthorizationService
             ->distinct();
 
         $this->applyProjectScope($query, $projectId);
-        $this->applySurfaceFilter($query, $surface);
 
         return $query
             ->orderBy('construction_permissions.slug')
@@ -76,7 +75,7 @@ class ConstructionAuthorizationService
     /**
      * @param  array<int, string>  $permissions
      */
-    public function hasAnyPermission(?Model $actor, array $permissions, ?int $projectId = null, ?string $surface = null): bool
+    public function hasAnyPermission(?Model $actor, array $permissions, ?int $projectId = null): bool
     {
         if (!$actor || $permissions === []) {
             return false;
@@ -101,14 +100,13 @@ class ConstructionAuthorizationService
             ->whereIn('construction_permissions.slug', $permissions);
 
         $this->applyProjectScope($query, $projectId);
-        $this->applySurfaceFilter($query, $surface);
 
         return $query->exists();
     }
 
-    public function can(Member $member, string $permission, ?Project $project = null, ?string $surface = null): bool
+    public function can(Member $member, string $permission, ?Project $project = null): bool
     {
-        return $this->hasAnyPermission($member, [$permission], $project?->getKey(), $surface);
+        return $this->hasAnyPermission($member, [$permission], $project?->getKey());
     }
 
     public function getRoles(Member $member, ?int $projectId = null): Collection
@@ -167,15 +165,15 @@ class ConstructionAuthorizationService
     /**
      * @return array<int, string>
      */
-    public function getPermissions(Member $member, ?int $projectId = null, ?string $surface = null): array
+    public function getPermissions(Member $member, ?int $projectId = null): array
     {
-        return $this->permissionsFor($member, $projectId, $surface);
+        return $this->permissionsFor($member, $projectId);
     }
 
     /**
      * @return array<int, string>
      */
-    public function getPermissionsForRole(Member $member, Role $role, ?int $projectId = null, ?string $surface = null): array
+    public function getPermissionsForRole(Member $member, Role $role, ?int $projectId = null): array
     {
         $query = Permission::query()
             ->select('construction_permissions.slug')
@@ -190,7 +188,6 @@ class ConstructionAuthorizationService
             ->distinct();
 
         $this->applyProjectScope($query, $projectId);
-        $this->applySurfaceFilter($query, $surface);
 
         return $query
             ->orderBy('construction_permissions.slug')
@@ -220,18 +217,6 @@ class ConstructionAuthorizationService
         }
 
         $query->where('construction_member_role_assignments.project_id', $projectId);
-    }
-
-    private function applySurfaceFilter(Builder $query, ?string $surface): void
-    {
-        if ($surface === null) {
-            return;
-        }
-
-        $query->where(function (Builder $query) use ($surface) {
-            $query->where('construction_role_permissions.surface', 'both')
-                ->orWhere('construction_role_permissions.surface', $surface);
-        });
     }
 
     public function inferProjectId(Request $request): ?int

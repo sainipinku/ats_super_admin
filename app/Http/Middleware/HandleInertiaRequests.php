@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Construction\Project;
 use App\Services\Construction\ConstructionAuthorizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -65,6 +66,26 @@ class HandleInertiaRequests extends Middleware
             ->values()
             ->all();
 
+        // Resolve the current project from the route (e.g. project show page)
+        // or from the ?project= query parameter.
+        // Route model binding resolves the parameter to a Project instance,
+        // so handle both model instances and raw IDs.
+        $currentProject = null;
+        $route = $request->route();
+        $routeProjectParam = $route ? $route->parameter('project') : null;
+
+        if ($routeProjectParam instanceof Project) {
+            $currentProject = $routeProjectParam->load('client', 'company');
+        } elseif ($routeProjectParam) {
+            $currentProject = Project::with('client', 'company')
+                ->find($routeProjectParam);
+        }
+
+        if ($currentProject === null && $request->query('project')) {
+            $currentProject = Project::with('client', 'company')
+                ->find($request->query('project'));
+        }
+
         return array_merge(parent::share($request), [
             'messages' => flash()->render('array'),
 
@@ -74,6 +95,17 @@ class HandleInertiaRequests extends Middleware
                 'permissions' => $mergedPermissions,
                 'construction_permissions' => $constructionPermissions,
             ],
+            'current_project' => $currentProject
+                ? [
+                    'id' => $currentProject->id,
+                    'name' => $currentProject->name,
+                    'project_code' => $currentProject->project_code,
+                    'status' => $currentProject->status,
+                    'current_stage' => $currentProject->current_stage,
+                    'client' => $currentProject->client?->name,
+                    'company' => $currentProject->company?->name,
+                ]
+                : null,
             'flash' => [
                 'success' => $request->session()->get('success'),
                 // 'error' => $request->session()->get('errors')

@@ -98,9 +98,9 @@ class ConstructionMemberContextServiceTest extends TestCase
         ]);
     }
 
-    private function assignPermission(Role $role, Permission $permission, string $surface = 'both'): void
+    private function assignPermission(Role $role, Permission $permission): void
     {
-        $role->permissions()->attach($permission->id, ['surface' => $surface]);
+        $role->permissions()->attach($permission->id);
     }
 
     private function service(): ConstructionMemberContextService
@@ -115,7 +115,7 @@ class ConstructionMemberContextServiceTest extends TestCase
         $project = $this->createProject('PRJ-C1', 'project-c1', 'Context Project');
         $surveyor = $this->createRole('surveyor', 'Surveyor');
         $surveyCreate = $this->createPermission('survey.create');
-        $this->assignPermission($surveyor, $surveyCreate, 'mobile');
+        $this->assignPermission($surveyor, $surveyCreate);
 
         MemberRoleAssignment::create([
             'member_id' => $member->id,
@@ -145,7 +145,7 @@ class ConstructionMemberContextServiceTest extends TestCase
         $project = $this->createProject('PRJ-AP', 'project-ap', 'Auto Project');
         $driver = $this->createRole('vehicle_driver', 'Vehicle Driver');
         $tripStart = $this->createPermission('vehicle.trip.start');
-        $this->assignPermission($driver, $tripStart, 'mobile');
+        $this->assignPermission($driver, $tripStart);
 
         MemberRoleAssignment::create([
             'member_id' => $member->id,
@@ -233,7 +233,7 @@ class ConstructionMemberContextServiceTest extends TestCase
         $member = $this->createMember($admin, 'Global Role');
         $reviewer = $this->createRole('review_approver', 'Review Approver');
         $review = $this->createPermission('survey_submission.review');
-        $this->assignPermission($reviewer, $review, 'web');
+        $this->assignPermission($reviewer, $review);
 
         MemberRoleAssignment::create([
             'member_id' => $member->id,
@@ -255,7 +255,7 @@ class ConstructionMemberContextServiceTest extends TestCase
         $member = $this->createMember($admin, 'Auto Global');
         $reviewer = $this->createRole('review_approver', 'Review Approver');
         $review = $this->createPermission('survey_submission.review');
-        $this->assignPermission($reviewer, $review, 'web');
+        $this->assignPermission($reviewer, $review);
 
         MemberRoleAssignment::create([
             'member_id' => $member->id,
@@ -281,8 +281,8 @@ class ConstructionMemberContextServiceTest extends TestCase
         $driver = $this->createRole('vehicle_driver', 'Vehicle Driver');
         $tripStart = $this->createPermission('vehicle.trip.start');
         $surveyCreate = $this->createPermission('survey.create');
-        $this->assignPermission($driver, $tripStart, 'mobile');
-        $this->assignPermission($surveyor, $surveyCreate, 'mobile');
+        $this->assignPermission($driver, $tripStart);
+        $this->assignPermission($surveyor, $surveyCreate);
 
         foreach (['surveyor' => $surveyor, 'vehicle_driver' => $driver] as $slug => $role) {
             MemberRoleAssignment::create([
@@ -315,8 +315,8 @@ class ConstructionMemberContextServiceTest extends TestCase
         $driver = $this->createRole('vehicle_driver', 'Vehicle Driver');
         $tripStart = $this->createPermission('vehicle.trip.start');
         $surveyCreate = $this->createPermission('survey.create');
-        $this->assignPermission($driver, $tripStart, 'mobile');
-        $this->assignPermission($surveyor, $surveyCreate, 'mobile');
+        $this->assignPermission($driver, $tripStart);
+        $this->assignPermission($surveyor, $surveyCreate);
 
         MemberRoleAssignment::create([
             'member_id' => $member->id,
@@ -400,16 +400,16 @@ class ConstructionMemberContextServiceTest extends TestCase
         $this->service()->getMobileContext($member, 'fake_role', $project->id);
     }
 
-    public function test_web_surface_filters_permissions(): void
+    public function test_common_permission_model_shared_across_surfaces(): void
     {
         $admin = $this->createSuperAdmin();
-        $member = $this->createMember($admin, 'Web Surface');
-        $project = $this->createProject('PRJ-WS', 'project-ws', 'Web Surface Project');
+        $member = $this->createMember($admin, 'Common Permission');
+        $project = $this->createProject('PRJ-CP', 'project-cp', 'Common Permission Project');
         $role = $this->createRole('site_employee', 'Site Employee');
-        $mobileOnly = $this->createPermission('attendance.mark');
-        $bothSurface = $this->createPermission('dashboard.view');
-        $this->assignPermission($role, $mobileOnly, 'mobile');
-        $this->assignPermission($role, $bothSurface, 'both');
+        $attendanceMark = $this->createPermission('attendance.mark');
+        $dashboardView = $this->createPermission('dashboard.view');
+        $this->assignPermission($role, $attendanceMark);
+        $this->assignPermission($role, $dashboardView);
 
         MemberRoleAssignment::create([
             'member_id' => $member->id,
@@ -418,32 +418,12 @@ class ConstructionMemberContextServiceTest extends TestCase
             'status' => 'active',
         ]);
 
-        $context = $this->service()->getWebContext($member, 'site_employee', $project->id);
+        // The same permission set is returned for both web and mobile contexts.
+        $webContext = $this->service()->getWebContext($member, 'site_employee', $project->id);
+        $mobileContext = $this->service()->getMobileContext($member, 'site_employee', $project->id);
 
-        $this->assertSame(['dashboard.view'], $context['permissions']);
-    }
-
-    public function test_mobile_surface_filters_permissions(): void
-    {
-        $admin = $this->createSuperAdmin();
-        $member = $this->createMember($admin, 'Mobile Surface');
-        $project = $this->createProject('PRJ-MS', 'project-ms', 'Mobile Surface Project');
-        $role = $this->createRole('site_employee', 'Site Employee');
-        $mobileOnly = $this->createPermission('attendance.mark');
-        $bothSurface = $this->createPermission('dashboard.view');
-        $this->assignPermission($role, $mobileOnly, 'mobile');
-        $this->assignPermission($role, $bothSurface, 'both');
-
-        MemberRoleAssignment::create([
-            'member_id' => $member->id,
-            'role_id' => $role->id,
-            'project_id' => $project->id,
-            'status' => 'active',
-        ]);
-
-        $context = $this->service()->getMobileContext($member, 'site_employee', $project->id);
-
-        $this->assertSame(['attendance.mark', 'dashboard.view'], $context['permissions']);
+        $this->assertSame(['attendance.mark', 'dashboard.view'], $webContext['permissions']);
+        $this->assertSame(['attendance.mark', 'dashboard.view'], $mobileContext['permissions']);
     }
 
     public function test_multiple_roles_same_project_require_selection(): void
@@ -477,7 +457,7 @@ class ConstructionMemberContextServiceTest extends TestCase
         $project = $this->createProject('PRJ-ICR', 'project-icr', 'Inactive Context Project');
         $surveyor = $this->createRole('surveyor', 'Surveyor');
         $surveyCreate = $this->createPermission('survey.create');
-        $this->assignPermission($surveyor, $surveyCreate, 'mobile');
+        $this->assignPermission($surveyor, $surveyCreate);
 
         MemberRoleAssignment::create([
             'member_id' => $member->id,

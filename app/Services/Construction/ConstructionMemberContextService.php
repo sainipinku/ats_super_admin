@@ -18,8 +18,7 @@ class ConstructionMemberContextService
     public function resolve(
         Member $member,
         ?string $requestedRole = null,
-        ?int $requestedProjectId = null,
-        ?string $surface = null
+        ?int $requestedProjectId = null
     ): array {
         $projects = $this->authorization->getProjects($member);
 
@@ -60,8 +59,7 @@ class ConstructionMemberContextService
             ? $this->authorization->getPermissionsForRole(
                 $member,
                 $activeRole,
-                $activeProject?->getKey(),
-                $surface
+                $activeProject?->getKey()
             )
             : [];
 
@@ -77,7 +75,7 @@ class ConstructionMemberContextService
             // All accessible construction projects.
             'projects' => $projects,
 
-            // Effective permissions of the active role on the active surface.
+            // Effective permissions of the active role.
             'permissions' => $permissions,
 
             // Currently selected role.
@@ -96,8 +94,7 @@ class ConstructionMemberContextService
         return $this->resolve(
             $member,
             $requestedRole,
-            $requestedProjectId,
-            'web'
+            $requestedProjectId
         );
     }
 
@@ -109,8 +106,7 @@ class ConstructionMemberContextService
         return $this->resolve(
             $member,
             $requestedRole,
-            $requestedProjectId,
-            'mobile'
+            $requestedProjectId
         );
     }
 

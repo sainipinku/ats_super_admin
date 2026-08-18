@@ -46,7 +46,7 @@ class ConstructionController extends Controller
      *
      * Resolves the authenticated member's accessible projects, project-scoped
      * roles (or global roles when no project), active project/role, and the
-     * role-specific permissions filtered to the mobile surface.
+     * role-specific permissions.
      *
      * Invalid/unauthorized project or role → HTTP 403.
      */
@@ -106,11 +106,6 @@ class ConstructionController extends Controller
     {
         $member = $request->user();
 
-        $this->authorizeMobileContext($member, $surveyPlan->project_id, $request, [
-            'survey.view',
-            'survey_plan.manage',
-        ]);
-
         $this->ensureSurveyAssignment($surveyPlan, $member);
 
         return response()->json([
@@ -123,8 +118,6 @@ class ConstructionController extends Controller
     {
         $member = $request->user();
 
-        abort_unless($member instanceof Member, 403);
-
         $validated = $request->validate([
             'survey_plan_id' => ['required', 'exists:construction_survey_plans,id'],
             'check_in_latitude' => ['nullable', 'numeric'],
@@ -133,11 +126,6 @@ class ConstructionController extends Controller
         ]);
 
         $surveyPlan = SurveyPlan::findOrFail($validated['survey_plan_id']);
-
-        $this->authorizeMobileContext($member, $surveyPlan->project_id, $request, [
-            'survey.create',
-            'survey_plan.manage',
-        ]);
 
         $this->ensureSurveyAssignment($surveyPlan, $member);
 
@@ -177,13 +165,6 @@ class ConstructionController extends Controller
     ): JsonResponse
     {
         $member = $request->user();
-
-        abort_unless($member instanceof Member, 403);
-
-        $this->authorizeMobileContext($member, $surveyVisit->project_id, $request, [
-            'survey.create',
-            'survey_plan.manage',
-        ]);
 
         $this->ensureVisitOwnedBy($surveyVisit, $member);
 
@@ -236,13 +217,6 @@ class ConstructionController extends Controller
     {
         $member = $request->user();
 
-        abort_unless($member instanceof Member, 403);
-
-        $this->authorizeMobileContext($member, $surveyVisit->project_id, $request, [
-            'survey.create',
-            'survey_plan.manage',
-        ]);
-
         $this->ensureVisitOwnedBy($surveyVisit, $member);
 
         $validated = $request->validate([
@@ -278,13 +252,6 @@ class ConstructionController extends Controller
     public function submitVisit(SurveyVisit $surveyVisit, Request $request, ConstructionActivityService $activityService): JsonResponse
     {
         $member = $request->user();
-
-        abort_unless($member instanceof Member, 403);
-
-        $this->authorizeMobileContext($member, $surveyVisit->project_id, $request, [
-            'survey.submit',
-            'survey_plan.manage',
-        ]);
 
         $this->ensureVisitOwnedBy($surveyVisit, $member);
 
@@ -324,10 +291,6 @@ class ConstructionController extends Controller
 
         $projectId = (int) $request->integer('project');
 
-        $this->authorizeMobileContext($member, $projectId, $request, [
-            'drafting.manage',
-        ]);
-
         return response()->json([
             'success' => true,
             'data' => DraftingJob::with(['project', 'surveySubmission'])
@@ -346,12 +309,6 @@ class ConstructionController extends Controller
     ): JsonResponse
     {
         $member = $request->user();
-
-        abort_unless($member instanceof Member, 403);
-
-        $this->authorizeMobileContext($member, $draftingJob->project_id, $request, [
-            'drafting.manage',
-        ]);
 
         abort_unless(
             (int) $draftingJob->assigned_to_member_id === (int) $member->getKey(),
@@ -453,11 +410,6 @@ class ConstructionController extends Controller
 
         $projectId = (int) $request->integer('project');
 
-        $this->authorizeMobileContext($member, $projectId, $request, [
-            'execution.task.view',
-            'execution_task.manage',
-        ]);
-
         return response()->json([
             'success' => true,
             'data' => ExecutionTask::with(['project', 'executionPlan', 'supervisor', 'assignees.member'])
@@ -489,11 +441,6 @@ class ConstructionController extends Controller
 
         $project = Project::findOrFail($validated['project_id']);
 
-        $this->authorizeMobileContext($member, $project->id, $request, [
-            'attendance.mark',
-            'attendance.manage',
-        ]);
-
         $attendance = $executionService->checkInAttendance($project, $validated, $member, $request);
 
         return response()->json(['success' => true, 'data' => $attendance], 201);
@@ -506,14 +453,7 @@ class ConstructionController extends Controller
     ): JsonResponse {
         $member = $request->user();
 
-        abort_unless($member instanceof Member, 403);
-
         abort_unless((int) $attendance->member_id === (int) $member->getKey(), 403, 'You can only check out your own attendance record.');
-
-        $this->authorizeMobileContext($member, $attendance->project_id, $request, [
-            'attendance.mark',
-            'attendance.manage',
-        ]);
 
         $validated = $request->validate([
             'check_out_latitude' => ['nullable', 'numeric'],
@@ -534,19 +474,12 @@ class ConstructionController extends Controller
     ): JsonResponse {
         $member = $request->user();
 
-        abort_unless($member instanceof Member, 403);
-
         $isAssigned = ExecutionTaskAssignee::where('execution_task_id', $task->id)
             ->where('member_id', $member->getKey())
             ->where('status', 'active')
             ->exists();
 
         abort_unless($isAssigned, 403, 'You are not assigned to this task.');
-
-        $this->authorizeMobileContext($member, $task->project_id, $request, [
-            'execution.task.update',
-            'execution_task.manage',
-        ]);
 
         $validated = $request->validate([
             'progress_percent' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -590,12 +523,6 @@ class ConstructionController extends Controller
 
         $project = Project::findOrFail($validated['project_id']);
 
-        $this->authorizeMobileContext($member, $project->id, $request, [
-            'dpr.create',
-            'dpr.submit',
-            'dpr.manage',
-        ]);
-
         // Prevent cross-project task IDs in the report header.
         if (!empty($validated['execution_task_id'])) {
             $this->ensureTaskInProject((int) $validated['execution_task_id'], $project->id);
@@ -617,10 +544,6 @@ class ConstructionController extends Controller
     {
         $member = $request->user();
 
-        $this->authorizeMobileContext($member, $project->id, $request, [
-            'vehicle_tracking.manage',
-        ]);
-
         return response()->json([
             'success' => true,
             'data' => [
@@ -640,12 +563,6 @@ class ConstructionController extends Controller
         ConstructionFleetService $fleetService
     ): JsonResponse {
         $member = $request->user();
-
-        abort_unless($member instanceof Member, 403);
-
-        $this->authorizeMobileContext($member, $project->id, $request, [
-            'vehicle_tracking.manage',
-        ]);
 
         $validated = $request->validate([
             'vehicle_id' => ['required', 'exists:construction_vehicles,id'],
@@ -676,11 +593,6 @@ class ConstructionController extends Controller
     {
         $member = $request->user();
 
-        $this->authorizeMobileContext($member, $project->id, $request, [
-            'equipment_usage.manage',
-            'equipment_allocation.manage',
-        ]);
-
         return response()->json([
             'success' => true,
             'data' => [
@@ -704,12 +616,6 @@ class ConstructionController extends Controller
         ConstructionEquipmentService $equipmentService
     ): JsonResponse {
         $member = $request->user();
-
-        abort_unless($member instanceof Member, 403);
-
-        $this->authorizeMobileContext($member, $project->id, $request, [
-            'equipment_usage.manage',
-        ]);
 
         $validated = $request->validate([
             'equipment_id' => ['required', 'exists:construction_equipments,id'],
@@ -740,12 +646,6 @@ class ConstructionController extends Controller
     ): JsonResponse {
         $member = $request->user();
 
-        abort_unless($member instanceof Member, 403);
-
-        $this->authorizeMobileContext($member, $project->id, $request, [
-            'equipment_allocation.manage',
-        ]);
-
         $validated = $request->validate([
             'allocation_id' => ['required', 'exists:construction_equipment_allocations,id'],
             'returned_at' => ['nullable', 'date'],
@@ -770,11 +670,6 @@ class ConstructionController extends Controller
     {
         $member = $request->user();
 
-        $this->authorizeMobileContext($member, $project->id, $request, [
-            'billing_invoice.manage',
-            'billing_payment.manage',
-        ]);
-
         return response()->json([
             'success' => true,
             'data' => [
@@ -792,11 +687,6 @@ class ConstructionController extends Controller
     public function handover(Project $project, Request $request): JsonResponse
     {
         $member = $request->user();
-
-        $this->authorizeMobileContext($member, $project->id, $request, [
-            'handover.manage',
-            'project_closure.manage',
-        ]);
 
         return response()->json([
             'success' => true,
@@ -818,61 +708,6 @@ class ConstructionController extends Controller
         $role = $request->query('role') ?? $request->input('role');
 
         return is_string($role) && $role !== '' ? $role : null;
-    }
-
-    /**
-     * Resolve the mobile context for the authenticated member on an exact project.
-     *
-     * Verifies Sanctum member + project accessibility + a valid active role for
-     * the project + at least one required permission on the mobile/both surface.
-     *
-     * Throws HTTP 403 on any failure. Never uses the union of all member permissions.
-     *
-     * @param  array<int, string>  $permissions
-     * @return array<string, mixed>
-     */
-    private function authorizeMobileContext(
-        object $member,
-        int $projectId,
-        Request $request,
-        array $permissions
-    ): array {
-        abort_unless($member instanceof Member, 403);
-
-        /** @var ConstructionMemberContextService $contextService */
-        $contextService = app(ConstructionMemberContextService::class);
-
-        try {
-            $context = $contextService->getMobileContext(
-                $member,
-                $this->requestedRoleFrom($request),
-                $projectId
-            );
-        } catch (AuthorizationException) {
-            abort(403, 'Project or role is not accessible.');
-        }
-
-        $activeRole = $context['active_role'];
-
-        if ($activeRole === null) {
-            abort(403, 'No active role for this project.');
-        }
-
-        /** @var ConstructionAuthorizationService $authorization */
-        $authorization = app(ConstructionAuthorizationService::class);
-
-        $rolePermissions = $authorization->getPermissionsForRole(
-            $member,
-            $activeRole,
-            $projectId,
-            'mobile'
-        );
-
-        if (array_intersect($permissions, $rolePermissions) === []) {
-            abort(403, 'Missing required mobile permission.');
-        }
-
-        return $context;
     }
 
     /**

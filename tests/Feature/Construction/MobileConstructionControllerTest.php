@@ -100,12 +100,11 @@ class MobileConstructionControllerTest extends TestCase
         Member $member,
         Role $role,
         Project $project,
-        array $permissionSlugs = [],
-        string $surface = 'mobile'
+        array $permissionSlugs = []
     ): void {
         foreach ($permissionSlugs as $slug) {
             $role->permissions()->syncWithoutDetaching(
-                [Permission::firstOrCreate(['slug' => $slug], ['name' => $slug, 'module' => 'test'])->id => ['surface' => $surface]]
+                [Permission::firstOrCreate(['slug' => $slug], ['name' => $slug, 'module' => 'test'])->id]
             );
         }
 
@@ -127,12 +126,11 @@ class MobileConstructionControllerTest extends TestCase
     private function assignGlobalRole(
         Member $member,
         Role $role,
-        array $permissionSlugs = [],
-        string $surface = 'mobile'
+        array $permissionSlugs = []
     ): void {
         foreach ($permissionSlugs as $slug) {
             $role->permissions()->syncWithoutDetaching(
-                [Permission::firstOrCreate(['slug' => $slug], ['name' => $slug, 'module' => 'test'])->id => ['surface' => $surface]]
+                [Permission::firstOrCreate(['slug' => $slug], ['name' => $slug, 'module' => 'test'])->id]
             );
         }
 
@@ -272,15 +270,15 @@ class MobileConstructionControllerTest extends TestCase
         $this->assertContains('survey.view', $response->json('data.permissions'));
     }
 
-    public function test_context_mobile_surface_filters_permissions(): void
+    public function test_context_common_permission_model_shared_across_surfaces(): void
     {
         $admin = $this->createSuperAdmin();
-        $member = $this->createMember($admin, 'Surface Member');
-        $project = $this->createProject('PRJ-SF', 'project-sf', 'Surface Filter');
+        $member = $this->createMember($admin, 'Common Permission Member');
+        $project = $this->createProject('PRJ-CP', 'project-cp', 'Common Permission');
         $reviewer = $this->createRole('review_approver', 'Review Approver');
 
-        // drawing_approval.manage is web-only in the seeder; assign it as web surface.
-        $this->assignRoleToProject($member, $reviewer, $project, ['drawing_approval.manage'], 'web');
+        // The same permission is shared for both web and mobile.
+        $this->assignRoleToProject($member, $reviewer, $project, ['drawing_approval.manage']);
 
         $response = $this->actingAs($member, 'sanctum')->getJson(
             '/api/construction/mobile/construction/context?project=' . $project->id . '&role=review_approver'
@@ -288,8 +286,8 @@ class MobileConstructionControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.active_role.slug', 'review_approver');
-        // Web-only permission must NOT appear in the mobile context.
-        $this->assertNotContains('drawing_approval.manage', $response->json('data.permissions'));
+        // The common permission model means the permission IS available on mobile.
+        $this->assertContains('drawing_approval.manage', $response->json('data.permissions'));
     }
 
     public function test_context_role_specific_permissions_only(): void

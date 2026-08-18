@@ -23,6 +23,7 @@ use App\Models\Construction\SurveyPlan;
 use App\Models\Construction\SurveySubmission;
 use App\Models\Construction\Vehicle;
 use App\Models\Member;
+use App\Models\SuperAdmin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -32,51 +33,75 @@ class AdminDashboardApiController extends Controller
 
     public function index(Request $request)
     {
-        /** @var Member|null $actor */
+        /** @var Member|SuperAdmin|null $actor */
         $actor = $this->constructionActor();
-        $actorId = $actor?->getKey();
 
-        $allProjectsQuery = Project::with(['company', 'client', 'latestBudget']);
-        $scopedProjectIds = null;
+        if ($actor === null) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
 
-        if ($actor) {
-            $teamProjectIds = ProjectTeamMember::where('member_id', $actorId)
+        // SuperAdmin has full access to all projects.
+        if ($actor instanceof SuperAdmin) {
+            $scopedProjectIds = Project::query()->pluck('id');
+        } elseif ($actor instanceof Member && $actor->isAdmin()) {
+            // Admin is scoped to their company, client, and team project assignments.
+            $teamProjectIds = ProjectTeamMember::where('member_id', $actor->getKey())
                 ->where('status', 'active')
                 ->pluck('project_id');
 
-            $companyId = $actor->company_id ?? $request->company_id;
-            $clientId = $actor->client_id ?? $request->client_id;
+            $scopedProjectIds = $teamProjectIds->toBase();
 
-            if ($teamProjectIds->isNotEmpty()) {
-                $scopedProjectIds = $teamProjectIds;
-                $allProjectsQuery->whereIn('id', $teamProjectIds);
-            } elseif ($companyId) {
-                $allProjectsQuery->where('company_id', $companyId);
-                $scopedProjectIds = Project::where('company_id', $companyId)->pluck('id');
-            } elseif ($clientId) {
-                $allProjectsQuery->where('client_id', $clientId);
-                $scopedProjectIds = Project::where('client_id', $clientId)->pluck('id');
+            if ($actor->company_id) {
+                $scopedProjectIds = $scopedProjectIds->merge(
+                    Project::where('company_id', $actor->company_id)->pluck('id')
+                );
             }
+
+            if ($actor->client_id) {
+                $scopedProjectIds = $scopedProjectIds->merge(
+                    Project::where('client_id', $actor->client_id)->pluck('id')
+                );
+            }
+
+            $scopedProjectIds = $scopedProjectIds->unique()->values();
+
+            // If the admin has no authorized project scope, deny access.
+            // Request filters must never create an authorization scope.
+            if ($scopedProjectIds->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden: No authorized projects.',
+                ], 403);
+            }
+        } else {
+            // Normal field Member → forbidden.
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden.',
+            ], 403);
         }
 
+        // Request filters must ONLY narrow the authorized scope (intersection).
+        // They can never expand beyond what the actor is authorized to see.
         if ($request->filled('company_id')) {
-            $allProjectsQuery->where('company_id', $request->company_id);
-            $scopedProjectIds = Project::where('company_id', $request->company_id)->pluck('id');
+            $companyProjectIds = Project::where('company_id', $request->company_id)->pluck('id');
+            $scopedProjectIds = $scopedProjectIds->intersect($companyProjectIds)->values();
         }
         if ($request->filled('client_id')) {
-            $allProjectsQuery->where('client_id', $request->client_id);
-            $scopedProjectIds = Project::where('client_id', $request->client_id)->pluck('id');
+            $clientProjectIds = Project::where('client_id', $request->client_id)->pluck('id');
+            $scopedProjectIds = $scopedProjectIds->intersect($clientProjectIds)->values();
         }
+
+        $allProjectsQuery = Project::with(['company', 'client', 'latestBudget'])
+            ->whereIn('id', $scopedProjectIds);
+
         if ($request->filled('status')) {
             $allProjectsQuery->where('status', $request->status);
         }
 
         $projects = $allProjectsQuery->latest()->get();
 
-        if ($scopedProjectIds === null) {
-            $scopedProjectIds = Project::pluck('id');
-        }
-        $projectIds = $projects->pluck('id');
+        $projectIds = $scopedProjectIds;
 
         $companies = $this->buildCompanyStats($scopedProjectIds, $request);
         $clients = $this->buildClientStats($scopedProjectIds, $request);

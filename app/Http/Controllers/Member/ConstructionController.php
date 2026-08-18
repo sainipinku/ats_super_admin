@@ -424,7 +424,7 @@ class ConstructionController extends Controller
     }
 
     /**
-     * Enforces member + exact project + active role + role permission + web surface.
+     * Enforces member + exact project + active role + role permission.
      */
     private function authorizeActionForContext(
         Member $actor,
@@ -451,8 +451,7 @@ class ConstructionController extends Controller
         $rolePermissions = $authorization->getPermissionsForRole(
             $actor,
             $activeRole,
-            $project->getKey(),
-            'web'
+            $project->getKey()
         );
 
         if (array_intersect($permissions, $rolePermissions) === []) {

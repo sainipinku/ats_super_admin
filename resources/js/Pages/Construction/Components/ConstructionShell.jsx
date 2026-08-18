@@ -74,7 +74,7 @@ export default function ConstructionShell({
     return (
         <Layout>
             <Head title={title} />
-            <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+            <div className="space-y-6 px-2 py-5 sm:px-3 lg:px-5">
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                         <div>

@@ -17,7 +17,6 @@ import {
     FaRoute,
     FaTools,
     FaMoneyBillWave,
-    FaKey,
     FaChevronRight,
 } from "react-icons/fa";
 
@@ -145,9 +144,31 @@ const navigation = [
     },
 ];
 
+const stageLabels = {
+    budget_pending: "Budget Pending",
+    budget_approved: "Budget Approved",
+    team_assigned: "Team Assigned",
+    planning: "Planning",
+    survey: "Survey",
+    foundation: "Foundation",
+    structure: "Structure",
+    finishing: "Finishing",
+    handover: "Handover",
+    completed: "Completed",
+};
+
+const statusColors = {
+    draft: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+    active: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    completed: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
+    on_hold: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+    cancelled: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
+};
+
 export default function Sidebar({ isOpen, onClose }) {
     const { props } = usePage();
     const user = props?.auth?.user;
+    const currentProject = props?.current_project;
 
     return (
         <>
@@ -166,18 +187,54 @@ export default function Sidebar({ isOpen, onClose }) {
             >
                 {/* ── Brand Header ─────────────────────────────── */}
                 <div className="relative flex shrink-0 items-center gap-3 border-b border-gray-200/80 px-5 py-4 dark:border-[#5146e64a]">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/30">
-                        <FaKey className="text-white" size={18} />
-                    </div>
+                    <img
+                        src="/images/cadmax_con_logo.jpeg"
+                        alt="betaxtech Logo"
+                        className="h-10 w-10 shrink-0 rounded-xl object-cover shadow-lg shadow-indigo-500/30"
+                        onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                        }}
+                    />
                     <div className="min-w-0">
-                        <p className="truncate text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
-                            CadMax ERP
+                        <p className="truncate text-[15px] uppercase font-bold tracking-tight text-slate-900 dark:text-white">
+                            betaxtech
                         </p>
                         <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-300">
                             Super Admin
                         </p>
                     </div>
                 </div>
+
+                {/* ── Current Project ──────────────────────────── */}
+                {currentProject && (
+                    <div className="border-b border-gray-200/80 px-5 py-3 dark:border-[#5146e64a]">
+                        <div className="rounded-xl bg-gradient-to-r from-indigo-50 to-violet-50 p-3 dark:from-[#5146E61A] dark:to-[#5146E60D]">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-300">
+                                Active Project
+                            </p>
+                            <p className="mt-1 truncate text-[13px] font-semibold text-slate-900 dark:text-white">
+                                {currentProject.name}
+                            </p>
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                                    {currentProject.project_code}
+                                </span>
+                                {currentProject.current_stage ? (
+                                    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                                        {stageLabels[currentProject.current_stage] || currentProject.current_stage}
+                                    </span>
+                                ) : null}
+                                {currentProject.status ? (
+                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                        statusColors[currentProject.status] || statusColors.draft
+                                    }`}>
+                                        {currentProject.status}
+                                    </span>
+                                ) : null}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* ── Scrollable Navigation ────────────────────── */}
                 <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 sidebar-scroll">

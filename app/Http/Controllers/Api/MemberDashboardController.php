@@ -70,11 +70,12 @@ class MemberDashboardController extends Controller
             ->whereIn('id', $primaryProjectIds)
             ->get();
 
+        // Only survey plans where the authenticated member is explicitly assigned
+        // should appear in the member dashboard survey workspace.
+        // The broader project scope must NOT expose plans the member was not assigned to.
         $surveyPlans = SurveyPlan::with(['project.company', 'project.client', 'planMembers.member'])
-            ->where(function ($q) use ($memberId, $projectIds) {
-                $q->whereHas('planMembers', function ($sub) use ($memberId) {
-                    $sub->where('member_id', $memberId);
-                })->orWhereIn('project_id', $projectIds->all());
+            ->whereHas('planMembers', function ($q) use ($memberId) {
+                $q->where('member_id', $memberId);
             })
             ->latest()
             ->get();
