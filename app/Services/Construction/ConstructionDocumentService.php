@@ -2,7 +2,7 @@
 
 namespace App\Services\Construction;
 
-use App\Models\Construction\Document;
+use App\Models\ConstructionDocument;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +19,7 @@ class ConstructionDocumentService
         ?int $projectId = null,
         ?string $disk = null,
         ?string $mimeType = null
-    ): Document {
+    ): ConstructionDocument {
         $targetDisk = $disk ?: 'public';
         $extension = strtolower($file->getClientOriginalExtension());
         $baseName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
@@ -32,7 +32,7 @@ class ConstructionDocumentService
         $normalizedFolder = trim($folder, '/');
         $storedPath = $file->storeAs($normalizedFolder, $fileName, $targetDisk);
 
-        return Document::create([
+        return ConstructionDocument::create([
             'company_id' => $companyId,
             'project_id' => $projectId,
             'documentable_type' => $documentable::class,
@@ -58,7 +58,7 @@ class ConstructionDocumentService
         ?int $projectId = null,
         ?string $disk = null,
         ?string $mimeType = null
-    ): Document {
+    ): ConstructionDocument {
         $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
         $baseName = pathinfo($originalName, PATHINFO_FILENAME);
         $sanitizedBaseName = Str::slug($baseName) ?: Str::uuid()->toString();
@@ -74,7 +74,7 @@ class ConstructionDocumentService
             Storage::disk($targetDisk)->put($path, '');
         }
 
-        return Document::create([
+        return ConstructionDocument::create([
             'company_id' => $companyId,
             'project_id' => $projectId,
             'documentable_type' => $documentable::class,

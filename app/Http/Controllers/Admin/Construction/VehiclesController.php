@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Admin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\Vehicle;
-use App\Models\Construction\VehicleAssignment;
-use App\Models\Construction\VehicleLocationPing;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
+use App\Models\ConstructionVehicle;
+use App\Models\VehicleAssignment;
+use App\Models\VehicleLocationPing;
 use App\Models\Member;
 use App\Services\Construction\ConstructionFleetService;
 use Illuminate\Http\RedirectResponse;
@@ -52,7 +52,7 @@ class VehiclesController extends Controller
 
         return Inertia::render('Admin/Construction/Vehicles/Index', [
             'projects' => Project::whereIn('id', $projectIds)->orderByDesc('id')->get(['id', 'project_code', 'name']),
-            'vehicles' => Vehicle::with('project')->whereIn('project_id', $projectIds)->latest()->take(60)->get(),
+            'vehicles' => ConstructionVehicle::with('project')->whereIn('project_id', $projectIds)->latest()->take(60)->get(),
             'assignments' => VehicleAssignment::with(['project', 'vehicle', 'driver'])
                 ->whereIn('project_id', $projectIds)
                 ->latest()

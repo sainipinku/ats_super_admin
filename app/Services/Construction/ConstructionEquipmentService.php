@@ -2,11 +2,11 @@
 
 namespace App\Services\Construction;
 
-use App\Models\Construction\Equipment;
-use App\Models\Construction\EquipmentAllocation;
-use App\Models\Construction\EquipmentUsageLog;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
+use App\Models\ConstructionEquipment;
+use App\Models\EquipmentAllocation;
+use App\Models\EquipmentUsageLog;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
 use App\Models\Member;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -20,13 +20,13 @@ class ConstructionEquipmentService
     ) {
     }
 
-    public function createEquipment(Project $project, array $validated, ?Model $actor, ?Request $request = null): Equipment
+    public function createEquipment(Project $project, array $validated, ?Model $actor, ?Request $request = null): ConstructionEquipment
     {
         return DB::transaction(function () use ($project, $validated, $actor, $request) {
-            $nextId = (Equipment::max('id') ?? 0) + 1;
+            $nextId = (ConstructionEquipment::max('id') ?? 0) + 1;
             $equipmentCode = $validated['equipment_code'] ?? ('EQP-' . str_pad((string) $nextId, 5, '0', STR_PAD_LEFT));
 
-            $equipment = Equipment::create([
+            $equipment = ConstructionEquipment::create([
                 'project_id' => $project->id,
                 'equipment_code' => $equipmentCode,
                 'name' => $validated['name'],
@@ -58,7 +58,7 @@ class ConstructionEquipmentService
     public function allocateEquipment(Project $project, array $validated, ?Model $actor, ?Request $request = null): EquipmentAllocation
     {
         return DB::transaction(function () use ($project, $validated, $actor, $request) {
-            $equipment = Equipment::query()
+            $equipment = ConstructionEquipment::query()
                 ->whereKey((int) $validated['equipment_id'])
                 ->where('project_id', $project->id)
                 ->first();
@@ -178,7 +178,7 @@ class ConstructionEquipmentService
     public function recordUsage(Project $project, array $validated, ?Model $actor, ?Request $request = null): EquipmentUsageLog
     {
         return DB::transaction(function () use ($project, $validated, $actor, $request) {
-            $equipment = Equipment::query()
+            $equipment = ConstructionEquipment::query()
                 ->whereKey((int) $validated['equipment_id'])
                 ->where('project_id', $project->id)
                 ->first();

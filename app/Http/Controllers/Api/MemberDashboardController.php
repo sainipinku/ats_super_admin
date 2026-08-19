@@ -3,24 +3,24 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Construction\AttendanceRecord;
-use App\Models\Construction\Client;
-use App\Models\Construction\Company;
-use App\Models\Construction\DailyProgressReport;
-use App\Models\Construction\DraftingJob;
-use App\Models\Construction\EquipmentAllocation;
-use App\Models\Construction\ExecutionTask;
-use App\Models\Construction\ExecutionTaskAssignee;
-use App\Models\Construction\Material;
-use App\Models\Construction\MaterialStock;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectBudget;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\SurveyPlan;
-use App\Models\Construction\SurveyPlanMember;
-use App\Models\Construction\SurveyVisit;
-use App\Models\Construction\Vehicle;
-use App\Models\Construction\VehicleAssignment;
+use App\Models\AttendanceRecord;
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\DailyProgressReport;
+use App\Models\DraftingJob;
+use App\Models\EquipmentAllocation;
+use App\Models\ExecutionTask;
+use App\Models\ExecutionTaskAssignee;
+use App\Models\Material;
+use App\Models\MaterialStock;
+use App\Models\Project;
+use App\Models\ProjectBudget;
+use App\Models\ProjectTeamMember;
+use App\Models\SurveyPlan;
+use App\Models\SurveyPlanMember;
+use App\Models\SurveyVisit;
+use App\Models\ConstructionVehicle;
+use App\Models\VehicleAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -70,11 +70,12 @@ class MemberDashboardController extends Controller
             ->whereIn('id', $primaryProjectIds)
             ->get();
 
+        // Only survey plans where the authenticated member is explicitly assigned
+        // should appear in the member dashboard survey workspace.
+        // The broader project scope must NOT expose plans the member was not assigned to.
         $surveyPlans = SurveyPlan::with(['project.company', 'project.client', 'planMembers.member'])
-            ->where(function ($q) use ($memberId, $projectIds) {
-                $q->whereHas('planMembers', function ($sub) use ($memberId) {
-                    $sub->where('member_id', $memberId);
-                })->orWhereIn('project_id', $projectIds->all());
+            ->whereHas('planMembers', function ($q) use ($memberId) {
+                $q->where('member_id', $memberId);
             })
             ->latest()
             ->get();
@@ -526,7 +527,7 @@ class MemberDashboardController extends Controller
             ->latest()
             ->get();
 
-        $vehicles = Vehicle::with(['assignments' => fn ($q) => $q->latest()->take(3)])
+        $vehicles = ConstructionVehicle::with(['assignments' => fn ($q) => $q->latest()->take(3)])
             ->where('project_id', $project->id)
             ->latest()
             ->get();
@@ -535,7 +536,7 @@ class MemberDashboardController extends Controller
             return $v->assignments->contains(fn ($a) => $a->assigned_to_member_id == $memberId && is_null($a->returned_at));
         })->values();
 
-        $equipments = \App\Models\Construction\Equipment::with([
+        $equipments = \App\Models\ConstructionEquipment::with([
             'allocations' => fn ($q) => $q->latest()->take(3),
         ])
             ->where('project_id', $project->id)
@@ -546,16 +547,16 @@ class MemberDashboardController extends Controller
             return $e->allocations->contains(fn ($a) => $a->assigned_to_member_id == $memberId && is_null($a->returned_at));
         })->values();
 
-        $invoices = \App\Models\Construction\ClientInvoice::with(['items', 'payments'])
+        $invoices = \App\Models\ClientInvoice::with(['items', 'payments'])
             ->where('project_id', $project->id)
             ->latest()
             ->get();
 
-        $payments = \App\Models\Construction\ClientPayment::where('project_id', $project->id)
+        $payments = \App\Models\ClientPayment::where('project_id', $project->id)
             ->latest()
             ->get();
 
-        $handovers = \App\Models\Construction\ProjectHandover::with(['items', 'finalDocument'])
+        $handovers = \App\Models\ProjectHandover::with(['items', 'finalDocument'])
             ->where('project_id', $project->id)
             ->latest()
             ->get();

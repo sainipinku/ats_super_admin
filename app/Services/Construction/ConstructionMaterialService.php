@@ -2,18 +2,18 @@
 
 namespace App\Services\Construction;
 
-use App\Models\Construction\Material;
-use App\Models\Construction\MaterialIssue;
-use App\Models\Construction\MaterialIssueItem;
-use App\Models\Construction\MaterialReceipt;
-use App\Models\Construction\MaterialReceiptItem;
-use App\Models\Construction\MaterialStock;
-use App\Models\Construction\Project;
-use App\Models\Construction\PurchaseOrder;
-use App\Models\Construction\PurchaseOrderItem;
-use App\Models\Construction\PurchaseRequest;
-use App\Models\Construction\PurchaseRequestItem;
-use App\Models\Construction\Vendor;
+use App\Models\Material;
+use App\Models\MaterialIssue;
+use App\Models\MaterialIssueItem;
+use App\Models\MaterialReceipt;
+use App\Models\MaterialReceiptItem;
+use App\Models\MaterialStock;
+use App\Models\Project;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
+use App\Models\PurchaseRequest;
+use App\Models\PurchaseRequestItem;
+use App\Models\Vendor;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;

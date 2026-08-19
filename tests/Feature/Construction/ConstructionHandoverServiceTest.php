@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Construction;
 
-use App\Models\Construction\Client;
-use App\Models\Construction\Company;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectHandover;
-use App\Models\Construction\ProjectHandoverItem;
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\Project;
+use App\Models\ProjectHandover;
+use App\Models\ProjectHandoverItem;
 use App\Models\Member;
 use App\Models\SuperAdmin;
 use App\Services\Construction\ConstructionHandoverService;

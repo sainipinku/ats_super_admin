@@ -2,14 +2,14 @@
 
 namespace Tests\Feature\Construction;
 
-use App\Models\Construction\Client;
-use App\Models\Construction\Company;
-use App\Models\Construction\ExecutionPlan;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\SurveyEntry;
-use App\Models\Construction\SurveyPlan;
-use App\Models\Construction\SurveyVisit;
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\ExecutionPlan;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
+use App\Models\SurveyEntry;
+use App\Models\SurveyPlan;
+use App\Models\SurveyVisit;
 use App\Models\Member;
 use App\Models\SuperAdmin;
 use App\Services\Construction\ConstructionDocumentService;

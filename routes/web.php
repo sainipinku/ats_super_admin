@@ -310,15 +310,19 @@ Route::prefix('super/construction')
             
         Route::put('/projects/{project}/team/{teamMember}', [ProjectController::class, 'updateTeamMember'])
             ->middleware('construction.permission:project_team.manage')
+            ->scopeBindings()
             ->name('projects.team.update');
         Route::patch('/projects/{project}/team/{teamMember}/status', [ProjectController::class, 'toggleTeamMemberStatus'])
             ->middleware('construction.permission:project_team.manage')
+            ->scopeBindings()
             ->name('projects.team.status');
         Route::delete('/projects/{project}/team/{teamMember}', [ProjectController::class, 'destroyTeamMember'])
             ->middleware('construction.permission:project_team.manage')
+            ->scopeBindings()
             ->name('projects.team.destroy');
         Route::get('/projects/{project}/team/{teamMember}', [ProjectController::class, 'showTeamMember'])
             ->middleware('construction.permission:project_team.manage')
+            ->scopeBindings()
             ->name('projects.team.show');
         Route::delete('/projects/{project}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'destroy'])
             ->middleware('construction.permission:project.manage')

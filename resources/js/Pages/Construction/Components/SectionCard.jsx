@@ -1,6 +1,6 @@
 export default function SectionCard({ title, description, actions = null, children, className = "" }) {
     return (
-        <section className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950 ${className}`.trim()}>
+        <section className={`rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950 overflow-hidden ${className}`.trim()}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>

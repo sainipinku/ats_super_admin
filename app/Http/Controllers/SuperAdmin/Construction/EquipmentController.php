@@ -4,10 +4,10 @@ namespace App\Http\Controllers\SuperAdmin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\Equipment;
-use App\Models\Construction\EquipmentAllocation;
-use App\Models\Construction\EquipmentUsageLog;
-use App\Models\Construction\Project;
+use App\Models\ConstructionEquipment;
+use App\Models\EquipmentAllocation;
+use App\Models\EquipmentUsageLog;
+use App\Models\Project;
 use App\Services\Construction\ConstructionEquipmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,7 +22,7 @@ class EquipmentController extends Controller
     {
         return Inertia::render('SuperAdmin/Construction/Equipment/Index', [
             'projects' => Project::orderByDesc('id')->get(['id', 'project_code', 'name']),
-            'equipments' => Equipment::with('project')->latest()->take(80)->get(),
+            'equipments' => ConstructionEquipment::with('project')->latest()->take(80)->get(),
             'allocations' => EquipmentAllocation::with(['project', 'equipment', 'assignedTo'])
                 ->latest()
                 ->take(80)

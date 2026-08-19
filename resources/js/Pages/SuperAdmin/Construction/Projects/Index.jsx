@@ -5,7 +5,7 @@ import SectionCard from "@/Pages/Construction/Components/SectionCard";
 import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
 import Modal from "@/Components/Modal";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     FaProjectDiagram,
     FaPlayCircle,
@@ -22,6 +22,7 @@ import {
     FaEye,
     FaEdit,
     FaTrashAlt,
+    FaEllipsisV,
 } from "react-icons/fa";
 
 const projectStatusFlow = [
@@ -67,6 +68,48 @@ export default function ProjectsIndex({ projects, companies, clients }) {
 
     const [stageFilter, setStageFilter] = useState("all");
     const [search, setSearch] = useState("");
+    const [openDropdownId, setOpenDropdownId] = useState(null);
+    const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (!event.target.closest("[data-project-dropdown]")) {
+                setOpenDropdownId(null);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // Close dropdown on scroll / resize so it never stays in wrong position
+    useEffect(() => {
+        function handleScrollOrResize() {
+            setOpenDropdownId(null);
+        }
+        window.addEventListener("scroll", handleScrollOrResize, true);
+        window.addEventListener("resize", handleScrollOrResize);
+        return () => {
+            window.removeEventListener("scroll", handleScrollOrResize, true);
+            window.removeEventListener("resize", handleScrollOrResize);
+        };
+    }, []);
+
+    const openProjectDropdown = (e, projectId) => {
+        if (openDropdownId === projectId) {
+            setOpenDropdownId(null);
+            return;
+        }
+        const rect = e.currentTarget.getBoundingClientRect();
+        const dropdownWidth = 176; // w-44 = 176px
+        let left = rect.right - dropdownWidth;
+        if (left < 8) left = 8;
+        if (left + dropdownWidth > window.innerWidth - 8) {
+            left = window.innerWidth - dropdownWidth - 8;
+        }
+        setDropdownPos({ top: rect.bottom + 4, left });
+        setOpenDropdownId(projectId);
+    };
 
     const openEditModal = (project) => {
         editForm.clearErrors();
@@ -303,13 +346,15 @@ export default function ProjectsIndex({ projects, companies, clients }) {
                     description="Track where each project sits in the lifecycle. Click View / Edit / Delete actions to manage."
                 >
                     {filteredProjects.length ? (
-                        <div className="overflow-x-auto -mx-2">
-                            <table className="min-w-full text-left text-sm">
+                        <div className="overflow-x-auto -mx-1 sm:-mx-2">
+                            <table className="w-full min-w-[480px] sm:min-w-[640px] text-left text-sm">
                                 <thead className="text-slate-500 dark:text-slate-400 bg-slate-50/60 dark:bg-slate-900/40">
                                     <tr>
                                         <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider">Project</th>
-                                        <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider">Company · Client</th>
+                                        <th className="hidden lg:table-cell px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider">Company · Client</th>
                                         <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider">Stage</th>
+                                        <th className="hidden md:table-cell px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider">Start Date</th>
+                                        <th className="hidden md:table-cell px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider">End Date</th>
                                         <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider">Budget</th>
                                         <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-right">Actions</th>
                                     </tr>
@@ -317,16 +362,22 @@ export default function ProjectsIndex({ projects, companies, clients }) {
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {filteredProjects.map((project) => (
                                         <tr key={project.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-colors">
-                                            <td className="px-3 py-3">
-                                                <div className="font-semibold text-slate-900 dark:text-white">{project.name}</div>
+                                            <td className="px-3 py-3 max-w-[180px] sm:max-w-none">
+                                                <div className="font-semibold text-slate-900 dark:text-white truncate">{project.name}</div>
                                                 <div className="text-[11px] text-slate-500 dark:text-slate-400">{project.project_code || "—"} · {project.priority || "medium"}</div>
                                             </td>
-                                            <td className="px-3 py-3 text-[13px] text-slate-600 dark:text-slate-300">
+                                            <td className="hidden lg:table-cell px-3 py-3 text-[13px] text-slate-600 dark:text-slate-300">
                                                 <div className="font-medium text-slate-700 dark:text-slate-200">{project.company?.name || "-"}</div>
                                                 <div className="text-[11px] text-slate-500 dark:text-slate-400">{project.client?.name || "-"}</div>
                                             </td>
                                             <td className="px-3 py-3">
                                                 <StatusBadge value={project.current_stage} />
+                                            </td>
+                                            <td className="hidden md:table-cell px-3 py-3 text-[13px] text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                                {formatDate(project.start_date)}
+                                            </td>
+                                            <td className="hidden md:table-cell px-3 py-3 text-[13px] text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                                {formatDate(project.expected_end_date)}
                                             </td>
                                             <td className="px-3 py-3 text-[13px] font-medium text-slate-700 dark:text-slate-200">
                                                 {formatCurrency(
@@ -335,27 +386,58 @@ export default function ProjectsIndex({ projects, companies, clients }) {
                                                         0
                                                 )}
                                             </td>
-                                            <td className="px-3 py-3">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <RowAction href={route("super.construction.projects.show", project.id)} icon={FaEye} color="indigo" label="View details" />
-                                                    <RowAction icon={FaEdit} color="sky" label="Edit" onClick={() => openEditModal(project)} />
-                                                    <RowAction
-                                                        color="rose"
-                                                        icon={FaTrashAlt}
-                                                        label="Delete"
-                                                        onClick={() => {
-                                                            if (confirm(`Delete project "${project.name}"? All survey, execution, material, billing and handover data tied to this project will be removed and cannot be restored.`)) {
-                                                                router.delete(route("super.construction.projects.destroy", project.id), {
-                                                                    preserveScroll: true,
-                                                                    onError: (errs) => {
-                                                                        if (typeof window !== "undefined" && typeof window.alert === "function") {
-                                                                            window.alert(Object.values(errs).find(Boolean) || "Failed to delete project.");
-                                                                        }
-                                                                    },
-                                                                });
-                                                            }
-                                                        }}
-                                                    />
+                                            <td className="px-3 py-3 text-right">
+                                                <div className="relative inline-block text-left" data-project-dropdown>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => openProjectDropdown(e, project.id)}
+                                                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+                                                        title="Actions"
+                                                    >
+                                                        <FaEllipsisV size={14} />
+                                                    </button>
+                                                    {openDropdownId === project.id && (
+                                                        <div
+                                                            className="fixed w-44 rounded-xl border border-slate-200 bg-white py-1 shadow-xl z-50 dark:border-slate-700 dark:bg-slate-900"
+                                                            style={{ top: dropdownPos.top, left: dropdownPos.left }}
+                                                        >
+                                                            <Link
+                                                                href={route("super.construction.projects.show", project.id)}
+                                                                className="flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors"
+                                                            >
+                                                                <FaEye size={13} className="text-indigo-500" />
+                                                                View Details
+                                                            </Link>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { setOpenDropdownId(null); openEditModal(project); }}
+                                                                className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors text-left"
+                                                            >
+                                                                <FaEdit size={13} className="text-sky-500" />
+                                                                Edit
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setOpenDropdownId(null);
+                                                                    if (confirm(`Delete project "${project.name}"? All survey, execution, material, billing and handover data tied to this project will be removed and cannot be restored.`)) {
+                                                                        router.delete(route("super.construction.projects.destroy", project.id), {
+                                                                            preserveScroll: true,
+                                                                            onError: (errs) => {
+                                                                                if (typeof window !== "undefined" && typeof window.alert === "function") {
+                                                                                    window.alert(Object.values(errs).find(Boolean) || "Failed to delete project.");
+                                                                                }
+                                                                            },
+                                                                        });
+                                                                    }
+                                                                }}
+                                                                className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/60 transition-colors text-left"
+                                                            >
+                                                                <FaTrashAlt size={13} />
+                                                                Delete
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -439,6 +521,22 @@ function formatCurrency(value) {
     return "₹" + num.toFixed(0);
 }
 
+function formatDate(value) {
+    if (!value) return "—";
+    // Handle full ISO timestamps like "2026-08-12T00:00:00.000000Z"
+    const datePart = String(value).split("T")[0] || value;
+    const parts = datePart.split("-");
+    if (parts.length === 3) {
+        const date = new Date(parts[0], parts[1] - 1, parts[2]);
+        if (!Number.isNaN(date.getTime())) {
+            return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+        }
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 function InputField({ form, name, label, type = "text", step }) {
     return (
         <div>
@@ -490,26 +588,3 @@ function SelectField({ form, name, label, options }) {
     );
 }
 
-function RowAction({ icon, color = "indigo", href, onClick, label }) {
-    const Icon = icon;
-    const colors = {
-        indigo: "text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/60",
-        sky: "text-sky-600 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-950/60",
-        rose: "text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/60",
-        emerald: "text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/60",
-        amber: "text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/60",
-    };
-    const cls = `inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${colors[color] || colors.indigo}`;
-    if (href) {
-        return (
-            <Link href={href} title={label} className={cls}>
-                <Icon size={14} />
-            </Link>
-        );
-    }
-    return (
-        <button type="button" title={label} onClick={onClick} className={cls}>
-            <Icon size={14} />
-        </button>
-    );
-}
