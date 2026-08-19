@@ -37,7 +37,6 @@ use App\Services\Construction\ConstructionFleetService;
 use App\Services\Construction\ConstructionMemberContextService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ConstructionController extends Controller
@@ -54,7 +53,7 @@ class ConstructionController extends Controller
     public function context(
         Request $request,
         ConstructionMemberContextService $contextService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         abort_unless($member instanceof Member, 403);
@@ -89,7 +88,7 @@ class ConstructionController extends Controller
         ]);
     }
 
-    public function assignedProjects(Request $request): JsonResponse
+    public function assignedProjects(Request $request)
     {
         $member = $request->user();
 
@@ -129,7 +128,7 @@ class ConstructionController extends Controller
     public function checkIn(
         Request $request,
         ConstructionActivityService $activityService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         $validated = $request->validate([
@@ -191,7 +190,7 @@ class ConstructionController extends Controller
         Request $request,
         ConstructionActivityService $activityService,
         ConstructionDocumentService $documentService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         $this->ensureVisitOwnedBy($surveyVisit, $member);
@@ -268,7 +267,7 @@ class ConstructionController extends Controller
         SurveyVisit $surveyVisit,
         Request $request,
         ConstructionActivityService $activityService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         $this->ensureVisitOwnedBy($surveyVisit, $member);
@@ -337,7 +336,7 @@ class ConstructionController extends Controller
         SurveyVisit $surveyVisit,
         Request $request,
         ConstructionActivityService $activityService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         $this->ensureVisitOwnedBy($surveyVisit, $member);
@@ -383,7 +382,7 @@ class ConstructionController extends Controller
         ]);
     }
 
-    public function draftingJobs(Request $request): JsonResponse
+    public function draftingJobs(Request $request)
     {
         $member = $request->user();
 
@@ -410,7 +409,7 @@ class ConstructionController extends Controller
         Request $request,
         ConstructionActivityService $activityService,
         ConstructionDocumentService $documentService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         abort_unless(
@@ -544,7 +543,7 @@ class ConstructionController extends Controller
         ], 201);
     }
 
-    public function assignedTasks(Request $request): JsonResponse
+    public function assignedTasks(Request $request)
     {
         $member = $request->user();
 
@@ -578,7 +577,7 @@ class ConstructionController extends Controller
     public function attendanceCheckIn(
         Request $request,
         ConstructionExecutionService $executionService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         $validated = $request->validate([
@@ -638,7 +637,7 @@ class ConstructionController extends Controller
         AttendanceRecord $attendance,
         Request $request,
         ConstructionExecutionService $executionService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         abort_unless(
@@ -685,7 +684,7 @@ class ConstructionController extends Controller
         ExecutionTask $task,
         Request $request,
         ConstructionExecutionService $executionService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         $isAssigned = ExecutionTaskAssignee::where(
@@ -736,7 +735,7 @@ class ConstructionController extends Controller
     public function submitDailyProgress(
         Request $request,
         ConstructionExecutionService $executionService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         $validated = $request->validate([
@@ -869,7 +868,7 @@ class ConstructionController extends Controller
     public function vehicles(
         Project $project,
         Request $request
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         return response()->json([
@@ -897,7 +896,7 @@ class ConstructionController extends Controller
         Project $project,
         Request $request,
         ConstructionFleetService $fleetService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         $validated = $request->validate([
@@ -978,7 +977,7 @@ class ConstructionController extends Controller
     public function equipment(
         Project $project,
         Request $request
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         return response()->json([
@@ -1013,7 +1012,7 @@ class ConstructionController extends Controller
         Project $project,
         Request $request,
         ConstructionEquipmentService $equipmentService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         $validated = $request->validate([
@@ -1082,7 +1081,7 @@ class ConstructionController extends Controller
         Project $project,
         Request $request,
         ConstructionEquipmentService $equipmentService
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         $validated = $request->validate([
@@ -1141,7 +1140,7 @@ class ConstructionController extends Controller
     public function billing(
         Project $project,
         Request $request
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         return response()->json([
@@ -1167,7 +1166,7 @@ class ConstructionController extends Controller
     public function handover(
         Project $project,
         Request $request
-    ): JsonResponse {
+    ) {
         $member = $request->user();
 
         return response()->json([

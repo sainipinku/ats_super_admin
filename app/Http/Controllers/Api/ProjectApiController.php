@@ -10,6 +10,8 @@ use App\Models\Construction\Project;
 use App\Models\Construction\ProjectBudget;
 use App\Models\Construction\ProjectTeamMember;
 use App\Models\Construction\Role;
+use App\Models\Construction\VehicleAssignment;
+use App\Models\Construction\VehicleLocationPing;
 use App\Models\Member;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -166,8 +168,8 @@ class ProjectApiController extends Controller
                 MemberRoleAssignment::where('project_id', $projectId)->delete();
                 ProjectTeamMember::where('project_id', $projectId)->delete();
                 ProjectBudget::where('project_id', $projectId)->delete();
-                \App\Models\Construction\VehicleAssignment::where('project_id', $projectId)->delete();
-                \App\Models\Construction\VehicleLocationPing::where('project_id', $projectId)->delete();
+                VehicleAssignment::where('project_id', $projectId)->delete();
+                VehicleLocationPing::where('project_id', $projectId)->delete();
                 \App\Models\Construction\EquipmentAllocation::where('project_id', $projectId)->delete();
                 \App\Models\Construction\EquipmentUsageLog::where('project_id', $projectId)->delete();
                 \App\Models\Construction\ProjectHandoverItem::whereIn(

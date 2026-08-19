@@ -112,7 +112,7 @@ class MobileConstructionControllerTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $role->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         ProjectTeamMember::create([
@@ -138,7 +138,7 @@ class MobileConstructionControllerTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $role->id,
             'project_id' => null,
-            'status' => 'active',
+            'status' => 1,
         ]);
     }
 

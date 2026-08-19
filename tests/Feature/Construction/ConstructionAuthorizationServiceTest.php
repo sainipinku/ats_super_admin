@@ -124,7 +124,7 @@ class ConstructionAuthorizationServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $role->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         ProjectTeamMember::create([
@@ -152,13 +152,13 @@ class ConstructionAuthorizationServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
         MemberRoleAssignment::create([
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $service = app(ConstructionAuthorizationService::class);
@@ -183,7 +183,7 @@ class ConstructionAuthorizationServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $projectA->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $service = app(ConstructionAuthorizationService::class);
@@ -205,7 +205,7 @@ class ConstructionAuthorizationServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'inactive',
+            'status' => 0,
         ]);
 
         $service = app(ConstructionAuthorizationService::class);
@@ -228,7 +228,7 @@ class ConstructionAuthorizationServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $role->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $service = app(ConstructionAuthorizationService::class);
@@ -249,7 +249,7 @@ class ConstructionAuthorizationServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $role->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $role->delete();
@@ -272,7 +272,7 @@ class ConstructionAuthorizationServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $role->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $service = app(ConstructionAuthorizationService::class);
@@ -297,7 +297,7 @@ class ConstructionAuthorizationServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => null,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         // Member is attached to project A but NOT project B.
@@ -332,7 +332,7 @@ class ConstructionAuthorizationServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $projectA->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $service = app(ConstructionAuthorizationService::class);
@@ -392,7 +392,7 @@ class ConstructionAuthorizationServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $service = app(ConstructionAuthorizationService::class);
@@ -411,7 +411,7 @@ class ConstructionAuthorizationServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => null,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $this->assertNull($service->resolveActiveRole($member, null, null));

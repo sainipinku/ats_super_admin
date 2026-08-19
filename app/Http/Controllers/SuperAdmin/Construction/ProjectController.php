@@ -18,6 +18,8 @@ use App\Models\Construction\ExecutionTask;
 use App\Models\Construction\SurveyPlan;
 use App\Models\Construction\SurveySubmission;
 use App\Models\Construction\SurveyVisit;
+use App\Models\Construction\VehicleAssignment;
+use App\Models\Construction\VehicleLocationPing;
 use App\Models\Member;
 use App\Services\Construction\ConstructionActivityService;
 use App\Services\Construction\ConstructionTeamAssignmentService;
@@ -933,7 +935,7 @@ class ProjectController extends Controller
                     $projectId
                 )->delete();
 
-                \App\Models\MemberRoleAssignment::where(
+                MemberRoleAssignment::where(
                     'project_id',
                     $projectId
                 )->delete();
@@ -948,12 +950,12 @@ class ProjectController extends Controller
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\VehicleAssignment::where(
+                VehicleAssignment::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\VehicleLocationPing::where(
+                VehicleLocationPing::where(
                     'project_id',
                     $projectId
                 )->delete();

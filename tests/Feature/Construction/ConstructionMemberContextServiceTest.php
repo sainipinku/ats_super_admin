@@ -121,7 +121,7 @@ class ConstructionMemberContextServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         ProjectTeamMember::create([
@@ -151,7 +151,7 @@ class ConstructionMemberContextServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         ProjectTeamMember::create([
@@ -181,13 +181,13 @@ class ConstructionMemberContextServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $projectA->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
         MemberRoleAssignment::create([
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $projectB->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         // Project-specific role cannot resolve without an explicit project.
@@ -209,7 +209,7 @@ class ConstructionMemberContextServiceTest extends TestCase
                 'member_id' => $member->id,
                 'role_id' => $role->id,
                 'project_id' => $project->id,
-                'status' => 'active',
+                'status' => 1,
             ]);
             ProjectTeamMember::create([
                 'project_id' => $project->id,
@@ -239,7 +239,7 @@ class ConstructionMemberContextServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $reviewer->id,
             'project_id' => null,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $context = $this->service()->getWebContext($member, 'review_approver');
@@ -261,7 +261,7 @@ class ConstructionMemberContextServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $reviewer->id,
             'project_id' => null,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $context = $this->service()->getWebContext($member);
@@ -289,14 +289,14 @@ class ConstructionMemberContextServiceTest extends TestCase
                 'member_id' => $member->id,
                 'role_id' => $role->id,
                 'project_id' => $projectA->id,
-                'status' => 'active',
+                'status' => 1,
             ]);
         }
         MemberRoleAssignment::create([
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $projectB->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $context = $this->service()->getMobileContext($member, 'vehicle_driver', $projectA->id);
@@ -322,13 +322,13 @@ class ConstructionMemberContextServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
         MemberRoleAssignment::create([
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $context = $this->service()->getMobileContext($member, 'surveyor', $project->id);
@@ -351,13 +351,13 @@ class ConstructionMemberContextServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $projectA->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
         MemberRoleAssignment::create([
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $projectB->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $this->expectException(AuthorizationException::class);
@@ -375,7 +375,7 @@ class ConstructionMemberContextServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $this->expectException(AuthorizationException::class);
@@ -393,7 +393,7 @@ class ConstructionMemberContextServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $this->expectException(AuthorizationException::class);
@@ -415,7 +415,7 @@ class ConstructionMemberContextServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $role->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         // The same permission set is returned for both web and mobile contexts.
@@ -439,7 +439,7 @@ class ConstructionMemberContextServiceTest extends TestCase
                 'member_id' => $member->id,
                 'role_id' => $role->id,
                 'project_id' => $project->id,
-                'status' => 'active',
+                'status' => 1,
             ]);
         }
 
@@ -463,7 +463,7 @@ class ConstructionMemberContextServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'inactive',
+            'status' => 0,
         ]);
 
         $this->expectException(AuthorizationException::class);
@@ -483,13 +483,13 @@ class ConstructionMemberContextServiceTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $projectA->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
         MemberRoleAssignment::create([
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $projectB->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         $context = $this->service()->getMobileContext($member, 'vehicle_driver', $projectB->id);

@@ -115,7 +115,7 @@ class MemberConstructionControllerTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $role->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
 
         ProjectTeamMember::create([

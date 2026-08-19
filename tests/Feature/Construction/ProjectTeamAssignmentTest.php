@@ -104,7 +104,7 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $role->id,
             'project_id' => $project->id,
-            'status' => $status,
+            'status' => $status === 'active' ? 1 : 0,
         ]);
 
         return $teamMember;
@@ -143,7 +143,7 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
     }
 
@@ -177,14 +177,14 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
         // Surveyor assignment remains untouched.
         $this->assertDatabaseHas('construction_member_role_assignments', [
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
     }
 
@@ -228,13 +228,13 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $projectA->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
         $this->assertDatabaseHas('construction_member_role_assignments', [
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $projectB->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
     }
 
@@ -314,7 +314,7 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'inactive',
+            'status' => 0,
         ]);
     }
 
@@ -340,7 +340,7 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
     }
 
@@ -383,13 +383,13 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'inactive',
+            'status' => 0,
         ]);
         $this->assertDatabaseHas('construction_member_role_assignments', [
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
     }
 
@@ -424,14 +424,14 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'inactive',
+            'status' => 0,
         ]);
         // New driver authorization active.
         $this->assertDatabaseHas('construction_member_role_assignments', [
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
     }
 
@@ -459,7 +459,7 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
     }
 
@@ -490,21 +490,21 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
         // Surveyor deactivated.
         $this->assertDatabaseHas('construction_member_role_assignments', [
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'inactive',
+            'status' => 0,
         ]);
         // Site employee active.
         $this->assertDatabaseHas('construction_member_role_assignments', [
             'member_id' => $member->id,
             'role_id' => $siteEmployee->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
     }
 
@@ -532,14 +532,14 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $memberA->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'inactive',
+            'status' => 0,
         ]);
         // New member's authorization active.
         $this->assertDatabaseHas('construction_member_role_assignments', [
             'member_id' => $memberB->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
     }
 
@@ -593,7 +593,7 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $project->id,
-            'status' => 'inactive',
+            'status' => 0,
         ]);
     }
 
@@ -616,7 +616,7 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $driver->id,
             'project_id' => $project->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
     }
 
@@ -640,7 +640,7 @@ class ProjectTeamAssignmentTest extends TestCase
             'member_id' => $member->id,
             'role_id' => $surveyor->id,
             'project_id' => $projectB->id,
-            'status' => 'active',
+            'status' => 1,
         ]);
     }
 
