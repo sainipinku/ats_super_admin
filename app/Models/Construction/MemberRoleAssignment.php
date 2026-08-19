@@ -14,6 +14,13 @@ class MemberRoleAssignment extends Model
         'member_id',
         'role_id',
         'project_id',
+        'is_senior',
+        'can_self_draft',
+    ];
+
+    protected $casts = [
+        'is_senior' => 'boolean',
+        'can_self_draft' => 'boolean',
     ];
 
     public function member(): BelongsTo

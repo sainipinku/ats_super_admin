@@ -15,6 +15,8 @@ class SurveyPlanMember extends Model
         'member_id',
         'role_in_survey',
         'status',
+        'survey_team_id',
+        'work_type',
     ];
 
     public function surveyPlan(): BelongsTo

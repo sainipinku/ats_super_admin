@@ -23,12 +23,20 @@ class Member extends Authenticatable
         'uuid',
         'created_by',
         'assigned_admin_id',
+        'approved_by',
+        'approved_at',
+        'approval_notes',
         'is_calling_team',
         'name',
         'username',
         'email',
         'phone',
+        'company_name',
+        'state',
+        'city',
         'password',
+        'terms_agreed',
+        'terms_agreed_at',
         'must_change_password',
         'status',
         'roles',
@@ -59,6 +67,8 @@ class Member extends Authenticatable
         'otp_expire' => 'datetime',
         'dob' => 'date',
         'phone_verify_at' => 'datetime',
+        'approved_at' => 'datetime',
+        'terms_agreed_at' => 'datetime',
         'reset_password_token_expires_at' => 'datetime',
         'password' => 'hashed',
         'candidate_profile' => 'array',
@@ -66,6 +76,7 @@ class Member extends Authenticatable
         'resume_size' => 'integer',
         'is_calling_team' => 'boolean',
         'must_change_password' => 'boolean',
+        'terms_agreed' => 'boolean',
     ];
     public function uniqueIds()
     {
@@ -78,6 +89,11 @@ class Member extends Authenticatable
         return $this->belongsTo(Member::class, 'created_by');
     }
 
+    public function approver()
+    {
+        return $this->belongsTo(SuperAdmin::class, 'approved_by');
+    }
+
     public function assignedAdmin()
     {
         return $this->belongsTo(Member::class, 'assigned_admin_id');
@@ -86,6 +102,16 @@ class Member extends Authenticatable
     public function callingTeamAssignments()
     {
         return $this->hasMany(JobApplication::class, 'assigned_calling_team_member_id');
+    }
+
+    public function scopePendingApproval($query)
+    {
+        return $query->where('status', '0')->whereNull('approved_at');
+    }
+
+    public function scopeApproved($query)
+    {
+        return $query->where('status', '1')->whereNotNull('approved_at');
     }
 
 

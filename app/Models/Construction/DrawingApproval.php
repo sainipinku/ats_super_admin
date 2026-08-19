@@ -21,11 +21,14 @@ class DrawingApproval extends Model
         'approved_at',
         'decision',
         'remarks',
+        'skip_junior_review',
+        'review_level',
     ];
 
     protected $casts = [
         'requested_at' => 'datetime',
         'approved_at' => 'datetime',
+        'skip_junior_review' => 'boolean',
     ];
 
     public function project(): BelongsTo

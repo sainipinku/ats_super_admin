@@ -21,11 +21,17 @@ class DraftingJob extends Model
         'assigned_at',
         'due_date',
         'status',
+        'rejection_reason',
+        'rejected_by_member_id',
+        'rejected_at',
+        'rejection_count',
     ];
 
     protected $casts = [
         'assigned_at' => 'datetime',
         'due_date' => 'date',
+        'rejected_at' => 'datetime',
+        'rejection_count' => 'integer',
     ];
 
     public function project(): BelongsTo
@@ -51,5 +57,10 @@ class DraftingJob extends Model
     public function drawingRevisions(): HasMany
     {
         return $this->hasMany(DrawingRevision::class);
+    }
+
+    public function rejectedBy(): BelongsTo
+    {
+        return $this->belongsTo(Member::class, 'rejected_by_member_id');
     }
 }
