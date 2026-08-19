@@ -2,16 +2,16 @@
 
 namespace Tests\Feature\Construction;
 
-use App\Models\Construction\Client;
-use App\Models\Construction\Company;
-use App\Models\Construction\ExecutionPlan;
-use App\Models\Construction\ExecutionTask;
-use App\Models\Construction\ExecutionTaskAssignee;
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\ExecutionPlan;
+use App\Models\ExecutionTask;
+use App\Models\ExecutionTaskAssignee;
 use App\Models\MemberRoleAssignment;
-use App\Models\Construction\Permission;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\Role;
+use App\Models\Permission;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
+use App\Models\ConstructionRole;
 use App\Models\Member;
 use App\Models\SuperAdmin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -79,9 +79,9 @@ class MemberConstructionControllerTest extends TestCase
         ]);
     }
 
-    private function createRole(string $slug, string $name = 'Role'): Role
+    private function createRole(string $slug, string $name = 'Role'): ConstructionRole
     {
-        return Role::create([
+        return ConstructionRole::create([
             'name' => $name,
             'slug' => $slug,
             'description' => $name,
@@ -101,7 +101,7 @@ class MemberConstructionControllerTest extends TestCase
 
     private function assignRoleToProject(
         Member $member,
-        Role $role,
+        ConstructionRole $role,
         Project $project,
         array $permissionSlugs = []
     ): void {
@@ -343,14 +343,14 @@ class MemberConstructionControllerTest extends TestCase
         $this->assignRoleToProject($member, $siteEmployee, $projectA, ['material_issue.manage']);
         $this->assignRoleToProject($member, $siteEmployee, $projectB, ['material_issue.manage']);
 
-        \App\Models\Construction\Material::create([
+        \App\Models\Material::create([
             'project_id' => $projectA->id,
             'material_code' => 'MAT-A',
             'name' => 'Cement A',
             'unit' => 'bag',
             'status' => 'active',
         ]);
-        \App\Models\Construction\Material::create([
+        \App\Models\Material::create([
             'project_id' => $projectB->id,
             'material_code' => 'MAT-B',
             'name' => 'Cement B',

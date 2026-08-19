@@ -2,10 +2,10 @@
 
 namespace App\Services\Construction;
 
-use App\Models\Construction\ClientInvoice;
-use App\Models\Construction\ClientInvoiceItem;
-use App\Models\Construction\ClientPayment;
-use App\Models\Construction\Project;
+use App\Models\ClientInvoice;
+use App\Models\ClientInvoiceItem;
+use App\Models\ClientPayment;
+use App\Models\Project;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

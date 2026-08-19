@@ -2,8 +2,8 @@
 
 namespace App\Services\Construction;
 
-use App\Models\Construction\Project;
-use App\Models\Construction\Role;
+use App\Models\Project;
+use App\Models\ConstructionRole;
 use App\Models\Member;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;

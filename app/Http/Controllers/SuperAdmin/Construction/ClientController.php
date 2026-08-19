@@ -4,8 +4,8 @@ namespace App\Http\Controllers\SuperAdmin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\Client;
-use App\Models\Construction\Company;
+use App\Models\Client;
+use App\Models\Company;
 use App\Services\Construction\ConstructionActivityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

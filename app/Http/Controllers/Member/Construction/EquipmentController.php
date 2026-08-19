@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Member\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\Equipment;
-use App\Models\Construction\EquipmentAllocation;
-use App\Models\Construction\EquipmentUsageLog;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
+use App\Models\ConstructionEquipment;
+use App\Models\EquipmentAllocation;
+use App\Models\EquipmentUsageLog;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
 use App\Models\Member;
 use App\Services\Construction\ConstructionEquipmentService;
 use Illuminate\Http\RedirectResponse;
@@ -30,7 +30,7 @@ class EquipmentController extends Controller
 
         return Inertia::render('Member/Construction/Equipment/Index', [
             'projects' => Project::whereIn('id', $projectIds)->orderByDesc('id')->get(['id', 'project_code', 'name']),
-            'equipments' => Equipment::with('project')->whereIn('project_id', $projectIds)->latest()->take(80)->get(),
+            'equipments' => ConstructionEquipment::with('project')->whereIn('project_id', $projectIds)->latest()->take(80)->get(),
             'allocations' => EquipmentAllocation::with(['project', 'equipment', 'assignedTo'])
                 ->whereIn('project_id', $projectIds)
                 ->latest()

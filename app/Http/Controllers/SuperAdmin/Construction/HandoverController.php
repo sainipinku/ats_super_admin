@@ -4,9 +4,9 @@ namespace App\Http\Controllers\SuperAdmin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectHandover;
-use App\Models\Construction\ProjectHandoverItem;
+use App\Models\Project;
+use App\Models\ProjectHandover;
+use App\Models\ProjectHandoverItem;
 use App\Services\Construction\ConstructionHandoverService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

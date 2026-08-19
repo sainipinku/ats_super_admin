@@ -4,7 +4,7 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEquipmentRequest;
-use App\Models\Construction\Project;
+use App\Models\Project;
 use App\Models\Employee;
 use App\Models\Equipment;
 use App\Models\EquipmentCategory;

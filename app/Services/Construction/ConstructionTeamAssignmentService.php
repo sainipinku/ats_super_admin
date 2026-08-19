@@ -3,9 +3,9 @@
 namespace App\Services\Construction;
 
 use App\Models\MemberRoleAssignment;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\Role;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
+use App\Models\ConstructionRole;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -232,7 +232,7 @@ class ConstructionTeamAssignmentService
      */
     private function ensureRoleAssignable(int $roleId): void
     {
-        $role = Role::withTrashed()->find($roleId);
+        $role = ConstructionRole::withTrashed()->find($roleId);
 
         if (
             !$role

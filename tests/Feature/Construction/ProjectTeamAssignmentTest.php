@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\Construction;
 
-use App\Models\Construction\Client;
-use App\Models\Construction\Company;
+use App\Models\Client;
+use App\Models\Company;
 use App\Models\MemberRoleAssignment;
-use App\Models\Construction\Permission;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\Role;
+use App\Models\Permission;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
+use App\Models\ConstructionRole;
 use App\Models\Member;
 use App\Models\SuperAdmin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -76,9 +76,9 @@ class ProjectTeamAssignmentTest extends TestCase
         ]);
     }
 
-    private function createRole(string $slug, string $name = 'Role', string $status = 'active'): Role
+    private function createRole(string $slug, string $name = 'Role', string $status = 'active'): ConstructionRole
     {
-        return Role::create([
+        return ConstructionRole::create([
             'name' => $name,
             'slug' => $slug,
             'description' => $name,
@@ -90,7 +90,7 @@ class ProjectTeamAssignmentTest extends TestCase
     private function assignTeam(
         Project $project,
         Member $member,
-        Role $role,
+        ConstructionRole $role,
         string $status = 'active'
     ): ProjectTeamMember {
         $teamMember = ProjectTeamMember::create([

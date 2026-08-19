@@ -4,27 +4,27 @@ namespace App\Http\Controllers\SuperAdmin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\ActivityLog;
-use App\Models\Construction\AttendanceRecord;
-use App\Models\Construction\Client;
-use App\Models\Construction\ClientInvoice;
-use App\Models\Construction\ClientPayment;
-use App\Models\Construction\Company;
-use App\Models\Construction\DailyProgressReport;
-use App\Models\Construction\DraftingJob;
-use App\Models\Construction\Equipment;
-use App\Models\Construction\EquipmentAllocation;
-use App\Models\Construction\MaterialReceipt;
-use App\Models\Construction\MaterialReceiptItem;
-use App\Models\Construction\Project;
-use App\Models\Construction\PurchaseOrder;
-use App\Models\Construction\SurveyPlan;
-use App\Models\Construction\SurveyPlanMember;
-use App\Models\Construction\SurveySubmission;
-use App\Models\Construction\ExecutionTask;
-use App\Models\Construction\Vehicle;
-use App\Models\Construction\VehicleAssignment;
-use App\Models\Construction\VehicleLocationPing;
+use App\Models\ConstructionActivityLog;
+use App\Models\AttendanceRecord;
+use App\Models\Client;
+use App\Models\ClientInvoice;
+use App\Models\ClientPayment;
+use App\Models\Company;
+use App\Models\DailyProgressReport;
+use App\Models\DraftingJob;
+use App\Models\ConstructionEquipment;
+use App\Models\EquipmentAllocation;
+use App\Models\MaterialReceipt;
+use App\Models\MaterialReceiptItem;
+use App\Models\Project;
+use App\Models\PurchaseOrder;
+use App\Models\SurveyPlan;
+use App\Models\SurveyPlanMember;
+use App\Models\SurveySubmission;
+use App\Models\ExecutionTask;
+use App\Models\ConstructionVehicle;
+use App\Models\VehicleAssignment;
+use App\Models\VehicleLocationPing;
 use App\Models\Member;
 use Carbon\Carbon;
 use Inertia\Inertia;
@@ -76,10 +76,10 @@ class DashboardController extends Controller
         $surveyTeams = SurveyPlan::distinct()->count('id');
         $surveyTeamMembers = SurveyPlanMember::distinct()->count('member_id');
 
-        $totalVehicles = Vehicle::count();
-        $activeVehicles = Vehicle::whereIn('status', ['active', 'assigned', 'in_use'])->count();
+        $totalVehicles = ConstructionVehicle::count();
+        $activeVehicles = ConstructionVehicle::whereIn('status', ['active', 'assigned', 'in_use'])->count();
 
-        $totalEquipment = Equipment::count();
+        $totalEquipment = ConstructionEquipment::count();
         $allocatedEquipment = EquipmentAllocation::distinct()->count('equipment_id');
 
         $totalClients = Client::count();
@@ -191,7 +191,7 @@ class DashboardController extends Controller
                 'attendancePending' => AttendanceRecord::where('status', 'pending')->count(),
             ],
             'recentProjects' => $projects,
-            'recentActivity' => ActivityLog::with(['project'])
+            'recentActivity' => ConstructionActivityLog::with(['project'])
                 ->latest('created_at')
                 ->take(10)
                 ->get(),

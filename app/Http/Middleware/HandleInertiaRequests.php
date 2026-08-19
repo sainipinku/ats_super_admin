@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Construction\Project;
+use App\Models\Project;
 use App\Services\Construction\ConstructionAuthorizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;

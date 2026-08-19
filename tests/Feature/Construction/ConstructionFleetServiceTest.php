@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Construction;
 
-use App\Models\Construction\Client;
-use App\Models\Construction\Company;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\Vehicle;
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
+use App\Models\ConstructionVehicle;
 use App\Models\Member;
 use App\Models\SuperAdmin;
 use App\Services\Construction\ConstructionFleetService;
@@ -32,7 +32,7 @@ class ConstructionFleetServiceTest extends TestCase
             'status' => 'active',
         ]);
 
-        $vehicleB = Vehicle::create([
+        $vehicleB = ConstructionVehicle::create([
             'project_id' => $projectB->id,
             'vehicle_code' => 'VEH-00001',
             'registration_number' => 'MH12AB1234',
@@ -69,7 +69,7 @@ class ConstructionFleetServiceTest extends TestCase
             'status' => 'active',
         ]);
 
-        $vehicle = Vehicle::create([
+        $vehicle = ConstructionVehicle::create([
             'project_id' => $project->id,
             'vehicle_code' => 'VEH-00002',
             'registration_number' => 'GJ01CD9999',
@@ -110,7 +110,7 @@ class ConstructionFleetServiceTest extends TestCase
             'status' => 'active',
         ]);
 
-        $vehicle = Vehicle::create([
+        $vehicle = ConstructionVehicle::create([
             'project_id' => $project->id,
             'vehicle_code' => 'VEH-00003',
             'registration_number' => 'RJ14EF4444',

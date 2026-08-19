@@ -2,11 +2,11 @@
 
 namespace App\Services\Construction;
 
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\Vehicle;
-use App\Models\Construction\VehicleAssignment;
-use App\Models\Construction\VehicleLocationPing;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
+use App\Models\ConstructionVehicle;
+use App\Models\VehicleAssignment;
+use App\Models\VehicleLocationPing;
 use App\Models\Member;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -20,12 +20,12 @@ class ConstructionFleetService
     ) {
     }
 
-    public function createVehicle(Project $project, array $validated, ?Model $actor, ?Request $request = null): Vehicle
+    public function createVehicle(Project $project, array $validated, ?Model $actor, ?Request $request = null): ConstructionVehicle
     {
         return DB::transaction(function () use ($project, $validated, $actor, $request) {
             $registrationNumber = strtoupper(trim((string) $validated['registration_number']));
 
-            $exists = Vehicle::query()
+            $exists = ConstructionVehicle::query()
                 ->where('project_id', $project->id)
                 ->where('registration_number', $registrationNumber)
                 ->exists();
@@ -36,10 +36,10 @@ class ConstructionFleetService
                 ]);
             }
 
-            $nextId = (Vehicle::max('id') ?? 0) + 1;
+            $nextId = (ConstructionVehicle::max('id') ?? 0) + 1;
             $vehicleCode = $validated['vehicle_code'] ?? ('VEH-' . str_pad((string) $nextId, 5, '0', STR_PAD_LEFT));
 
-            $vehicle = Vehicle::create([
+            $vehicle = ConstructionVehicle::create([
                 'project_id' => $project->id,
                 'vehicle_code' => $vehicleCode,
                 'registration_number' => $registrationNumber,
@@ -72,7 +72,7 @@ class ConstructionFleetService
     public function assignVehicle(Project $project, array $validated, ?Model $actor, ?Request $request = null): VehicleAssignment
     {
         return DB::transaction(function () use ($project, $validated, $actor, $request) {
-            $vehicle = Vehicle::query()
+            $vehicle = ConstructionVehicle::query()
                 ->whereKey((int) $validated['vehicle_id'])
                 ->where('project_id', $project->id)
                 ->first();
@@ -143,7 +143,7 @@ class ConstructionFleetService
     public function recordLocationPing(Project $project, array $validated, ?Model $actor, ?Request $request = null): VehicleLocationPing
     {
         return DB::transaction(function () use ($project, $validated, $actor, $request) {
-            $vehicle = Vehicle::query()
+            $vehicle = ConstructionVehicle::query()
                 ->whereKey((int) $validated['vehicle_id'])
                 ->where('project_id', $project->id)
                 ->first();

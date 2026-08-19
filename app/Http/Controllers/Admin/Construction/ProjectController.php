@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Admin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\ActivityLog;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
+use App\Models\ConstructionActivityLog;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
 use App\Models\Member;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -56,7 +56,7 @@ class ProjectController extends Controller
 
         return Inertia::render('Admin/Construction/Projects/Show', [
             'project' => $project,
-            'activityLog' => ActivityLog::with('actor')
+            'activityLog' => ConstructionActivityLog::with('actor')
                 ->where('project_id', $project->id)
                 ->latest('created_at')
                 ->take(15)

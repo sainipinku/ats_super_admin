@@ -4,24 +4,24 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\AttendanceRecord;
-use App\Models\Construction\Client;
-use App\Models\Construction\Company;
-use App\Models\Construction\DailyProgressReport;
-use App\Models\Construction\DraftingJob;
-use App\Models\Construction\DrawingApproval;
-use App\Models\Construction\Equipment;
-use App\Models\Construction\EquipmentAllocation;
-use App\Models\Construction\ExecutionPlan;
-use App\Models\Construction\ExecutionTask;
-use App\Models\Construction\Material;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectBudget;
-use App\Models\Construction\ProjectHandover;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\SurveyPlan;
-use App\Models\Construction\SurveySubmission;
-use App\Models\Construction\Vehicle;
+use App\Models\AttendanceRecord;
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\DailyProgressReport;
+use App\Models\DraftingJob;
+use App\Models\DrawingApproval;
+use App\Models\ConstructionEquipment;
+use App\Models\EquipmentAllocation;
+use App\Models\ExecutionPlan;
+use App\Models\ExecutionTask;
+use App\Models\Material;
+use App\Models\Project;
+use App\Models\ProjectBudget;
+use App\Models\ProjectHandover;
+use App\Models\ProjectTeamMember;
+use App\Models\SurveyPlan;
+use App\Models\SurveySubmission;
+use App\Models\ConstructionVehicle;
 use App\Models\Member;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -444,12 +444,12 @@ class AdminDashboardApiController extends Controller
                 $projectIdsArr
             )->count(),
 
-            'vehicles_count' => Vehicle::whereIn(
+            'vehicles_count' => ConstructionVehicle::whereIn(
                 'project_id',
                 $projectIdsArr
             )->count(),
 
-            'equipment_count' => Equipment::whereIn(
+            'equipment_count' => ConstructionEquipment::whereIn(
                 'project_id',
                 $projectIdsArr
             )->count(),

@@ -3,10 +3,10 @@
 namespace App\Services\Construction;
 
 use App\Models\MemberRoleAssignment;
-use App\Models\Construction\Permission;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\Role;
+use App\Models\Permission;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
+use App\Models\ConstructionRole;
 use App\Models\Member;
 use App\Models\SuperAdmin;
 use Illuminate\Database\Eloquent\Builder;
@@ -195,7 +195,7 @@ class ConstructionAuthorizationService
         Member $member,
         ?int $projectId = null
     ): Collection {
-        $query = Role::query()
+        $query = ConstructionRole::query()
             ->join(
                 'construction_member_role_assignments',
                 'construction_member_role_assignments.role_id',
@@ -231,7 +231,7 @@ class ConstructionAuthorizationService
      */
    public function getGlobalRoles(Member $member): Collection
 {
-    return Role::query()
+    return ConstructionRole::query()
         ->whereHas('assignments', function ($query) use ($member) {
             $query
                 ->where('member_id', $member->getKey())
@@ -307,7 +307,7 @@ class ConstructionAuthorizationService
      */
     public function getPermissionsForRole(
         Member $member,
-        Role $role,
+        ConstructionRole $role,
         ?int $projectId = null
     ): array {
         $query = Permission::query()

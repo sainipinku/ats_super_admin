@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Admin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectHandover;
-use App\Models\Construction\ProjectHandoverItem;
-use App\Models\Construction\ProjectTeamMember;
+use App\Models\Project;
+use App\Models\ProjectHandover;
+use App\Models\ProjectHandoverItem;
+use App\Models\ProjectTeamMember;
 use App\Models\Member;
 use App\Services\Construction\ConstructionHandoverService;
 use Illuminate\Http\RedirectResponse;

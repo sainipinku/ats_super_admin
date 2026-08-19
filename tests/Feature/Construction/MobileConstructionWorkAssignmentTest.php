@@ -2,23 +2,23 @@
 
 namespace Tests\Feature\Construction;
 
-use App\Models\Construction\Client;
-use App\Models\Construction\Company;
-use App\Models\Construction\Equipment;
-use App\Models\Construction\EquipmentAllocation;
-use App\Models\Construction\ExecutionPlan;
-use App\Models\Construction\ExecutionTask;
-use App\Models\Construction\ExecutionTaskAssignee;
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\ConstructionEquipment;
+use App\Models\EquipmentAllocation;
+use App\Models\ExecutionPlan;
+use App\Models\ExecutionTask;
+use App\Models\ExecutionTaskAssignee;
 use App\Models\MemberRoleAssignment;
-use App\Models\Construction\Permission;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\Role;
-use App\Models\Construction\SurveyPlan;
-use App\Models\Construction\SurveyPlanMember;
-use App\Models\Construction\SurveyVisit;
-use App\Models\Construction\Vehicle;
-use App\Models\Construction\VehicleAssignment;
+use App\Models\Permission;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
+use App\Models\ConstructionRole;
+use App\Models\SurveyPlan;
+use App\Models\SurveyPlanMember;
+use App\Models\SurveyVisit;
+use App\Models\ConstructionVehicle;
+use App\Models\VehicleAssignment;
 use App\Models\Member;
 use App\Models\SuperAdmin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -86,9 +86,9 @@ class MobileConstructionWorkAssignmentTest extends TestCase
         ]);
     }
 
-    private function createRole(string $slug, string $name = 'Role'): Role
+    private function createRole(string $slug, string $name = 'Role'): ConstructionRole
     {
-        return Role::create([
+        return ConstructionRole::create([
             'name' => $name,
             'slug' => $slug,
             'description' => $name,
@@ -99,7 +99,7 @@ class MobileConstructionWorkAssignmentTest extends TestCase
 
     private function assignRoleToProject(
         Member $member,
-        Role $role,
+        ConstructionRole $role,
         Project $project,
         array $permissionSlugs = []
     ): void {
@@ -152,9 +152,9 @@ class MobileConstructionWorkAssignmentTest extends TestCase
         ]);
     }
 
-    private function createVehicle(Project $project, string $code = 'VEH-001'): Vehicle
+    private function createVehicle(Project $project, string $code = 'VEH-001'): ConstructionVehicle
     {
-        return Vehicle::create([
+        return ConstructionVehicle::create([
             'project_id' => $project->id,
             'vehicle_code' => $code,
             'registration_number' => 'RJ14' . Str::upper(Str::random(4)),
@@ -162,9 +162,9 @@ class MobileConstructionWorkAssignmentTest extends TestCase
         ]);
     }
 
-    private function createEquipment(Project $project, string $code = 'EQP-001'): Equipment
+    private function createEquipment(Project $project, string $code = 'EQP-001'): ConstructionEquipment
     {
-        return Equipment::create([
+        return ConstructionEquipment::create([
             'project_id' => $project->id,
             'equipment_code' => $code,
             'name' => 'Equipment ' . $code,

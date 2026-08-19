@@ -4,19 +4,19 @@ namespace App\Http\Controllers\Member;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\ActivityLog;
-use App\Models\Construction\AttendanceRecord;
-use App\Models\Construction\DailyProgressReport;
-use App\Models\Construction\DraftingJob;
-use App\Models\Construction\DrawingApproval;
-use App\Models\Construction\ExecutionTask;
-use App\Models\Construction\ExecutionTaskAssignee;
-use App\Models\Construction\Material;
-use App\Models\Construction\MaterialIssue;
-use App\Models\Construction\MaterialStock;
-use App\Models\Construction\Project;
-use App\Models\Construction\SurveyPlan;
-use App\Models\Construction\VehicleAssignment;
+use App\Models\ConstructionActivityLog;
+use App\Models\AttendanceRecord;
+use App\Models\DailyProgressReport;
+use App\Models\DraftingJob;
+use App\Models\DrawingApproval;
+use App\Models\ExecutionTask;
+use App\Models\ExecutionTaskAssignee;
+use App\Models\Material;
+use App\Models\MaterialIssue;
+use App\Models\MaterialStock;
+use App\Models\Project;
+use App\Models\SurveyPlan;
+use App\Models\VehicleAssignment;
 use App\Models\Member;
 use App\Services\Construction\ConstructionAuthorizationService;
 use App\Services\Construction\ConstructionExecutionService;
@@ -115,7 +115,7 @@ class ConstructionController extends Controller
             ...$this->serializeContext($context),
             'project' => $project,
             'activityLog' => in_array('activity_log.view', $permissions)
-                ? ActivityLog::with('actor')
+                ? ConstructionActivityLog::with('actor')
                     ->where('project_id', $project->id)
                     ->latest('created_at')
                     ->take(15)

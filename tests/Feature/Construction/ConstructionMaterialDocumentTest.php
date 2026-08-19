@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Construction;
 
-use App\Models\Construction\Client;
-use App\Models\Construction\Company;
-use App\Models\Construction\Material;
-use App\Models\Construction\Project;
-use App\Models\Construction\Vendor;
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\Material;
+use App\Models\Project;
+use App\Models\Vendor;
 use App\Models\Member;
 use App\Models\SuperAdmin;
 use App\Services\Construction\ConstructionMaterialService;

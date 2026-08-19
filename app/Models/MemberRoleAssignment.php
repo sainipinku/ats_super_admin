@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Models\Construction\Project;
-use App\Models\Construction\Role;
+use App\Models\Project;
+use App\Models\ConstructionRole;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -29,7 +29,7 @@ class MemberRoleAssignment extends Model
 
     public function role(): BelongsTo
     {
-        return $this->belongsTo(Role::class);
+        return $this->belongsTo(ConstructionRole::class);
     }
 
     public function project(): BelongsTo

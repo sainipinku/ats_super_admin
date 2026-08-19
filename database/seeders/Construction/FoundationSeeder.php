@@ -2,8 +2,8 @@
 
 namespace Database\Seeders\Construction;
 
-use App\Models\Construction\Permission;
-use App\Models\Construction\Role;
+use App\Models\Permission;
+use App\Models\ConstructionRole;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -75,7 +75,7 @@ class FoundationSeeder extends Seeder
         ];
 
         foreach ($roles as $roleData) {
-            $role = Role::updateOrCreate(
+            $role = ConstructionRole::updateOrCreate(
                 ['slug' => $roleData['slug']],
                 [...$roleData, 'status' => 'active']
             );

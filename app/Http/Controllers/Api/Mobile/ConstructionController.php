@@ -3,30 +3,30 @@
 namespace App\Http\Controllers\Api\Mobile;
 
 use App\Http\Controllers\Controller;
-use App\Models\Construction\AttendanceRecord;
-use App\Models\Construction\ClientInvoice;
-use App\Models\Construction\ClientPayment;
-use App\Models\Construction\DailyProgressReport;
-use App\Models\Construction\DraftingJob;
-use App\Models\Construction\Equipment;
-use App\Models\Construction\EquipmentAllocation;
-use App\Models\Construction\EquipmentUsageLog;
-use App\Models\Construction\ExecutionTask;
-use App\Models\Construction\ExecutionTaskAssignee;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectHandover;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\SurveyEntry;
-use App\Models\Construction\SurveyMeasurement;
-use App\Models\Construction\SurveyPlan;
-use App\Models\Construction\SurveyPlanMember;
-use App\Models\Construction\SurveySubmission;
-use App\Models\Construction\SurveyVisit;
-use App\Models\Construction\Vehicle;
-use App\Models\Construction\VehicleAssignment;
-use App\Models\Construction\VehicleLocationPing;
-use App\Models\Construction\DrawingRevision;
-use App\Models\Construction\DrawingApproval;
+use App\Models\AttendanceRecord;
+use App\Models\ClientInvoice;
+use App\Models\ClientPayment;
+use App\Models\DailyProgressReport;
+use App\Models\DraftingJob;
+use App\Models\ConstructionEquipment;
+use App\Models\EquipmentAllocation;
+use App\Models\EquipmentUsageLog;
+use App\Models\ExecutionTask;
+use App\Models\ExecutionTaskAssignee;
+use App\Models\Project;
+use App\Models\ProjectHandover;
+use App\Models\ProjectTeamMember;
+use App\Models\SurveyEntry;
+use App\Models\SurveyMeasurement;
+use App\Models\SurveyPlan;
+use App\Models\SurveyPlanMember;
+use App\Models\SurveySubmission;
+use App\Models\SurveyVisit;
+use App\Models\ConstructionVehicle;
+use App\Models\VehicleAssignment;
+use App\Models\VehicleLocationPing;
+use App\Models\DrawingRevision;
+use App\Models\DrawingApproval;
 use App\Models\Member;
 use App\Services\Construction\ConstructionActivityService;
 use App\Services\Construction\ConstructionAuthorizationService;
@@ -874,7 +874,7 @@ class ConstructionController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'vehicles' => Vehicle::where(
+                'vehicles' => ConstructionVehicle::where(
                     'project_id',
                     $project->id
                 )
@@ -944,7 +944,7 @@ class ConstructionController extends Controller
             ],
         ]);
 
-        $vehicle = Vehicle::findOrFail(
+        $vehicle = ConstructionVehicle::findOrFail(
             $validated['vehicle_id']
         );
 
@@ -983,7 +983,7 @@ class ConstructionController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'equipments' => Equipment::where(
+                'equipments' => ConstructionEquipment::where(
                     'project_id',
                     $project->id
                 )
@@ -1048,7 +1048,7 @@ class ConstructionController extends Controller
             ],
         ]);
 
-        $equipment = Equipment::findOrFail(
+        $equipment = ConstructionEquipment::findOrFail(
             $validated['equipment_id']
         );
 
@@ -1268,7 +1268,7 @@ class ConstructionController extends Controller
      * active assigned driver for the vehicle.
      */
     private function ensureVehicleDriverAssignment(
-        Vehicle $vehicle,
+        ConstructionVehicle $vehicle,
         Member $member
     ): void {
         abort_unless(
@@ -1292,7 +1292,7 @@ class ConstructionController extends Controller
      * for the equipment.
      */
     private function ensureEquipmentAllocationAccess(
-        Equipment $equipment,
+        ConstructionEquipment $equipment,
         Member $member
     ): void {
         abort_unless(

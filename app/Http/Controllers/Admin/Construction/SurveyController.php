@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Admin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\SurveyPlan;
-use App\Models\Construction\SurveyPlanMember;
-use App\Models\Construction\SurveySubmission;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
+use App\Models\SurveyPlan;
+use App\Models\SurveyPlanMember;
+use App\Models\SurveySubmission;
 use App\Models\Member;
 use App\Services\Construction\ConstructionActivityService;
 use Illuminate\Http\RedirectResponse;

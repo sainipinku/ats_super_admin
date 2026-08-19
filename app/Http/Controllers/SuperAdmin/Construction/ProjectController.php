@@ -4,22 +4,22 @@ namespace App\Http\Controllers\SuperAdmin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\Client;
-use App\Models\Construction\Company;
-use App\Models\Construction\ActivityLog;
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\ConstructionActivityLog;
 use App\Models\MemberRoleAssignment;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectBudget;
-use App\Models\Construction\ProjectTeamMember;
-use App\Models\Construction\Role;
-use App\Models\Construction\AttendanceRecord;
-use App\Models\Construction\DailyProgressReport;
-use App\Models\Construction\ExecutionTask;
-use App\Models\Construction\SurveyPlan;
-use App\Models\Construction\SurveySubmission;
-use App\Models\Construction\SurveyVisit;
-use App\Models\Construction\VehicleAssignment;
-use App\Models\Construction\VehicleLocationPing;
+use App\Models\Project;
+use App\Models\ProjectBudget;
+use App\Models\ProjectTeamMember;
+use App\Models\ConstructionRole;
+use App\Models\AttendanceRecord;
+use App\Models\DailyProgressReport;
+use App\Models\ExecutionTask;
+use App\Models\SurveyPlan;
+use App\Models\SurveySubmission;
+use App\Models\SurveyVisit;
+use App\Models\VehicleAssignment;
+use App\Models\VehicleLocationPing;
 use App\Models\Member;
 use App\Services\Construction\ConstructionActivityService;
 use App\Services\Construction\ConstructionTeamAssignmentService;
@@ -120,7 +120,7 @@ class ProjectController extends Controller
         ];
 
         foreach ($defaultRoles as $rData) {
-            Role::firstOrCreate(
+            ConstructionRole::firstOrCreate(
                 ['slug' => $rData['slug']],
                 $rData
             );
@@ -193,7 +193,7 @@ class ProjectController extends Controller
             [
                 'project' => $project,
                 'members' => $members,
-                'roles' => Role::where('status', 'active')
+                'roles' => ConstructionRole::where('status', 'active')
                     ->where('slug', '!=', 'super_admin')
                     ->orderBy('name')
                     ->get([
@@ -201,7 +201,7 @@ class ProjectController extends Controller
                         'name',
                         'slug',
                     ]),
-                'activityLog' => ActivityLog::with('actor')
+                'activityLog' => ConstructionActivityLog::with('actor')
                     ->where('project_id', $project->id)
                     ->latest('created_at')
                     ->take(15)
@@ -881,7 +881,7 @@ class ProjectController extends Controller
             ->get();
 
         // 8. Activity logs for this member in this project.
-        $activityLog = ActivityLog::with('actor')
+        $activityLog = ConstructionActivityLog::with('actor')
             ->where('project_id', $project->id)
             ->where(
                 function ($query) use ($memberId, $teamMember) {
@@ -930,7 +930,7 @@ class ProjectController extends Controller
             \DB::transaction(function () use ($project) {
                 $projectId = $project->id;
 
-                \App\Models\Construction\ActivityLog::where(
+                \App\Models\ConstructionActivityLog::where(
                     'project_id',
                     $projectId
                 )->delete();
@@ -940,12 +940,12 @@ class ProjectController extends Controller
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\ProjectTeamMember::where(
+                \App\Models\ProjectTeamMember::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\ProjectBudget::where(
+                \App\Models\ProjectBudget::where(
                     'project_id',
                     $projectId
                 )->delete();
@@ -960,164 +960,164 @@ class ProjectController extends Controller
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\EquipmentAllocation::where(
+                \App\Models\EquipmentAllocation::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\EquipmentUsageLog::where(
+                \App\Models\EquipmentUsageLog::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\ProjectHandoverItem::whereIn(
+                \App\Models\ProjectHandoverItem::whereIn(
                     'handover_id',
-                    \App\Models\Construction\ProjectHandover::where(
+                    \App\Models\ProjectHandover::where(
                         'project_id',
                         $projectId
                     )->select('id')
                 )->delete();
 
-                \App\Models\Construction\ProjectHandover::where(
+                \App\Models\ProjectHandover::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\ClientPayment::where(
+                \App\Models\ClientPayment::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\ClientInvoice::where(
+                \App\Models\ClientInvoice::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\MaterialIssue::where(
+                \App\Models\MaterialIssue::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\MaterialReceipt::where(
+                \App\Models\MaterialReceipt::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\MaterialStock::where(
+                \App\Models\MaterialStock::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\PurchaseOrder::where(
+                \App\Models\PurchaseOrder::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\PurchaseRequest::where(
+                \App\Models\PurchaseRequest::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\DrawingApproval::where(
+                \App\Models\DrawingApproval::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\DrawingRevision::where(
+                \App\Models\DrawingRevision::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\DraftingJob::where(
+                \App\Models\DraftingJob::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\Document::where(
+                \App\Models\ConstructionDocument::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\AttendanceRecord::where(
+                \App\Models\AttendanceRecord::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\DailyProgressItem::whereIn(
+                \App\Models\DailyProgressItem::whereIn(
                     'daily_progress_report_id',
-                    \App\Models\Construction\DailyProgressReport::where(
+                    \App\Models\DailyProgressReport::where(
                         'project_id',
                         $projectId
                     )->select('id')
                 )->delete();
 
-                \App\Models\Construction\DailyProgressReport::where(
+                \App\Models\DailyProgressReport::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\ExecutionTaskAssignee::where(
+                \App\Models\ExecutionTaskAssignee::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\ExecutionTask::where(
+                \App\Models\ExecutionTask::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\ExecutionPlan::where(
+                \App\Models\ExecutionPlan::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\SurveyMeasurement::where(
+                \App\Models\SurveyMeasurement::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\SurveyEntry::where(
+                \App\Models\SurveyEntry::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\SurveySubmission::where(
+                \App\Models\SurveySubmission::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\SurveyVisit::where(
+                \App\Models\SurveyVisit::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\SurveyPlan::where(
+                \App\Models\SurveyPlan::where(
                     'project_id',
                     $projectId
                 )->delete();
 
-                \App\Models\Construction\Vehicle::where(
+                \App\Models\ConstructionVehicle::where(
                     'project_id',
                     $projectId
                 )->update([
                     'project_id' => null,
                 ]);
 
-                \App\Models\Construction\Equipment::where(
+                \App\Models\ConstructionEquipment::where(
                     'project_id',
                     $projectId
                 )->update([
                     'project_id' => null,
                 ]);
 
-                \App\Models\Construction\Material::where(
+                \App\Models\Material::where(
                     'project_id',
                     $projectId
                 )->update([
                     'project_id' => null,
                 ]);
 
-                \App\Models\Construction\Vendor::where(
+                \App\Models\Vendor::where(
                     'project_id',
                     $projectId
                 )->update([
