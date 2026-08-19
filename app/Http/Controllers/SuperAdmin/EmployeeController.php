@@ -4,7 +4,7 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEmployeeRequest;
-use App\Models\Construction\MemberRoleAssignment;
+use App\Models\MemberRoleAssignment;
 use App\Models\Construction\Role as ConstructionRole;
 use App\Models\Employee;
 use App\Models\Department;

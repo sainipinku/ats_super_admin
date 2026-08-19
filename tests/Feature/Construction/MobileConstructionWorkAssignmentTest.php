@@ -9,7 +9,7 @@ use App\Models\Construction\EquipmentAllocation;
 use App\Models\Construction\ExecutionPlan;
 use App\Models\Construction\ExecutionTask;
 use App\Models\Construction\ExecutionTaskAssignee;
-use App\Models\Construction\MemberRoleAssignment;
+use App\Models\MemberRoleAssignment;
 use App\Models\Construction\Permission;
 use App\Models\Construction\Project;
 use App\Models\Construction\ProjectTeamMember;

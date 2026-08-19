@@ -2,7 +2,7 @@
 
 namespace App\Services\Construction;
 
-use App\Models\Construction\MemberRoleAssignment;
+use App\Models\MemberRoleAssignment;
 use App\Models\Construction\Permission;
 use App\Models\Construction\Project;
 use App\Models\Construction\ProjectTeamMember;
@@ -34,10 +34,18 @@ class ConstructionAuthorizationService
     }
 
     /**
+     * Get all effective construction permissions for the actor.
+     *
+     * MemberRoleAssignment.status:
+     * 1 = active
+     * 0 = inactive
+     *
      * @return array<int, string>
      */
-    public function permissionsFor(?Model $actor, ?int $projectId = null): array
-    {
+    public function permissionsFor(
+        ?Model $actor,
+        ?int $projectId = null
+    ): array {
         if (!$actor) {
             return [];
         }
@@ -55,12 +63,36 @@ class ConstructionAuthorizationService
 
         $query = Permission::query()
             ->select('construction_permissions.slug')
-            ->join('construction_role_permissions', 'construction_role_permissions.permission_id', '=', 'construction_permissions.id')
-            ->join('construction_roles', 'construction_roles.id', '=', 'construction_role_permissions.role_id')
-            ->join('construction_member_role_assignments', 'construction_member_role_assignments.role_id', '=', 'construction_roles.id')
-            ->where('construction_member_role_assignments.member_id', $actor->getKey())
-            ->where('construction_member_role_assignments.status', 'active')
-            ->where('construction_roles.status', 'active')
+            ->join(
+                'construction_role_permissions',
+                'construction_role_permissions.permission_id',
+                '=',
+                'construction_permissions.id'
+            )
+            ->join(
+                'construction_roles',
+                'construction_roles.id',
+                '=',
+                'construction_role_permissions.role_id'
+            )
+            ->join(
+                'construction_member_role_assignments',
+                'construction_member_role_assignments.role_id',
+                '=',
+                'construction_roles.id'
+            )
+            ->where(
+                'construction_member_role_assignments.member_id',
+                $actor->getKey()
+            )
+            ->where(
+                'construction_member_role_assignments.status',
+                1
+            )
+            ->where(
+                'construction_roles.status',
+                'active'
+            )
             ->whereNull('construction_roles.deleted_at')
             ->distinct();
 
@@ -73,10 +105,19 @@ class ConstructionAuthorizationService
     }
 
     /**
-     * @param  array<int, string>  $permissions
+     * Check whether the actor has at least one requested permission.
+     *
+     * MemberRoleAssignment.status:
+     * 1 = active
+     * 0 = inactive
+     *
+     * @param array<int, string> $permissions
      */
-    public function hasAnyPermission(?Model $actor, array $permissions, ?int $projectId = null): bool
-    {
+    public function hasAnyPermission(
+        ?Model $actor,
+        array $permissions,
+        ?int $projectId = null
+    ): bool {
         if (!$actor || $permissions === []) {
             return false;
         }
@@ -90,32 +131,89 @@ class ConstructionAuthorizationService
         }
 
         $query = Permission::query()
-            ->join('construction_role_permissions', 'construction_role_permissions.permission_id', '=', 'construction_permissions.id')
-            ->join('construction_roles', 'construction_roles.id', '=', 'construction_role_permissions.role_id')
-            ->join('construction_member_role_assignments', 'construction_member_role_assignments.role_id', '=', 'construction_roles.id')
-            ->where('construction_member_role_assignments.member_id', $actor->getKey())
-            ->where('construction_member_role_assignments.status', 'active')
-            ->where('construction_roles.status', 'active')
+            ->join(
+                'construction_role_permissions',
+                'construction_role_permissions.permission_id',
+                '=',
+                'construction_permissions.id'
+            )
+            ->join(
+                'construction_roles',
+                'construction_roles.id',
+                '=',
+                'construction_role_permissions.role_id'
+            )
+            ->join(
+                'construction_member_role_assignments',
+                'construction_member_role_assignments.role_id',
+                '=',
+                'construction_roles.id'
+            )
+            ->where(
+                'construction_member_role_assignments.member_id',
+                $actor->getKey()
+            )
+            ->where(
+                'construction_member_role_assignments.status',
+                1
+            )
+            ->where(
+                'construction_roles.status',
+                'active'
+            )
             ->whereNull('construction_roles.deleted_at')
-            ->whereIn('construction_permissions.slug', $permissions);
+            ->whereIn(
+                'construction_permissions.slug',
+                $permissions
+            );
 
         $this->applyProjectScope($query, $projectId);
 
         return $query->exists();
     }
 
-    public function can(Member $member, string $permission, ?Project $project = null): bool
-    {
-        return $this->hasAnyPermission($member, [$permission], $project?->getKey());
+    public function can(
+        Member $member,
+        string $permission,
+        ?Project $project = null
+    ): bool {
+        return $this->hasAnyPermission(
+            $member,
+            [$permission],
+            $project?->getKey()
+        );
     }
 
-    public function getRoles(Member $member, ?int $projectId = null): Collection
-    {
+    /**
+     * Get active roles for the member.
+     *
+     * MemberRoleAssignment.status:
+     * 1 = active
+     * 0 = inactive
+     */
+    public function getRoles(
+        Member $member,
+        ?int $projectId = null
+    ): Collection {
         $query = Role::query()
-            ->join('construction_member_role_assignments', 'construction_member_role_assignments.role_id', '=', 'construction_roles.id')
-            ->where('construction_member_role_assignments.member_id', $member->getKey())
-            ->where('construction_member_role_assignments.status', 'active')
-            ->where('construction_roles.status', 'active')
+            ->join(
+                'construction_member_role_assignments',
+                'construction_member_role_assignments.role_id',
+                '=',
+                'construction_roles.id'
+            )
+            ->where(
+                'construction_member_role_assignments.member_id',
+                $member->getKey()
+            )
+            ->where(
+                'construction_member_role_assignments.status',
+                1
+            )
+            ->where(
+                'construction_roles.status',
+                'active'
+            )
             ->whereNull('construction_roles.deleted_at')
             ->distinct();
 
@@ -124,30 +222,53 @@ class ConstructionAuthorizationService
         return $query->get(['construction_roles.*']);
     }
 
-    public function getGlobalRoles(Member $member): Collection
-    {
-        return Role::query()
-            ->join('construction_member_role_assignments', 'construction_member_role_assignments.role_id', '=', 'construction_roles.id')
-            ->where('construction_member_role_assignments.member_id', $member->getKey())
-            ->where('construction_member_role_assignments.status', 'active')
-            ->whereNull('construction_member_role_assignments.project_id')
-            ->where('construction_roles.status', 'active')
-            ->whereNull('construction_roles.deleted_at')
-            ->distinct()
-            ->get(['construction_roles.*']);
-    }
-
+    /**
+     * Get active global roles (project_id IS NULL).
+     *
+     * MemberRoleAssignment.status:
+     * 1 = active
+     * 0 = inactive
+     */
+   public function getGlobalRoles(Member $member): Collection
+{
+    return Role::query()
+        ->whereHas('assignments', function ($query) use ($member) {
+            $query
+                ->where('member_id', $member->getKey())
+                ->where('status', 1)
+                ->whereNull('project_id');
+        })
+        ->where('status', 'active')
+        ->whereNull('deleted_at')
+        ->get();
+}
+    /**
+     * Get projects accessible through active role assignments
+     * or active project-team membership.
+     */
     public function getProjects(Member $member): Collection
     {
         $projectIds = MemberRoleAssignment::query()
-            ->where('member_id', $member->getKey())
-            ->where('status', 'active')
+            ->where(
+                'member_id',
+                $member->getKey()
+            )
+            ->where(
+                'status',
+                1
+            )
             ->whereNotNull('project_id')
             ->pluck('project_id')
             ->merge(
                 ProjectTeamMember::query()
-                    ->where('member_id', $member->getKey())
-                    ->where('status', 'active')
+                    ->where(
+                        'member_id',
+                        $member->getKey()
+                    )
+                    ->where(
+                        'status',
+                        'active'
+                    )
                     ->pluck('project_id')
             )
             ->unique()
@@ -165,25 +286,66 @@ class ConstructionAuthorizationService
     /**
      * @return array<int, string>
      */
-    public function getPermissions(Member $member, ?int $projectId = null): array
-    {
-        return $this->permissionsFor($member, $projectId);
+    public function getPermissions(
+        Member $member,
+        ?int $projectId = null
+    ): array {
+        return $this->permissionsFor(
+            $member,
+            $projectId
+        );
     }
 
     /**
+     * Get permissions for one specific active member role.
+     *
+     * MemberRoleAssignment.status:
+     * 1 = active
+     * 0 = inactive
+     *
      * @return array<int, string>
      */
-    public function getPermissionsForRole(Member $member, Role $role, ?int $projectId = null): array
-    {
+    public function getPermissionsForRole(
+        Member $member,
+        Role $role,
+        ?int $projectId = null
+    ): array {
         $query = Permission::query()
             ->select('construction_permissions.slug')
-            ->join('construction_role_permissions', 'construction_role_permissions.permission_id', '=', 'construction_permissions.id')
-            ->join('construction_roles', 'construction_roles.id', '=', 'construction_role_permissions.role_id')
-            ->join('construction_member_role_assignments', 'construction_member_role_assignments.role_id', '=', 'construction_roles.id')
-            ->where('construction_member_role_assignments.member_id', $member->getKey())
-            ->where('construction_member_role_assignments.role_id', $role->getKey())
-            ->where('construction_member_role_assignments.status', 'active')
-            ->where('construction_roles.status', 'active')
+            ->join(
+                'construction_role_permissions',
+                'construction_role_permissions.permission_id',
+                '=',
+                'construction_permissions.id'
+            )
+            ->join(
+                'construction_roles',
+                'construction_roles.id',
+                '=',
+                'construction_role_permissions.role_id'
+            )
+            ->join(
+                'construction_member_role_assignments',
+                'construction_member_role_assignments.role_id',
+                '=',
+                'construction_roles.id'
+            )
+            ->where(
+                'construction_member_role_assignments.member_id',
+                $member->getKey()
+            )
+            ->where(
+                'construction_member_role_assignments.role_id',
+                $role->getKey()
+            )
+            ->where(
+                'construction_member_role_assignments.status',
+                1
+            )
+            ->where(
+                'construction_roles.status',
+                'active'
+            )
             ->whereNull('construction_roles.deleted_at')
             ->distinct();
 
@@ -195,28 +357,45 @@ class ConstructionAuthorizationService
             ->all();
     }
 
-    public function resolveActiveRole(Member $member, ?string $requestedRole, ?int $projectId = null): ?Role
-    {
-        $roles = $this->getRoles($member, $projectId);
+    public function resolveActiveRole(
+        Member $member,
+        ?string $requestedRole,
+        ?int $projectId = null
+    ): ?Role {
+        $roles = $this->getRoles(
+            $member,
+            $projectId
+        );
 
         if ($requestedRole === null) {
-            return $roles->count() === 1 ? $roles->first() : null;
+            return $roles->count() === 1
+                ? $roles->first()
+                : null;
         }
 
-        return $roles->where('slug', $requestedRole)->first();
+        return $roles
+            ->where('slug', $requestedRole)
+            ->first();
     }
 
     /**
      * Project-scoped checks require an exact project role assignment.
-     * Global (project_id IS NULL) assignments only apply without project context.
+     *
+     * Global assignments (project_id IS NULL) only apply
+     * when there is no project context.
      */
-    private function applyProjectScope(Builder $query, ?int $projectId): void
-    {
+    private function applyProjectScope(
+        Builder $query,
+        ?int $projectId
+    ): void {
         if ($projectId === null) {
             return;
         }
 
-        $query->where('construction_member_role_assignments.project_id', $projectId);
+        $query->where(
+            'construction_member_role_assignments.project_id',
+            $projectId
+        );
     }
 
     public function inferProjectId(Request $request): ?int
@@ -227,13 +406,20 @@ class ConstructionAuthorizationService
             return $projectId;
         }
 
-        foreach ($request->route()?->parameters() ?? [] as $parameter) {
+        foreach (
+            $request->route()?->parameters() ?? []
+            as $parameter
+        ) {
             if ($parameter instanceof Model) {
-                if ($parameter->getTable() === 'construction_projects') {
+                if (
+                    $parameter->getTable()
+                    === 'construction_projects'
+                ) {
                     return (int) $parameter->getKey();
                 }
 
-                $relatedProjectId = $parameter->getAttribute('project_id');
+                $relatedProjectId =
+                    $parameter->getAttribute('project_id');
 
                 if ($relatedProjectId !== null) {
                     return (int) $relatedProjectId;

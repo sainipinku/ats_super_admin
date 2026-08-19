@@ -4,7 +4,7 @@ namespace Tests\Feature\Construction;
 
 use App\Models\Construction\Client;
 use App\Models\Construction\Company;
-use App\Models\Construction\MemberRoleAssignment;
+use App\Models\MemberRoleAssignment;
 use App\Models\Construction\Permission;
 use App\Models\Construction\Project;
 use App\Models\Construction\ProjectTeamMember;

@@ -2,7 +2,7 @@
 
 namespace App\Services\Construction;
 
-use App\Models\Construction\MemberRoleAssignment;
+use App\Models\MemberRoleAssignment;
 use App\Models\Construction\Project;
 use App\Models\Construction\ProjectTeamMember;
 use App\Models\Construction\Role;
@@ -12,19 +12,38 @@ use Illuminate\Validation\ValidationException;
 
 class ConstructionTeamAssignmentService
 {
-   
+    /**
+     * MemberRoleAssignment status:
+     * 1 = active
+     * 0 = inactive
+     *
+     * ProjectTeamMember status remains its existing string convention:
+     * active / inactive
+     */
+    private const ROLE_ASSIGNMENT_ACTIVE = 1;
+    private const ROLE_ASSIGNMENT_INACTIVE = 0;
+
     public function assign(
         Project $project,
         array $validated,
         ?Model $actor
     ): ProjectTeamMember {
         return DB::transaction(function () use ($project, $validated, $actor) {
-            $roleId = !empty($validated['role_id']) ? (int) $validated['role_id'] : null;
+            $roleId = !empty($validated['role_id'])
+                ? (int) $validated['role_id']
+                : null;
 
             if ($roleId !== null) {
                 $this->ensureRoleAssignable($roleId);
-                $this->ensureNoDuplicate($project->id, (int) $validated['member_id'], $roleId);
+
+                $this->ensureNoDuplicate(
+                    $project->id,
+                    (int) $validated['member_id'],
+                    $roleId
+                );
             }
+
+            $teamStatus = $validated['status'] ?? 'active';
 
             $teamMember = ProjectTeamMember::create([
                 'project_id' => $project->id,
@@ -34,7 +53,7 @@ class ConstructionTeamAssignmentService
                 'assigned_to' => $validated['assigned_to'] ?? null,
                 'assignment_scope' => $validated['assignment_scope'] ?? null,
                 'is_primary' => (bool) ($validated['is_primary'] ?? false),
-                'status' => $validated['status'] ?? 'active',
+                'status' => $teamStatus,
                 'assigned_by_type' => $actor ? $actor::class : null,
                 'assigned_by_id' => $actor?->getKey(),
             ]);
@@ -44,7 +63,7 @@ class ConstructionTeamAssignmentService
                     memberId: (int) $validated['member_id'],
                     roleId: $roleId,
                     projectId: $project->id,
-                    status: $teamMember->status
+                    teamStatus: $teamStatus
                 );
             }
 
@@ -58,19 +77,36 @@ class ConstructionTeamAssignmentService
         array $validated,
         ?Model $actor
     ): ProjectTeamMember {
-        return DB::transaction(function () use ($project, $teamMember, $validated, $actor) {
+        return DB::transaction(function () use (
+            $project,
+            $teamMember,
+            $validated,
+            $actor
+        ) {
             $oldMemberId = (int) $teamMember->member_id;
-            $oldRoleId = $teamMember->role_id ? (int) $teamMember->role_id : null;
+
+            $oldRoleId = $teamMember->role_id
+                ? (int) $teamMember->role_id
+                : null;
 
             $newMemberId = (int) $validated['member_id'];
-            $newRoleId = !empty($validated['role_id']) ? (int) $validated['role_id'] : null;
+
+            $newRoleId = !empty($validated['role_id'])
+                ? (int) $validated['role_id']
+                : null;
 
             if ($newRoleId !== null) {
                 $this->ensureRoleAssignable($newRoleId);
-                $this->ensureNoDuplicate($project->id, $newMemberId, $newRoleId, $teamMember->id);
+
+                $this->ensureNoDuplicate(
+                    $project->id,
+                    $newMemberId,
+                    $newRoleId,
+                    $teamMember->id
+                );
             }
 
-            $newStatus = $validated['status'] ?? $teamMember->status;
+            $newTeamStatus = $validated['status'] ?? $teamMember->status;
 
             $teamMember->update([
                 'member_id' => $newMemberId,
@@ -79,48 +115,79 @@ class ConstructionTeamAssignmentService
                 'assigned_to' => $validated['assigned_to'] ?? null,
                 'assignment_scope' => $validated['assignment_scope'] ?? null,
                 'is_primary' => (bool) ($validated['is_primary'] ?? false),
-                'status' => $newStatus,
+                'status' => $newTeamStatus,
             ]);
 
-            // Deactivate the old authorization record when the role or member changed.
-            if ($oldRoleId !== null && ($oldRoleId !== $newRoleId || $oldMemberId !== $newMemberId)) {
-                $this->deactivateRoleAssignment($oldMemberId, $oldRoleId, $project->id);
+            /*
+             * If the member or role changed, deactivate the old
+             * MemberRoleAssignment without affecting unrelated roles.
+             */
+            if (
+                $oldRoleId !== null
+                && (
+                    $oldRoleId !== $newRoleId
+                    || $oldMemberId !== $newMemberId
+                )
+            ) {
+                $this->deactivateRoleAssignment(
+                    $oldMemberId,
+                    $oldRoleId,
+                    $project->id
+                );
             }
 
-            // Create/reactivate the new authorization record.
+            /*
+             * Create/reactivate the new authorization assignment.
+             * MemberRoleAssignment.status is always stored as integer:
+             * 1 = active, 0 = inactive.
+             */
             if ($newRoleId !== null) {
-                $this->syncRoleAssignment($newMemberId, $newRoleId, $project->id, $newStatus);
+                $this->syncRoleAssignment(
+                    memberId: $newMemberId,
+                    roleId: $newRoleId,
+                    projectId: $project->id,
+                    teamStatus: $newTeamStatus
+                );
             }
 
-            return $teamMember;
+            return $teamMember->fresh();
         });
     }
 
     /**
      * Toggle the status of a role-bearing team assignment.
      *
-     * Both ProjectTeamMember and MemberRoleAssignment are updated atomically.
+     * ProjectTeamMember continues using its existing string status.
+     * MemberRoleAssignment is synchronized using integer status.
      */
     public function toggleStatus(
         Project $project,
         ProjectTeamMember $teamMember,
         ?Model $actor
     ): ProjectTeamMember {
-        return DB::transaction(function () use ($project, $teamMember, $actor) {
-            $newStatus = $teamMember->status === 'active' ? 'inactive' : 'active';
+        return DB::transaction(function () use (
+            $project,
+            $teamMember,
+            $actor
+        ) {
+            $newTeamStatus = $teamMember->status === 'active'
+                ? 'inactive'
+                : 'active';
 
-            $teamMember->update(['status' => $newStatus]);
+            $teamMember->update([
+                'status' => $newTeamStatus,
+            ]);
 
             if ($teamMember->role_id !== null) {
                 $this->syncRoleAssignment(
                     memberId: (int) $teamMember->member_id,
                     roleId: (int) $teamMember->role_id,
                     projectId: $project->id,
-                    status: $newStatus
+                    teamStatus: $newTeamStatus
                 );
             }
 
-            return $teamMember;
+            return $teamMember->fresh();
         });
     }
 
@@ -128,8 +195,7 @@ class ConstructionTeamAssignmentService
      * Remove a team assignment and deactivate the corresponding
      * MemberRoleAssignment.
      *
-     * Only the specific assignment is removed. Other roles for the same
-     * member/project remain untouched.
+     * Only the specific assignment is affected.
      */
     public function remove(
         Project $project,
@@ -138,12 +204,19 @@ class ConstructionTeamAssignmentService
     ): void {
         DB::transaction(function () use ($project, $teamMember, $actor) {
             $memberId = (int) $teamMember->member_id;
-            $roleId = $teamMember->role_id ? (int) $teamMember->role_id : null;
+
+            $roleId = $teamMember->role_id
+                ? (int) $teamMember->role_id
+                : null;
 
             $teamMember->delete();
 
             if ($roleId !== null) {
-                $this->deactivateRoleAssignment($memberId, $roleId, $project->id);
+                $this->deactivateRoleAssignment(
+                    $memberId,
+                    $roleId,
+                    $project->id
+                );
             }
         });
     }
@@ -155,13 +228,17 @@ class ConstructionTeamAssignmentService
     */
 
     /**
-     * Ensure the role exists, is active, and is not soft-deleted.
+     * Ensure the construction role exists, is active and not soft-deleted.
      */
     private function ensureRoleAssignable(int $roleId): void
     {
         $role = Role::withTrashed()->find($roleId);
 
-        if (!$role || $role->trashed() || $role->status !== 'active') {
+        if (
+            !$role
+            || $role->trashed()
+            || $role->status !== 'active'
+        ) {
             throw ValidationException::withMessages([
                 'role_id' => 'The selected role is not active or no longer exists.',
             ]);
@@ -169,16 +246,24 @@ class ConstructionTeamAssignmentService
     }
 
     /**
-     * Enforce composite uniqueness: (project_id, member_id, role_id).
+     * Enforce:
+     * (project_id, member_id, role_id)
      *
-     * Same member + same project + different role = allowed.
-     * Same member + same project + same role = rejected.
+     * Same member + project + different role = allowed.
+     * Same member + project + same role = rejected.
      */
-    private function ensureNoDuplicate(int $projectId, int $memberId, int $roleId, ?int $ignoreId = null): void
-    {
-        $query = ProjectTeamMember::where('project_id', $projectId)
-            ->where('member_id', $memberId)
-            ->where('role_id', $roleId);
+    private function ensureNoDuplicate(
+        int $projectId,
+        int $memberId,
+        int $roleId,
+        ?int $ignoreId = null
+    ): void {
+        $query = ProjectTeamMember::query()
+            ->forAssignment(
+                $projectId,
+                $memberId,
+                $roleId
+            );
 
         if ($ignoreId !== null) {
             $query->where('id', '!=', $ignoreId);
@@ -192,12 +277,24 @@ class ConstructionTeamAssignmentService
     }
 
     /**
-     * Create or reactivate the MemberRoleAssignment for the given
-     * member/role/project, keeping its status synchronized with the
-     * team assignment.
+     * Synchronize MemberRoleAssignment status with the team assignment.
+     *
+     * MemberRoleAssignment uses:
+     * 1 = active
+     * 0 = inactive
+     *
+     * ProjectTeamMember keeps its existing:
+     * active / inactive
      */
-    private function syncRoleAssignment(int $memberId, int $roleId, int $projectId, string $status): void
-    {
+    private function syncRoleAssignment(
+        int $memberId,
+        int $roleId,
+        int $projectId,
+        string $teamStatus
+    ): void {
+        $roleAssignmentStatus =
+            $this->mapTeamStatusToRoleAssignmentStatus($teamStatus);
+
         MemberRoleAssignment::updateOrCreate(
             [
                 'member_id' => $memberId,
@@ -205,22 +302,38 @@ class ConstructionTeamAssignmentService
                 'project_id' => $projectId,
             ],
             [
-                'status' => $status,
+                'status' => $roleAssignmentStatus,
             ]
         );
     }
 
     /**
-     * Deactivate the MemberRoleAssignment for the given member/role/project.
-     *
-     * The row is preserved (history is retained) but no longer grants
-     * authorization because Phase 3 authorization requires status = active.
+     * Convert ProjectTeamMember string status to
+     * MemberRoleAssignment integer status.
      */
-    private function deactivateRoleAssignment(int $memberId, int $roleId, int $projectId): void
-    {
-        MemberRoleAssignment::where('member_id', $memberId)
+    private function mapTeamStatusToRoleAssignmentStatus(
+        string $teamStatus
+    ): int {
+        return $teamStatus === 'active'
+            ? self::ROLE_ASSIGNMENT_ACTIVE
+            : self::ROLE_ASSIGNMENT_INACTIVE;
+    }
+
+    /**
+     * Preserve the MemberRoleAssignment row for history,
+     * but remove its authorization effect.
+     */
+    private function deactivateRoleAssignment(
+        int $memberId,
+        int $roleId,
+        int $projectId
+    ): void {
+        MemberRoleAssignment::query()
+            ->where('member_id', $memberId)
             ->where('role_id', $roleId)
             ->where('project_id', $projectId)
-            ->update(['status' => 'inactive']);
+            ->update([
+                'status' => self::ROLE_ASSIGNMENT_INACTIVE,
+            ]);
     }
 }

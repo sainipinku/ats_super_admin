@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Construction\Client;
 use App\Models\Construction\Company;
-use App\Models\Construction\MemberRoleAssignment;
+use App\Models\MemberRoleAssignment;
 use App\Models\Construction\Project;
 use App\Models\Construction\ProjectBudget;
 use App\Models\Construction\ProjectTeamMember;

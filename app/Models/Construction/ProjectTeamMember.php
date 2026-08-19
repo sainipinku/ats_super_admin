@@ -3,6 +3,7 @@
 namespace App\Models\Construction;
 
 use App\Models\Member;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -53,6 +54,28 @@ class ProjectTeamMember extends Model
 
     public function executionTaskAssignments(): HasMany
     {
-        return $this->hasMany(ExecutionTaskAssignee::class, 'member_id', 'member_id');
+        return $this->hasMany(
+            ExecutionTaskAssignee::class,
+            'member_id',
+            'member_id'
+        );
+    }
+
+    /**
+     * Scope for the unique project/member/role combination.
+     *
+     * Same member + same project + same role = one assignment.
+     * Same member + same project + different role = allowed.
+     */
+    public function scopeForAssignment(
+        Builder $query,
+        int $projectId,
+        int $memberId,
+        ?int $roleId
+    ): Builder {
+        return $query
+            ->where('project_id', $projectId)
+            ->where('member_id', $memberId)
+            ->where('role_id', $roleId);
     }
 }
