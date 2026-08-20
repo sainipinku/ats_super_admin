@@ -75,9 +75,6 @@ class MemberDashboardController extends Controller
             ->whereIn('id', $primaryProjectIds)
             ->get();
 
-        // Only survey plans where the authenticated member is explicitly assigned
-        // should appear in the member dashboard survey workspace.
-        // The broader project scope must NOT expose plans the member was not assigned to.
         $surveyPlans = SurveyPlan::with(['project.company', 'project.client', 'planMembers.member'])
             ->whereHas('planMembers', function ($q) use ($memberId) {
                 $q->where('member_id', $memberId);
@@ -540,6 +537,7 @@ class MemberDashboardController extends Controller
     {
         $member = $request->user();
         $memberId = $member->getKey();
+        $now = now();
 
         $isAssigned = ProjectTeamMember::where('project_id', $project->id)
             ->where('member_id', $memberId)
@@ -641,12 +639,16 @@ class MemberDashboardController extends Controller
         $myVehicles = collect([]);
         try {
             $vehicles = ConstructionVehicle::with(['assignments' => fn ($q) => $q->latest()->take(3)])
-            ->where('project_id', $project->id)
-            ->latest()
-            ->get();
+                ->where('project_id', $project->id)
+                ->latest()
+                ->get();
 
             $myVehicles = $vehicles->filter(function ($v) use ($memberId, $now) {
-                return $v->assignments->contains(fn ($a) => $a->driver_member_id == $memberId && $a->status === 'active' && (is_null($a->assigned_to) || $a->assigned_to >= $now));
+                return $v->assignments->contains(function ($a) use ($memberId, $now) {
+                    return $a->driver_member_id == $memberId &&
+                           $a->status === 'active' &&
+                           (is_null($a->assigned_to) || $a->assigned_to >= $now);
+                });
             })->values();
         } catch (\Throwable $e) {
             report($e);
@@ -656,14 +658,18 @@ class MemberDashboardController extends Controller
         $myEquipments = collect([]);
         try {
             $equipments = \App\Models\ConstructionEquipment::with([
-            'allocations' => fn ($q) => $q->latest()->take(3),
-        ])
-            ->where('project_id', $project->id)
-            ->latest()
-            ->get();
+                'allocations' => fn ($q) => $q->latest()->take(3),
+            ])
+                ->where('project_id', $project->id)
+                ->latest()
+                ->get();
 
             $myEquipments = $equipments->filter(function ($e) use ($memberId) {
-                return $e->allocations->contains(fn ($a) => $a->assigned_to_member_id == $memberId && is_null($a->returned_at) && $a->status === 'active');
+                return $e->allocations->contains(function ($a) use ($memberId) {
+                    return $a->assigned_to_member_id == $memberId &&
+                           is_null($a->returned_at) &&
+                           $a->status === 'active';
+                });
             })->values();
         } catch (\Throwable $e) {
             report($e);
