@@ -1,9 +1,8 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Construction;
 
-use App\Models\Project;
-use App\Models\ConstructionRole;
+use App\Models\Member;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -15,11 +14,6 @@ class MemberRoleAssignment extends Model
         'member_id',
         'role_id',
         'project_id',
-        'status',
-    ];
-
-    protected $casts = [
-        'status' => 'integer',
     ];
 
     public function member(): BelongsTo
@@ -29,7 +23,7 @@ class MemberRoleAssignment extends Model
 
     public function role(): BelongsTo
     {
-        return $this->belongsTo(ConstructionRole::class);
+        return $this->belongsTo(Role::class);
     }
 
     public function project(): BelongsTo

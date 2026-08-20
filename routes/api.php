@@ -31,6 +31,7 @@ Route::get('/', function () {
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
+    Route::get('/registration-status', [AuthController::class, 'registrationStatus']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/send-otp', [AuthController::class, 'sendOtp']);
     Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
@@ -123,7 +124,6 @@ Route::prefix('construction')->middleware('auth:sanctum')->group(function () {
     });
 
     Route::prefix('mobile/construction')->group(function () {
-        Route::get('/context', [ConstructionController::class, 'context']);
         Route::get('/projects/assigned', [ConstructionController::class, 'assignedProjects']);
         Route::get('/survey-plans/{surveyPlan}', [ConstructionController::class, 'showSurveyPlan'])
             ->middleware('construction.permission:survey_plan.manage');
@@ -168,4 +168,21 @@ Route::prefix('construction')->middleware('auth:sanctum')->group(function () {
         Route::get('/documents/{document}/download', [App\Http\Controllers\Construction\DocumentController::class, 'download'])
             ->middleware('construction.permission:document.manage');
     });
+});
+
+Route::prefix('super')->middleware('auth:sanctum')->name('api.super.')->group(function () {
+    Route::prefix('members')->name('members.')->group(function () {
+        Route::get('/pending', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'pendingList']);
+        Route::get('/approved', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'approvedList']);
+        Route::get('/rejected', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'rejectedList']);
+        Route::get('/stats', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'approvalStats']);
+        Route::get('/{member}/show', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'show']);
+        Route::post('/{member}/approve', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'approve']);
+        Route::post('/{member}/reject', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'reject']);
+        Route::post('/{member}/assign-admin', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'assignAdmin']);
+    });
+
+    Route::get('/roles/construction', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'constructionRoles']);
+    Route::get('/departments/all', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'allDepartments']);
+    Route::get('/designations/by-departments', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'designationsByDepartments']);
 });

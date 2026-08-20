@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SuperAdmin;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use App\Models\Department;
 use Illuminate\Support\Str;
@@ -790,5 +791,424 @@ class MemberController extends Controller
             ],
             'status' => true
         ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Registration & Approval Workflow Methods
+    |--------------------------------------------------------------------------
+    */
+
+    private function getApprovalStats(): array
+    {
+        return [
+            'pending'  => Member::pending()->selfRegistered()->count(),
+            'approved' => Member::approved()->count(),
+            'rejected' => Member::rejected()->count(),
+            'self_registered' => Member::selfRegistered()->count(),
+            'total'    => Member::count(),
+        ];
+    }
+
+    private function transformMemberForTable(Member $m): array
+    {
+        $departmentIds = is_array($m->departments) ? $m->departments : [];
+        $designationIds = is_array($m->designation) ? $m->designation : [];
+        $roleIds = is_array($m->roles) ? $m->roles : [];
+
+        $statusCode = (int) $m->status;
+
+        return [
+            'id'            => $m->id,
+            'uuid'          => $m->uuid,
+            'name'          => $m->name,
+            'username'      => $m->username,
+            'email'         => $m->email,
+            'phone'         => $m->phone,
+            'company_name'  => $m->company_name,
+            'state'         => $m->state,
+            'city'          => $m->city,
+            'profile_photo' => $m->profile_photo_url,
+            'registration_source' => $m->registration_source,
+            'status'        => $statusCode,
+            'status_text'   => match($statusCode) {
+                Member::STATUS_PENDING  => 'Pending Approval',
+                Member::STATUS_ACTIVE   => 'Active',
+                Member::STATUS_REJECTED => 'Rejected',
+                default                 => 'Unknown',
+            },
+            'status_badge_class' => match($statusCode) {
+                Member::STATUS_PENDING  => 'bg-amber-100 text-amber-800 border border-amber-200',
+                Member::STATUS_ACTIVE   => 'bg-green-100 text-green-800 border border-green-200',
+                Member::STATUS_REJECTED => 'bg-red-100 text-red-800 border border-red-200',
+                default                 => 'bg-gray-100 text-gray-800 border border-gray-200',
+            },
+            'role_ids'      => $roleIds,
+            'role_names'    => $roleIds ? Role::whereIn('id', $roleIds)->pluck('name')->implode(', ') : 'Not Assigned',
+            'department_names' => $departmentIds ? Department::whereIn('id', $departmentIds)->pluck('name')->implode(', ') : null,
+            'designation_names' => $designationIds ? Designation::whereIn('id', $designationIds)->pluck('name')->implode(', ') : null,
+            'assigned_admin_id'   => $m->assigned_admin_id,
+            'assigned_admin_name' => $m->assignedAdmin?->name,
+            'approved_by_name'    => $m->approver?->name,
+            'approval_remark'     => $m->approval_remark,
+            'is_calling_team'     => (bool) $m->is_calling_team,
+            'phone_verified'      => !empty($m->phone_verify_at),
+            'created_at'          => optional($m->created_at)->format('d M, Y h:i A'),
+            'approved_at'         => optional($m->approved_at)?->format('d M, Y h:i A'),
+            'rejected_at'         => optional($m->rejected_at)?->format('d M, Y h:i A'),
+        ];
+    }
+
+    public function pendingApprovalsPage()
+    {
+        $stats    = $this->getApprovalStats();
+        $roles    = Role::where('status', 1)->get(['id', 'name', 'slug']);
+        $depts    = Department::where('status', 1)->orderBy('name')->get(['id', 'name']);
+        $admins   = Member::approved()->whereRaw('JSON_CONTAINS(roles, \'["1"]\') OR JSON_CONTAINS(roles, \'[1]\') OR JSON_CONTAINS(roles, \'["2"]\') OR JSON_CONTAINS(roles, \'[2]\')')
+            ->get(['id', 'name'])
+            ->map(fn($a) => ['id' => $a->id, 'name' => $a->name]);
+
+        return Inertia::render('SuperAdmin/Members/Approvals/PendingApprovals', [
+            'stats'     => $stats,
+            'roles'     => $roles,
+            'departments' => $depts,
+            'assignable_admins' => $admins,
+            'activeTab' => 'pending',
+        ]);
+    }
+
+    public function approvedMembersPage()
+    {
+        $stats    = $this->getApprovalStats();
+        $roles    = Role::where('status', 1)->get(['id', 'name', 'slug']);
+        $depts    = Department::where('status', 1)->orderBy('name')->get(['id', 'name']);
+        $admins   = Member::approved()->whereRaw('JSON_CONTAINS(roles, \'["1"]\') OR JSON_CONTAINS(roles, \'[1]\') OR JSON_CONTAINS(roles, \'["2"]\') OR JSON_CONTAINS(roles, \'[2]\')')
+            ->get(['id', 'name'])
+            ->map(fn($a) => ['id' => $a->id, 'name' => $a->name]);
+
+        return Inertia::render('SuperAdmin/Members/Approvals/PendingApprovals', [
+            'stats'     => $stats,
+            'roles'     => $roles,
+            'departments' => $depts,
+            'assignable_admins' => $admins,
+            'activeTab' => 'approved',
+        ]);
+    }
+
+    public function rejectedMembersPage()
+    {
+        $stats    = $this->getApprovalStats();
+        $roles    = Role::where('status', 1)->get(['id', 'name', 'slug']);
+        $depts    = Department::where('status', 1)->orderBy('name')->get(['id', 'name']);
+        $admins   = Member::approved()->whereRaw('JSON_CONTAINS(roles, \'["1"]\') OR JSON_CONTAINS(roles, \'[1]\') OR JSON_CONTAINS(roles, \'["2"]\') OR JSON_CONTAINS(roles, \'[2]\')')
+            ->get(['id', 'name'])
+            ->map(fn($a) => ['id' => $a->id, 'name' => $a->name]);
+
+        return Inertia::render('SuperAdmin/Members/Approvals/PendingApprovals', [
+            'stats'     => $stats,
+            'roles'     => $roles,
+            'departments' => $depts,
+            'assignable_admins' => $admins,
+            'activeTab' => 'rejected',
+        ]);
+    }
+
+    public function approvalStatsApi()
+    {
+        return response()->json([
+            'success' => true,
+            'stats'   => $this->getApprovalStats(),
+        ]);
+    }
+
+    public function pendingApi(Request $request)
+    {
+        $perPage = $request->input('per_page', 15);
+        $query   = Member::pending()->with(['approver:id,name', 'assignedAdmin:id,name']);
+
+        if ($request->search) {
+            $s = "%{$request->search}%";
+            $query->where(fn($q) => $q
+                ->where('name', 'like', $s)
+                ->orWhere('email', 'like', $s)
+                ->orWhere('phone', 'like', $s)
+                ->orWhere('company_name', 'like', $s));
+        }
+
+        if ($request->state)  $query->where('state', $request->state);
+        if ($request->city)   $query->where('city', $request->city);
+        if ($request->source) $query->where('registration_source', $request->source === 'web' ? 'web' : 'mobile_api');
+
+        $members = $query->latest('created_at')->paginate($perPage);
+        $members->getCollection()->transform(fn($m) => $this->transformMemberForTable($m));
+
+        return response()->json([
+            'success' => true,
+            'members' => $members,
+        ]);
+    }
+
+    public function approvedApi(Request $request)
+    {
+        $perPage = $request->input('per_page', 15);
+        $query   = Member::approved()->with(['approver:id,name', 'assignedAdmin:id,name']);
+
+        if ($request->search) {
+            $s = "%{$request->search}%";
+            $query->where(fn($q) => $q
+                ->where('name', 'like', $s)
+                ->orWhere('email', 'like', $s)
+                ->orWhere('phone', 'like', $s)
+                ->orWhere('company_name', 'like', $s));
+        }
+
+        $members = $query->latest('approved_at')->paginate($perPage);
+        $members->getCollection()->transform(fn($m) => $this->transformMemberForTable($m));
+
+        return response()->json([
+            'success' => true,
+            'members' => $members,
+        ]);
+    }
+
+    public function rejectedApi(Request $request)
+    {
+        $perPage = $request->input('per_page', 15);
+        $query   = Member::rejected()->with(['approver:id,name']);
+
+        if ($request->search) {
+            $s = "%{$request->search}%";
+            $query->where(fn($q) => $q
+                ->where('name', 'like', $s)
+                ->orWhere('email', 'like', $s)
+                ->orWhere('phone', 'like', $s));
+        }
+
+        $members = $query->latest('rejected_at')->paginate($perPage);
+        $members->getCollection()->transform(fn($m) => $this->transformMemberForTable($m));
+
+        return response()->json([
+            'success' => true,
+            'members' => $members,
+        ]);
+    }
+
+    public function approvalShowApi(Request $request, Member $member)
+    {
+        $member->loadMissing(['approver:id,name', 'assignedAdmin:id,name']);
+
+        return response()->json([
+            'success' => true,
+            'member'  => $this->transformMemberForTable($member),
+            'registration_details' => [
+                'source'       => $member->registration_source,
+                'source_label' => match($member->registration_source) {
+                    'web'           => 'Web Portal',
+                    'mobile_api'    => 'Mobile App',
+                    'admin_created' => 'Admin Created',
+                    default         => 'Unknown',
+                },
+                'ip_address' => null,
+                'user_agent' => null,
+            ],
+        ]);
+    }
+
+    public function approveMember(Request $request, Member $member)
+    {
+        if (! $member->isPending() && ! $member->isRejected()) {
+            return back()->with('error', 'Only pending or rejected members can be approved.');
+        }
+
+        $validated = $request->validate([
+            'roles'               => ['required', 'array', 'min:1'],
+            'roles.*'             => ['integer', 'exists:roles,id'],
+            'departments'         => ['nullable', 'array'],
+            'departments.*'       => ['integer', 'exists:departments,id'],
+            'designations'        => ['nullable', 'array'],
+            'designations.*'      => ['integer', 'exists:designations,id'],
+            'assigned_admin_id'   => ['nullable', 'integer', Rule::exists('members', 'id')],
+            'approval_remark'     => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $superAdmin = Auth::guard('superadmin')->user();
+
+        try {
+            DB::beginTransaction();
+
+            $member->update([
+                'status'            => Member::STATUS_ACTIVE,
+                'approved_by'       => $superAdmin?->id ?? SuperAdmin::query()->value('id'),
+                'approved_at'       => now(),
+                'rejected_at'       => null,
+                'approval_remark'   => $validated['approval_remark'] ?? null,
+                'roles'             => array_map('intval', $validated['roles']),
+                'departments'       => isset($validated['departments']) ? array_map('intval', $validated['departments']) : [],
+                'designation'       => isset($validated['designations']) ? array_map('intval', $validated['designations']) : [],
+                'assigned_admin_id' => $validated['assigned_admin_id'] ?? null,
+            ]);
+
+            if (in_array(2, array_map('intval', $validated['roles']), true)) {
+                $existingSA = SuperAdmin::where('phone', $member->phone)->first();
+                if (! $existingSA) {
+                    SuperAdmin::create([
+                        'name'           => $member->name,
+                        'roles'          => 'super',
+                        'phone'          => $member->phone,
+                        'whatsapp_phone' => $member->phone,
+                        'email'          => $member->email,
+                        'status'         => 1,
+                        'username'       => $member->username,
+                        'password'       => $member->password,
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Member approved successfully. Construction roles assigned.',
+                    'member'  => $this->transformMemberForTable($member->fresh()),
+                ]);
+            }
+
+            return back()->with('success', "✅ Member {$member->name} approved & roles assigned!");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('approveMember failed.', ['member_id' => $member->id, 'e' => $e->getMessage()]);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to approve member: ' . $e->getMessage(),
+                ], 500);
+            }
+
+            return back()->with('error', 'Failed to approve member: ' . $e->getMessage());
+        }
+    }
+
+    public function rejectMember(Request $request, Member $member)
+    {
+        if (! $member->isPending()) {
+            return back()->with('error', 'Only pending members can be rejected.');
+        }
+
+        $validated = $request->validate([
+            'approval_remark' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        $superAdmin = Auth::guard('superadmin')->user();
+
+        try {
+            $member->update([
+                'status'          => Member::STATUS_REJECTED,
+                'approved_by'     => $superAdmin?->id ?? SuperAdmin::query()->value('id'),
+                'rejected_at'     => now(),
+                'approval_remark' => $validated['approval_remark'],
+            ]);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Registration rejected.',
+                    'member'  => $this->transformMemberForTable($member->fresh()),
+                ]);
+            }
+
+            return back()->with('success', "Member {$member->name} has been rejected.");
+        } catch (\Exception $e) {
+            Log::error('rejectMember failed.', ['member_id' => $member->id, 'e' => $e->getMessage()]);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to reject member: ' . $e->getMessage(),
+                ], 500);
+            }
+
+            return back()->with('error', 'Failed to reject member: ' . $e->getMessage());
+        }
+    }
+
+    public function bulkApprove(Request $request)
+    {
+        $validated = $request->validate([
+            'member_ids'          => ['required', 'array', 'min:1'],
+            'member_ids.*'        => ['integer', 'exists:members,id'],
+            'roles'               => ['required', 'array', 'min:1'],
+            'roles.*'             => ['integer', 'exists:roles,id'],
+            'departments'         => ['nullable', 'array'],
+            'designations'        => ['nullable', 'array'],
+            'assigned_admin_id'   => ['nullable', 'integer', Rule::exists('members', 'id')],
+        ]);
+
+        $superAdmin = Auth::guard('superadmin')->user();
+        $approverId = $superAdmin?->id ?? SuperAdmin::query()->value('id');
+
+        $approved = 0;
+        $failed   = 0;
+
+        foreach ($validated['member_ids'] as $mid) {
+            try {
+                $member = Member::find($mid);
+                if (! $member || ! $member->isPending()) {
+                    $failed++;
+                    continue;
+                }
+
+                DB::beginTransaction();
+
+                $member->update([
+                    'status'            => Member::STATUS_ACTIVE,
+                    'approved_by'       => $approverId,
+                    'approved_at'       => now(),
+                    'rejected_at'       => null,
+                    'roles'             => array_map('intval', $validated['roles']),
+                    'departments'       => isset($validated['departments']) ? array_map('intval', $validated['departments']) : [],
+                    'designation'       => isset($validated['designations']) ? array_map('intval', $validated['designations']) : [],
+                    'assigned_admin_id' => $validated['assigned_admin_id'] ?? null,
+                ]);
+
+                if (in_array(2, array_map('intval', $validated['roles']), true)) {
+                    $existingSA = SuperAdmin::where('phone', $member->phone)->first();
+                    if (! $existingSA) {
+                        SuperAdmin::create([
+                            'name'           => $member->name,
+                            'roles'          => 'super',
+                            'phone'          => $member->phone,
+                            'whatsapp_phone' => $member->phone,
+                            'email'          => $member->email,
+                            'status'         => 1,
+                            'username'       => $member->username,
+                            'password'       => $member->password,
+                        ]);
+                    }
+                }
+
+                DB::commit();
+                $approved++;
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error('bulkApprove member failed.', ['member_id' => $mid, 'e' => $e->getMessage()]);
+                $failed++;
+            }
+        }
+
+        $msg = "✅ Bulk approved {$approved} member(s).";
+        if ($failed > 0) $msg .= " ({$failed} skipped/failed)";
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'approved_count' => $approved,
+                'failed_count'   => $failed,
+            ]);
+        }
+
+        return back()->with('success', $msg);
     }
 }

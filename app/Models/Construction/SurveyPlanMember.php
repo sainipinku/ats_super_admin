@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Construction;
 
 use App\Models\Member;
 use Illuminate\Database\Eloquent\Model;
@@ -15,8 +15,6 @@ class SurveyPlanMember extends Model
         'member_id',
         'role_in_survey',
         'status',
-        'survey_team_id',
-        'work_type',
     ];
 
     public function surveyPlan(): BelongsTo

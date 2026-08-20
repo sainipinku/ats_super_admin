@@ -4,28 +4,31 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\AttendanceRecord;
-use App\Models\Client;
-use App\Models\Company;
-use App\Models\DailyProgressReport;
-use App\Models\DraftingJob;
-use App\Models\DrawingApproval;
-use App\Models\ConstructionEquipment;
-use App\Models\EquipmentAllocation;
-use App\Models\ExecutionPlan;
-use App\Models\ExecutionTask;
-use App\Models\Material;
-use App\Models\Project;
-use App\Models\ProjectBudget;
-use App\Models\ProjectHandover;
-use App\Models\ProjectTeamMember;
-use App\Models\SurveyPlan;
-use App\Models\SurveySubmission;
-use App\Models\ConstructionVehicle;
+use App\Models\Construction\AttendanceRecord;
+use App\Models\Construction\Client;
+use App\Models\Construction\Company;
+use App\Models\Construction\DailyProgressReport;
+use App\Models\Construction\DraftingJob;
+use App\Models\Construction\DrawingApproval;
+use App\Models\Construction\Equipment;
+use App\Models\Construction\EquipmentAllocation;
+use App\Models\Construction\ExecutionPlan;
+use App\Models\Construction\ExecutionTask;
+use App\Models\Construction\Material;
+use App\Models\Construction\MaterialStock;
+use App\Models\Construction\Project;
+use App\Models\Construction\ProjectBudget;
+use App\Models\Construction\ProjectHandover;
+use App\Models\Construction\ProjectTeamMember;
+use App\Models\Construction\SurveyPlan;
+use App\Models\Construction\SurveySubmission;
+use App\Models\Construction\Vehicle;
+use App\Models\Construction\VehicleAssignment;
 use App\Models\Member;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AdminDashboardApiController extends Controller
 {
@@ -137,20 +140,31 @@ class AdminDashboardApiController extends Controller
             ->latest()
             ->get();
 
-        $projectIds = $scopedProjectIds;
+        if ($scopedProjectIds === null || $scopedProjectIds->isEmpty()) {
+            try {
+                $scopedProjectIds = Project::pluck('id');
+            } catch (\Throwable $e) {
+                report($e);
+                $scopedProjectIds = collect([]);
+            }
+        }
+        $projectIds = $projects->pluck('id');
 
-        $companies = $this->buildCompanyStats(
-            $scopedProjectIds,
-            $request
-        );
+        $companies = collect([]);
+        $clients = collect([]);
+        try {
+            $companies = $this->buildCompanyStats($scopedProjectIds, $request);
+            $clients = $this->buildClientStats($scopedProjectIds, $request);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
-        $clients = $this->buildClientStats(
-            $scopedProjectIds,
-            $request
-        );
-
-        $stats = $this->buildStats($scopedProjectIds);
-
+        $stats = [];
+        try {
+            $stats = $this->buildStats($scopedProjectIds);
+        } catch (\Throwable $e) {
+            report($e);
+        }
         $stats['assigned_projects_direct_count'] = $projects->count();
 
         $byStage = $projects->countBy('current_stage');
@@ -209,6 +223,13 @@ class AdminDashboardApiController extends Controller
             ->get();
 
         $pendingApprovals = [
+            'survey_submissions' => collect([]),
+            'drawing_approvals' => collect([]),
+            'dpr_approvals' => collect([]),
+            'attendance_approvals' => collect([]),
+        ];
+        try {
+            $pendingApprovals = [
             'survey_submissions' => SurveySubmission::with([
                 'surveyVisit.surveyPlan.project',
             ])
@@ -259,6 +280,9 @@ class AdminDashboardApiController extends Controller
                 ->take(10)
                 ->get(),
         ];
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $teamPerformance = $this->buildTeamPerformance(
             $scopedProjectIds
@@ -306,6 +330,35 @@ class AdminDashboardApiController extends Controller
     private function buildStats($scopedProjectIds)
     {
         $projectIdsArr = $scopedProjectIds->all();
+
+        if (empty($projectIdsArr)) {
+            return [
+                'total_projects' => 0,
+                'active_projects' => 0,
+                'completed_projects' => 0,
+                'draft_projects' => 0,
+                'on_hold_projects' => 0,
+                'companies_count' => 0,
+                'clients_count' => 0,
+                'team_members_count' => 0,
+                'survey_plans' => 0,
+                'survey_pending_submissions' => 0,
+                'drafting_queue' => 0,
+                'drawing_approvals_pending' => 0,
+                'execution_plans' => 0,
+                'execution_tasks' => 0,
+                'tasks_completed' => 0,
+                'tasks_in_progress' => 0,
+                'tasks_blocked' => 0,
+                'dpr_pending_review' => 0,
+                'attendance_pending_review' => 0,
+                'materials_count' => 0,
+                'vehicles_count' => 0,
+                'equipment_count' => 0,
+                'approved_budget_total' => 0,
+                'estimated_budget_total' => 0,
+            ];
+        }
 
         return [
             'total_projects' => Project::whereIn(
@@ -581,6 +634,9 @@ class AdminDashboardApiController extends Controller
     private function buildTeamPerformance($scopedProjectIds)
     {
         $projectIdsArr = $scopedProjectIds->all();
+        if (empty($projectIdsArr)) {
+            return collect([]);
+        }
 
         $members = Member::query()
             ->whereIn('id', function ($q) use ($projectIdsArr) {
@@ -699,6 +755,12 @@ class AdminDashboardApiController extends Controller
     private function buildFinanceSummary($scopedProjectIds)
     {
         $projectIdsArr = $scopedProjectIds->all();
+        $empty = [
+            'budget' => ['approved_total' => 0, 'estimated_total' => 0],
+            'invoices' => ['count' => 0, 'total_amount' => 0, 'paid_amount' => 0, 'balance_due' => 0],
+            'payments' => ['count' => 0, 'total_amount' => 0],
+            'top_projects_by_budget' => [],
+        ];
 
         $approvedBudgets = ProjectBudget::where(
             'status',
@@ -811,6 +873,12 @@ class AdminDashboardApiController extends Controller
     private function buildInventorySummary($scopedProjectIds)
     {
         $projectIdsArr = $scopedProjectIds->all();
+        $empty = [
+            'materials' => ['count' => 0, 'low_stock_count' => 0],
+            'vehicles' => ['total' => 0, 'in_service' => 0, 'maintenance' => 0, 'out_of_service' => 0, 'active_assignments' => []],
+            'equipment' => ['total' => 0, 'in_service' => 0, 'maintenance' => 0, 'out_of_service' => 0, 'active_allocations' => []],
+            'handovers_count' => 0,
+        ];
 
         $materials = DB::table(
             'construction_materials'

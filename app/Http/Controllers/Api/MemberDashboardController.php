@@ -51,10 +51,15 @@ class MemberDashboardController extends Controller
 
         $companyIds = Project::whereIn('id', $projectIds)->pluck('company_id')->unique()->values();
 
-        $companies = Company::withCount(['projects', 'clients'])
-            ->whereIn('id', $companyIds)
-            ->orderBy('name')
-            ->get(['id', 'name', 'email','legal_name','phone','logo_path','status']);
+        try {
+            $companies = Company::withCount(['projects', 'clients'])
+                ->whereIn('id', $companyIds)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'legal_name', 'phone', 'logo_path', 'status']);
+        } catch (\Throwable $e) {
+            report($e);
+            $companies = collect([]);
+        }
 
         $projects = Project::with(['company', 'client', 'latestBudget', 'teamMembers.role'])
             ->whereIn('id', $projectIds)
@@ -81,28 +86,41 @@ class MemberDashboardController extends Controller
             ->get();
 
         $today = now()->toDateString();
+        $todayVisits = collect([]);
+        try {
+            $todayVisits = SurveyVisit::with(['surveyPlan', 'project'])
+                ->whereHas('surveyPlan.planMembers', function ($q) use ($memberId) {
+                    $q->where('member_id', $memberId);
+                })
+                ->whereDate('check_in_at', $today)
+                ->latest()
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
-        $todayVisits = SurveyVisit::with(['surveyPlan', 'project'])
-            ->whereHas('surveyPlan.planMembers', function ($q) use ($memberId) {
+        $pendingSurveyPlans = 0;
+        try {
+            $pendingSurveyPlans = SurveyPlan::whereHas('planMembers', function ($q) use ($memberId) {
                 $q->where('member_id', $memberId);
             })
-            ->whereDate('check_in_at', $today)
-            ->latest()
-            ->get();
+                ->whereIn('status', ['pending', 'in_progress'])
+                ->count();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
-        $pendingSurveyPlans = SurveyPlan::with(['project'])
-            ->whereHas('planMembers', function ($q) use ($memberId) {
-                $q->where('member_id', $memberId);
-            })
-            ->whereIn('status', ['pending', 'in_progress'])
-            ->count();
-
-        $tasks = ExecutionTask::with(['project', 'executionPlan', 'supervisor'])
-            ->whereHas('assignees', function ($q) use ($memberId) {
-                $q->where('member_id', $memberId)->where('status', 'active');
-            })
-            ->latest()
-            ->get();
+        $tasks = collect([]);
+        try {
+            $tasks = ExecutionTask::with(['project', 'executionPlan', 'supervisor'])
+                ->whereHas('assignees', function ($q) use ($memberId) {
+                    $q->where('member_id', $memberId)->where('status', 'active');
+                })
+                ->latest()
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $taskCounts = [
             'total' => $tasks->count(),
@@ -112,15 +130,32 @@ class MemberDashboardController extends Controller
             'blocked' => $tasks->where('status', 'blocked')->count(),
         ];
 
-        $todayAttendance = AttendanceRecord::where('member_id', $memberId)
-            ->where('attendance_date', $today)
-            ->latest()
-            ->first();
+        $todayAttendance = null;
+        try {
+            $todayAttendance = AttendanceRecord::where('member_id', $memberId)
+                ->where('attendance_date', $today)
+                ->latest()
+                ->first();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
-        $attendanceLast30 = AttendanceRecord::where('member_id', $memberId)
-            ->where('attendance_date', '>=', now()->subDays(30)->toDateString())
-            ->latest('attendance_date')
-            ->get();
+        $attendanceLast30 = collect([]);
+        try {
+            $attendanceLast30 = AttendanceRecord::where('member_id', $memberId)
+                ->where('attendance_date', '>=', now()->subDays(30)->toDateString())
+                ->latest('attendance_date')
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        $hoursWorked = 0;
+        try {
+            $hoursWorked = (float) $attendanceLast30->sum('hours_worked');
+        } catch (\Throwable $e) {
+            $hoursWorked = 0;
+        }
 
         $attendanceSummary = [
             'total_days' => $attendanceLast30->count(),
@@ -129,30 +164,57 @@ class MemberDashboardController extends Controller
             'overtime' => $attendanceLast30->where('attendance_type', 'overtime')->count(),
             'check_in_today' => (bool) $todayAttendance,
             'today_record' => $todayAttendance,
+            'total_hours_last_30_days' => $hoursWorked,
         ];
 
-        $draftingJobs = DraftingJob::with(['project'])
-            ->where('assigned_to_member_id', $memberId)
-            ->latest()
-            ->get();
+        $draftingJobs = collect([]);
+        try {
+            $draftingJobs = DraftingJob::with(['project'])
+                ->where('assigned_to_member_id', $memberId)
+                ->latest()
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
-        $recentDPRs = DailyProgressReport::with(['project'])
-            ->where('submitted_by_member_id', $memberId)
-            ->latest('report_date')
-            ->take(10)
-            ->get();
+        $recentDPRs = collect([]);
+        try {
+            $recentDPRs = DailyProgressReport::with(['project'])
+                ->where('submitted_by_member_id', $memberId)
+                ->latest('report_date')
+                ->take(10)
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
-        $vehiclesAssigned = VehicleAssignment::with(['vehicle', 'project'])
-            ->where('assigned_to_member_id', $memberId)
-            ->whereNull('returned_at')
-            ->latest()
-            ->get();
+        $vehiclesAssigned = collect([]);
+        try {
+            $now = now();
+            $vehiclesAssigned = VehicleAssignment::with(['vehicle', 'project'])
+                ->where('driver_member_id', $memberId)
+                ->where('status', 'active')
+                ->where(function ($q) use ($now) {
+                    $q->whereNull('assigned_to')
+                        ->orWhere('assigned_to', '>=', $now);
+                })
+                ->latest()
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
-        $equipmentAssigned = EquipmentAllocation::with(['equipment', 'project'])
-            ->where('assigned_to_member_id', $memberId)
-            ->whereNull('returned_at')
-            ->latest()
-            ->get();
+        $equipmentAssigned = collect([]);
+        try {
+            $equipmentAssigned = EquipmentAllocation::with(['equipment', 'project'])
+                ->where('assigned_to_member_id', $memberId)
+                ->whereNull('returned_at')
+                ->where('status', 'active')
+                ->latest()
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $projectStageCounts = $projects->countBy('current_stage');
 
@@ -165,9 +227,14 @@ class MemberDashboardController extends Controller
             'total' => $projects->count(),
         ];
 
-        $totalBudgetApproved = ProjectBudget::where('status', 'approved')
-            ->whereIn('project_id', $projectIds->all())
-            ->sum('approved_amount') ?? 0;
+        $totalBudgetApproved = 0;
+        try {
+            $totalBudgetApproved = (float) ProjectBudget::where('status', 'approved')
+                ->whereIn('project_id', $projectIds->all())
+                ->sum('approved_amount');
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json([
             'success' => true,
@@ -311,13 +378,19 @@ class MemberDashboardController extends Controller
         $perPage = $request->per_page ?? 15;
         $surveys = $query->latest()->paginate($perPage);
 
-        $pending = SurveyPlan::whereHas('planMembers', function ($q) use ($memberId) {
-            $q->where('member_id', $memberId);
-        })->whereIn('status', ['pending', 'in_progress'])->count();
+        $pending = 0;
+        $completed = 0;
+        try {
+            $pending = SurveyPlan::whereHas('planMembers', function ($q) use ($memberId) {
+                $q->where('member_id', $memberId);
+            })->whereIn('status', ['pending', 'in_progress'])->count();
 
-        $completed = SurveyPlan::whereHas('planMembers', function ($q) use ($memberId) {
-            $q->where('member_id', $memberId);
-        })->where('status', 'submitted')->count();
+            $completed = SurveyPlan::whereHas('planMembers', function ($q) use ($memberId) {
+                $q->where('member_id', $memberId);
+            })->where('status', 'submitted')->count();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json([
             'success' => true,
@@ -363,14 +436,19 @@ class MemberDashboardController extends Controller
         $perPage = $request->per_page ?? 15;
         $tasks = $query->latest()->paginate($perPage);
 
-        $summary = DB::table('construction_execution_task_assignees')
-            ->join('construction_execution_tasks', 'construction_execution_task_assignees.execution_task_id', '=', 'construction_execution_tasks.id')
-            ->where('construction_execution_task_assignees.member_id', $memberId)
-            ->where('construction_execution_task_assignees.status', 'active')
-            ->selectRaw('construction_execution_tasks.status, COUNT(*) as count')
-            ->groupBy('construction_execution_tasks.status')
-            ->pluck('count', 'status')
-            ->toArray();
+        $summary = [];
+        try {
+            $summary = DB::table('construction_execution_task_assignees')
+                ->join('construction_execution_tasks', 'construction_execution_task_assignees.execution_task_id', '=', 'construction_execution_tasks.id')
+                ->where('construction_execution_task_assignees.member_id', $memberId)
+                ->where('construction_execution_task_assignees.status', 'active')
+                ->selectRaw('construction_execution_tasks.status, COUNT(*) as count')
+                ->groupBy('construction_execution_tasks.status')
+                ->pluck('count', 'status')
+                ->toArray();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json([
             'success' => true,
@@ -410,14 +488,26 @@ class MemberDashboardController extends Controller
         $records = $query->latest('attendance_date')->paginate($perPage);
 
         $today = now()->toDateString();
-        $todayRecord = AttendanceRecord::where('member_id', $memberId)
-            ->where('attendance_date', $today)
-            ->latest()
-            ->first();
+        $todayRecord = null;
+        try {
+            $todayRecord = AttendanceRecord::where('member_id', $memberId)
+                ->where('attendance_date', $today)
+                ->latest()
+                ->first();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
-        $last30 = AttendanceRecord::where('member_id', $memberId)
-            ->where('attendance_date', '>=', now()->subDays(30)->toDateString())
-            ->get();
+        $last30 = collect([]);
+        $hoursWorked30 = 0;
+        try {
+            $last30 = AttendanceRecord::where('member_id', $memberId)
+                ->where('attendance_date', '>=', now()->subDays(30)->toDateString())
+                ->get();
+            $hoursWorked30 = (float) $last30->sum('hours_worked');
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $summary = [
             'today' => [
@@ -429,7 +519,7 @@ class MemberDashboardController extends Controller
                 'present' => $last30->where('attendance_type', 'present')->count(),
                 'half_day' => $last30->where('attendance_type', 'half_day')->count(),
                 'overtime' => $last30->where('attendance_type', 'overtime')->count(),
-                'total_hours' => (float) $last30->sum('hours_worked'),
+                'total_hours' => $hoursWorked30,
             ],
         ];
 
@@ -486,66 +576,98 @@ class MemberDashboardController extends Controller
             'teamMembers.role',
         ]);
 
-        $surveyPlans = SurveyPlan::with([
-            'planMembers.member',
-            'visits.checkedInBy',
-            'visits.entries.capturedBy',
-            'visits.measurements.capturedBy',
-            'visits.submission',
-        ])
-            ->where('project_id', $project->id)
-            ->latest()
-            ->get();
+        $surveyPlans = collect([]);
+        try {
+            $surveyPlans = SurveyPlan::with([
+                'planMembers.member',
+                'visits.checkedInBy',
+                'visits.entries.capturedBy',
+                'visits.measurements.capturedBy',
+                'visits.submission',
+            ])
+                ->where('project_id', $project->id)
+                ->latest()
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $mySurveyPlans = $surveyPlans->filter(function ($plan) use ($memberId) {
             return $plan->planMembers->contains('member_id', $memberId);
         })->values();
 
-        $tasks = ExecutionTask::with(['executionPlan', 'supervisor', 'assignees.member'])
-            ->where('project_id', $project->id)
-            ->latest()
-            ->get();
+        $tasks = collect([]);
+        try {
+            $tasks = ExecutionTask::with(['executionPlan', 'supervisor', 'assignees.member'])
+                ->where('project_id', $project->id)
+                ->latest()
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $myTasks = $tasks->filter(function ($task) use ($memberId) {
             return $task->assignees->contains(fn ($a) => $a->member_id == $memberId && $a->status === 'active');
         })->values();
 
-        $draftingJobs = DraftingJob::with(['assignedTo', 'drawingRevisions.uploadedBy'])
-            ->where('project_id', $project->id)
-            ->latest()
-            ->get();
-
+        $draftingJobs = collect([]);
+        try {
+            $draftingJobs = DraftingJob::with(['assignedTo', 'drawingRevisions.uploadedBy'])
+                ->where('project_id', $project->id)
+                ->latest()
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+        }
         $myDraftingJobs = $draftingJobs->where('assigned_to_member_id', $memberId)->values();
 
-        $materials = Material::with('stocks')
+        $materials = collect([]);
+        $stocks = collect([]);
+        try {
+            $materials = Material::with('stocks')
+                ->where('project_id', $project->id)
+                ->latest()
+                ->get();
+
+            $stocks = MaterialStock::with('material')
+                ->where('project_id', $project->id)
+                ->latest()
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        $vehicles = collect([]);
+        $myVehicles = collect([]);
+        try {
+            $vehicles = ConstructionVehicle::with(['assignments' => fn ($q) => $q->latest()->take(3)])
             ->where('project_id', $project->id)
             ->latest()
             ->get();
 
-        $stocks = MaterialStock::with('material')
-            ->where('project_id', $project->id)
-            ->latest()
-            ->get();
+            $myVehicles = $vehicles->filter(function ($v) use ($memberId, $now) {
+                return $v->assignments->contains(fn ($a) => $a->driver_member_id == $memberId && $a->status === 'active' && (is_null($a->assigned_to) || $a->assigned_to >= $now));
+            })->values();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
-        $vehicles = ConstructionVehicle::with(['assignments' => fn ($q) => $q->latest()->take(3)])
-            ->where('project_id', $project->id)
-            ->latest()
-            ->get();
-
-        $myVehicles = $vehicles->filter(function ($v) use ($memberId) {
-            return $v->assignments->contains(fn ($a) => $a->assigned_to_member_id == $memberId && is_null($a->returned_at));
-        })->values();
-
-        $equipments = \App\Models\ConstructionEquipment::with([
+        $equipments = collect([]);
+        $myEquipments = collect([]);
+        try {
+            $equipments = \App\Models\ConstructionEquipment::with([
             'allocations' => fn ($q) => $q->latest()->take(3),
         ])
             ->where('project_id', $project->id)
             ->latest()
             ->get();
 
-        $myEquipments = $equipments->filter(function ($e) use ($memberId) {
-            return $e->allocations->contains(fn ($a) => $a->assigned_to_member_id == $memberId && is_null($a->returned_at));
-        })->values();
+            $myEquipments = $equipments->filter(function ($e) use ($memberId) {
+                return $e->allocations->contains(fn ($a) => $a->assigned_to_member_id == $memberId && is_null($a->returned_at) && $a->status === 'active');
+            })->values();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $invoices = \App\Models\ClientInvoice::with(['items', 'payments'])
             ->where('project_id', $project->id)
@@ -561,17 +683,23 @@ class MemberDashboardController extends Controller
             ->latest()
             ->get();
 
-        $dprs = DailyProgressReport::with(['items', 'submittedBy'])
-            ->where('project_id', $project->id)
-            ->latest('report_date')
-            ->take(20)
-            ->get();
+        $dprs = collect([]);
+        $attendance = collect([]);
+        try {
+            $dprs = DailyProgressReport::with(['items', 'submittedBy'])
+                ->where('project_id', $project->id)
+                ->latest('report_date')
+                ->take(20)
+                ->get();
 
-        $attendance = AttendanceRecord::with(['member'])
-            ->where('project_id', $project->id)
-            ->latest('attendance_date')
-            ->take(50)
-            ->get();
+            $attendance = AttendanceRecord::with(['member'])
+                ->where('project_id', $project->id)
+                ->latest('attendance_date')
+                ->take(50)
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $myAttendance = $attendance->where('member_id', $memberId)->values();
 
@@ -592,10 +720,19 @@ class MemberDashboardController extends Controller
             'assigned_to_me' => $mySurveyPlans->count(),
         ];
 
+        $invoiceTotal = 0;
+        $paymentTotal = 0;
+        try {
+            $invoiceTotal = (float) $invoices->sum('total_amount');
+            $paymentTotal = (float) $payments->sum('amount');
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         $financeSummary = [
-            'budget_total_invoices' => $invoices->sum('total_amount') ?? 0,
-            'paid_total' => $payments->sum('amount') ?? 0,
-            'pending' => ($invoices->sum('total_amount') ?? 0) - ($payments->sum('amount') ?? 0),
+            'budget_total_invoices' => $invoiceTotal,
+            'paid_total' => $paymentTotal,
+            'pending' => $invoiceTotal - $paymentTotal,
             'invoices_count' => $invoices->count(),
             'payments_count' => $payments->count(),
         ];

@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\HasApiTokens;
 
 class SuperAdmin extends Authenticatable
 {
-    use HasUuids;
+    use HasApiTokens, HasUuids;
     protected $fillable = [
         'roles',
         'name',

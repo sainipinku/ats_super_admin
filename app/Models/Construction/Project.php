@@ -1,11 +1,7 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Construction;
 
-use App\Models\ConstructionEquipment;
-use App\Models\ConstructionVehicle;
-
-use App\Models\Member;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -37,14 +33,6 @@ class Project extends Model
         'current_stage',
         'created_by_type',
         'created_by_id',
-        'client_review_status',
-        'client_review_requested_at',
-        'client_review_requested_by_member_id',
-        'client_approved_at',
-        'client_approved_by_client_id',
-        'client_revision_comment',
-        'partial_revision_sections',
-        'revision_iteration_count',
     ];
 
     protected $casts = [
@@ -52,10 +40,6 @@ class Project extends Model
         'longitude' => 'float',
         'start_date' => 'date',
         'expected_end_date' => 'date',
-        'client_review_requested_at' => 'datetime',
-        'client_approved_at' => 'datetime',
-        'partial_revision_sections' => 'array',
-        'revision_iteration_count' => 'integer',
     ];
 
     public function company(): BelongsTo
@@ -165,7 +149,7 @@ class Project extends Model
 
     public function vehicles(): HasMany
     {
-        return $this->hasMany(ConstructionVehicle::class);
+        return $this->hasMany(Vehicle::class);
     }
 
     public function vehicleAssignments(): HasMany
@@ -180,7 +164,7 @@ class Project extends Model
 
     public function equipments(): HasMany
     {
-        return $this->hasMany(ConstructionEquipment::class);
+        return $this->hasMany(Equipment::class);
     }
 
     public function equipmentAllocations(): HasMany
@@ -206,20 +190,5 @@ class Project extends Model
     public function handovers(): HasMany
     {
         return $this->hasMany(ProjectHandover::class);
-    }
-
-    public function surveyTeams(): HasMany
-    {
-        return $this->hasMany(SurveyTeam::class);
-    }
-
-    public function clientReviewRequestedBy(): BelongsTo
-    {
-        return $this->belongsTo(Member::class, 'client_review_requested_by_member_id');
-    }
-
-    public function clientApprovedBy(): BelongsTo
-    {
-        return $this->belongsTo(Client::class, 'client_approved_by_client_id');
     }
 }
