@@ -22,8 +22,16 @@ return new class extends Migration
     public function up(): void
     {
         // Clean up any leftover columns from previous failed runs
+        // (MySQL < 8.0.29 does not support DROP COLUMN IF EXISTS)
         foreach (['payment_status_new', 'status_new', 'insurance_status_new', 'puc_status_new'] as $col) {
-            DB::statement("ALTER TABLE vehicles DROP COLUMN IF EXISTS `{$col}`");
+            $exists = DB::table('information_schema.columns')
+                ->where('table_schema', DB::getDatabaseName())
+                ->where('table_name', 'vehicles')
+                ->where('column_name', $col)
+                ->exists();
+            if ($exists) {
+                DB::statement("ALTER TABLE vehicles DROP COLUMN `{$col}`");
+            }
         }
 
         // --- payment_status: ENUM('paid','unpaid') → TINYINT ---
@@ -85,8 +93,16 @@ return new class extends Migration
     public function down(): void
     {
         // Clean up any leftover columns
+        // (MySQL < 8.0.29 does not support DROP COLUMN IF EXISTS)
         foreach (['payment_status_old', 'status_old', 'insurance_status_old', 'puc_status_old'] as $col) {
-            DB::statement("ALTER TABLE vehicles DROP COLUMN IF EXISTS `{$col}`");
+            $exists = DB::table('information_schema.columns')
+                ->where('table_schema', DB::getDatabaseName())
+                ->where('table_name', 'vehicles')
+                ->where('column_name', $col)
+                ->exists();
+            if ($exists) {
+                DB::statement("ALTER TABLE vehicles DROP COLUMN `{$col}`");
+            }
         }
 
         // --- payment_status: TINYINT → ENUM('paid','unpaid') ---
