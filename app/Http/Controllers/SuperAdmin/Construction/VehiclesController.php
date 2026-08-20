@@ -4,10 +4,10 @@ namespace App\Http\Controllers\SuperAdmin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\Project;
-use App\Models\Construction\Vehicle;
-use App\Models\Construction\VehicleAssignment;
-use App\Models\Construction\VehicleLocationPing;
+use App\Models\Project;
+use App\Models\ConstructionVehicle;
+use App\Models\VehicleAssignment;
+use App\Models\VehicleLocationPing;
 use App\Services\Construction\ConstructionFleetService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -44,7 +44,7 @@ class VehiclesController extends Controller
 
         return Inertia::render('SuperAdmin/Construction/Vehicles/Index', [
             'projects' => Project::orderByDesc('id')->get(['id', 'project_code', 'name']),
-            'vehicles' => Vehicle::with('project')->latest()->take(60)->get(),
+            'vehicles' => ConstructionVehicle::with('project')->latest()->take(60)->get(),
             'assignments' => VehicleAssignment::with(['project', 'vehicle', 'driver'])
                 ->latest()
                 ->take(60)

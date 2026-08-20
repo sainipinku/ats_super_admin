@@ -2,17 +2,18 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Str;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Http\Request;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 class Member extends Authenticatable
@@ -78,11 +79,11 @@ class Member extends Authenticatable
         'must_change_password' => 'boolean',
         'terms_agreed' => 'boolean',
     ];
+
     public function uniqueIds()
     {
         return ['uuid'];
     }
-
 
     public function creator()
     {
@@ -101,19 +102,11 @@ class Member extends Authenticatable
 
     public function callingTeamAssignments()
     {
-        return $this->hasMany(JobApplication::class, 'assigned_calling_team_member_id');
+        return $this->hasMany(
+            JobApplication::class,
+            'assigned_calling_team_member_id'
+        );
     }
-
-    public function scopePendingApproval($query)
-    {
-        return $query->where('status', '0')->whereNull('approved_at');
-    }
-
-    public function scopeApproved($query)
-    {
-        return $query->where('status', '1')->whereNotNull('approved_at');
-    }
-
 
     protected $appends = [
         'profile_photo_url',
@@ -131,25 +124,30 @@ class Member extends Authenticatable
 
     public function roles()
     {
-        return $this->belongsToMany(Role::class, 'member_roles', 'member_id', 'role_id');
+        return $this->belongsToMany(
+            Role::class,
+            'member_roles',
+            'member_id',
+            'role_id'
+        );
     }
 
     /**
-     * Scope to filter members by role ID
+     * Scope to filter members by role ID.
      */
     public function scopeHasRole($query, $roleId)
     {
-        return $query->where(function($q) use ($roleId) {
+        return $query->where(function ($q) use ($roleId) {
             $q->whereJsonContains('roles', (string) $roleId);
         });
     }
 
     /**
-     * Scope to filter members by role slug
+     * Scope to filter members by role slug.
      */
     public function scopeHasRoleBySlug($query, $slug)
     {
-        return $query->whereHas('roles', function($q) use ($slug) {
+        return $query->whereHas('roles', function ($q) use ($slug) {
             $q->where('slug', $slug);
         });
     }
@@ -158,7 +156,9 @@ class Member extends Authenticatable
     {
         return Attribute::make(
             get: function ($value) {
-                return $value ? Carbon::parse($value)->format('Y-m-d') : null;
+                return $value
+                    ? Carbon::parse($value)->format('Y-m-d')
+                    : null;
             }
         );
     }
@@ -177,7 +177,7 @@ class Member extends Authenticatable
 
                 return asset('images/profileimg.png');
             }
-    );
+        );
     }
 
     public function resumeUrl(): Attribute
@@ -205,7 +205,10 @@ class Member extends Authenticatable
     {
         return Attribute::make(
             get: function () {
-                $candidate = is_array($this->candidate_profile) ? $this->candidate_profile : [];
+                $candidate = is_array($this->candidate_profile)
+                    ? $this->candidate_profile
+                    : [];
+
                 $skills = $candidate['skills'] ?? null;
 
                 return is_array($skills) ? $skills : null;
@@ -217,40 +220,63 @@ class Member extends Authenticatable
     {
         return Attribute::make(
             get: function () {
-                $candidate = is_array($this->candidate_profile) ? $this->candidate_profile : [];
+                $candidate = is_array($this->candidate_profile)
+                    ? $this->candidate_profile
+                    : [];
 
-                return $candidate['experience'] ?? ($candidate['experience_label'] ?? null);
+                return $candidate['experience']
+                    ?? ($candidate['experience_label'] ?? null);
             }
         );
     }
-   public function notify_tokens()
+
+    public function notify_tokens()
     {
         return $this->hasMany(FcmToken::class, 'user_id');
     }
 
     public function fcm_token()
     {
-        return $this->hasOne(FcmToken::class,'user_id')->latestOfMany();
+        return $this->hasOne(FcmToken::class, 'user_id')->latestOfMany();
     }
 
     public function currentAge(): Attribute
     {
         return Attribute::make(
             get: function () {
-                return $this->dob ? (int)Carbon::parse($this->dob)->diffInYears(Carbon::now()) : 0;
+                return $this->dob
+                    ? (int) Carbon::parse($this->dob)->diffInYears(Carbon::now())
+                    : 0;
             }
         );
     }
+
+    /**
+     * Get the requested construction role from the current request.
+     *
+     * Centralizes role extraction so controllers can reuse the same logic.
+     */
+    public function getRequestedConstructionRole(Request $request): ?string
+    {
+        $role = $request->query('role') ?? $request->input('role');
+
+        return is_string($role) && $role !== ''
+            ? $role
+            : null;
+    }
+
     public function isAdmin(): bool
     {
         return $this->id === 1 || $this->slug === 'admin';
     }
- public function isSuperAdmin(): bool
+
+    public function isSuperAdmin(): bool
     {
         return $this->id === 2 || $this->slug === 'super-admin';
     }
+
     /**
-     * Check if the role is a member role
+     * Check if the role is a member role.
      */
     public function isMember(): bool
     {
@@ -262,11 +288,11 @@ class Member extends Authenticatable
         return (bool) $this->is_calling_team;
     }
 
-
     public function getRoleName($roleId)
     {
-        // Get role name from relationship
-        return $this->roles()->where('id', $roleId)->value('name');
+        return $this->roles()
+            ->where('id', $roleId)
+            ->value('name');
     }
 
     public function getGuardName(): string
@@ -283,7 +309,7 @@ class Member extends Authenticatable
     }
 
     /**
-     * Get the dashboard route for this role
+     * Get the dashboard route for this role.
      */
     public function getDashboardRoute(): string
     {
@@ -297,6 +323,7 @@ class Member extends Authenticatable
             default => 'home',
         };
     }
+
     public function employee()
     {
         return $this->hasOne(Employee::class, 'member_id');
@@ -304,35 +331,54 @@ class Member extends Authenticatable
 
     public function departmentList()
     {
-        return $this->belongsToMany(Department::class, 'member_department', 'member_id', 'department_id')
-            ->withTimestamps();
+        return $this->belongsToMany(
+            Department::class,
+            'member_department',
+            'member_id',
+            'department_id'
+        )->withTimestamps();
     }
 
     public function designationList()
     {
-        return $this->belongsToMany(Designation::class, 'member_designation', 'member_id', 'designation_id')
-            ->withTimestamps();
+        return $this->belongsToMany(
+            Designation::class,
+            'member_designation',
+            'member_id',
+            'designation_id'
+        )->withTimestamps();
     }
+
     public function getDepartmentNamesAttribute()
     {
         if (is_array($this->departments)) {
-            return Department::whereIn('id', $this->departments)->pluck('name')->implode(', ');
+            return Department::whereIn('id', $this->departments)
+                ->pluck('name')
+                ->implode(', ');
         }
+
         return '';
     }
+
     public function getRoleNamesAttribute()
     {
         if (is_array($this->roles)) {
-            return Role::whereIn('id', $this->roles)->pluck('name')->implode(', ');
+            return Role::whereIn('id', $this->roles)
+                ->pluck('name')
+                ->implode(', ');
         }
+
         return '';
     }
 
     public function getDesignationNamesAttribute()
     {
         if (is_array($this->designation)) {
-            return Designation::whereIn('id', $this->designation)->pluck('name')->implode(', ');
+            return Designation::whereIn('id', $this->designation)
+                ->pluck('name')
+                ->implode(', ');
         }
+
         return '';
     }
 
@@ -354,9 +400,14 @@ class Member extends Authenticatable
         return $this->unreadAppNotifications($model)->count();
     }
 
-    public function markAppNotificationAsRead(string $uuid, string $model = 'member'): bool
-    {
-        $notification = $this->appNotifications($model)->where('uuid', $uuid)->first();
+    public function markAppNotificationAsRead(
+        string $uuid,
+        string $model = 'member'
+    ): bool {
+        $notification = $this->appNotifications($model)
+            ->where('uuid', $uuid)
+            ->first();
+
         if (!$notification) {
             return false;
         }
@@ -369,27 +420,35 @@ class Member extends Authenticatable
         return true;
     }
 
-    public function markAllAppNotificationsAsRead(string $model = 'member'): int
-    {
+    public function markAllAppNotificationsAsRead(
+        string $model = 'member'
+    ): int {
         return $this->unreadAppNotifications($model)->update([
             'status' => 'read',
             'viewed_at' => now(),
         ]);
     }
 
-    public function deleteAppNotification(string $uuid, string $model = 'member'): bool
-    {
-        $notification = $this->appNotifications($model)->where('uuid', $uuid)->first();
+    public function deleteAppNotification(
+        string $uuid,
+        string $model = 'member'
+    ): bool {
+        $notification = $this->appNotifications($model)
+            ->where('uuid', $uuid)
+            ->first();
+
         if (!$notification) {
             return false;
         }
 
         $notification->delete();
+
         return true;
     }
 
-    public function deleteAllAppNotifications(string $model = 'member'): int
-    {
+    public function deleteAllAppNotifications(
+        string $model = 'member'
+    ): int {
         return $this->appNotifications($model)->delete();
     }
 
@@ -411,10 +470,8 @@ class Member extends Authenticatable
 
     public function isPasswordResetTokenValid()
     {
-        return $this->reset_password_token &&
-            $this->reset_password_token_expires_at &&
-            $this->reset_password_token_expires_at->isFuture();
+        return $this->reset_password_token
+            && $this->reset_password_token_expires_at
+            && $this->reset_password_token_expires_at->isFuture();
     }
-
-
 }

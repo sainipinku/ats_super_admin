@@ -2,9 +2,9 @@
 
 namespace App\Services\Construction;
 
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectHandover;
-use App\Models\Construction\ProjectHandoverItem;
+use App\Models\Project;
+use App\Models\ProjectHandover;
+use App\Models\ProjectHandoverItem;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

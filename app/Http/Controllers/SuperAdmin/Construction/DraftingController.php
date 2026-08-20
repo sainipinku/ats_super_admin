@@ -4,11 +4,11 @@ namespace App\Http\Controllers\SuperAdmin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\Document;
-use App\Models\Construction\DraftingJob;
-use App\Models\Construction\DrawingApproval;
-use App\Models\Construction\DrawingRevision;
-use App\Models\Construction\SurveySubmission;
+use App\Models\ConstructionDocument;
+use App\Models\DraftingJob;
+use App\Models\DrawingApproval;
+use App\Models\DrawingRevision;
+use App\Models\SurveySubmission;
 use App\Models\Member;
 use App\Services\Construction\ConstructionActivityService;
 use App\Services\Construction\ConstructionDocumentService;

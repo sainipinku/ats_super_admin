@@ -14,12 +14,19 @@ class EnsureConstructionPermission
     ) {
     }
 
-    public function handle(Request $request, Closure $next, string ...$permissions): Response
-    {
+    public function handle(
+        Request $request,
+        Closure $next,
+        string ...$permissions
+    ): Response {
         $actor = $this->authorizationService->resolveActor($request);
         $projectId = $this->authorizationService->inferProjectId($request);
 
-        if (!$this->authorizationService->hasAnyPermission($actor, $permissions, $projectId)) {
+        if (!$this->authorizationService->hasAnyPermission(
+            $actor,
+            $permissions,
+            $projectId
+        )) {
             $message = 'Unauthorized: Missing required construction permission.';
 
             if ($request->expectsJson()) {

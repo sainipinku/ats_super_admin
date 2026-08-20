@@ -337,14 +337,14 @@ export default function AuthenticatedLayout({ header, children }) {
                                             )}
                                         </button>
 
-                                        <div className="shrink-0 items-center hidden sm:flex">
+                                        {/* <div className="shrink-0 items-center hidden sm:flex">
                                             <Link href={route("super.dashboard")}>
                                                 <ApplicationLogo
                                                     props={settings}
                                                     className="block w-auto h-8 fill-current"
                                                 />
                                             </Link>
-                                        </div>
+                                        </div> */}
                                     </div>
 
                                     {/* MIDDLE SECTION: QuickPills */}
@@ -659,7 +659,7 @@ export default function AuthenticatedLayout({ header, children }) {
                         </header>
                     )}
 
-                    <main className="pt-[72px] px-3 sm:px-6 lg:px-8 pb-8">{children}</main>
+                    <main className="pt-[72px] px-1 sm:px-2 lg:px-3 pb-8">{children}</main>
 
                     <Toaster
                         position="top-right"

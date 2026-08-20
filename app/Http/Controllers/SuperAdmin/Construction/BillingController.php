@@ -4,9 +4,9 @@ namespace App\Http\Controllers\SuperAdmin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\ClientInvoice;
-use App\Models\Construction\ClientPayment;
-use App\Models\Construction\Project;
+use App\Models\ClientInvoice;
+use App\Models\ClientPayment;
+use App\Models\Project;
 use App\Services\Construction\ConstructionBillingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

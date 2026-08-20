@@ -40,9 +40,9 @@ const variantConfig = {
         layout: MemberLayout,
         items: [
             { label: "Project Dashboard", href: route("member.dashboard"), active: "member.construction.dashboard", permissions: ["dashboard.view"] },
-            { label: "Assigned Projects", href: route("member.construction.projects.index"), active: "member.construction.projects.*", permissions: ["dashboard.view"] },
-            { label: "Site Execution", href: route("member.construction.execution.index"), active: "member.construction.execution.*", permissions: ["execution_task.manage", "dpr.manage", "attendance.manage"] },
-            // { label: "Material Management", href: route("member.construction.materials.index"), active: "member.construction.materials.*", permissions: ["material_issue.manage", "material_stock.manage"] },
+            { label: "Assigned Projects", href: route("member.construction.projects.index"), active: "member.construction.projects.*", permissions: ["dashboard.view", "project.manage"] },
+            { label: "Site Execution", href: route("member.construction.execution.index"), active: "member.construction.execution.*", permissions: ["execution_task.manage", "execution.task.view", "dpr.manage", "attendance.manage"] },
+            { label: "Material Management", href: route("member.construction.materials.index"), active: "member.construction.materials.*", permissions: ["material_issue.manage", "material_stock.manage", "material.manage"] },
             { label: "Vehicle Tracking", href: route("member.construction.vehicles.index"), active: "member.construction.vehicles.*", permissions: ["vehicle_tracking.manage"] },
             { label: "Equipment Allocation", href: route("member.construction.equipment.index"), active: "member.construction.equipment.*", permissions: ["equipment_allocation.manage", "equipment_usage.manage"] },
             { label: "Handover & Closure", href: route("member.construction.handover.index"), active: "member.construction.handover.*", permissions: ["handover.manage"] },
@@ -58,7 +58,15 @@ export default function ConstructionShell({
 }) {
     const config = variantConfig[variant];
     const Layout = config.layout;
-    const permissions = usePage().props.auth?.permissions ?? [];
+    const page = usePage();
+
+    // Member navigation is driven by the active-role context permissions.
+    // SuperAdmin/Admin navigation keeps the existing auth permission source.
+    const permissions =
+        variant === "member"
+            ? page.props.permissions ?? page.props.auth?.permissions ?? []
+            : page.props.auth?.permissions ?? page.props.permissions ?? [];
+
     const navItems = config.items.filter((item) =>
         !item.permissions || item.permissions.some((permission) => permissions.includes(permission))
     );
@@ -66,7 +74,7 @@ export default function ConstructionShell({
     return (
         <Layout>
             <Head title={title} />
-            <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+            <div className="space-y-6 px-2 py-5 sm:px-3 lg:px-5">
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                         <div>

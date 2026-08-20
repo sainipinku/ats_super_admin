@@ -304,72 +304,70 @@ export default function List({ employees, departmentOptions, designationOptions,
         <AuthenticatedLayout>
             <Head title="Employees" />
 
-            <div className="min-h-screen py-[40px] memberbg">
-                <div className="mt-[64px]">
-                    <EmployeeFilters
-                        departmentFilter={departmentFilter}
-                        handleDepartmentFilterChange={handleDepartmentFilterChange}
-                        designationFilter={designationFilter}
-                        handleDesignationFilterChange={handleDesignationFilterChange}
-                        statusFilter={statusFilter}
-                        handleStatusFilterChange={handleStatusFilterChange}
-                        perPage={perPage}
-                        handlePerPageChange={handlePerPageChange}
-                        searchTerm={searchTerm}
-                        handleSearchChange={handleSearchChange}
-                        filterSelectClass={filterSelectClass}
-                        handleCreate={handleCreate}
-                        departmentOptions={departmentOptions}
-                        designationOptions={designationOptions}
-                        departmentDesignationMap={departmentDesignationMap}
-                    />
+            <div className="min-h-screen py-[20px] memberbg">
+                <EmployeeFilters
+                    departmentFilter={departmentFilter}
+                    handleDepartmentFilterChange={handleDepartmentFilterChange}
+                    designationFilter={designationFilter}
+                    handleDesignationFilterChange={handleDesignationFilterChange}
+                    statusFilter={statusFilter}
+                    handleStatusFilterChange={handleStatusFilterChange}
+                    perPage={perPage}
+                    handlePerPageChange={handlePerPageChange}
+                    searchTerm={searchTerm}
+                    handleSearchChange={handleSearchChange}
+                    filterSelectClass={filterSelectClass}
+                    handleCreate={handleCreate}
+                    departmentOptions={departmentOptions}
+                    designationOptions={designationOptions}
+                    departmentDesignationMap={departmentDesignationMap}
+                />
 
-                    <EmployeeTable
-                        employees={employees}
-                        isLoading={isLoading}
-                        getStatusDisplay={getStatusDisplay}
-                        handleEdit={handleEdit}
-                        handleDelete={(uuid) => { setEmployeeToDelete(uuid); setShowDeleteDialog(true); }}
-                        toggleStatus={toggleStatus}
-                    />
+                <EmployeeTable
+                    employees={employees}
+                    isLoading={isLoading}
+                    getStatusDisplay={getStatusDisplay}
+                    handleEdit={handleEdit}
+                    handleDelete={(uuid) => { setEmployeeToDelete(uuid); setShowDeleteDialog(true); }}
+                    toggleStatus={toggleStatus}
+                />
 
-                    {employees.data.length > 0 && (
-                        <div className="mt-4 flex justify-between items-center flex-wrap gap-4" style={{ padding: '0px 34px' }}>
-                            <span className="dark:text-white text-black">
-                                Showing {employees.from} to {employees.to} of {employees.total} entries
-                            </span>
-                            <nav aria-label="Pagination" className="flex items-center gap-2">
-                                <button onClick={() => handlePageChange(employees.current_page - 1)}
-                                    disabled={employees.current_page == 1}
-                                    className={`flex items-center justify-center gap-1 px-3 py-1 rounded-full text-sm text-white ${employees.current_page == 1 ? "opacity-50 cursor-not-allowed bg-[rgb(74_91_127)]" : "bg-[rgb(82_70_230)] hover:bg-[rgb(82_70_230)/0.9]"}`}>
-                                    <ChevronLeftIcon className="size-4" /><span>BACK</span>
-                                </button>
-                                <div className="flex items-center gap-1">
-                                    {Array.from({ length: employees.last_page }, (_, i) => i + 1).map((page) => {
-                                        if (page == 1 || page == 2 || page == employees.last_page - 1 || page == employees.last_page ||
-                                            (page >= employees.current_page - 1 && page <= employees.current_page + 1)) {
-                                            return (
-                                                <button key={page} onClick={() => handlePageChange(page)}
-                                                    className={`flex items-center justify-center w-8 h-8 rounded-full text-sm text-white ${page == employees.current_page ? "bg-[rgb(82_70_230)]" : "bg-[rgb(74_91_127)] hover:bg-[rgb(74_91_127)/0.9]"}`}>
-                                                    {page}
-                                                </button>
-                                            );
-                                        }
-                                        if ((page == 3 && employees.current_page > 4) || (page == employees.last_page - 2 && employees.current_page < employees.last_page - 3)) {
-                                            return <span key={`ellipsis-${page}`} className="flex items-center justify-center w-8 h-8 rounded-full text-sm text-gray-500">...</span>;
-                                        }
-                                        return null;
-                                    })}
-                                </div>
-                                <button onClick={() => handlePageChange(employees.current_page + 1)}
-                                    disabled={employees.current_page == employees.last_page}
-                                    className={`flex items-center justify-center gap-1 px-3 py-1 rounded-full text-sm text-white ${employees.current_page == employees.last_page ? "opacity-50 cursor-not-allowed bg-[rgb(74_91_127)]" : "bg-[rgb(82_70_230)] hover:bg-[rgb(82_70_230)/0.9]"}`}>
-                                    <span>NEXT</span><ChevronRightIcon className="size-4" />
-                                </button>
-                            </nav>
-                        </div>
-                    )}
-                </div>
+                {employees.data.length > 0 && (
+                    <div className="mt-4 flex justify-between items-center flex-wrap gap-4" style={{ padding: '0px 34px' }}>
+                        <span className="dark:text-white text-black">
+                            Showing {employees.from} to {employees.to} of {employees.total} entries
+                        </span>
+                        <nav aria-label="Pagination" className="flex items-center gap-2">
+                            <button onClick={() => handlePageChange(employees.current_page - 1)}
+                                disabled={employees.current_page == 1}
+                                className={`flex items-center justify-center gap-1 px-3 py-1 rounded-full text-sm text-white ${employees.current_page == 1 ? "opacity-50 cursor-not-allowed bg-[rgb(74_91_127)]" : "bg-[rgb(82_70_230)] hover:bg-[rgb(82_70_230)/0.9]"}`}>
+                                <ChevronLeftIcon className="size-4" /><span>BACK</span>
+                            </button>
+                            <div className="flex items-center gap-1">
+                                {Array.from({ length: employees.last_page }, (_, i) => i + 1).map((page) => {
+                                    if (page == 1 || page == 2 || page == employees.last_page - 1 || page == employees.last_page ||
+                                        (page >= employees.current_page - 1 && page <= employees.current_page + 1)) {
+                                        return (
+                                            <button key={page} onClick={() => handlePageChange(page)}
+                                                className={`flex items-center justify-center w-8 h-8 rounded-full text-sm text-white ${page == employees.current_page ? "bg-[rgb(82_70_230)]" : "bg-[rgb(74_91_127)] hover:bg-[rgb(74_91_127)/0.9]"}`}>
+                                                {page}
+                                            </button>
+                                        );
+                                    }
+                                    if ((page == 3 && employees.current_page > 4) || (page == employees.last_page - 2 && employees.current_page < employees.last_page - 3)) {
+                                        return <span key={`ellipsis-${page}`} className="flex items-center justify-center w-8 h-8 rounded-full text-sm text-gray-500">...</span>;
+                                    }
+                                    return null;
+                                })}
+                            </div>
+                            <button onClick={() => handlePageChange(employees.current_page + 1)}
+                                disabled={employees.current_page == employees.last_page}
+                                className={`flex items-center justify-center gap-1 px-3 py-1 rounded-full text-sm text-white ${employees.current_page == employees.last_page ? "opacity-50 cursor-not-allowed bg-[rgb(74_91_127)]" : "bg-[rgb(82_70_230)] hover:bg-[rgb(82_70_230)/0.9]"}`}>
+                                <span>NEXT</span><ChevronRightIcon className="size-4" />
+                            </button>
+                        </nav>
+                    </div>
+                )}
             </div>
 
             <ConfirmDialog isOpen={showDeleteDialog} onClose={() => { setShowDeleteDialog(false); setEmployeeToDelete(null); }}

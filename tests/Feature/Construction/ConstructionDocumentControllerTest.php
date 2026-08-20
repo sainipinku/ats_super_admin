@@ -3,12 +3,12 @@
 namespace Tests\Feature\Construction;
 
 use App\Http\Controllers\Construction\DocumentController;
-use App\Models\Construction\Client;
-use App\Models\Construction\Company;
-use App\Models\Construction\Document;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectHandover;
-use App\Models\Construction\ProjectTeamMember;
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\ConstructionDocument;
+use App\Models\Project;
+use App\Models\ProjectHandover;
+use App\Models\ProjectTeamMember;
 use App\Models\Member;
 use App\Models\SuperAdmin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -75,7 +75,7 @@ class ConstructionDocumentControllerTest extends TestCase
 
         Storage::disk('public')->put('construction/handover/final-docs/test.pdf', 'dummy');
 
-        $document = Document::create([
+        $document = ConstructionDocument::create([
             'company_id' => $project->company_id,
             'project_id' => $project->id,
             'documentable_type' => $handover::class,

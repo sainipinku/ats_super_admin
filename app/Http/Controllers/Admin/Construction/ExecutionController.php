@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Admin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\AttendanceRecord;
-use App\Models\Construction\DailyProgressReport;
-use App\Models\Construction\ExecutionPlan;
-use App\Models\Construction\ExecutionTask;
-use App\Models\Construction\Project;
-use App\Models\Construction\ProjectTeamMember;
+use App\Models\AttendanceRecord;
+use App\Models\DailyProgressReport;
+use App\Models\ExecutionPlan;
+use App\Models\ExecutionTask;
+use App\Models\Project;
+use App\Models\ProjectTeamMember;
 use App\Models\Member;
 use App\Services\Construction\ConstructionExecutionService;
 use Illuminate\Http\RedirectResponse;

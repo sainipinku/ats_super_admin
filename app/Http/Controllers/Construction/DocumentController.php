@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
-use App\Models\Construction\Document;
-use App\Models\Construction\ProjectTeamMember;
+use App\Models\ConstructionDocument;
+use App\Models\ProjectTeamMember;
 use App\Models\Member;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,7 +17,7 @@ class DocumentController extends Controller
 {
     use ResolvesConstructionActor;
 
-    public function view(Document $document, Request $request): BinaryFileResponse
+    public function view(ConstructionDocument $document, Request $request): BinaryFileResponse
     {
         $this->ensureDocumentAccess($document, $request);
 
@@ -31,7 +31,7 @@ class DocumentController extends Controller
         ]);
     }
 
-    public function download(Document $document, Request $request): StreamedResponse
+    public function download(ConstructionDocument $document, Request $request): StreamedResponse
     {
         $this->ensureDocumentAccess($document, $request);
 
@@ -43,7 +43,7 @@ class DocumentController extends Controller
         return Storage::disk($disk)->download($document->path, $filename);
     }
 
-    private function ensureDocumentAccess(Document $document, Request $request): void
+    private function ensureDocumentAccess(ConstructionDocument $document, Request $request): void
     {
         if (Auth::guard('superadmin')->check()) {
             return;
@@ -68,7 +68,7 @@ class DocumentController extends Controller
         abort(403, 'Unauthorized.');
     }
 
-    private function resolveDocumentPath(Document $document): string
+    private function resolveDocumentPath(ConstructionDocument $document): string
     {
         $disk = $document->disk ?: 'public';
         abort_unless(Storage::disk($disk)->exists($document->path), 404, 'Document not found.');

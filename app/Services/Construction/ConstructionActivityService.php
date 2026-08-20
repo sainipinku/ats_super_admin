@@ -2,7 +2,7 @@
 
 namespace App\Services\Construction;
 
-use App\Models\Construction\ActivityLog;
+use App\Models\ConstructionActivityLog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
@@ -18,7 +18,7 @@ class ConstructionActivityService
         array $meta = [],
         ?Request $request = null
     ): void {
-        ActivityLog::create([
+        ConstructionActivityLog::create([
             'company_id' => $companyId,
             'project_id' => $projectId,
             'actor_type' => $actor ? $actor::class : null,

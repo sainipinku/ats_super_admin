@@ -2,16 +2,13 @@
 
 namespace Database\Seeders\Construction;
 
-use App\Models\Construction\Permission;
-use App\Models\Construction\Role;
+use App\Models\Permission;
+use App\Models\ConstructionRole;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class FoundationSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         $permissions = [
@@ -21,14 +18,22 @@ class FoundationSeeder extends Seeder
             ['name' => 'Project Budget Approve', 'slug' => 'project_budget.approve', 'module' => 'project_budget'],
             ['name' => 'Project Team Manage', 'slug' => 'project_team.manage', 'module' => 'project_team'],
             ['name' => 'Survey Plan Manage', 'slug' => 'survey_plan.manage', 'module' => 'survey_plan'],
+            ['name' => 'Survey View', 'slug' => 'survey.view', 'module' => 'survey_plan'],
+            ['name' => 'Survey Create', 'slug' => 'survey.create', 'module' => 'survey_plan'],
+            ['name' => 'Survey Submit', 'slug' => 'survey.submit', 'module' => 'survey_plan'],
             ['name' => 'Survey Submission Review', 'slug' => 'survey_submission.review', 'module' => 'survey_submission'],
             ['name' => 'Drafting Manage', 'slug' => 'drafting.manage', 'module' => 'drafting'],
             ['name' => 'Drawing Approval Manage', 'slug' => 'drawing_approval.manage', 'module' => 'drawing_approval'],
             ['name' => 'Execution Manage', 'slug' => 'execution.manage', 'module' => 'execution'],
             ['name' => 'Execution Task Manage', 'slug' => 'execution_task.manage', 'module' => 'execution_task'],
+            ['name' => 'Execution Task View', 'slug' => 'execution.task.view', 'module' => 'execution_task'],
+            ['name' => 'Execution Task Update', 'slug' => 'execution.task.update', 'module' => 'execution_task'],
             ['name' => 'Daily Progress Manage', 'slug' => 'dpr.manage', 'module' => 'daily_progress'],
+            ['name' => 'Daily Progress Create', 'slug' => 'dpr.create', 'module' => 'daily_progress'],
+            ['name' => 'Daily Progress Submit', 'slug' => 'dpr.submit', 'module' => 'daily_progress'],
             ['name' => 'Daily Progress Review', 'slug' => 'dpr.review', 'module' => 'daily_progress'],
             ['name' => 'Attendance Manage', 'slug' => 'attendance.manage', 'module' => 'attendance'],
+            ['name' => 'Attendance Mark', 'slug' => 'attendance.mark', 'module' => 'attendance'],
             ['name' => 'Attendance Review', 'slug' => 'attendance.review', 'module' => 'attendance'],
             ['name' => 'Vendor Manage', 'slug' => 'vendor.manage', 'module' => 'materials'],
             ['name' => 'Material Manage', 'slug' => 'material.manage', 'module' => 'materials'],
@@ -40,6 +45,9 @@ class FoundationSeeder extends Seeder
             ['name' => 'Vehicle Manage', 'slug' => 'vehicle.manage', 'module' => 'vehicles'],
             ['name' => 'Vehicle Assignment Manage', 'slug' => 'vehicle_assignment.manage', 'module' => 'vehicles'],
             ['name' => 'Vehicle Tracking Manage', 'slug' => 'vehicle_tracking.manage', 'module' => 'vehicles'],
+            ['name' => 'Vehicle Trip Start', 'slug' => 'vehicle.trip.start', 'module' => 'vehicles'],
+            ['name' => 'Vehicle Trip End', 'slug' => 'vehicle.trip.end', 'module' => 'vehicles'],
+            ['name' => 'Vehicle Location Update', 'slug' => 'vehicle.location.update', 'module' => 'vehicles'],
             ['name' => 'Equipment Manage', 'slug' => 'equipment.manage', 'module' => 'equipment'],
             ['name' => 'Equipment Allocation Manage', 'slug' => 'equipment_allocation.manage', 'module' => 'equipment'],
             ['name' => 'Equipment Usage Manage', 'slug' => 'equipment_usage.manage', 'module' => 'equipment'],
@@ -52,11 +60,6 @@ class FoundationSeeder extends Seeder
             ['name' => 'Dashboard View', 'slug' => 'dashboard.view', 'module' => 'dashboard'],
         ];
 
-        $permissionSlugs = collect($permissions)->pluck('slug')->all();
-        DB::table('construction_permissions')
-            ->whereNotIn('slug', $permissionSlugs)
-            ->delete();
-
         foreach ($permissions as $permission) {
             Permission::updateOrCreate(['slug' => $permission['slug']], $permission);
         }
@@ -66,24 +69,19 @@ class FoundationSeeder extends Seeder
             ['name' => 'Project Admin', 'slug' => 'project_admin', 'description' => 'Project scoped ERP access', 'is_system_role' => true],
             ['name' => 'Surveyor', 'slug' => 'surveyor', 'description' => 'Field survey execution', 'is_system_role' => true],
             ['name' => 'Draft Person', 'slug' => 'draft_person', 'description' => 'Drafting and revisions', 'is_system_role' => true],
+            ['name' => 'Vehicle Driver', 'slug' => 'vehicle_driver', 'description' => 'Vehicle transport and site movement', 'is_system_role' => true],
             ['name' => 'Review Approver', 'slug' => 'review_approver', 'description' => 'Workflow approvals', 'is_system_role' => true],
             ['name' => 'Site Employee', 'slug' => 'site_employee', 'description' => 'Construction execution updates and attendance', 'is_system_role' => true],
         ];
 
-        $roleSlugs = collect($roles)->pluck('slug')->all();
-        DB::table('construction_roles')
-            ->where('is_system_role', true)
-            ->whereNotIn('slug', $roleSlugs)
-            ->delete();
-
         foreach ($roles as $roleData) {
-            $role = Role::updateOrCreate(
+            $role = ConstructionRole::updateOrCreate(
                 ['slug' => $roleData['slug']],
                 [...$roleData, 'status' => 'active']
             );
 
             $rolePermissionSlugs = match ($role->slug) {
-                'super_admin' => $permissionSlugs,
+                'super_admin' => collect($permissions)->pluck('slug')->all(),
                 'project_admin' => [
                     'dashboard.view',
                     'project.manage',
@@ -121,10 +119,21 @@ class FoundationSeeder extends Seeder
                 ],
                 'surveyor' => [
                     'survey_plan.manage',
+                    'survey.view',
+                    'survey.create',
+                    'survey.submit',
                     'document.manage',
                 ],
                 'draft_person' => [
                     'drafting.manage',
+                    'document.manage',
+                ],
+                'vehicle_driver' => [
+                    'dashboard.view',
+                    'vehicle_tracking.manage',
+                    'vehicle.trip.start',
+                    'vehicle.trip.end',
+                    'vehicle.location.update',
                     'document.manage',
                 ],
                 'review_approver' => [
@@ -139,10 +148,16 @@ class FoundationSeeder extends Seeder
                 'site_employee' => [
                     'dashboard.view',
                     'execution_task.manage',
+                    'execution.task.view',
+                    'execution.task.update',
                     'dpr.manage',
+                    'dpr.create',
+                    'dpr.submit',
                     'attendance.manage',
+                    'attendance.mark',
                     'material_issue.manage',
                     'vehicle_tracking.manage',
+                    'vehicle.location.update',
                     'equipment_allocation.manage',
                     'equipment_usage.manage',
                     'handover.manage',
@@ -151,9 +166,73 @@ class FoundationSeeder extends Seeder
                 default => [],
             };
 
-            $role->permissions()->sync(
-                Permission::whereIn('slug', $rolePermissionSlugs)->pluck('id')->all()
-            );
+            $surfaceOverrides = [
+                'survey.create' => 'mobile',
+                'survey.submit' => 'mobile',
+                'vehicle.trip.start' => 'mobile',
+                'vehicle.trip.end' => 'mobile',
+                'vehicle.location.update' => 'mobile',
+                'attendance.mark' => 'mobile',
+                'dpr.create' => 'mobile',
+                'dpr.submit' => 'mobile',
+                'execution.task.update' => 'mobile',
+                'drawing_approval.manage' => 'web',
+                'billing_invoice.manage' => 'web',
+                'billing_payment.manage' => 'web',
+                'project_budget.approve' => 'web',
+                'project_team.manage' => 'web',
+                'survey_submission.review' => 'web',
+                'dpr.review' => 'web',
+                'attendance.review' => 'web',
+                'activity_log.view' => 'web',
+            ];
+
+            $permissionIds = Permission::whereIn('slug', $rolePermissionSlugs)->pluck('id', 'slug');
+
+            // Preserve existing pairs; insert only missing ones.
+            $existingRows = DB::table('construction_role_permissions')
+                ->where('role_id', $role->id)
+                ->pluck('surface', 'permission_id')
+                ->all();
+
+            $rowsToInsert = [];
+            foreach ($rolePermissionSlugs as $slug) {
+                $permissionId = $permissionIds[$slug] ?? null;
+
+                if ($permissionId === null || array_key_exists($permissionId, $existingRows)) {
+                    continue;
+                }
+
+                $rowsToInsert[] = [
+                    'role_id' => $role->id,
+                    'permission_id' => $permissionId,
+                    'surface' => $surfaceOverrides[$slug] ?? 'both',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            if ($rowsToInsert !== []) {
+                DB::table('construction_role_permissions')->insert($rowsToInsert);
+            }
+
+            // Apply default surface override only to untouched rows.
+            foreach ($rolePermissionSlugs as $slug) {
+                $surface = $surfaceOverrides[$slug] ?? null;
+                $permissionId = $permissionIds[$slug] ?? null;
+
+                if ($surface === null || $permissionId === null) {
+                    continue;
+                }
+
+                if (($existingRows[$permissionId] ?? null) === 'both') {
+                    DB::table('construction_role_permissions')
+                        ->where('role_id', $role->id)
+                        ->where('permission_id', $permissionId)
+                        ->where('surface', 'both')
+                        ->update(['surface' => $surface, 'updated_at' => now()]);
+                }
+            }
         }
     }
 }

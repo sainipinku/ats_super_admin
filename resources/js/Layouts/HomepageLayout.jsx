@@ -1,16 +1,8 @@
 import { Link, usePage } from '@inertiajs/react';
 import { useTheme } from '@/Contexts/ThemeContext';
-import {
-    Sun,
-    Moon,
-    Menu,
-    X,
-    Building2,
-    LayoutDashboard,
-    Home,
-} from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, Building2, Home, LayoutDashboard, Menu, Moon, ShieldCheck, Sun, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 
 export default function HomepageLayout({ children }) {
     const { toggleTheme, isDark } = useTheme();
@@ -20,116 +12,125 @@ export default function HomepageLayout({ children }) {
     const isAuthenticated = !!auth?.user;
 
     useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 20);
-        };
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+        const onScroll = () => setIsScrolled(window.scrollY > 20);
+        window.addEventListener('scroll', onScroll);
+        return () => window.removeEventListener('scroll', onScroll);
     }, []);
 
     const navLinks = [
         { name: 'Home', href: route('homepage'), icon: Home },
-        // { name: 'Browse Jobs', href: route('jobs.index'), icon: Briefcase },
-        // { name: 'Companies', href: route('companies.index'), icon: Building2 },
-        // { name: 'About', href: route('about'), icon: Sparkles },
-        // { name: 'Contact', href: route('contact.show'), icon: Mail },
+        { name: 'Platform', href: '#platform', icon: Building2 },
+        { name: 'Features', href: '#features', icon: ShieldCheck },
     ];
 
-    if (isAuthenticated) {
-        const dashboardRouteByGuard = {
-            superadmin: 'super.dashboard',
-            admin: 'admin.dashboard',
-            member: 'member.dashboard',
-        };
-        const dashboardRouteName = dashboardRouteByGuard[auth?.guard] ?? 'home';
+    const dashboardRouteName = isAuthenticated
+        ? ({ superadmin: 'super.dashboard', admin: 'admin.dashboard', member: 'member.dashboard' })[auth?.guard] ?? 'home'
+        : null;
+
+    if (dashboardRouteName) {
         navLinks.push({ name: 'Dashboard', href: route(dashboardRouteName), icon: LayoutDashboard });
     }
 
     return (
-        <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-[#0f172a]' : 'bg-gray-50'}`}>
+        <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-[#03011C]' : 'bg-white'}`}>
             {/* Navbar */}
-            <nav
-                className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-300 ${isScrolled
+            <nav className={`fixed left-0 right-0 top-0 z-50 transition-all duration-300 ${
+                isScrolled
                     ? isDark
-                        ? 'bg-gray-900/95 border-b border-gray-800'
-                        : 'bg-white border-b border-gray-200 shadow-sm'
-                    : isDark ? 'bg-[#0f172a]' : 'bg-gray-50'
-                    }`}
-            >
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex h-28 items-center justify-between">
-
+                        ? 'border-b border-white/10 bg-[#03011C]/90 backdrop-blur-xl'
+                        : 'border-b border-slate-200 bg-white/90 shadow-sm backdrop-blur-xl'
+                    : isDark
+                        ? 'bg-transparent'
+                        : 'border-b border-slate-200/60 bg-white/85 backdrop-blur-sm'
+            }`}>
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <div className="flex h-20 items-center justify-between">
                         {/* Logo */}
-                        <div className="flex items-center gap-3">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-2xl font-bold text-white shadow-lg shadow-blue-600/30">
-                                ◈
-                            </div>
-
-                            <div>
-                                <div className="text-2xl font-bold tracking-wide text-black">
-                                    CADMAX
+                        <Link href={route('homepage')} className="flex items-center gap-3">
+                            <img
+                                src="/images/cadmax_con_logo.jpeg"
+                                alt="betaxtech Logo"
+                                className="h-11 w-11 rounded-xl object-cover shadow-lg shadow-indigo-500/30 ring-2 ring-indigo-500/20"
+                            />
+                            <div className="leading-tight">
+                                <div className={`text-xl font-extrabold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                    betaxtech
                                 </div>
-
-                                <div className="text-[11px] font-semibold tracking-[0.35em] text-blue-300">
-                                    CONSULTANCY
+                                <div className="bg-gradient-to-r from-indigo-500 to-violet-500 bg-clip-text text-[9px] font-bold uppercase tracking-[0.3em] text-transparent">
+                                    ERP Suite
                                 </div>
                             </div>
+                        </Link>
+
+                        {/* Desktop Nav */}
+                        <div className="hidden items-center gap-1 lg:flex">
+                            {navLinks.map((link) => (
+                                <a
+                                    key={link.name}
+                                    href={link.href}
+                                    className={`relative px-4 py-2 text-sm font-medium transition-colors ${
+                                        isDark
+                                            ? 'text-slate-300 hover:text-white'
+                                            : 'text-slate-700 hover:text-indigo-600'
+                                    }`}
+                                >
+                                    {link.name}
+                                </a>
+                            ))}
                         </div>
 
-                        {/* Navigation */}
-                        {/* <nav className="hidden items-center gap-10 md:flex">
-                            <a
-                                href="/"
-                                className="relative py-2 text-sm font-medium text-white"
-                            >
-                                Home
-                                <span className="absolute bottom-0 left-0 h-0.5 w-full bg-blue-500" />
-                            </a>
-
-                            <a
-                                href="/services"
-                                className="text-sm font-medium text-slate-300 transition hover:text-white"
-                            >
-                                Services
-                            </a>
-
-                            <a
-                                href="/about"
-                                className="text-sm font-medium text-slate-300 transition hover:text-white"
-                            >
-                                About Us
-                            </a>
-
-                            <a
-                                href="/contact"
-                                className="text-sm font-medium text-slate-300 transition hover:text-white"
-                            >
-                                Contact
-                            </a>
-                        </nav> */}
-
                         {/* Right buttons */}
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                             <button
                                 type="button"
-                                className="hidden h-10 w-10 items-center justify-center rounded-full bg-white/10 text-xl text-white backdrop-blur-sm transition hover:bg-white/20 sm:flex"
+                                onClick={toggleTheme}
+                                className={`flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 ${
+                                    isDark ? 'bg-white/10 text-yellow-300 hover:bg-white/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                                aria-label="Toggle theme"
                             >
-                                ☾
+                                {isDark ? <Sun size={18} /> : <Moon size={18} />}
                             </button>
 
-                            <a
-                                href="/login"
-                                className="hidden text-sm font-medium text-black sm:block"
-                            >
-                                Sign In
-                            </a>
+                            {dashboardRouteName ? (
+                                <Link
+                                    href={route(dashboardRouteName)}
+                                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition-all hover:from-indigo-500 hover:to-violet-500"
+                                >
+                                    <LayoutDashboard size={16} />
+                                    Dashboard
+                                </Link>
+                            ) : (
+                                <>
+                                    <Link
+                                        href={route('login')}
+                                        className={`hidden text-sm font-medium transition-colors sm:block ${
+                                            isDark ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-indigo-600'
+                                        }`}
+                                    >
+                                        Sign In
+                                    </Link>
+                                    <Link
+                                        href={route('register')}
+                                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition-all hover:from-indigo-500 hover:to-violet-500"
+                                    >
+                                        Get Started
+                                        <ArrowRight size={15} />
+                                    </Link>
+                                </>
+                            )}
 
-                            <a
-                                href="/register"
-                                className="rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-700"
+                            {/* Mobile toggle */}
+                            <button
+                                type="button"
+                                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                                className={`flex h-10 w-10 items-center justify-center rounded-xl lg:hidden ${
+                                    isDark ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-700'
+                                }`}
+                                aria-label="Toggle menu"
                             >
-                                Sign Up
-                            </a>
+                                {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -142,38 +143,30 @@ export default function HomepageLayout({ children }) {
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
                             transition={{ duration: 0.3 }}
-                            className={`lg:hidden border-t ${isDark
-                                ? 'bg-slate-900/95 border-slate-800 backdrop-blur-xl'
-                                : 'bg-white/95 border-slate-200 backdrop-blur-xl'
-                                }`}
+                            className={`border-t lg:hidden ${
+                                isDark ? 'border-white/10 bg-[#03011C]/95 backdrop-blur-xl' : 'border-slate-200 bg-white/95 backdrop-blur-xl'
+                            }`}
                         >
-                            <div className="px-4 py-4 space-y-2">
+                            <div className="space-y-2 px-4 py-4">
                                 {navLinks.map((link) => (
                                     <Link
                                         key={link.name}
                                         href={link.href}
                                         onClick={() => setMobileMenuOpen(false)}
-                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${isDark
-                                            ? 'text-slate-300 hover:text-white hover:bg-white/10'
-                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                                            }`}
+                                        className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                                            isDark ? 'text-slate-300 hover:bg-white/10 hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                        }`}
                                     >
-                                        <link.icon className="w-5 h-5" />
+                                        <link.icon className="h-5 w-5" />
                                         {link.name}
                                     </Link>
                                 ))}
-                                <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
-                                    {isAuthenticated ? (
+                                <div className={`space-y-2 border-t pt-4 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                                    {dashboardRouteName ? (
                                         <Link
-                                            href={route(({
-                                                superadmin: 'super.dashboard',
-                                                admin: 'admin.dashboard',
-                                                member: 'member.dashboard',
-                                            })[auth?.guard] ?? 'home')}
-                                            className={`block w-full text-center px-4 py-3 rounded-xl text-sm font-semibold ${isDark
-                                                ? 'bg-gradient-to-r from-brand-500 to-accent-purple text-white'
-                                                : 'bg-gradient-to-r from-brand-600 to-brand-700 text-white'
-                                                }`}
+                                            href={route(dashboardRouteName)}
+                                            onClick={() => setMobileMenuOpen(false)}
+                                            className="block w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-center text-sm font-semibold text-white"
                                         >
                                             Dashboard
                                         </Link>
@@ -181,19 +174,17 @@ export default function HomepageLayout({ children }) {
                                         <>
                                             <Link
                                                 href={route('login')}
-                                                className={`block w-full text-center px-4 py-3 rounded-xl text-sm font-medium ${isDark
-                                                    ? 'text-slate-300 hover:text-white'
-                                                    : 'text-slate-600 hover:text-slate-900'
-                                                    }`}
+                                                onClick={() => setMobileMenuOpen(false)}
+                                                className={`block w-full rounded-xl px-4 py-3 text-center text-sm font-medium ${
+                                                    isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                                                }`}
                                             >
                                                 Sign In
                                             </Link>
                                             <Link
                                                 href={route('register')}
-                                                className={`block w-full text-center px-4 py-3 rounded-xl text-sm font-semibold ${isDark
-                                                    ? 'bg-gradient-to-r from-brand-500 to-accent-purple text-white'
-                                                    : 'bg-gradient-to-r from-brand-600 to-brand-700 text-white'
-                                                    }`}
+                                                onClick={() => setMobileMenuOpen(false)}
+                                                className="block w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-center text-sm font-semibold text-white"
                                             >
                                                 Get Started
                                             </Link>
@@ -207,9 +198,7 @@ export default function HomepageLayout({ children }) {
             </nav>
 
             {/* Main Content */}
-            <main className="pt-16 lg:pt-20">
-                {children}
-            </main>
+            <main>{children}</main>
         </div>
     );
 }
