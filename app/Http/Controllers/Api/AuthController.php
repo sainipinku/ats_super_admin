@@ -14,22 +14,25 @@ use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
-    /**
-     * Legacy register (kept for backward compat — auto-activates)
-     */
     public function register(Request $request)
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:20', 'unique:members,phone'],
             'email' => ['nullable', 'email', 'max:255', 'unique:members,email'],
+            'company_name' => ['nullable', 'string', 'max:255'],
+            'state' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'password' => ['required', 'confirmed', Password::min(6)],
+            'password_confirmation' => ['required', 'string', 'min:6'],
+            'terms_agreed' => ['required', 'boolean', 'in:1'],
         ]);
 
         $creatorId = SuperAdmin::query()->value('id');
         if (! $creatorId) {
             return response()->json([
                 'success' => false,
-                'message' => 'Super admin not configured.',
+                'message' => 'Super admin not configured. System setup incomplete.',
             ], 500);
         }
 
@@ -46,11 +49,17 @@ class AuthController extends Controller
             'username' => $username,
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'],
-            'password' => Str::random(32),
-            'status' => 1,
-            'approved_by' => $creatorId,
-            'approved_at' => now(),
-            'roles' => [3],
+            'company_name' => $validated['company_name'] ?? null,
+            'state' => $validated['state'] ?? null,
+            'city' => $validated['city'] ?? null,
+            'password' => Hash::make($validated['password']),
+            'status' => Member::STATUS_PENDING,
+            'registration_source' => $request->isJson() || $request->wantsJson() || $request->header('X-Mobile-App')
+                ? 'mobile_api'
+                : 'web',
+            'roles' => [],
+            'departments' => [],
+            'designation' => [],
             'slug' => $slug,
         ]);
 
@@ -58,8 +67,12 @@ class AuthController extends Controller
 
         $payload = [
             'success' => true,
-            'message' => 'Registered successfully. OTP sent to your phone.',
+            'message' => 'Registration submitted successfully. Your account is pending admin approval.',
             'member_id' => $member->id,
+            'member_uuid' => $member->uuid,
+            'status' => 'pending_approval',
+            'status_text' => 'Pending Admin Approval',
+            'estimated_time' => 'Typically within 24-48 hours',
         ];
 
         if (config('app.debug')) {
@@ -70,110 +83,78 @@ class AuthController extends Controller
         return response()->json($payload, 201);
     }
 
-    /**
-     * Registration v2 — full form per mobile UI screenshot.
-     * Creates INACTIVE account (status=0) awaiting Super Admin approval.
-     * Accepts either (A) member_temp_id returned from verifyOtp(purpose=registration)
-     * OR (B) inline otp parameter that will be verified on the temp row first.
-     */
-    public function registerV2(Request $request)
+    public function registrationStatus(Request $request)
     {
         $validated = $request->validate([
-            'member_temp_id'        => ['nullable', 'integer', 'exists:members,id'],
-            'name'                  => ['required', 'string', 'max:255'],
-            'phone'                 => ['required', 'string', 'digits:10'],
-            'email'                 => ['nullable', 'email', 'max:255', 'unique:members,email'],
-            'company_name'          => ['nullable', 'string', 'max:255'],
-            'state'                 => ['required', 'string', 'max:100'],
-            'city'                  => ['required', 'string', 'max:100'],
-            'password'              => ['required', 'confirmed', Password::min(6)->mixedCase()->numbers()->symbols()],
-            'terms_agreed'          => ['required', 'boolean', 'in:1'],
-            'otp'                   => ['nullable', 'required_without:member_temp_id', 'string', 'max:10'],
-        ], [
-            'phone.digits'          => 'Mobile number must be exactly 10 digits.',
-            'terms_agreed.in'       => 'You must agree to the Terms & Conditions and Privacy Policy.',
-            'password.mixed_case'   => 'Password must contain uppercase and lowercase letters.',
-            'password.numbers'      => 'Password must contain at least one number.',
-            'password.symbols'      => 'Password must contain at least one special character.',
-            'otp.required_without'  => 'OTP is required when member_temp_id is not provided.',
+            'phone' => ['required', 'string', 'max:20'],
         ]);
 
-        $query = Member::query()->where('phone', $validated['phone']);
-        if (! empty($validated['member_temp_id'])) {
-            $query->orWhere('id', (int) $validated['member_temp_id']);
-        }
-        $member = $query->first();
+        $member = Member::query()->where('phone', $validated['phone'])->first();
 
         if (! $member) {
             return response()->json([
                 'success' => false,
-                'message' => 'Phone not registered for OTP flow. Please send OTP first.',
-            ], 422);
+                'message' => 'No registration found for this phone number.',
+                'registered' => false,
+            ], 404);
         }
 
-        if (empty($member->phone_verify_at) && empty($validated['otp'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Phone not verified. Please provide OTP or complete verify-otp step first.',
-            ], 422);
-        }
+        $statusMap = [
+            Member::STATUS_PENDING => [
+                'key' => 'pending_approval',
+                'text' => 'Pending Admin Approval',
+                'description' => 'Your account is awaiting review by our admin team.',
+                'can_login' => false,
+            ],
+            Member::STATUS_ACTIVE => [
+                'key' => 'approved',
+                'text' => 'Account Approved',
+                'description' => $member->approved_at
+                    ? 'Your account was approved on ' . optional($member->approved_at)->format('M d, Y') . '.'
+                    : 'Your account is active and ready to use.',
+                'can_login' => true,
+                'has_roles' => !empty($member->roles),
+                'role_names' => $member->role_names,
+            ],
+            Member::STATUS_REJECTED => [
+                'key' => 'rejected',
+                'text' => 'Registration Rejected',
+                'description' => $member->approval_remark
+                    ? 'Reason: ' . $member->approval_remark
+                    : 'Unfortunately, your registration was not approved.',
+                'can_login' => false,
+            ],
+        ];
 
-        if (empty($member->phone_verify_at) && ! empty($validated['otp'])) {
-            if (! $member->otp || ! $member->otp_expire || $member->otp_expire->isPast() || (string) $member->otp !== (string) $validated['otp']) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid or expired OTP. Please verify your phone number first.',
-                ], 422);
-            }
-            $member->forceFill([
-                'otp'             => null,
-                'otp_expire'      => null,
-                'phone_verify_at' => now(),
-            ])->save();
-        }
-
-        $usernameBase = 'user' . preg_replace('/\D+/', '', $validated['phone']);
-        $username = $this->makeUnique('members', 'username', substr($usernameBase, 0, 20));
-
-        $slugBase = 'member-' . preg_replace('/\D+/', '', $validated['phone']);
-        $slug = $this->makeUnique('members', 'slug', Str::slug($slugBase));
-
-        $member->update([
-            'name'              => $validated['name'],
-            'username'          => $username,
-            'email'             => $validated['email'] ?? null,
-            'phone'             => $validated['phone'],
-            'company_name'      => $validated['company_name'] ?? null,
-            'state'             => $validated['state'],
-            'city'              => $validated['city'],
-            'password'          => $validated['password'],
-            'terms_agreed'      => true,
-            'terms_agreed_at'   => now(),
-            'status'            => 0,
-            'approved_by'       => null,
-            'approved_at'       => null,
-            'roles'             => [],
-            'slug'              => $slug,
-        ]);
+        $statusInfo = $statusMap[$member->status] ?? $statusMap[Member::STATUS_PENDING];
 
         return response()->json([
-            'success'        => true,
-            'message'        => 'Registration submitted successfully. Your account is awaiting Super Admin approval. You will be notified once approved.',
-            'member_id'      => $member->id,
-            'member_uuid'    => $member->uuid,
-            'account_status' => 'pending_approval',
-        ], 202);
+            'success' => true,
+            'registered' => true,
+            'member' => [
+                'uuid' => $member->uuid,
+                'name' => $member->name,
+                'phone' => $member->phone,
+                'email' => $member->email,
+                'company_name' => $member->company_name,
+                'state' => $member->state,
+                'city' => $member->city,
+            ],
+            'approval' => $statusInfo + [
+                'code' => (int) $member->status,
+                'registered_at' => optional($member->created_at)->toISOString(),
+                'approved_at' => optional($member->approved_at)->toISOString(),
+                'rejected_at' => optional($member->rejected_at)->toISOString(),
+                'approval_remark' => $member->approval_remark,
+            ],
+        ]);
     }
 
-    /**
-     * Login with identifier (email/phone/username) and password.
-     * Distinguishes between INACTIVE (pending approval) and truly disabled accounts.
-     */
     public function login(Request $request)
     {
         $validated = $request->validate([
-            'identifier'  => ['required', 'string'],
-            'password'    => ['required', 'string'],
+            'identifier' => ['required', 'string'],
+            'password' => ['required', 'string'],
             'device_name' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -192,33 +173,27 @@ class AuthController extends Controller
             ], 422);
         }
 
-        if ((string) $member->status === '0' && empty($member->approved_at)) {
+        if ($member->isPending()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Your registration is pending Super Admin approval. You will be notified once your account is activated.',
-                'account_status' => 'pending_approval',
-                'can_login' => false,
+                'message' => 'Your account is pending admin approval. You will be notified once approved.',
+                'error_code' => 'PENDING_APPROVAL',
+                'can_check_status' => true,
             ], 403);
         }
 
-        if ((int) ($member->status ?? 1) !== 1) {
+        if ($member->isRejected()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Your account has been deactivated. Please contact admin.',
-                'account_status' => 'deactivated',
+                'message' => 'Your registration was not approved.' . ($member->approval_remark ? " Reason: {$member->approval_remark}" : ''),
+                'error_code' => 'ACCOUNT_REJECTED',
             ], 403);
         }
 
-        if ($member->must_change_password && Hash::check($validated['password'], $member->password)) {
-            $tokenName = $validated['device_name'] ?? ($request->userAgent() ?: 'api-token');
-            $member->tokens()->where('name', $tokenName)->delete();
-            $tempToken = $member->createToken($tokenName, ['password-change-only'])->plainTextToken;
+        if (! $member->isActive()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Password change required. Please set a new password before continuing.',
-                'must_change_password' => true,
-                'temp_token' => $tempToken,
-                'token_type' => 'Bearer',
+                'message' => 'Your account is inactive. Please contact admin.',
             ], 403);
         }
 
@@ -233,7 +208,8 @@ class AuthController extends Controller
         if (empty($roles)) {
             return response()->json([
                 'success' => false,
-                'message' => 'No role assigned. Please contact admin.',
+                'message' => 'No role assigned. Please contact admin to assign your construction role (Driver, Surveyor, Draftsman, Supervisor).',
+                'error_code' => 'NO_ROLE_ASSIGNED',
             ], 403);
         }
 
@@ -246,6 +222,7 @@ class AuthController extends Controller
 
         $tokenName = $validated['device_name'] ?? ($request->userAgent() ?: 'api-token');
         $member->tokens()->where('name', $tokenName)->delete();
+
         $token = $member->createToken($tokenName)->plainTextToken;
 
         ActivityLog::create([
@@ -263,53 +240,49 @@ class AuthController extends Controller
             'message' => 'Login successful.',
             'token' => $token,
             'token_type' => 'Bearer',
-            'member' => $member,
-            'account_status' => 'active',
+            'member' => $member->loadMissing(['employee', 'fcm_token']),
+            'role_names' => $member->role_names,
+            'department_names' => $member->department_names,
+            'designation_names' => $member->designation_names,
+            'must_change_password' => (bool) $member->must_change_password,
         ]);
     }
 
-    /**
-     * Send OTP — supports 'login' (existing active member) or 'registration' (pre-creates temp row).
-     */
     public function sendOtp(Request $request)
     {
         $validated = $request->validate([
-            'phone'   => ['required', 'string', 'max:20'],
-            'purpose' => ['nullable', 'string', 'in:login,registration'],
+            'phone' => ['required', 'string', 'max:20'],
         ]);
-
-        $purpose = $validated['purpose'] ?? 'login';
-        $phone = preg_replace('/\D+/', '', $validated['phone']);
 
         $member = Member::query()->where('phone', $validated['phone'])->first();
 
-        if ($purpose === 'registration') {
-            if (! $member) {
-                $slugBase = 'pending-' . $phone;
-                $member = Member::create([
-                    'uuid'       => (string) Str::uuid(),
-                    'created_by' => SuperAdmin::query()->value('id') ?? null,
-                    'name'       => 'Pending_' . substr($phone, -4),
-                    'username'   => 'tmp' . $phone . Str::random(4),
-                    'phone'      => $validated['phone'],
-                    'password'   => Hash::make(Str::random(32)),
-                    'status'     => 0,
-                    'roles'      => [],
-                    'slug'       => $this->makeUnique('members', 'slug', Str::slug($slugBase)),
-                ]);
-            }
-        } elseif (! $member || ((int) ($member->status ?? 1) !== 1 && empty($member->approved_at) === false)) {
+        if (! $member) {
             return response()->json([
                 'success' => false,
-                'message' => 'Account not found or inactive.',
+                'message' => 'No account found for this phone number.',
             ], 404);
         }
 
-        if ($purpose === 'login' && (! $member || (int) ($member->status ?? 1) !== 1)) {
+        if ($member->isPending()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Account not found or inactive.',
-            ], 404);
+                'message' => 'Your account is pending admin approval. OTP login is not available until approved.',
+                'error_code' => 'PENDING_APPROVAL',
+            ], 403);
+        }
+
+        if ($member->isRejected()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your registration was not approved.',
+            ], 403);
+        }
+
+        if (! $member->isActive()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Account is not active.',
+            ], 403);
         }
 
         $this->issueOtp($member);
@@ -317,7 +290,6 @@ class AuthController extends Controller
         $payload = [
             'success' => true,
             'message' => 'OTP sent successfully.',
-            'purpose' => $purpose,
         ];
 
         if (config('app.debug')) {
@@ -328,33 +300,42 @@ class AuthController extends Controller
         return response()->json($payload);
     }
 
-    /**
-     * Verify OTP — for login issues a token; for registration only marks phone_verify_at.
-     */
     public function verifyOtp(Request $request)
     {
         $validated = $request->validate([
-            'phone'       => ['required', 'string', 'max:20'],
-            'otp'         => ['required', 'string', 'max:10'],
-            'purpose'     => ['nullable', 'string', 'in:login,registration'],
+            'phone' => ['required', 'string', 'max:20'],
+            'otp' => ['required', 'string', 'max:10'],
             'device_name' => ['nullable', 'string', 'max:255'],
         ]);
-
-        $purpose = $validated['purpose'] ?? 'login';
 
         $member = Member::query()->where('phone', $validated['phone'])->first();
 
         if (! $member) {
             return response()->json([
                 'success' => false,
-                'message' => 'Account not found.',
+                'message' => 'No account found for this phone number.',
             ], 404);
         }
 
-        if ($purpose === 'login' && (int) ($member->status ?? 1) !== 1) {
+        if ($member->isPending()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Account is inactive.',
+                'message' => 'Your account is pending admin approval.',
+                'error_code' => 'PENDING_APPROVAL',
+            ], 403);
+        }
+
+        if ($member->isRejected()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your registration was not approved.',
+            ], 403);
+        }
+
+        if (! $member->isActive()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Account is not active.',
             ], 403);
         }
 
@@ -373,26 +354,17 @@ class AuthController extends Controller
         }
 
         $member->forceFill([
-            'otp'            => null,
-            'otp_expire'     => null,
+            'otp' => null,
+            'otp_expire' => null,
             'phone_verify_at' => now(),
         ])->save();
 
-        if ($purpose === 'registration') {
+        $roles = is_array($member->roles) ? $member->roles : [];
+        if (empty($roles)) {
             return response()->json([
-                'success'         => true,
-                'message'         => 'Phone verified successfully. Please complete registration.',
-                'phone_verified'  => true,
-                'member_temp_id'  => $member->id,
-            ]);
-        }
-
-        if (empty($member->approved_at) && (string) $member->status === '0') {
-            return response()->json([
-                'success'        => false,
-                'message'        => 'Your registration is pending Super Admin approval.',
-                'account_status' => 'pending_approval',
-                'phone_verified' => true,
+                'success' => false,
+                'message' => 'No role assigned. Please contact admin.',
+                'error_code' => 'NO_ROLE_ASSIGNED',
             ], 403);
         }
 
@@ -410,31 +382,38 @@ class AuthController extends Controller
         ]);
 
         return response()->json([
-            'success'    => true,
-            'message'    => 'OTP verified successfully.',
-            'token'      => $token,
+            'success' => true,
+            'message' => 'OTP verified successfully.',
+            'token' => $token,
             'token_type' => 'Bearer',
-            'member'     => $member,
+            'member' => $member->loadMissing(['employee', 'fcm_token']),
+            'role_names' => $member->role_names,
         ]);
     }
 
-    /**
-     * Get authenticated member profile
-     */
     public function me(Request $request)
     {
         $member = $request->user();
-        $member->loadMissing(['employee', 'fcm_token']);
+        $member->loadMissing(['employee', 'fcm_token', 'approver:id,name']);
 
         return response()->json([
             'success' => true,
             'member' => $member,
+            'role_names' => $member->role_names,
+            'department_names' => $member->department_names,
+            'designation_names' => $member->designation_names,
+            'status_info' => [
+                'code' => (int) $member->status,
+                'text' => match((int) $member->status) {
+                    Member::STATUS_PENDING => 'Pending Approval',
+                    Member::STATUS_ACTIVE => 'Active',
+                    Member::STATUS_REJECTED => 'Rejected',
+                    default => 'Unknown',
+                },
+            ],
         ]);
     }
 
-    /**
-     * Logout - Revoke current token
-     */
     public function logout(Request $request)
     {
         $member = $request->user();
@@ -443,7 +422,6 @@ class AuthController extends Controller
         if ($token) {
             $tokenName = $token->name;
 
-            // Log activity before revoking token
             ActivityLog::create([
                 'user_id'     => $member->id,
                 'user_role'   => 'doer',
@@ -463,9 +441,6 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Issue OTP to member (random 6-digit OTP, in debug mode returns 123456)
-     */
     private function issueOtp(Member $member): void
     {
         $otp = config('app.debug') ? '123456' : (string) random_int(100000, 999999);
@@ -475,9 +450,6 @@ class AuthController extends Controller
         ])->save();
     }
 
-    /**
-     * Make unique value for table column
-     */
     private function makeUnique(string $table, string $column, string $base): string
     {
         $value = $base;

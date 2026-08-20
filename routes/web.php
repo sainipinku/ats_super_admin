@@ -114,6 +114,23 @@ Route::prefix('super')->name('super.')->group(function () {
             Route::post('/update-status/{uuid}', [MemberController::class, 'updateStatus'])->name('status');
             Route::put('/{member}/password', [MemberController::class, 'updatePassword'])->name('password');
             Route::redirect('/{uuid}/details', '/super/construction/projects')->name('details');
+
+            Route::prefix('approvals')->name('approvals.')->group(function () {
+                Route::get('/pending', [MemberController::class, 'pendingApprovalsPage'])->name('pending');
+                Route::get('/approved', [MemberController::class, 'approvedMembersPage'])->name('approved');
+                Route::get('/rejected', [MemberController::class, 'rejectedMembersPage'])->name('rejected');
+
+                Route::prefix('api')->name('api.')->group(function () {
+                    Route::get('/stats', [MemberController::class, 'approvalStatsApi'])->name('stats');
+                    Route::get('/pending', [MemberController::class, 'pendingApi'])->name('pending');
+                    Route::get('/approved', [MemberController::class, 'approvedApi'])->name('approved');
+                    Route::get('/rejected', [MemberController::class, 'rejectedApi'])->name('rejected');
+                    Route::get('/{member}/show', [MemberController::class, 'approvalShowApi'])->name('show');
+                    Route::post('/{member}/approve', [MemberController::class, 'approveMember'])->name('approve');
+                    Route::post('/{member}/reject', [MemberController::class, 'rejectMember'])->name('reject');
+                    Route::post('/{member}/bulk-approve', [MemberController::class, 'bulkApprove'])->name('bulk-approve');
+                });
+            });
         });
 
         // Job Requests Routes (Super Admin)

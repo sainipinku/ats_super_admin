@@ -223,6 +223,13 @@ class AdminDashboardApiController extends Controller
             ->get();
 
         $pendingApprovals = [
+            'survey_submissions' => collect([]),
+            'drawing_approvals' => collect([]),
+            'dpr_approvals' => collect([]),
+            'attendance_approvals' => collect([]),
+        ];
+        try {
+            $pendingApprovals = [
             'survey_submissions' => SurveySubmission::with([
                 'surveyVisit.surveyPlan.project',
             ])
@@ -271,7 +278,8 @@ class AdminDashboardApiController extends Controller
                 ->where('status', 'pending')
                 ->latest('attendance_date')
                 ->take(10)
-                ->get();
+                ->get(),
+        ];
         } catch (\Throwable $e) {
             report($e);
         }

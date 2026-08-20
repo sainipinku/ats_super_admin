@@ -637,7 +637,10 @@ class MemberDashboardController extends Controller
             report($e);
         }
 
-        $vehicles = ConstructionVehicle::with(['assignments' => fn ($q) => $q->latest()->take(3)])
+        $vehicles = collect([]);
+        $myVehicles = collect([]);
+        try {
+            $vehicles = ConstructionVehicle::with(['assignments' => fn ($q) => $q->latest()->take(3)])
             ->where('project_id', $project->id)
             ->latest()
             ->get();
@@ -649,7 +652,10 @@ class MemberDashboardController extends Controller
             report($e);
         }
 
-        $equipments = \App\Models\ConstructionEquipment::with([
+        $equipments = collect([]);
+        $myEquipments = collect([]);
+        try {
+            $equipments = \App\Models\ConstructionEquipment::with([
             'allocations' => fn ($q) => $q->latest()->take(3),
         ])
             ->where('project_id', $project->id)
@@ -677,6 +683,9 @@ class MemberDashboardController extends Controller
             ->latest()
             ->get();
 
+        $dprs = collect([]);
+        $attendance = collect([]);
+        try {
             $dprs = DailyProgressReport::with(['items', 'submittedBy'])
                 ->where('project_id', $project->id)
                 ->latest('report_date')

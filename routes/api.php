@@ -4,18 +4,12 @@ use App\Http\Controllers\Api\AdminDashboardApiController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientApiController;
 use App\Http\Controllers\Api\CompanyApiController;
-use App\Http\Controllers\Api\Construction\ClientReviewController;
-use App\Http\Controllers\Api\Construction\DraftingApprovalController;
-use App\Http\Controllers\Api\Construction\DriverAllocationController;
-use App\Http\Controllers\Api\Construction\PhaseBillingController;
-use App\Http\Controllers\Api\Construction\SurveyTeamController;
 use App\Http\Controllers\Api\MemberDashboardController;
 use App\Http\Controllers\Api\Mobile\ConstructionController;
 use App\Http\Controllers\Api\Member\JobController;
 use App\Http\Controllers\Api\Member\ProfileController;
 use App\Http\Controllers\Api\Member\TaskController;
 use App\Http\Controllers\Api\ProjectApiController;
-use App\Http\Controllers\Api\SuperAdminApprovalApiController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -31,19 +25,13 @@ Route::get('/', function () {
             'projects' => '/api/construction/projects/*',
             'companies' => '/api/construction/companies/*',
             'clients' => '/api/construction/clients/*',
-            'approvals' => '/api/super-admin/approvals/*',
-            'driver_allocation' => '/api/construction/driver-allocations/*',
-            'survey_teams' => '/api/construction/projects/{projectId}/survey-teams/*',
-            'drafting_approval' => '/api/construction/drafting-approvals/*',
-            'phase_billing' => '/api/construction/projects/{projectId}/billing/*',
-            'client_review' => '/api/construction/client-review/*',
         ],
     ]);
 });
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/register-v2', [AuthController::class, 'registerV2']);
+    Route::get('/registration-status', [AuthController::class, 'registrationStatus']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/send-otp', [AuthController::class, 'sendOtp']);
     Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
@@ -92,13 +80,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [AdminDashboardApiController::class, 'index']);
     });
-
-    Route::prefix('super-admin')->name('super-admin.')->group(function () {
-        Route::get('/approvals/pending', [SuperAdminApprovalApiController::class, 'pendingApprovals']);
-        Route::post('/approvals/{memberId}/approve', [SuperAdminApprovalApiController::class, 'approve']);
-        Route::post('/approvals/{memberId}/reject', [SuperAdminApprovalApiController::class, 'reject']);
-        Route::post('/approvals/{memberId}/assign-role', [SuperAdminApprovalApiController::class, 'assignConstructionRole']);
-    });
 });
 
 Route::prefix('construction')->middleware('auth:sanctum')->group(function () {
@@ -142,48 +123,7 @@ Route::prefix('construction')->middleware('auth:sanctum')->group(function () {
         });
     });
 
-    Route::prefix('driver-allocations')->group(function () {
-        Route::get('/', [DriverAllocationController::class, 'index']);
-        Route::post('/', [DriverAllocationController::class, 'store']);
-        Route::get('/{allocation}', [DriverAllocationController::class, 'show']);
-        Route::match(['put', 'post'], '/{allocation}', [DriverAllocationController::class, 'update']);
-        Route::post('/{allocation}/checkpoints', [DriverAllocationController::class, 'storeCheckpoint']);
-        Route::get('/{allocation}/checkpoints', [DriverAllocationController::class, 'driverCheckpoints']);
-    });
-
-    Route::prefix('projects/{projectId}/survey-teams')->group(function () {
-        Route::get('/', [SurveyTeamController::class, 'index']);
-        Route::post('/', [SurveyTeamController::class, 'store']);
-        Route::get('/{teamId}', [SurveyTeamController::class, 'show']);
-        Route::delete('/{teamId}', [SurveyTeamController::class, 'destroy']);
-        Route::post('/{teamId}/members', [SurveyTeamController::class, 'addMember']);
-        Route::delete('/{teamId}/members/{memberId}', [SurveyTeamController::class, 'removeMember']);
-        Route::patch('/{teamId}/members/{memberId}/work-type', [SurveyTeamController::class, 'updateWorkType']);
-    });
-
-    Route::prefix('drafting-approvals')->group(function () {
-        Route::get('/capabilities/{memberId}', [DraftingApprovalController::class, 'draftingCapabilities']);
-        Route::post('/revisions/{revisionId}/request', [DraftingApprovalController::class, 'requestApproval']);
-        Route::post('/{approvalId}', [DraftingApprovalController::class, 'approve']);
-        Route::post('/drafting-jobs/{draftingJobId}/reject', [DraftingApprovalController::class, 'rejectDraft']);
-    });
-
-    Route::prefix('projects/{projectId}/billing')->group(function () {
-        Route::get('/phase-breakdown', [PhaseBillingController::class, 'phaseBreakdown']);
-        Route::post('/generate-invoice', [PhaseBillingController::class, 'generatePhaseInvoice']);
-    });
-
-    Route::prefix('client-review')->group(function () {
-        Route::get('/client/{clientId}/dashboard', [ClientReviewController::class, 'clientDashboard']);
-        Route::post('/projects/{projectId}/mark-ready', [ClientReviewController::class, 'markReadyForClient']);
-        Route::get('/projects/{projectId}', [ClientReviewController::class, 'projectDetailForReview']);
-        Route::post('/projects/{projectId}/approve', [ClientReviewController::class, 'clientApprove']);
-        Route::post('/projects/{projectId}/request-revision', [ClientReviewController::class, 'clientRequestRevision']);
-        Route::post('/projects/{projectId}/supervisor/resolve/{revisionCycle}', [ClientReviewController::class, 'supervisorResolveRevision']);
-    });
-
     Route::prefix('mobile/construction')->group(function () {
-        Route::get('/context', [ConstructionController::class, 'context']);
         Route::get('/projects/assigned', [ConstructionController::class, 'assignedProjects']);
         Route::get('/survey-plans/{surveyPlan}', [ConstructionController::class, 'showSurveyPlan'])
             ->middleware('construction.permission:survey_plan.manage');
@@ -228,4 +168,21 @@ Route::prefix('construction')->middleware('auth:sanctum')->group(function () {
         Route::get('/documents/{document}/download', [App\Http\Controllers\Construction\DocumentController::class, 'download'])
             ->middleware('construction.permission:document.manage');
     });
+});
+
+Route::prefix('super')->middleware('auth:sanctum')->name('api.super.')->group(function () {
+    Route::prefix('members')->name('members.')->group(function () {
+        Route::get('/pending', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'pendingList']);
+        Route::get('/approved', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'approvedList']);
+        Route::get('/rejected', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'rejectedList']);
+        Route::get('/stats', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'approvalStats']);
+        Route::get('/{member}/show', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'show']);
+        Route::post('/{member}/approve', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'approve']);
+        Route::post('/{member}/reject', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'reject']);
+        Route::post('/{member}/assign-admin', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'assignAdmin']);
+    });
+
+    Route::get('/roles/construction', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'constructionRoles']);
+    Route::get('/departments/all', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'allDepartments']);
+    Route::get('/designations/by-departments', [App\Http\Controllers\Api\SuperAdminApprovalApiController::class, 'designationsByDepartments']);
 });
