@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SuperAdmin\Construction;
 
 use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
+use App\Models\Member;
 use App\Models\Project;
 use App\Models\ConstructionVehicle;
 use App\Models\VehicleAssignment;
