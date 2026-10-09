@@ -101,6 +101,35 @@ class SuperAdminManageController extends Controller
             ->latest()
             ->get();
 
+        $superAdminsMap = SuperAdmin::with('company')->get()->keyBy('id');
+        $allMembersMap = Member::get(['id', 'created_by', 'company_name'])->keyBy('id');
+
+        $admins->transform(function ($admin) use ($superAdminsMap, $allMembersMap) {
+            $creatorCompany = null;
+            $current = $admin;
+            $visited = [];
+
+            while ($current && $current->created_by && !in_array($current->created_by, $visited)) {
+                $visited[] = $current->created_by;
+
+                $superAdmin = $superAdminsMap->get($current->created_by);
+                if ($superAdmin && $superAdmin->company) {
+                    $creatorCompany = $superAdmin->company;
+                    break;
+                }
+
+                $current = $allMembersMap->get($current->created_by);
+            }
+
+            if ($creatorCompany) {
+                $admin->setRelation('company', $creatorCompany);
+            } elseif (!empty($admin->company_name)) {
+                $admin->setRelation('company', (object) ['name' => $admin->company_name]);
+            }
+
+            return $admin;
+        });
+
         $constructionRoles = \App\Models\ConstructionRole::where('status', 'active')->get();
         $legacyRoles = \App\Models\Role::where('status', 1)->get();
         $companies = \App\Models\Company::where('status', 'active')->get();

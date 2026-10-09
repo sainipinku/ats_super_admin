@@ -986,6 +986,7 @@ Route::get('/migrate', function () {
     return response()->json(['migrated']);
 });
 
+
 Route::get('seed', function () {
     Artisan::call('db:seed');
     return response()->json(['seeded']);

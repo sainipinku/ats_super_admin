@@ -298,8 +298,8 @@ export default function SuperAdminsIndex({ superAdmins, admins, constructionRole
                                             </tr>
                                         ))
                                     ) : (
-                                        <tr>
-                                            <td colSpan="6" className="px-6 py-10 text-center text-slate-400">
+                                         <tr>
+                                            <td colSpan="7" className="px-6 py-10 text-center text-slate-400">
                                                 No Super Admin accounts found.
                                             </td>
                                         </tr>
@@ -322,6 +322,23 @@ export default function SuperAdminsIndex({ superAdmins, admins, constructionRole
                                                                 <div className="text-xs text-slate-400">@{user.username || 'admin'}</div>
                                                             </div>
                                                         </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {user.company ? (
+                                                            <div>
+                                                                <div className="font-semibold text-slate-900 flex items-center gap-1.5 text-xs">
+                                                                    <Building className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                                                    <span>{user.company.name}</span>
+                                                                </div>
+                                                                {user.company.legal_name && (
+                                                                    <div className="text-[11px] text-slate-500">{user.company.legal_name}</div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-400 italic">
+                                                                {user.company_name || 'No Company'}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <button
@@ -389,7 +406,7 @@ export default function SuperAdminsIndex({ superAdmins, admins, constructionRole
                                         })
                                     ) : (
                                         <tr>
-                                            <td colSpan="6" className="px-6 py-10 text-center text-slate-400">
+                                            <td colSpan="7" className="px-6 py-10 text-center text-slate-400">
                                                 No Admin accounts found.
                                             </td>
                                         </tr>
