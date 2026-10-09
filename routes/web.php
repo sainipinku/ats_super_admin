@@ -980,6 +980,8 @@ Route::post('/reset-password', [HomeController::class, 'resetPassword'])->name('
 Route::post('/super-reset-password', [HomeController::class, 'superResetPassword'])->name('super.password.update');
 /** PUBLIC ROUTES END HERE **/
 
+
+
 /** UTILITY ROUTES START HERE **/
 Route::get('/migrate', function () {
     Artisan::call('migrate');
