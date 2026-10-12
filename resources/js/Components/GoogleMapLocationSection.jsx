@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   GoogleMap,
   Marker,
-  StandaloneSearchBox,
   useJsApiLoader,
 } from '@react-google-maps/api';
 import toast from 'react-hot-toast';
@@ -30,9 +29,10 @@ export default function GoogleMapLocationSection({
     id: 'google-maps-location-picker',
   });
 
-  const searchBoxRef = useRef(null);
   const mapRef = useRef(null);
   const geocoderRef = useRef(null);
+  const autocompleteSessionTokenRef = useRef(null);
+  const skipAutocompleteInputRef = useRef(null);
 
   const hasInitialCoords =
     initialLat != null && initialLng != null && initialLat !== '' && initialLng !== '';
@@ -45,6 +45,10 @@ export default function GoogleMapLocationSection({
   const [formattedAddress, setFormattedAddress] = useState(
     initialLocationName || initialAddress || ''
   );
+  const [searchInput, setSearchInput] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
   const [manualCoords, setManualCoords] = useState({
     lat: hasInitialCoords ? String(initialLat) : '',
     lng: hasInitialCoords ? String(initialLng) : '',
@@ -124,34 +128,85 @@ export default function GoogleMapLocationSection({
     }
   }, [hasInitialCoords, markerPosition, initialLocationName, initialAddress, reverseGeocode]);
 
-  const onPlacesChanged = useCallback(() => {
-    const places = searchBoxRef.current?.getPlaces?.();
-    if (!places?.length) {
-      toast.error('No locations match your search.');
-      return;
+  useEffect(() => {
+    const input = searchInput.trim();
+    const skipAutocomplete = skipAutocompleteInputRef.current === input;
+    skipAutocompleteInputRef.current = null;
+    if (!isLoaded || !input || skipAutocomplete) {
+      setSuggestions([]);
+      setIsSearching(false);
+      setSearchError('');
+      return undefined;
     }
-    const place = places[0];
-    const location = place.geometry?.location;
-    if (!location) {
-      toast.error('Selected location has no coordinates.');
-      return;
+
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      setIsSearching(true);
+      setSearchError('');
+      try {
+        const places = window.google.maps.places;
+        autocompleteSessionTokenRef.current ??= new places.AutocompleteSessionToken();
+        const response = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input,
+          sessionToken: autocompleteSessionTokenRef.current,
+        });
+        if (!cancelled) {
+          setSuggestions((response.suggestions || []).filter((item) => item.placePrediction));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Google Places autocomplete failed:', error);
+          setSuggestions([]);
+          setSearchError('Location search failed. Check your API key, billing, and that Places API (New) is enabled for your Google Maps project.');
+        }
+      } finally {
+        if (!cancelled) setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [isLoaded, searchInput]);
+
+  const selectSuggestion = useCallback(async (suggestion) => {
+    try {
+      const place = suggestion.placePrediction.toPlace();
+      await place.fetchFields({
+        fields: ['displayName', 'formattedAddress', 'location'],
+      });
+      const location = place.location;
+      if (!location) {
+        toast.error('Selected location has no coordinates.');
+        return;
+      }
+      const lat = location.lat();
+      const lng = location.lng();
+      const locationName = place.displayName || place.formattedAddress || '';
+      const address = place.formattedAddress || locationName;
+      setMarkerPosition({ lat, lng });
+      setManualCoords({ lat: String(lat), lng: String(lng) });
+      setFormattedAddress(address);
+      skipAutocompleteInputRef.current = locationName;
+      setSearchInput(locationName);
+      setSuggestions([]);
+      setSearchError('');
+      autocompleteSessionTokenRef.current = null;
+      if (mapRef.current) {
+        mapRef.current.panTo({ lat, lng });
+        mapRef.current.setZoom(15);
+      }
+      emitChange({
+        location_name: locationName,
+        project_address: address,
+        latitude: lat,
+        longitude: lng,
+      });
+    } catch (error) {
+      console.error('Google Places location details failed:', error);
+      toast.error('Unable to load details for the selected location.');
     }
-    const lat = location.lat();
-    const lng = location.lng();
-    const formatted = place.formatted_address || place.name || '';
-    setMarkerPosition({ lat, lng });
-    setManualCoords({ lat: String(lat), lng: String(lng) });
-    setFormattedAddress(formatted);
-    if (mapRef.current) {
-      mapRef.current.panTo({ lat, lng });
-      mapRef.current.setZoom(15);
-    }
-    emitChange({
-      location_name: formatted,
-      project_address: formatted,
-      latitude: lat,
-      longitude: lng,
-    });
   }, [emitChange]);
 
   const onMarkerDragEnd = useCallback((event) => {
@@ -217,16 +272,46 @@ export default function GoogleMapLocationSection({
     <div className="space-y-3">
       <div className="space-y-2">
         <label className="text-xs font-medium text-foreground">Search Location</label>
-        <StandaloneSearchBox
-          onLoad={(ref) => (searchBoxRef.current = ref)}
-          onPlacesChanged={onPlacesChanged}
-        >
+        <div className="relative">
           <input
             type="text"
             placeholder="Start typing an address, place, or landmark…"
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm outline-none ring-offset-background focus:border-ring focus:ring-2 focus:ring-ring/30 placeholder:text-muted-foreground"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={suggestions.length > 0}
           />
-        </StandaloneSearchBox>
+          {suggestions.length > 0 && (
+            <ul
+              className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-background py-1 shadow-lg"
+              role="listbox"
+            >
+              {suggestions.map((suggestion) => {
+                const prediction = suggestion.placePrediction;
+                if (!prediction) return null;
+                return (
+                  <li key={prediction.placeId} role="option" aria-selected="false">
+                    <button
+                      type="button"
+                      className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+                      onClick={() => selectSuggestion(suggestion)}
+                    >
+                      {prediction.text.toString()}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {isSearching && (
+            <p className="mt-1 text-xs text-muted-foreground">Searching locations…</p>
+          )}
+          {searchError && (
+            <p className="mt-1 text-xs text-destructive" role="alert">{searchError}</p>
+          )}
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-md border border-border/60">
