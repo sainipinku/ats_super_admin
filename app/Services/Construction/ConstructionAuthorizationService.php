@@ -176,10 +176,18 @@ class ConstructionAuthorizationService
         }
 
         $isUnrestrictedSuperAdmin = false;
+
         if ($actor instanceof SuperAdmin) {
             $isUnrestrictedSuperAdmin = true;
         } elseif ($actor instanceof Member) {
-            $isUnrestrictedSuperAdmin = ((int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1) || $actor->isAdmin());
+            $isUnrestrictedSuperAdmin = (
+                $actor->isSuperAdmin()
+                || $actor->slug === 'super-admin'
+                || (int) $actor->id === 1
+                || (string) $actor->id === '1'
+                || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1)
+                || $actor->isAdmin()
+            );
         }
 
         if ($isUnrestrictedSuperAdmin) {

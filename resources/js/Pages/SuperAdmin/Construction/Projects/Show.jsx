@@ -292,65 +292,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                 <StatCard label="Handovers" value={metrics.handovers} />
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
-                <SectionCard title="Project Summary" description="This project record is the anchor for all Phase 1 foundation and Phase 2 survey workflows.">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <StatusBadge value={project.status} />
-                        <StatusBadge value={project.current_stage} />
-                        <StatusBadge value={project.priority} />
-                    </div>
-                    <dl className="mt-5 grid gap-4 sm:grid-cols-2">
-                        <Field label="Client" value={project.client?.name} />
-                        <Field label="Company" value={project.company?.name} />
-                        <Field label="Start Date" value={formatDate(project.start_date)} />
-                        <Field label="Expected End" value={formatDate(project.expected_end_date)} />
-                        <LocationDisplay
-                            className="sm:col-span-2"
-                            locationName={project.location_name}
-                            address={project.project_address}
-                            lat={project.latitude}
-                            lng={project.longitude}
-                        />
-                        <Field label="Description" value={project.description} span="sm:col-span-2" />
-                    </dl>
-                </SectionCard>
-
-                <SectionCard title="Workflow Snapshot" description="Quick read of where this project currently stands.">
-                    <div className="space-y-4">
-                        <SnapshotRow label="Latest Budget" value={project.budgets?.[0] ? `${project.budgets[0].currency} ${project.budgets[0].approved_amount || project.budgets[0].estimated_amount}` : null} badge={project.budgets?.[0]?.status} />
-                        <SnapshotRow label="Latest Survey Submission" value={latestSubmission ? `Visit #${latestSubmission.survey_visit_id}` : null} badge={latestSubmission?.status_key} />
-                        <SnapshotRow label="Latest Drafting Job" value={latestDraftingJob ? latestDraftingJob.assigned_to?.name || "Unassigned" : null} badge={latestDraftingJob?.status} />
-                        <SnapshotRow label="Primary Team Size" value={`${project.team_members?.filter((item) => item.is_primary).length || 0} primary assignments`} />
-                    </div>
-                </SectionCard>
-            </div>
-
             <div className="grid gap-6 xl:grid-cols-2">
-                <SectionCard title="Budget Approval" description="Approve, reject, or revise the project budget before downstream work continues.">
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            budgetForm.post(route("super.construction.projects.budget.store", project.id), { preserveScroll: true });
-                        }}
-                        className="grid gap-4"
-                    >
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <InputField form={budgetForm} name="estimated_amount" label="Estimated Amount" />
-                            <InputField form={budgetForm} name="approved_amount" label="Approved Amount" />
-                            <InputField form={budgetForm} name="currency" label="Currency" />
-                            <SelectField form={budgetForm} name="status" label="Budget Decision" options={[
-                                { value: "pending", label: "Pending" },
-                                { value: "approved", label: "Approved" },
-                                { value: "rejected", label: "Rejected" },
-                            ]} />
-                        </div>
-                        <TextAreaField form={budgetForm} name="notes" label="Budget Notes" rows={4} />
-                        <button type="submit" disabled={budgetForm.processing} className="rounded-xl bg-indigo-600 px-4 py-3 font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
-                            {budgetForm.processing ? "Saving..." : "Save Budget Decision"}
-                        </button>
-                    </form>
-                </SectionCard>
-
                 <SectionCard title="Team Assignment" description="Assign project admin, surveyor, draft person, and review roles to project members.">
                     <form
                         onSubmit={(e) => {
@@ -409,9 +351,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                         </button>
                     </form>
                 </SectionCard>
-            </div>
 
-            <div className="grid gap-6 xl:grid-cols-2">
                 <SectionCard title="Assigned Team" description="Current team and role coverage for this project.">
                     {project.team_members?.length ? (
                         <div className="space-y-3">

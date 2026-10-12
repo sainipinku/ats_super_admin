@@ -45,17 +45,19 @@ export default function GoogleMapLocationSection({
   const [formattedAddress, setFormattedAddress] = useState(
     initialLocationName || initialAddress || ''
   );
+  const [searchInput, setSearchInput] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
   const [manualCoords, setManualCoords] = useState({
     lat: hasInitialCoords ? String(initialLat) : '',
     lng: hasInitialCoords ? String(initialLng) : '',
   });
 
   const [searchQuery, setSearchQuery] = useState(initialLocationName || initialAddress || '');
-  const [suggestions, setSuggestions] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [isSearching, setIsSearching] = useState(false);
 
   // Sync initial coordinates
   useEffect(() => {
@@ -740,11 +742,10 @@ export default function GoogleMapLocationSection({
                     type="button"
                     onClick={() => handleSelectSuggestion(item)}
                     onMouseEnter={() => setHighlightedIndex(idx)}
-                    className={`flex w-full items-start gap-3 px-3.5 py-2.5 text-left transition ${
-                      highlightedIndex === idx
+                    className={`flex w-full items-start gap-3 px-3.5 py-2.5 text-left transition ${highlightedIndex === idx
                         ? 'bg-indigo-50/80 text-indigo-950 dark:bg-indigo-950/60 dark:text-indigo-200'
                         : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60'
-                    }`}
+                      }`}
                   >
                     <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-[13px] text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
                       {item.type === 'place' ? '🏢' : '📍'}
@@ -821,7 +822,7 @@ export default function GoogleMapLocationSection({
             placeholder="-90.0 to 90.0"
             error={
               manualCoords.lat !== '' &&
-              (Number(manualCoords.lat) < -90 || Number(manualCoords.lat) > 90)
+                (Number(manualCoords.lat) < -90 || Number(manualCoords.lat) > 90)
                 ? 'Must be -90 to 90'
                 : undefined
             }
@@ -837,7 +838,7 @@ export default function GoogleMapLocationSection({
             placeholder="-180.0 to 180.0"
             error={
               manualCoords.lng !== '' &&
-              (Number(manualCoords.lng) < -180 || Number(manualCoords.lng) > 180)
+                (Number(manualCoords.lng) < -180 || Number(manualCoords.lng) > 180)
                 ? 'Must be -180 to 180'
                 : undefined
             }
