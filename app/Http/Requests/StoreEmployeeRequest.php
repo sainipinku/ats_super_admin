@@ -15,16 +15,17 @@ class StoreEmployeeRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'full_name' => is_string($this->input('full_name')) ? trim($this->input('full_name')) : $this->input('full_name'),
-            'email' => is_string($this->input('email')) ? trim($this->input('email')) : $this->input('email'),
-            'phone' => is_string($this->input('phone')) ? trim($this->input('phone')) : $this->input('phone'),
-            'alternate_number' => is_string($this->input('alternate_number')) ? trim($this->input('alternate_number')) : $this->input('alternate_number'),
-            'aadhaar_number' => is_string($this->input('aadhaar_number')) ? trim($this->input('aadhaar_number')) : $this->input('aadhaar_number'),
-            'pan_number' => is_string($this->input('pan_number')) ? strtoupper(trim($this->input('pan_number'))) : $this->input('pan_number'),
-            'department' => is_string($this->input('department')) ? trim($this->input('department')) : $this->input('department'),
-            'designation' => is_string($this->input('designation')) ? trim($this->input('designation')) : $this->input('designation'),
-        ]);
+        if ($this->has('phone')) {
+            $this->merge([
+                'phone' => substr(preg_replace('/\D/', '', (string) $this->phone), 0, 12),
+            ]);
+        }
+
+        if ($this->has('alternate_number') && $this->alternate_number) {
+            $this->merge([
+                'alternate_number' => substr(preg_replace('/\D/', '', (string) $this->alternate_number), 0, 12),
+            ]);
+        }
     }
 
     public function rules(): array
@@ -52,7 +53,8 @@ class StoreEmployeeRequest extends FormRequest
             'phone' => [
                 'required',
                 'string',
-                'regex:/^[6-9]\d{9}$/',
+                'max:12',
+                'regex:/^[0-9]{1,12}$/',
                 Rule::unique('members')->ignore($memberId)->whereNull('deleted_at'),
             ],
             'password' => [$memberId ? 'nullable' : 'required', 'required_with:confirm_password', 'string', 'min:6', 'same:confirm_password'],
@@ -70,11 +72,11 @@ class StoreEmployeeRequest extends FormRequest
             'designation' => ['required', 'string', Rule::in($designationOptions)],
             'gender' => ['nullable', 'in:male,female,other'],
             'dob' => ['nullable', 'date', 'before:today'],
-            'status' => ['nullable', 'boolean'],
+            'status' => ['nullable'],
 
             // Employee-specific fields
             'profile_photo' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
-            'alternate_number' => ['nullable', 'string', 'regex:/^[6-9]\d{9}$/'],
+            'alternate_number' => ['nullable', 'string', 'max:12', 'regex:/^[0-9]{1,12}$/'],
             'aadhaar_number' => [
                 'nullable',
                 'string',
@@ -94,9 +96,10 @@ class StoreEmployeeRequest extends FormRequest
     {
         return [
             'phone.unique' => 'This phone number is already in use.',
-            'phone.regex' => 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.',
-            'password.same' => 'The password and confirmation do not match.',
-            'confirm_password.required_with' => 'Confirm the password when changing it.',
+            'phone.max' => 'Phone number cannot exceed 12 digits.',
+            'phone.regex' => 'Phone number must contain only digits (max 12).',
+            'alternate_number.max' => 'Alternate number cannot exceed 12 digits.',
+            'alternate_number.regex' => 'Alternate number must contain only digits (max 12).',
             'email.unique' => 'This email address is already in use.',
             'email.required' => 'Email address is required for login.',
             'full_name.regex' => 'Enter a valid name using letters, spaces, apostrophes, periods, or hyphens.',

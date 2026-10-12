@@ -37,6 +37,21 @@ trait ResolvesConstructionActor
         return false;
     }
 
+    protected function isProjectOwner(?Model $actor = null): bool
+    {
+        $actor = $actor ?? $this->constructionActor();
+
+        if (!$actor) {
+            return false;
+        }
+
+        if ($actor instanceof \App\Models\SuperAdmin) {
+            return (int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1);
+        }
+
+        return false;
+    }
+
     protected function getAccessibleProjectIds(?Model $actor = null): \Illuminate\Support\Collection
     {
         $actor = $actor ?? $this->constructionActor();
@@ -46,14 +61,7 @@ trait ResolvesConstructionActor
         }
 
         // 1. Check if Project Owner (SuperAdmin id == 1 or is_project_owner == 1)
-        $isProjectOwner = false;
-        if ($actor instanceof \App\Models\SuperAdmin) {
-            if ((int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int)$actor->is_project_owner === 1)) {
-                $isProjectOwner = true;
-            }
-        }
-
-        if ($isProjectOwner) {
+        if ($this->isProjectOwner($actor)) {
             return \App\Models\Project::pluck('id');
         }
 
@@ -114,13 +122,13 @@ trait ResolvesConstructionActor
         }
 
         if ($actor instanceof \App\Models\SuperAdmin) {
-            if ((int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int)$actor->is_project_owner === 1)) {
-                return null;
-            }
             return $actor->company_id ? (int) $actor->company_id : null;
         }
 
         if ($actor instanceof \App\Models\Member) {
+            if (!empty($actor->company_id)) {
+                return (int) $actor->company_id;
+            }
             if ($actor->created_by) {
                 $creator = \App\Models\SuperAdmin::find($actor->created_by);
                 if ($creator && $creator->company_id) {

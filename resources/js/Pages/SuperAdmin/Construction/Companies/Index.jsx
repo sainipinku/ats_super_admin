@@ -72,7 +72,14 @@ export default function CompaniesIndex({ companies }) {
                         <InputField form={form} name="name" label="Company Name" />
                         <InputField form={form} name="legal_name" label="Legal Name" />
                         <InputField form={form} name="email" label="Email" />
-                        <InputField form={form} name="phone" label="Phone" />
+                        <InputField
+                            form={form}
+                            name="phone"
+                            label="Phone (Max 12 digits)"
+                            isNumeric={true}
+                            maxLength={12}
+                            placeholder="Enter phone number (max 12 digits)"
+                        />
                         <InputField form={form} name="gst_number" label="GST Number" />
                         <TextAreaField form={form} name="address" label="Address" rows={4} />
                         <SelectField form={form} name="status" label="Status" options={[
@@ -140,7 +147,14 @@ export default function CompaniesIndex({ companies }) {
                     <InputField form={editForm} name="name" label="Company Name" />
                     <InputField form={editForm} name="legal_name" label="Legal Name" />
                     <InputField form={editForm} name="email" label="Email" />
-                    <InputField form={editForm} name="phone" label="Phone" />
+                    <InputField
+                        form={editForm}
+                        name="phone"
+                        label="Phone (Max 12 digits)"
+                        isNumeric={true}
+                        maxLength={12}
+                        placeholder="Enter phone number (max 12 digits)"
+                    />
                     <InputField form={editForm} name="gst_number" label="GST Number" />
                     <TextAreaField form={editForm} name="address" label="Address" rows={4} />
                     <SelectField form={editForm} name="status" label="Status" options={[
@@ -170,11 +184,32 @@ export default function CompaniesIndex({ companies }) {
     );
 }
 
-function InputField({ form, name, label }) {
+function InputField({ form, name, label, type = "text", maxLength, isNumeric = false, placeholder = "" }) {
+    const handleChange = (e) => {
+        let val = e.target.value;
+        if (isNumeric) {
+            val = val.replace(/\D/g, "");
+            if (maxLength) {
+                val = val.slice(0, maxLength);
+            }
+        } else if (maxLength) {
+            val = val.slice(0, maxLength);
+        }
+        form.setData(name, val);
+    };
+
     return (
         <div>
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">{label}</label>
-            <input value={form.data[name]} onChange={(e) => form.setData(name, e.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
+            <input
+                type={type}
+                maxLength={maxLength}
+                inputMode={isNumeric ? "numeric" : undefined}
+                placeholder={placeholder}
+                value={form.data[name] ?? ""}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:border-indigo-700 dark:focus:ring-indigo-900/60"
+            />
             {form.errors[name] ? <p className="mt-1 text-xs text-rose-600">{form.errors[name]}</p> : null}
         </div>
     );

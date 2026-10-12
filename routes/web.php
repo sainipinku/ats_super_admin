@@ -337,10 +337,18 @@ Route::prefix('super/construction')
         Route::put('/clients/{client}', [App\Http\Controllers\SuperAdmin\Construction\ClientController::class, 'update'])
             ->middleware('construction.permission:client.manage')
             ->name('clients.update');
+        Route::post('/clients/{client}/status', [App\Http\Controllers\SuperAdmin\Construction\ClientController::class, 'updateStatus'])
+            ->middleware('construction.permission:client.manage')
+            ->name('clients.status');
+        Route::delete('/clients/{client}', [App\Http\Controllers\SuperAdmin\Construction\ClientController::class, 'destroy'])
+            ->middleware('construction.permission:client.manage')
+            ->name('clients.destroy');
 
         Route::get('/projects', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'index'])
             ->middleware('construction.permission:project.manage')
             ->name('projects.index');
+        Route::get('/projects/next-code', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'nextProjectCode'])
+            ->name('projects.next-code');
         Route::post('/projects', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'store'])
             ->middleware('construction.permission:project.manage')
             ->name('projects.store');
@@ -399,15 +407,12 @@ Route::prefix('super/construction')
             ->name('projects.checklists.store');
         Route::put('/projects/{project}/checklists/{checklist}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'updateChecklistItem'])
             ->middleware('construction.permission:execution_task.manage,survey_plan.manage')
-            ->scopeBindings()
             ->name('projects.checklists.update');
         Route::patch('/projects/{project}/checklists/{checklist}/toggle', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'toggleChecklistItem'])
             ->middleware('construction.permission:execution_task.manage,survey_plan.manage')
-            ->scopeBindings()
             ->name('projects.checklists.toggle');
         Route::delete('/projects/{project}/checklists/{checklist}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'destroyChecklistItem'])
             ->middleware('construction.permission:execution_task.manage,survey_plan.manage')
-            ->scopeBindings()
             ->name('projects.checklists.destroy');
         Route::post('/projects/{project}/checklists/seed-defaults', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'seedDefaultChecklists'])
             ->middleware('construction.permission:execution_task.manage,survey_plan.manage')
@@ -643,15 +648,12 @@ Route::prefix('admin/construction')
             ->name('projects.checklists.store');
         Route::put('/projects/{project}/checklists/{checklist}', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'updateChecklistItem'])
             ->middleware('construction.permission:execution_task.manage,survey_plan.manage')
-            ->scopeBindings()
             ->name('projects.checklists.update');
         Route::patch('/projects/{project}/checklists/{checklist}/toggle', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'toggleChecklistItem'])
             ->middleware('construction.permission:execution_task.manage,survey_plan.manage')
-            ->scopeBindings()
             ->name('projects.checklists.toggle');
         Route::delete('/projects/{project}/checklists/{checklist}', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'destroyChecklistItem'])
             ->middleware('construction.permission:execution_task.manage,survey_plan.manage')
-            ->scopeBindings()
             ->name('projects.checklists.destroy');
         Route::post('/projects/{project}/checklists/seed-defaults', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'seedDefaultChecklists'])
             ->middleware('construction.permission:execution_task.manage,survey_plan.manage')

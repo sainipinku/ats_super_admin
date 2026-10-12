@@ -62,6 +62,9 @@ export default function ProjectShow({ project, members, roles, activityLog, work
     });
 
     const [editingTask, setEditingTask] = useState(null);
+    const mergedTaskList = useMemo(() => mergedTasksForExecutionList(project), [project]);
+    const [showCreateTask, setShowCreateTask] = useState(false);
+    const [showAdvancedTaskFields, setShowAdvancedTaskFields] = useState(false);
 
     const editingTaskForm = useForm({
         title: "",
@@ -139,7 +142,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
         const matching = [];
         const others = [];
         members.forEach((m) => {
-            const desig = (m.designation_text || "").toLowerCase();
+            const desig = `${m.role_badge || ""} ${m.designation_text || ""}`.toLowerCase();
             if (desig.includes(targetKeyword)) {
                 matching.push(m);
             } else {
@@ -289,65 +292,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                 <StatCard label="Handovers" value={metrics.handovers} />
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
-                <SectionCard title="Project Summary" description="This project record is the anchor for all Phase 1 foundation and Phase 2 survey workflows.">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <StatusBadge value={project.status} />
-                        <StatusBadge value={project.current_stage} />
-                        <StatusBadge value={project.priority} />
-                    </div>
-                    <dl className="mt-5 grid gap-4 sm:grid-cols-2">
-                        <Field label="Client" value={project.client?.name} />
-                        <Field label="Company" value={project.company?.name} />
-                        <Field label="Start Date" value={formatDate(project.start_date)} />
-                        <Field label="Expected End" value={formatDate(project.expected_end_date)} />
-                        <LocationDisplay
-                            className="sm:col-span-2"
-                            locationName={project.location_name}
-                            address={project.project_address}
-                            lat={project.latitude}
-                            lng={project.longitude}
-                        />
-                        <Field label="Description" value={project.description} span="sm:col-span-2" />
-                    </dl>
-                </SectionCard>
-
-                <SectionCard title="Workflow Snapshot" description="Quick read of where this project currently stands.">
-                    <div className="space-y-4">
-                        <SnapshotRow label="Latest Budget" value={project.budgets?.[0] ? `${project.budgets[0].currency} ${project.budgets[0].approved_amount || project.budgets[0].estimated_amount}` : null} badge={project.budgets?.[0]?.status} />
-                        <SnapshotRow label="Latest Survey Submission" value={latestSubmission ? `Visit #${latestSubmission.survey_visit_id}` : null} badge={latestSubmission?.status_key} />
-                        <SnapshotRow label="Latest Drafting Job" value={latestDraftingJob ? latestDraftingJob.assigned_to?.name || "Unassigned" : null} badge={latestDraftingJob?.status} />
-                        <SnapshotRow label="Primary Team Size" value={`${project.team_members?.filter((item) => item.is_primary).length || 0} primary assignments`} />
-                    </div>
-                </SectionCard>
-            </div>
-
             <div className="grid gap-6 xl:grid-cols-2">
-                <SectionCard title="Budget Approval" description="Approve, reject, or revise the project budget before downstream work continues.">
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            budgetForm.post(route("super.construction.projects.budget.store", project.id), { preserveScroll: true });
-                        }}
-                        className="grid gap-4"
-                    >
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <InputField form={budgetForm} name="estimated_amount" label="Estimated Amount" />
-                            <InputField form={budgetForm} name="approved_amount" label="Approved Amount" />
-                            <InputField form={budgetForm} name="currency" label="Currency" />
-                            <SelectField form={budgetForm} name="status" label="Budget Decision" options={[
-                                { value: "pending", label: "Pending" },
-                                { value: "approved", label: "Approved" },
-                                { value: "rejected", label: "Rejected" },
-                            ]} />
-                        </div>
-                        <TextAreaField form={budgetForm} name="notes" label="Budget Notes" rows={4} />
-                        <button type="submit" disabled={budgetForm.processing} className="rounded-xl bg-indigo-600 px-4 py-3 font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
-                            {budgetForm.processing ? "Saving..." : "Save Budget Decision"}
-                        </button>
-                    </form>
-                </SectionCard>
-
                 <SectionCard title="Team Assignment" description="Assign project admin, surveyor, draft person, and review roles to project members.">
                     <form
                         onSubmit={(e) => {
@@ -384,10 +329,13 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                                 label="Member"
                                 options={[
                                     { value: "", label: "-- Select Member --" },
-                                    ...sortedMembers.map((member) => ({
-                                        value: member.id,
-                                        label: `${member.name}${member.designation_text ? ` (${member.designation_text})` : ""}${member.email ? ` • ${member.email}` : ""}`,
-                                    })),
+                                    ...sortedMembers.map((member) => {
+                                        const badge = member.role_badge ? ` (${member.role_badge})` : (member.designation_text ? ` (${member.designation_text})` : "");
+                                        return {
+                                            value: member.id,
+                                            label: `${member.name}${badge}${member.email ? ` • ${member.email}` : ""}`,
+                                        };
+                                    }),
                                 ]}
                             />
                             {/* <InputField form={teamForm} name="assigned_from" label="Assigned From" type="date" />
@@ -403,9 +351,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                         </button>
                     </form>
                 </SectionCard>
-            </div>
 
-            <div className="grid gap-6 xl:grid-cols-2">
                 <SectionCard title="Assigned Team" description="Current team and role coverage for this project.">
                     {project.team_members?.length ? (
                         <div className="space-y-3">
@@ -615,117 +561,185 @@ export default function ProjectShow({ project, members, roles, activityLog, work
             <SectionCard
                 title="Execution Tasks"
                 description={`${taskCounts.total} total tasks · ${taskCounts.completed} complete · ${taskCounts.in_progress} in-progress · ${taskCounts.pending} pending`}
+                actions={
+                    <button
+                        type="button"
+                        onClick={() => setShowCreateTask((prev) => !prev)}
+                        className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold shadow-xs transition ${
+                            showCreateTask
+                                ? "bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200"
+                                : "bg-indigo-600 text-white hover:bg-indigo-500"
+                        }`}
+                    >
+                        <span className="text-base font-bold leading-none">{showCreateTask ? "✕" : "+"}</span>
+                        <span>{showCreateTask ? "Close Task Form" : "New Task"}</span>
+                    </button>
+                }
             >
-                <form
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        taskForm.post(route("super.construction.projects.tasks.store", project.id), {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                taskForm.reset(
-                                    "title",
-                                    "description",
-                                    "planned_start_date",
-                                    "planned_end_date",
-                                    "actual_start_date",
-                                    "actual_end_date",
-                                    "priority",
-                                    "planned_quantity",
-                                    "unit",
-                                    "supervisor_member_id",
-                                    "requires_daily_update",
-                                    "requires_gps_verification",
-                                    "status",
-                                );
-                                taskForm.setData("priority", "medium");
-                                taskForm.setData("status", "draft");
-                            },
-                            onError: (errors) => {
-                                const firstError = Object.values(errors)[0];
-                                if (firstError) toast.error(firstError);
-                            },
-                        });
-                    }}
-                    className="grid gap-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900"
-                >
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Register New Execution Task</p>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <InputField form={taskForm} name="title" label="Task Title" placeholder="Survey site perimeter lines" />
-                        <SelectField
-                            form={taskForm}
-                            name="priority"
-                            label="Priority"
-                            options={[
-                                { value: "low", label: "Low" },
-                                { value: "medium", label: "Medium" },
-                                { value: "high", label: "High" },
-                                { value: "critical", label: "Critical" },
-                            ]}
-                        />
-                        <SelectField
-                            form={taskForm}
-                            name="status"
-                            label="Status"
-                            options={[
-                                { value: "draft", label: "Draft" },
-                                { value: "planned", label: "Planned" },
-                                { value: "in_progress", label: "In Progress" },
-                                { value: "completed", label: "Completed" },
-                                { value: "blocked", label: "Blocked" },
-                            ]}
-                        />
-                        <SelectField
-                            form={taskForm}
-                            name="supervisor_member_id"
-                            label="Supervisor"
-                            options={[
-                                { value: "", label: "-- Optional supervisor --" },
-                                ...members.map((m) => ({ value: m.id, label: m.name })),
-                            ]}
-                        />
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <InputField form={taskForm} name="planned_start_date" label="Planned Start" type="date" />
-                        <InputField form={taskForm} name="planned_end_date" label="Planned End" type="date" />
-                        <InputField form={taskForm} name="actual_start_date" label="Actual Start" type="date" />
-                        <InputField form={taskForm} name="actual_end_date" label="Actual End" type="date" />
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <InputField form={taskForm} name="planned_quantity" label="Planned Quantity" type="number" />
-                        <InputField form={taskForm} name="unit" label="Unit" placeholder="sqm / nos / m" />
-                        <label className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-200">
-                            <input
-                                type="checkbox"
-                                checked={taskForm.data.requires_daily_update}
-                                onChange={(e) => taskForm.setData("requires_daily_update", e.target.checked)}
-                            />
-                            Requires Daily Update
-                        </label>
-                        <label className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-200">
-                            <input
-                                type="checkbox"
-                                checked={taskForm.data.requires_gps_verification}
-                                onChange={(e) => taskForm.setData("requires_gps_verification", e.target.checked)}
-                            />
-                            GPS Verification
-                        </label>
-                    </div>
-                    <TextAreaField form={taskForm} name="description" label="Task Description" rows={2} />
-                    <div className="flex justify-end">
-                        <button
-                            type="submit"
-                            disabled={taskForm.processing}
-                            className="rounded-xl bg-indigo-600 px-4 py-3 font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-                        >
-                            {taskForm.processing ? "Saving..." : "Create Execution Task"}
-                        </button>
-                    </div>
-                </form>
+                {showCreateTask && (
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            taskForm.post(route("super.construction.projects.tasks.store", project.id), {
+                                preserveScroll: true,
+                                onSuccess: () => {
+                                    taskForm.reset(
+                                        "title",
+                                        "description",
+                                        "planned_start_date",
+                                        "planned_end_date",
+                                        "actual_start_date",
+                                        "actual_end_date",
+                                        "priority",
+                                        "planned_quantity",
+                                        "unit",
+                                        "supervisor_member_id",
+                                        "requires_daily_update",
+                                        "requires_gps_verification",
+                                        "status",
+                                    );
+                                    taskForm.setData("priority", "medium");
+                                    taskForm.setData("status", "draft");
+                                    setShowCreateTask(false);
+                                    setShowAdvancedTaskFields(false);
+                                    toast.success("Execution task created successfully.");
+                                },
+                                onError: (errors) => {
+                                    const firstError = Object.values(errors)[0];
+                                    if (firstError) toast.error(firstError);
+                                },
+                            });
+                        }}
+                        className="mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-slate-50 p-5 shadow-xs dark:border-indigo-950 dark:from-slate-900 dark:to-slate-950"
+                    >
+                        <div className="flex items-center justify-between border-b border-indigo-100 pb-3 dark:border-slate-800">
+                            <div>
+                                <p className="text-sm font-bold text-slate-900 dark:text-white">Register New Execution Task</p>
+                                <p className="text-xs text-slate-500">Provide the essential task details. You can attach checklists immediately after creating.</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowCreateTask(false)}
+                                className="rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                                ✕
+                            </button>
+                        </div>
 
-                <div className="mt-6">
-                    {mergedTasksForExecutionList(project).length ? (
+                        {/* Core Fields */}
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <div className="sm:col-span-2">
+                                <InputField form={taskForm} name="title" label="Task Title *" placeholder="e.g. Survey site perimeter lines" required />
+                            </div>
+                            <SelectField
+                                form={taskForm}
+                                name="supervisor_member_id"
+                                label="Supervisor"
+                                options={[
+                                    { value: "", label: "-- Optional supervisor --" },
+                                    ...members.map((m) => {
+                                        const badge = m.role_badge ? ` (${m.role_badge})` : (m.designation_text ? ` (${m.designation_text})` : "");
+                                        return { value: m.id, label: `${m.name}${badge}` };
+                                    }),
+                                ]}
+                            />
+                            <SelectField
+                                form={taskForm}
+                                name="priority"
+                                label="Priority"
+                                options={[
+                                    { value: "low", label: "Low" },
+                                    { value: "medium", label: "Medium" },
+                                    { value: "high", label: "High" },
+                                    { value: "critical", label: "Critical" },
+                                ]}
+                            />
+                        </div>
+
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <InputField form={taskForm} name="planned_start_date" label="Planned Start Date" type="date" />
+                            <InputField form={taskForm} name="planned_end_date" label="Planned End Date" type="date" />
+                            <div className="sm:col-span-2 flex items-center pt-5">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAdvancedTaskFields((prev) => !prev)}
+                                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                                >
+                                    <span>{showAdvancedTaskFields ? "▾ Hide additional fields" : "▸ Add more details (Quantity, Status, GPS Verification, Description)"}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Collapsible Advanced Fields */}
+                        {showAdvancedTaskFields && (
+                            <div className="mt-4 space-y-4 rounded-xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                    <SelectField
+                                        form={taskForm}
+                                        name="status"
+                                        label="Initial Status"
+                                        options={[
+                                            { value: "draft", label: "Draft" },
+                                            { value: "planned", label: "Planned" },
+                                            { value: "in_progress", label: "In Progress" },
+                                            { value: "completed", label: "Completed" },
+                                            { value: "blocked", label: "Blocked" },
+                                        ]}
+                                    />
+                                    <InputField form={taskForm} name="planned_quantity" label="Planned Quantity" type="number" />
+                                    <InputField form={taskForm} name="unit" label="Unit" placeholder="sqm / nos / m" />
+                                    <div className="flex flex-col justify-center gap-2 pt-2">
+                                        <label className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-200 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={taskForm.data.requires_daily_update}
+                                                onChange={(e) => taskForm.setData("requires_daily_update", e.target.checked)}
+                                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                            Requires Daily Update
+                                        </label>
+                                        <label className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-200 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={taskForm.data.requires_gps_verification}
+                                                onChange={(e) => taskForm.setData("requires_gps_verification", e.target.checked)}
+                                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                            GPS Verification
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <InputField form={taskForm} name="actual_start_date" label="Actual Start (Optional)" type="date" />
+                                    <InputField form={taskForm} name="actual_end_date" label="Actual End (Optional)" type="date" />
+                                </div>
+                                <TextAreaField form={taskForm} name="description" label="Task Description / Notes" rows={2} placeholder="Optional scope notes, equipment requirements..." />
+                            </div>
+                        )}
+
+                        <div className="mt-4 flex items-center justify-end gap-3 border-t border-indigo-100/80 pt-3 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setShowCreateTask(false)}
+                                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={taskForm.processing}
+                                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-60"
+                            >
+                                {taskForm.processing ? "Creating Task..." : "Create Execution Task"}
+                            </button>
+                        </div>
+                    </form>
+                )}
+
+                <div>
+                    {mergedTaskList.length ? (
                         <div className="space-y-3">
-                            {mergedTasksForExecutionList(project).map((task) => (
+                            {mergedTaskList.map((task) => (
                                 <TaskRow
                                     key={task._sourceKey}
                                     task={task}
@@ -736,7 +750,23 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                             ))}
                         </div>
                     ) : (
-                        <EmptyState title="No execution tasks yet." description="Create a task from the form above to track daily execution progress." />
+                        <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center dark:border-slate-800">
+                            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-2xl text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+                                🏗️
+                            </span>
+                            <h3 className="mt-3 text-sm font-bold text-slate-900 dark:text-white">No execution tasks yet</h3>
+                            <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
+                                Create your first task to assign supervisors, track dates, and attach checklists.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setShowCreateTask(true)}
+                                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500"
+                            >
+                                <span className="font-bold">+</span>
+                                <span>Create First Task</span>
+                            </button>
+                        </div>
                     )}
                 </div>
             </SectionCard>
@@ -851,7 +881,10 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                                     label="Supervisor"
                                     options={[
                                         { value: "", label: "-- No supervisor --" },
-                                        ...members.map((m) => ({ value: m.id, label: m.name })),
+                                        ...members.map((m) => {
+                                            const badge = m.role_badge ? ` (${m.role_badge})` : (m.designation_text ? ` (${m.designation_text})` : "");
+                                            return { value: m.id, label: `${m.name}${badge}` };
+                                        }),
                                     ]}
                                 />
                                 <InputField form={editingTaskForm} name="planned_start_date" label="Planned Start" type="date" />
@@ -904,8 +937,35 @@ export default function ProjectShow({ project, members, roles, activityLog, work
     );
 }
 
-function TaskRow({ task, project, onEdit }) {
+function TaskRow({ task, project, members, onEdit }) {
     const [confirmingDelete, setConfirmingDelete] = useState(false);
+    const [showChecklists, setShowChecklists] = useState(false);
+    const [showAddChecklistModal, setShowAddChecklistModal] = useState(false);
+    const [previewImage, setPreviewImage] = useState(null);
+
+    // Quick inline add state
+    const [quickTitle, setQuickTitle] = useState("");
+    const [quickDay, setQuickDay] = useState(1);
+    const [isSubmittingQuick, setIsSubmittingQuick] = useState(false);
+    const [togglingId, setTogglingId] = useState(null);
+
+    // Detailed add modal form
+    const addChecklistForm = useForm({
+        scope: task._source === "unified" ? "unified_task" : "execution_task",
+        execution_task_id: task._source !== "unified" ? task.id : "",
+        unified_task_id: task._source === "unified" ? task.id : "",
+        survey_plan_id: "",
+        day_number: 1,
+        item_title: "",
+        assign_hours: "",
+        notes: "",
+        status: "pending",
+        is_completed: false,
+        image_1: null,
+        image_2: null,
+    });
+    const [img1Preview, setImg1Preview] = useState(null);
+    const [img2Preview, setImg2Preview] = useState(null);
 
     const handleDelete = () => {
         router.delete(route("super.construction.projects.tasks-v2.destroy", [project.id, task.id]), {
@@ -924,45 +984,143 @@ function TaskRow({ task, project, onEdit }) {
         ? Math.round((completedChecklists / taskChecklists.length) * 100)
         : (Number(task.progress_percent) || 0);
 
+    const handleToggleChecklist = (checklistItem) => {
+        setTogglingId(checklistItem.id);
+        router.patch(
+            route("super.construction.projects.checklists.toggle", [project.id, checklistItem.id]),
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setTogglingId(null),
+                onError: (errors) => {
+                    const firstError = Object.values(errors)[0];
+                    if (firstError) toast.error(firstError);
+                    else toast.error("Failed to toggle checklist item.");
+                },
+            }
+        );
+    };
+
+    const handleDeleteChecklist = (checklistItem) => {
+        if (!confirm(`Are you sure you want to delete checklist item "${checklistItem.item_title}"?`)) return;
+        router.delete(
+            route("super.construction.projects.checklists.destroy", [project.id, checklistItem.id]),
+            {
+                preserveScroll: true,
+                onSuccess: () => toast.success("Checklist item removed."),
+                onError: (errors) => {
+                    const firstError = Object.values(errors)[0];
+                    if (firstError) toast.error(firstError);
+                    else toast.error("Failed to delete checklist item.");
+                },
+            }
+        );
+    };
+
+    const handleQuickAdd = (e) => {
+        e.preventDefault();
+        if (!quickTitle.trim()) return;
+        setIsSubmittingQuick(true);
+        router.post(
+            route("super.construction.projects.checklists.store", project.id),
+            {
+                scope: task._source === "unified" ? "unified_task" : "execution_task",
+                execution_task_id: task._source !== "unified" ? task.id : "",
+                unified_task_id: task._source === "unified" ? task.id : "",
+                day_number: Number(quickDay) || 1,
+                item_title: quickTitle.trim(),
+                status: "pending",
+                is_completed: false,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setQuickTitle("");
+                    setIsSubmittingQuick(false);
+                    setShowChecklists(true);
+                    toast.success("Checklist item linked to task.");
+                },
+                onError: (errors) => {
+                    setIsSubmittingQuick(false);
+                    const firstError = Object.values(errors)[0];
+                    if (firstError) toast.error(firstError);
+                    else toast.error("Failed to add checklist item.");
+                },
+            }
+        );
+    };
+
+    const handleDetailedAdd = (e) => {
+        e.preventDefault();
+        if (!addChecklistForm.data.item_title.trim()) {
+            toast.error("Please enter a checklist title.");
+            return;
+        }
+        addChecklistForm.post(
+            route("super.construction.projects.checklists.store", project.id),
+            {
+                preserveScroll: true,
+                forceFormData: true,
+                onSuccess: () => {
+                    addChecklistForm.reset("item_title", "assign_hours", "notes", "image_1", "image_2");
+                    setImg1Preview(null);
+                    setImg2Preview(null);
+                    setShowAddChecklistModal(false);
+                    setShowChecklists(true);
+                    toast.success("Checklist item created and linked.");
+                },
+                onError: (errors) => {
+                    const firstError = Object.values(errors)[0];
+                    if (firstError) toast.error(firstError);
+                    else toast.error("Failed to add checklist item.");
+                },
+            }
+        );
+    };
+
     return (
         <>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4.5 shadow-xs transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-[280px]">
                         <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold text-slate-900 dark:text-white">{task.title}</p>
+                            <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                {task.task_code}
+                            </span>
+                            <p className="font-bold text-slate-900 dark:text-white">{task.title}</p>
                             <StatusBadge value={task.status} />
                             <StatusBadge value={task.priority} />
                         </div>
                         <p className="mt-1 text-xs text-slate-500">
-                            {task.task_code} • {formatDate(task.planned_start_date) || "TBD"} → {formatDate(task.planned_end_date) || "TBD"}
+                            Planned: {formatDate(task.planned_start_date) || "TBD"} → {formatDate(task.planned_end_date) || "TBD"}
                         </p>
                         {task.description ? (
                             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{task.description}</p>
                         ) : null}
-                        <div className="mt-3 grid gap-3 text-xs sm:grid-cols-3">
+                        <div className="mt-3 grid gap-3 text-xs grid-cols-2 sm:grid-cols-3">
                             <div>
-                                <p className="text-slate-500">Supervisor</p>
-                                <p className="font-medium text-slate-900 dark:text-white">{task.supervisor?.name || "Unassigned"}</p>
+                                <p className="text-slate-400">Supervisor</p>
+                                <p className="font-semibold text-slate-800 dark:text-slate-200">{task.supervisor?.name || "Unassigned"}</p>
                             </div>
                             <div>
-                                <p className="text-slate-500">Progress</p>
-                                <p className="font-medium text-slate-900 dark:text-white">{progress}%</p>
+                                <p className="text-slate-400">Progress</p>
+                                <p className="font-semibold text-slate-800 dark:text-slate-200">{progress}%</p>
                             </div>
-                            <div>
-                                <p className="text-slate-500">Checklists</p>
-                                <p className="font-medium text-slate-900 dark:text-white">
-                                    {completedChecklists}/{taskChecklists.length}
+                            <div className="col-span-2 sm:col-span-1">
+                                <p className="text-slate-400">Checklists</p>
+                                <p className="font-semibold text-slate-800 dark:text-slate-200">
+                                    {completedChecklists} of {taskChecklists.length} done
                                 </p>
                             </div>
                         </div>
                         <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                             <div
-                                className="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 transition-all"
+                                className="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 transition-all duration-300"
                                 style={{ width: `${progress}%` }}
                             />
                         </div>
 
+                        {/* Submitted Field Reports */}
                         {(task.survey_visits || task.surveyVisits || []).length > 0 && (
                             <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
                                 <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
@@ -1009,7 +1167,7 @@ function TaskRow({ task, project, onEdit }) {
                                                 <div className="mt-2 flex flex-wrap gap-2">
                                                     {v.photos.map((imgUrl, idx) => (
                                                         <a key={idx} href={imgUrl} target="_blank" rel="noreferrer">
-                                                            <img src={imgUrl} alt={`Proof ${idx + 1}`} className="h-12 w-12 rounded-lg border border-slate-200 object-cover shadow-sm hover:opacity-80 dark:border-slate-700" />
+                                                            <img src={imgUrl} alt={`Proof ${idx + 1}`} className="h-12 w-12 rounded-lg border border-slate-200 object-cover shadow-xs hover:opacity-80 dark:border-slate-700" />
                                                         </a>
                                                     ))}
                                                 </div>
@@ -1020,14 +1178,39 @@ function TaskRow({ task, project, onEdit }) {
                             </div>
                         )}
                     </div>
-                    <div className="flex flex-wrap gap-2">
+
+                    {/* Task Actions */}
+                    <div className="flex flex-wrap items-center gap-2">
                         <button
+                            type="button"
+                            onClick={() => setShowAddChecklistModal(true)}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-500"
+                            title="Add a checklist item directly to this task"
+                        >
+                            <span className="text-sm font-bold leading-none">+</span>
+                            <span>Add Checklist</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowChecklists((prev) => !prev)}
+                            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                                showChecklists
+                                    ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300"
+                                    : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                            }`}
+                        >
+                            <span>Checklists ({completedChecklists}/{taskChecklists.length})</span>
+                            <span className={`transform text-[9px] transition-transform ${showChecklists ? "rotate-180" : ""}`}>▼</span>
+                        </button>
+                        <button
+                            type="button"
                             onClick={onEdit}
                             className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
                         >
                             Edit Task
                         </button>
                         <button
+                            type="button"
                             onClick={() => setConfirmingDelete(true)}
                             className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30"
                         >
@@ -1035,7 +1218,371 @@ function TaskRow({ task, project, onEdit }) {
                         </button>
                     </div>
                 </div>
+
+                {/* Inline Checklist Section */}
+                {showChecklists && (
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-slate-800 dark:bg-slate-900/60">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5 dark:border-slate-800">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                    Checklist Items ({completedChecklists}/{taskChecklists.length} completed)
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowAddChecklistModal(true)}
+                                className="text-xs font-semibold text-emerald-600 hover:text-emerald-500 dark:text-emerald-400"
+                            >
+                                + Detailed Add with Photos
+                            </button>
+                        </div>
+
+                        {taskChecklists.length > 0 ? (
+                            <div className="mt-3 space-y-2">
+                                {taskChecklists.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className={`flex items-start justify-between gap-3 rounded-lg border p-2.5 text-xs transition ${
+                                            item.is_completed
+                                                ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-950 dark:bg-emerald-950/20"
+                                                : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700/80 dark:bg-slate-950"
+                                        }`}
+                                    >
+                                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                            <button
+                                                type="button"
+                                                disabled={togglingId === item.id}
+                                                onClick={() => handleToggleChecklist(item)}
+                                                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
+                                                    item.is_completed
+                                                        ? "border-emerald-600 bg-emerald-600 text-white"
+                                                        : "border-slate-300 bg-white hover:border-indigo-500 dark:border-slate-600 dark:bg-slate-800"
+                                                }`}
+                                                title={item.is_completed ? "Click to reopen" : "Click to mark completed"}
+                                            >
+                                                {item.is_completed ? (
+                                                    <svg className="h-3 w-3 stroke-current stroke-2" viewBox="0 0 24 24" fill="none">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                ) : null}
+                                            </button>
+                                            <div className="min-w-0 flex-1">
+                                                <p
+                                                    className={`font-medium ${
+                                                        item.is_completed
+                                                            ? "text-slate-500 line-through dark:text-slate-400"
+                                                            : "text-slate-800 dark:text-slate-100"
+                                                    }`}
+                                                >
+                                                    {item.item_title}
+                                                </p>
+                                                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                                    <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium dark:bg-slate-800">
+                                                        Day {item.day_number || 1}
+                                                    </span>
+                                                    {item.assign_hours != null && item.assign_hours !== "" && (
+                                                        <span className="rounded bg-amber-50 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                                                            ⏱ {item.assign_hours} hrs
+                                                        </span>
+                                                    )}
+                                                    {item.notes && (
+                                                        <span className="truncate max-w-xs text-slate-500 dark:text-slate-400">
+                                                            • {item.notes}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {(item.image_url_1 || item.image_url_2) && (
+                                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                                        {item.image_url_1 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setPreviewImage(item.image_url_1)}
+                                                                className="overflow-hidden rounded-md border border-slate-200 dark:border-slate-700"
+                                                            >
+                                                                <img
+                                                                    src={item.image_url_1}
+                                                                    alt="Proof 1"
+                                                                    className="h-10 w-10 object-cover hover:opacity-80"
+                                                                />
+                                                            </button>
+                                                        )}
+                                                        {item.image_url_2 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setPreviewImage(item.image_url_2)}
+                                                                className="overflow-hidden rounded-md border border-slate-200 dark:border-slate-700"
+                                                            >
+                                                                <img
+                                                                    src={item.image_url_2}
+                                                                    alt="Proof 2"
+                                                                    className="h-10 w-10 object-cover hover:opacity-80"
+                                                                />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteChecklist(item)}
+                                            className="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 p-1"
+                                            title="Delete checklist item"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="my-3 rounded-lg border border-dashed border-slate-200 bg-white/50 p-3 text-center text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/30">
+                                No checklists linked to this task yet. Use the quick-add bar below or click '+ Add Checklist' to get started.
+                            </div>
+                        )}
+
+                        {/* Fast Quick Add Input */}
+                        <form onSubmit={handleQuickAdd} className="mt-3 flex flex-wrap sm:flex-nowrap items-center gap-2">
+                            <input
+                                type="text"
+                                value={quickTitle}
+                                onChange={(e) => setQuickTitle(e.target.value)}
+                                placeholder="Type a checklist item & press Enter (e.g. Inspect boundary benchmarks)..."
+                                className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                            />
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-[11px] font-medium text-slate-500">Day</span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="366"
+                                    value={quickDay}
+                                    onChange={(e) => setQuickDay(e.target.value)}
+                                    className="w-14 rounded-xl border border-slate-300 bg-white px-2 py-2 text-center text-xs text-slate-800 shadow-2xs dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={!quickTitle.trim() || isSubmittingQuick}
+                                className="rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50 shrink-0"
+                            >
+                                {isSubmittingQuick ? "Adding..." : "+ Add Item"}
+                            </button>
+                        </form>
+                    </div>
+                )}
             </div>
+
+            {/* Detailed Add Checklist Modal */}
+            {showAddChecklistModal && (
+                <Modal show={true} onClose={() => setShowAddChecklistModal(false)}>
+                    <form onSubmit={handleDetailedAdd} className="p-6">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-3 dark:border-slate-800">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                    Add Checklist to Task
+                                </h3>
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    Linking directly to <span className="font-semibold text-indigo-600 dark:text-indigo-400">"{task.title}"</span> ({task.task_code})
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowAddChecklistModal(false)}
+                                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="mt-4 space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                    Checklist Title <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={addChecklistForm.data.item_title}
+                                    onChange={(e) => addChecklistForm.setData("item_title", e.target.value)}
+                                    placeholder="e.g. Conduct elevation survey and record boundary coordinates"
+                                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-800 shadow-2xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                        Survey Day #
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="366"
+                                        value={addChecklistForm.data.day_number}
+                                        onChange={(e) => addChecklistForm.setData("day_number", e.target.value)}
+                                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-800 shadow-2xs dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                        Estimated Hours
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.5"
+                                        min="0"
+                                        value={addChecklistForm.data.assign_hours}
+                                        onChange={(e) => addChecklistForm.setData("assign_hours", e.target.value)}
+                                        placeholder="e.g. 2.5"
+                                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-800 shadow-2xs dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                        Initial Status
+                                    </label>
+                                    <select
+                                        value={addChecklistForm.data.status}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            addChecklistForm.setData({
+                                                ...addChecklistForm.data,
+                                                status: val,
+                                                is_completed: val === "completed",
+                                            });
+                                        }}
+                                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-800 shadow-2xs dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                                    >
+                                        <option value="pending">Pending</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                    Notes / Remarks (Optional)
+                                </label>
+                                <textarea
+                                    rows={2}
+                                    value={addChecklistForm.data.notes}
+                                    onChange={(e) => addChecklistForm.setData("notes", e.target.value)}
+                                    placeholder="Add any specific instructions or requirements..."
+                                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-800 shadow-2xs dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                    Photo Attachments (Optional, max 2)
+                                </label>
+                                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    addChecklistForm.setData("image_1", file);
+                                                    setImg1Preview(URL.createObjectURL(file));
+                                                }
+                                            }}
+                                            className="block w-full text-xs text-slate-500 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-800 dark:file:text-slate-200"
+                                        />
+                                        {img1Preview && (
+                                            <div className="mt-2 relative inline-block">
+                                                <img src={img1Preview} alt="Preview 1" className="h-16 w-16 rounded-lg object-cover border" />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        addChecklistForm.setData("image_1", null);
+                                                        setImg1Preview(null);
+                                                    }}
+                                                    className="absolute -top-1 -right-1 rounded-full bg-rose-500 text-white h-4 w-4 text-[10px] flex items-center justify-center"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    addChecklistForm.setData("image_2", file);
+                                                    setImg2Preview(URL.createObjectURL(file));
+                                                }
+                                            }}
+                                            className="block w-full text-xs text-slate-500 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-800 dark:file:text-slate-200"
+                                        />
+                                        {img2Preview && (
+                                            <div className="mt-2 relative inline-block">
+                                                <img src={img2Preview} alt="Preview 2" className="h-16 w-16 rounded-lg object-cover border" />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        addChecklistForm.setData("image_2", null);
+                                                        setImg2Preview(null);
+                                                    }}
+                                                    className="absolute -top-1 -right-1 rounded-full bg-rose-500 text-white h-4 w-4 text-[10px] flex items-center justify-center"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setShowAddChecklistModal(false)}
+                                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={addChecklistForm.processing}
+                                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-60"
+                            >
+                                {addChecklistForm.processing ? "Adding..." : "Add Checklist Item"}
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
+            )}
+
+            {/* Photo Lightbox Modal */}
+            {previewImage && (
+                <Modal show={true} onClose={() => setPreviewImage(null)}>
+                    <div className="p-4">
+                        <div className="flex justify-end pb-2">
+                            <button
+                                type="button"
+                                onClick={() => setPreviewImage(null)}
+                                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <img
+                            src={previewImage}
+                            alt="Checklist Proof"
+                            className="max-h-[75vh] w-full rounded-xl object-contain"
+                        />
+                    </div>
+                </Modal>
+            )}
+
+            {/* Task Delete Confirmation Modal */}
             {confirmingDelete ? (
                 <Modal show={true} onClose={() => setConfirmingDelete(false)}>
                     <div className="p-6">

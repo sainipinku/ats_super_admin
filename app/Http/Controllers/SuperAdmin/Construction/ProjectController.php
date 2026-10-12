@@ -31,9 +31,11 @@ use App\Support\Construction\SurveyStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use App\Models\SuperAdmin;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
-use App\Http\Controllers\Concerns\IntersectsAdminDeletion;
 use Inertia\Response;
+use App\Http\Controllers\Concerns\IntersectsAdminDeletion;
 
 class ProjectController extends Controller
 {
@@ -170,14 +172,32 @@ class ProjectController extends Controller
             return $project;
         });
 
+        $userCompanyId = $this->getAccessibleCompanyId($actor);
+
+        $companies = Company::orderBy('name')->get(['id', 'name']);
+        $clientsQuery = Client::orderBy('name');
+        if ($userCompanyId) {
+            $clientsQuery->where('company_id', $userCompanyId);
+        }
+        $clients = $clientsQuery->get([
+            'id',
+            'name',
+            'company_id',
+        ]);
+
         return Inertia::render('SuperAdmin/Construction/Projects/Index', [
             'projects' => $projects,
-            'companies' => Company::orderBy('name')->get(['id', 'name']),
-            'clients' => Client::orderBy('name')->get([
-                'id',
-                'name',
-                'company_id',
-            ]),
+            'companies' => $companies,
+            'clients' => $clients,
+            'user_company_id' => $userCompanyId,
+            'next_project_code' => Project::generateUniqueProjectCode(),
+        ]);
+    }
+
+    public function nextProjectCode(): \Illuminate\Http\JsonResponse
+    {
+        return response()->json([
+            'code' => Project::generateUniqueProjectCode(),
         ]);
     }
 
@@ -290,67 +310,7 @@ class ProjectController extends Controller
             );
         }
 
-        $members = Member::where('status', 1)
-            ->orderBy('name')
-            ->get([
-                'id',
-                'name',
-                'email',
-                'departments',
-                'designation',
-            ]);
-
-        // Collect all numeric designation IDs from all members.
-        $designationIds = $members
-            ->flatMap(function ($member) {
-                if (!is_array($member->designation)) {
-                    return [];
-                }
-
-                return array_values($member->designation);
-            })
-            ->filter(fn ($id) => is_numeric($id))
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-
-        // Fetch all required designations in one query.
-        $designationNames = \App\Models\Designation::whereIn(
-            'id',
-            $designationIds
-        )->pluck('name', 'id');
-
-        // Build display text without additional database queries.
-        $members->transform(function ($member) use ($designationNames) {
-            $desigStr = '';
-
-            if (!empty($member->designation)) {
-                if (is_array($member->designation)) {
-                    $desigValues = array_values($member->designation);
-
-                    if (
-                        isset($desigValues[0])
-                        && is_numeric($desigValues[0])
-                    ) {
-                        $desigStr = collect($desigValues)
-                            ->map(
-                                fn ($id) =>
-                                    $designationNames[(int) $id] ?? null
-                            )
-                            ->filter()
-                            ->implode(', ');
-                    } else {
-                        $desigStr = implode(', ', $desigValues);
-                    }
-                } else {
-                    $desigStr = (string) $member->designation;
-                }
-            }
-
-            $member->designation_text = $desigStr;
-
-            return $member;
-        });
+        $members = $this->getProjectMembers($project);
 
         return Inertia::render(
             'SuperAdmin/Construction/Projects/Show',
@@ -433,6 +393,11 @@ class ProjectController extends Controller
         ConstructionActivityService $activityService
     ) {
         $actor = $this->constructionActor();
+        $userCompanyId = $this->getAccessibleCompanyId($actor);
+
+        if ($userCompanyId) {
+            $request->merge(['company_id' => $userCompanyId]);
+        }
 
         $validated = $request->validate([
             'company_id' => [
@@ -447,7 +412,7 @@ class ProjectController extends Controller
                 'nullable',
                 'string',
                 'max:32',
-                Rule::unique('construction_projects', 'project_code'),
+                Rule::unique('construction_projects', 'project_code')->whereNull('deleted_at'),
             ],
             'name' => [
                 'required',
@@ -515,28 +480,32 @@ class ProjectController extends Controller
             ],
         ]);
 
-        $nextId = (Project::max('id') ?? 0) + 1;
-        $nameSlug = Str::slug($validated['name']);
+        $projectCode = Project::generateUniqueProjectCode($validated['project_code'] ?? null);
+        $projectSlug = Project::generateUniqueSlug($validated['name'] ?? 'project');
 
-        $project = Project::create([
-            ...$validated,
-            'project_code' => !empty($validated['project_code'])
-                ? $validated['project_code']
-                : 'PRJ-'
-                . str_pad(
-                    (string) $nextId,
-                    5,
-                    '0',
-                    STR_PAD_LEFT
-                ),
-            'slug' => $nameSlug . '-' . $nextId,
-            'status' => $validated['status'] ?? 'draft',
-            'current_stage' => $validated['current_stage'] ?? 'budget_pending',
-            'created_by_type' => $actor
-                ? $actor::class
-                : null,
+        $clientReviewStatus = !empty($validated['client_review_status']) ? $validated['client_review_status'] : 'pending';
+        $status = !empty($validated['status']) ? $validated['status'] : 'draft';
+        $currentStage = !empty($validated['current_stage']) ? $validated['current_stage'] : 'budget_pending';
+        $priority = !empty($validated['priority']) ? $validated['priority'] : 'medium';
+
+        $insertData = array_merge($validated, [
+            'project_code' => $projectCode,
+            'slug' => $projectSlug,
+            'status' => $status,
+            'current_stage' => $currentStage,
+            'client_review_status' => $clientReviewStatus,
+            'priority' => $priority,
+            'created_by_type' => $actor ? $actor::class : null,
             'created_by_id' => $actor?->getKey(),
         ]);
+
+        try {
+            $project = Project::create($insertData);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException | \Illuminate\Database\QueryException $e) {
+            $insertData['project_code'] = Project::generateUniqueProjectCode();
+            $insertData['slug'] = Project::generateUniqueSlug($validated['name'] ?? 'project');
+            $project = Project::create($insertData);
+        }
 
         $activityService->log(
             module: 'project',
@@ -568,6 +537,11 @@ class ProjectController extends Controller
         ConstructionActivityService $activityService
     ) {
         $actor = $this->constructionActor();
+        $userCompanyId = $this->getAccessibleCompanyId($actor);
+
+        if ($userCompanyId) {
+            $request->merge(['company_id' => $userCompanyId]);
+        }
 
         $validated = $request->validate([
             'company_id' => [
@@ -649,6 +623,10 @@ class ProjectController extends Controller
                 'string',
             ],
         ]);
+
+        if (array_key_exists('client_review_status', $validated) && empty($validated['client_review_status'])) {
+            unset($validated['client_review_status']);
+        }
 
         $project->update(array_filter($validated, static fn ($value) => $value !== null));
 
@@ -1806,7 +1784,7 @@ class ProjectController extends Controller
 
     public function updateChecklistItem(
         Project $project,
-        \App\Models\TaskChecklist $checklist,
+        $checklist,
         Request $request,
         ConstructionActivityService $activityService
     ) {
@@ -1825,197 +1803,306 @@ class ProjectController extends Controller
             'remove_image_2' => ['nullable', 'boolean'],
         ]);
 
-        try {
-            $attributes = [];
-            if (isset($validated['day_number'])) {
-                $attributes['day_number'] = $validated['day_number'];
+        $item = $checklist instanceof \App\Models\TaskChecklist
+            ? $checklist
+            : \App\Models\TaskChecklist::find($checklist);
+
+        if ($item) {
+            $taskProjectId = null;
+            if ($item->execution_task_id) {
+                $taskProjectId = \App\Models\ExecutionTask::where('id', $item->execution_task_id)->value('project_id');
             }
-            if (array_key_exists('item_title', $validated)) {
-                $attributes['item_title'] = $validated['item_title'];
+            $planProjectId = null;
+            if ($item->survey_plan_id) {
+                $planProjectId = \App\Models\SurveyPlan::where('id', $item->survey_plan_id)->value('project_id');
             }
-            if (array_key_exists('assign_hours', $validated)) {
-                $attributes['assign_hours'] = $validated['assign_hours'];
+            if (
+                ($taskProjectId !== null && (int) $taskProjectId !== (int) $project->id)
+                || ($planProjectId !== null && (int) $planProjectId !== (int) $project->id)
+            ) {
+                return back()->with('error', 'The selected checklist item does not belong to this project.');
             }
-            if (array_key_exists('notes', $validated)) {
-                $attributes['notes'] = $validated['notes'];
-            }
-            if (array_key_exists('status', $validated)) {
-                $attributes['status'] = $validated['status'];
-                if ($validated['status'] === 'completed') {
-                    $attributes['is_completed'] = true;
-                    $attributes['completed_at'] = $checklist->completed_at ?? now();
-                    $attributes['completed_by_member_id'] = $checklist->completed_by_member_id ?? $actor?->getKey();
+
+            try {
+                $attributes = [];
+                if (isset($validated['day_number'])) {
+                    $attributes['day_number'] = $validated['day_number'];
                 }
-            }
-            if (array_key_exists('is_completed', $validated)) {
-                $attributes['is_completed'] = (bool) $validated['is_completed'];
-                if ((bool) $validated['is_completed']) {
-                    $attributes['status'] = 'completed';
-                    $attributes['completed_at'] = $checklist->completed_at ?? now();
-                    $attributes['completed_by_member_id'] = $checklist->completed_by_member_id ?? $actor?->getKey();
-                } else {
-                    $attributes['status'] = 'pending';
-                    $attributes['completed_at'] = null;
-                    $attributes['completed_by_member_id'] = null;
+                if (array_key_exists('item_title', $validated)) {
+                    $attributes['item_title'] = $validated['item_title'];
                 }
+                if (array_key_exists('assign_hours', $validated)) {
+                    $attributes['assign_hours'] = $validated['assign_hours'];
+                }
+                if (array_key_exists('notes', $validated)) {
+                    $attributes['notes'] = $validated['notes'];
+                }
+                if (array_key_exists('status', $validated)) {
+                    $attributes['status'] = $validated['status'];
+                    if ($validated['status'] === 'completed') {
+                        $attributes['is_completed'] = true;
+                        $attributes['completed_at'] = $item->completed_at ?? now();
+                        $attributes['completed_by_member_id'] = $item->completed_by_member_id ?? $actor?->getKey();
+                    }
+                }
+                if (array_key_exists('is_completed', $validated)) {
+                    $attributes['is_completed'] = (bool) $validated['is_completed'];
+                    if ((bool) $validated['is_completed']) {
+                        $attributes['status'] = 'completed';
+                        $attributes['completed_at'] = $item->completed_at ?? now();
+                        $attributes['completed_by_member_id'] = $item->completed_by_member_id ?? $actor?->getKey();
+                    } else {
+                        $attributes['status'] = 'pending';
+                        $attributes['completed_at'] = null;
+                        $attributes['completed_by_member_id'] = null;
+                    }
+                }
+
+                if ($request->hasFile('image_1')) {
+                    $path = $request->file('image_1')->store('checklists', 'public');
+                    $attributes['image_url_1'] = '/storage/' . $path;
+                } elseif ($request->boolean('remove_image_1')) {
+                    $attributes['image_url_1'] = null;
+                }
+
+                if ($request->hasFile('image_2')) {
+                    $path = $request->file('image_2')->store('checklists', 'public');
+                    $attributes['image_url_2'] = '/storage/' . $path;
+                } elseif ($request->boolean('remove_image_2')) {
+                    $attributes['image_url_2'] = null;
+                }
+
+                $item->update($attributes);
+            } catch (\Throwable $e) {
+                report($e);
+                return back()->with('error', 'Failed to update checklist item. ' . $e->getMessage());
             }
 
-            if ($request->hasFile('image_1')) {
-                $path = $request->file('image_1')->store('checklists', 'public');
-                $attributes['image_url_1'] = '/storage/' . $path;
-            } elseif ($request->boolean('remove_image_1')) {
-                $attributes['image_url_1'] = null;
-            }
+            $activityService->log(
+                module: 'task_checklist',
+                action: 'updated',
+                actor: $actor,
+                reference: $item,
+                companyId: $project->company_id,
+                projectId: $project->id,
+                meta: [
+                    'day_number' => $item->day_number,
+                    'is_completed' => $item->is_completed,
+                ],
+                request: $request
+            );
 
-            if ($request->hasFile('image_2')) {
-                $path = $request->file('image_2')->store('checklists', 'public');
-                $attributes['image_url_2'] = '/storage/' . $path;
-            } elseif ($request->boolean('remove_image_2')) {
-                $attributes['image_url_2'] = null;
-            }
-
-            $checklist->update($attributes);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return back()->with('error', 'Failed to update checklist item. ' . $e->getMessage());
+            return back()->with('success', 'Checklist item updated successfully.');
         }
 
-        $activityService->log(
-            module: 'task_checklist',
-            action: 'updated',
-            actor: $actor,
-            reference: $checklist,
-            companyId: $project->company_id,
-            projectId: $project->id,
-            meta: [
-                'day_number' => $checklist->day_number,
-                'is_completed' => $checklist->is_completed,
-            ],
-            request: $request
-        );
+        // Try unified TaskChecklistItem
+        $unifiedItem = \App\Models\TaskChecklistItem::where('id', is_object($checklist) ? $checklist->id : $checklist)
+            ->where('project_id', $project->id)
+            ->first();
 
-        return back()->with(
-            'success',
-            'Checklist item updated successfully.'
-        );
+        if ($unifiedItem) {
+            try {
+                $uAttrs = [];
+                if (isset($validated['day_number'])) $uAttrs['day_number'] = $validated['day_number'];
+                if (array_key_exists('item_title', $validated)) $uAttrs['item_title'] = $validated['item_title'];
+                if (array_key_exists('assign_hours', $validated)) $uAttrs['assign_hours'] = $validated['assign_hours'];
+                if (array_key_exists('notes', $validated)) $uAttrs['notes'] = $validated['notes'];
+                if (array_key_exists('status', $validated)) $uAttrs['status'] = $validated['status'];
+                if (array_key_exists('is_completed', $validated)) {
+                    $uAttrs['is_completed'] = (bool) $validated['is_completed'];
+                    $uAttrs['status'] = (bool) $validated['is_completed'] ? 'completed' : 'pending';
+                    $uAttrs['completed_at'] = (bool) $validated['is_completed'] ? now() : null;
+                }
+                $unifiedItem->update($uAttrs);
+            } catch (\Throwable $e) {
+                report($e);
+                return back()->with('error', 'Failed to update checklist item. ' . $e->getMessage());
+            }
+            return back()->with('success', 'Checklist item updated successfully.');
+        }
+
+        return back()->with('error', 'The selected checklist item does not belong to this project.');
     }
 
     public function toggleChecklistItem(
         Project $project,
-        \App\Models\TaskChecklist $checklist,
+        $checklist,
         ConstructionActivityService $activityService
     ) {
         $actor = $this->constructionActor();
 
-        $taskProjectId = null;
-        if ($checklist->execution_task_id) {
-            $taskProjectId = \App\Models\ExecutionTask::where('id', $checklist->execution_task_id)->value('project_id');
-        }
-        $planProjectId = null;
-        if ($checklist->survey_plan_id) {
-            $planProjectId = \App\Models\SurveyPlan::where('id', $checklist->survey_plan_id)->value('project_id');
-        }
-        if (
-            ($taskProjectId !== null && (int) $taskProjectId !== (int) $project->id)
-            || ($planProjectId !== null && (int) $planProjectId !== (int) $project->id)
-        ) {
-            return back()->with(
-                'error',
-                'The selected checklist item does not belong to this project.'
+        $item = $checklist instanceof \App\Models\TaskChecklist
+            ? $checklist
+            : \App\Models\TaskChecklist::find($checklist);
+
+        if ($item) {
+            $taskProjectId = null;
+            if ($item->execution_task_id) {
+                $taskProjectId = \App\Models\ExecutionTask::where('id', $item->execution_task_id)->value('project_id');
+            }
+            $planProjectId = null;
+            if ($item->survey_plan_id) {
+                $planProjectId = \App\Models\SurveyPlan::where('id', $item->survey_plan_id)->value('project_id');
+            }
+            if (
+                ($taskProjectId !== null && (int) $taskProjectId !== (int) $project->id)
+                || ($planProjectId !== null && (int) $planProjectId !== (int) $project->id)
+            ) {
+                return back()->with('error', 'The selected checklist item does not belong to this project.');
+            }
+
+            $nextCompleted = !$item->is_completed;
+            try {
+                $item->update([
+                    'is_completed' => $nextCompleted,
+                    'status' => $nextCompleted ? 'completed' : 'pending',
+                    'completed_by_member_id' => $nextCompleted ? $actor?->getKey() : null,
+                    'completed_at' => $nextCompleted ? now() : null,
+                ]);
+
+                // Also sync matching unified item if exists
+                try {
+                    \App\Models\TaskChecklistItem::where('project_id', $project->id)
+                        ->where('item_title', $item->item_title)
+                        ->update([
+                            'is_completed' => $nextCompleted,
+                            'status' => $nextCompleted ? 'completed' : 'pending',
+                        ]);
+                } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                report($e);
+                return back()->with('error', 'Failed to toggle checklist item. ' . $e->getMessage());
+            }
+
+            $activityService->log(
+                module: 'task_checklist',
+                action: $nextCompleted ? 'completed' : 'reopened',
+                actor: $actor,
+                reference: $item,
+                companyId: $project->company_id,
+                projectId: $project->id,
+                meta: ['day_number' => $item->day_number],
+                request: request()
             );
+
+            return back()->with('success', $nextCompleted ? 'Checklist item marked complete.' : 'Checklist item reopened.');
         }
 
-        $nextCompleted = !$checklist->is_completed;
-        try {
-            $checklist->update([
-                'is_completed' => $nextCompleted,
-                'completed_by_member_id' => $nextCompleted ? $actor?->getKey() : null,
-                'completed_at' => $nextCompleted ? now() : null,
-            ]);
-        } catch (\Throwable $e) {
-            report($e);
+        // Try finding unified TaskChecklistItem
+        $unifiedItem = \App\Models\TaskChecklistItem::where('id', is_object($checklist) ? $checklist->id : $checklist)
+            ->where('project_id', $project->id)
+            ->first();
 
-            return back()->with(
-                'error',
-                'Failed to toggle checklist item. ' . $e->getMessage()
-            );
+        if ($unifiedItem) {
+            $nextCompleted = !$unifiedItem->is_completed;
+            try {
+                $unifiedItem->update([
+                    'is_completed' => $nextCompleted,
+                    'status' => $nextCompleted ? 'completed' : 'pending',
+                    'completed_at' => $nextCompleted ? now() : null,
+                    'completed_by_id' => $nextCompleted ? $actor?->getKey() : null,
+                ]);
+
+                // Sync matching TaskChecklist if exists
+                try {
+                    \App\Models\TaskChecklist::where('item_title', $unifiedItem->item_title)
+                        ->update([
+                            'is_completed' => $nextCompleted,
+                            'status' => $nextCompleted ? 'completed' : 'pending',
+                        ]);
+                } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                report($e);
+                return back()->with('error', 'Failed to toggle checklist item. ' . $e->getMessage());
+            }
+
+            return back()->with('success', $nextCompleted ? 'Checklist item marked complete.' : 'Checklist item reopened.');
         }
 
-        $activityService->log(
-            module: 'task_checklist',
-            action: $nextCompleted ? 'completed' : 'reopened',
-            actor: $actor,
-            reference: $checklist,
-            companyId: $project->company_id,
-            projectId: $project->id,
-            meta: ['day_number' => $checklist->day_number],
-            request: request()
-        );
-
-        return back()->with(
-            'success',
-            $nextCompleted ? 'Checklist item marked complete.' : 'Checklist item reopened.'
-        );
+        return back()->with('error', 'The selected checklist item does not belong to this project.');
     }
 
     public function destroyChecklistItem(
         Project $project,
-        \App\Models\TaskChecklist $checklist,
+        $checklist,
         ConstructionActivityService $activityService
     ) {
         $actor = $this->constructionActor();
 
-        $taskProjectId = null;
-        if ($checklist->execution_task_id) {
-            $taskProjectId = \App\Models\ExecutionTask::where('id', $checklist->execution_task_id)->value('project_id');
-        }
-        $planProjectId = null;
-        if ($checklist->survey_plan_id) {
-            $planProjectId = \App\Models\SurveyPlan::where('id', $checklist->survey_plan_id)->value('project_id');
-        }
-        if (
-            ($taskProjectId !== null && (int) $taskProjectId !== (int) $project->id)
-            || ($planProjectId !== null && (int) $planProjectId !== (int) $project->id)
-        ) {
-            return back()->with(
-                'error',
-                'The selected checklist item does not belong to this project.'
+        $item = $checklist instanceof \App\Models\TaskChecklist
+            ? $checklist
+            : \App\Models\TaskChecklist::find($checklist);
+
+        if ($item) {
+            $taskProjectId = null;
+            if ($item->execution_task_id) {
+                $taskProjectId = \App\Models\ExecutionTask::where('id', $item->execution_task_id)->value('project_id');
+            }
+            $planProjectId = null;
+            if ($item->survey_plan_id) {
+                $planProjectId = \App\Models\SurveyPlan::where('id', $item->survey_plan_id)->value('project_id');
+            }
+            if (
+                ($taskProjectId !== null && (int) $taskProjectId !== (int) $project->id)
+                || ($planProjectId !== null && (int) $planProjectId !== (int) $project->id)
+            ) {
+                return back()->with('error', 'The selected checklist item does not belong to this project.');
+            }
+
+            $title = $item->item_title;
+            $dayNumber = $item->day_number;
+
+            try {
+                $item->delete();
+                try {
+                    \App\Models\TaskChecklistItem::where('project_id', $project->id)
+                        ->where('item_title', $title)
+                        ->delete();
+                } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                report($e);
+                return back()->with('error', 'Failed to delete checklist item. ' . $e->getMessage());
+            }
+
+            $activityService->log(
+                module: 'task_checklist',
+                action: 'deleted',
+                actor: $actor,
+                reference: null,
+                companyId: $project->company_id,
+                projectId: $project->id,
+                meta: [
+                    'item_title' => $title,
+                    'day_number' => $dayNumber,
+                ],
+                request: request()
             );
+
+            return back()->with('success', "Checklist item removed from Day {$dayNumber}.");
         }
 
-        $title = $checklist->item_title;
-        $dayNumber = $checklist->day_number;
+        // Try finding unified TaskChecklistItem
+        $unifiedItem = \App\Models\TaskChecklistItem::where('id', is_object($checklist) ? $checklist->id : $checklist)
+            ->where('project_id', $project->id)
+            ->first();
 
-        try {
-            $checklist->delete();
-        } catch (\Throwable $e) {
-            report($e);
+        if ($unifiedItem) {
+            $title = $unifiedItem->item_title;
+            $dayNumber = $unifiedItem->day_number;
+            try {
+                $unifiedItem->delete();
+                try {
+                    \App\Models\TaskChecklist::where('item_title', $title)->delete();
+                } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                report($e);
+                return back()->with('error', 'Failed to delete checklist item. ' . $e->getMessage());
+            }
 
-            return back()->with(
-                'error',
-                'Failed to delete checklist item. ' . $e->getMessage()
-            );
+            return back()->with('success', "Checklist item removed from Day {$dayNumber}.");
         }
 
-        $activityService->log(
-            module: 'task_checklist',
-            action: 'deleted',
-            actor: $actor,
-            reference: null,
-            companyId: $project->company_id,
-            projectId: $project->id,
-            meta: [
-                'item_title' => $title,
-                'day_number' => $dayNumber,
-            ],
-            request: request()
-        );
-
-        return back()->with(
-            'success',
-            "Checklist item removed from Day {$dayNumber}."
-        );
+        return back()->with('error', 'The selected checklist item does not belong to this project.');
     }
 
     public function seedDefaultChecklists(
@@ -2141,5 +2228,236 @@ class ProjectController extends Controller
             'success',
             "Seeded {$inserted} default checklist item(s) for Day {$validated['day_number']}."
         );
+    }
+
+    /**
+     * Resolve project members scoped strictly to this company / project:
+     * - Company Super Admin(s) (ensured as active Member records)
+     * - Company Admin(s) (Members created by company Super Admin with admin role)
+     * - Company Employees/Members (created by company Super Admin/Admin or matching company name)
+     * - Project Team Members assigned to this project
+     */
+    protected function getProjectMembers(Project $project)
+    {
+        // 1. Determine company ID
+        $companyId = $project->company_id;
+        if (!$companyId && in_array($project->created_by_type, [SuperAdmin::class, 'App\Models\SuperAdmin', '\\App\\Models\\SuperAdmin'], true)) {
+            $companyId = SuperAdmin::where('id', $project->created_by_id)->value('company_id');
+        }
+
+        $company = $project->company ?: ($companyId ? Company::find($companyId) : null);
+
+        // 2. Resolve SuperAdmins associated with this company or project
+        $companySuperAdmins = collect();
+        if ($companyId) {
+            $companySuperAdmins = SuperAdmin::where('company_id', $companyId)->get();
+        }
+
+        if ($project->created_by_id && in_array($project->created_by_type, [SuperAdmin::class, 'App\Models\SuperAdmin', '\\App\\Models\\SuperAdmin'], true)) {
+            $creatorSa = SuperAdmin::find($project->created_by_id);
+            if ($creatorSa && !$companySuperAdmins->contains('id', $creatorSa->id)) {
+                $companySuperAdmins->push($creatorSa);
+            }
+        }
+
+        $actor = $this->constructionActor();
+        if ($companySuperAdmins->isEmpty() && $actor instanceof SuperAdmin) {
+            $companySuperAdmins->push($actor);
+        }
+
+        // 3. Ensure each company SuperAdmin has a corresponding Member record so they can be assigned / selected as supervisor
+        $companySuperAdminMemberIds = [];
+        foreach ($companySuperAdmins as $sa) {
+            $member = Member::where(function ($q) use ($sa) {
+                $hasClause = false;
+                if (!empty($sa->email)) {
+                    $q->where('email', $sa->email);
+                    $hasClause = true;
+                }
+                if (!empty($sa->phone)) {
+                    if ($hasClause) {
+                        $q->orWhere('phone', $sa->phone);
+                    } else {
+                        $q->where('phone', $sa->phone);
+                        $hasClause = true;
+                    }
+                }
+                if (!$hasClause) {
+                    $q->whereRaw('1 = 0');
+                }
+            })->first();
+
+            if (!$member) {
+                $baseUsername = Str::slug(explode('@', $sa->email ?: 'superadmin')[0], '_') ?: 'superadmin';
+                $username = $baseUsername;
+                $counter = 1;
+                while (Member::where('username', $username)->exists()) {
+                    $username = $baseUsername . '_' . $counter;
+                    $counter++;
+                }
+
+                $member = Member::create([
+                    'name' => $sa->name,
+                    'email' => $sa->email ?: ($username . '@cadmax.local'),
+                    'phone' => $sa->phone ?: null,
+                    'username' => $username,
+                    'password' => $sa->password ?? Hash::make('SuperAdmin@123'),
+                    'status' => 1,
+                    'roles' => ['super_admin', 1],
+                    'designation' => ['Super Admin'],
+                    'departments' => ['Administration'],
+                    'company_name' => $company?->name,
+                    'slug' => Str::slug($sa->name . '-' . Str::random(6)),
+                    'created_by' => $sa->id,
+                    'registration_source' => 'admin_created',
+                ]);
+            } else {
+                if ((int) $member->status !== 1) {
+                    $member->update(['status' => 1]);
+                }
+            }
+
+            $companySuperAdminMemberIds[] = $member->id;
+        }
+
+        $companySuperAdminIds = $companySuperAdmins->pluck('id')->filter()->toArray();
+
+        // 4. Resolve Admins for this company
+        $companyAdminMemberIds = [];
+        if (!empty($companySuperAdminIds)) {
+            $companyAdminMemberIds = Member::whereIn('created_by', $companySuperAdminIds)
+                ->where(function ($q) {
+                    $q->whereJsonContains('roles', 1)
+                        ->orWhereJsonContains('roles', '1')
+                        ->orWhereJsonContains('roles', 'admin')
+                        ->orWhere('registration_source', 'admin_created')
+                        ->orWhere('slug', 'like', 'admin%');
+                })
+                ->pluck('id')
+                ->toArray();
+        }
+
+        // 5. Resolve all Company Employees / Members
+        $assignedProjectMemberIds = ProjectTeamMember::where('project_id', $project->id)
+            ->pluck('member_id')
+            ->toArray();
+
+        $companyMemberIdsQuery = Member::query()->where(function ($q) use ($companySuperAdminIds, $companyAdminMemberIds, $company, $assignedProjectMemberIds) {
+            $hasCondition = false;
+            if (!empty($companySuperAdminIds)) {
+                $q->whereIn('created_by', $companySuperAdminIds);
+                $hasCondition = true;
+            }
+            if (!empty($companyAdminMemberIds)) {
+                $q->orWhereIn('created_by', $companyAdminMemberIds);
+                $hasCondition = true;
+            }
+            if ($company && !empty($company->name)) {
+                $q->orWhere('company_name', $company->name);
+                $hasCondition = true;
+            }
+            if ($company && !empty($company->legal_name) && $company->legal_name !== $company->name) {
+                $q->orWhere('company_name', $company->legal_name);
+                $hasCondition = true;
+            }
+            if (!empty($assignedProjectMemberIds)) {
+                $q->orWhereIn('id', $assignedProjectMemberIds);
+                $hasCondition = true;
+            }
+            if (!$hasCondition) {
+                $q->whereRaw('1 = 0');
+            }
+        })->pluck('id')->toArray();
+
+        $allTargetMemberIds = collect($companySuperAdminMemberIds)
+            ->concat($companyAdminMemberIds)
+            ->concat($assignedProjectMemberIds)
+            ->concat($companyMemberIdsQuery)
+            ->unique()
+            ->filter()
+            ->values();
+
+        $members = Member::whereIn('id', $allTargetMemberIds)
+            ->where('status', 1)
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'email',
+                'departments',
+                'designation',
+                'roles',
+                'registration_source',
+                'created_by',
+            ]);
+
+        // Collect all numeric designation IDs from all members.
+        $designationIds = $members
+            ->flatMap(function ($member) {
+                if (!is_array($member->designation)) {
+                    return [];
+                }
+
+                return array_values($member->designation);
+            })
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        // Fetch all required designations in one query.
+        $designationNames = \App\Models\Designation::whereIn(
+            'id',
+            $designationIds
+        )->pluck('name', 'id');
+
+        // Build display text without additional database queries.
+        $members->transform(function ($member) use ($designationNames, $companySuperAdminMemberIds, $companyAdminMemberIds) {
+            $desigStr = '';
+
+            if (!empty($member->designation)) {
+                if (is_array($member->designation)) {
+                    $desigValues = array_values($member->designation);
+
+                    if (
+                        isset($desigValues[0])
+                        && is_numeric($desigValues[0])
+                    ) {
+                        $desigStr = collect($desigValues)
+                            ->map(
+                                fn ($id) =>
+                                    $designationNames[(int) $id] ?? null
+                            )
+                            ->filter()
+                            ->implode(', ');
+                    } else {
+                        $desigStr = implode(', ', $desigValues);
+                    }
+                } else {
+                    $desigStr = (string) $member->designation;
+                }
+            }
+
+            $isSuperAdmin = in_array($member->id, $companySuperAdminMemberIds, true)
+                || (is_array($member->roles) && (in_array('super_admin', $member->roles, true) || in_array('superadmin', $member->roles, true)));
+
+            $isAdmin = in_array($member->id, $companyAdminMemberIds, true)
+                || (is_array($member->roles) && (in_array(1, $member->roles, true) || in_array('1', $member->roles, true) || in_array('admin', $member->roles, true)))
+                || $member->registration_source === 'admin_created';
+
+            if ($isSuperAdmin) {
+                $member->role_badge = 'Super Admin';
+            } elseif ($isAdmin) {
+                $member->role_badge = 'Admin';
+            } else {
+                $member->role_badge = null;
+            }
+
+            $member->designation_text = $desigStr;
+
+            return $member;
+        });
+
+        return $members;
     }
 }

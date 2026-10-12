@@ -81,11 +81,9 @@ class ClientApiController extends Controller
             'status' => ['sometimes', 'in:active,inactive'],
         ]);
 
-        $nextId = (Client::max('id') ?? 0) + 1;
-
         $client = Client::create([
             ...$validated,
-            'client_code' => 'CLT-' . str_pad((string) $nextId, 5, '0', STR_PAD_LEFT),
+            'client_code' => Client::generateUniqueClientCode(),
             'status' => $validated['status'] ?? 'active',
             'created_by_type' => $actor ? $actor::class : null,
             'created_by_id' => $actor?->getKey(),
