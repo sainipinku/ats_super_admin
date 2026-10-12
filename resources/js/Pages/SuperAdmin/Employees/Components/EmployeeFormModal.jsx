@@ -107,9 +107,10 @@ export default function EmployeeFormModal({
                                 name="phone"
                                 value={formData.phone}
                                 onChange={(e) => {
-                                    const val = e.target.value.replace(/[^0-9]/g, '');
+                                    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 12);
                                     handleChange({ target: { name: 'phone', value: val } });
                                 }}
+                                maxLength={12}
                                 className={inputClass('phone')}
                                 required
                                 inputMode="numeric"
@@ -188,7 +189,19 @@ export default function EmployeeFormModal({
                         {/* Alternate Number */}
                         <div>
                             <label className="block text-gray-700 dark:text-gray-300 mb-1 text-sm">Alternate Number</label>
-                            <input type="text" name="alternate_number" value={formData.alternate_number} onChange={handleChange} className={inputClass('alternate_number')} />
+                            <input
+                                type="text"
+                                name="alternate_number"
+                                value={formData.alternate_number}
+                                onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 12);
+                                    handleChange({ target: { name: 'alternate_number', value: val } });
+                                }}
+                                maxLength={12}
+                                className={inputClass('alternate_number')}
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                            />
                             {errors.alternate_number && <p className="text-red-500 text-xs mt-1">{errors.alternate_number}</p>}
                         </div>
 
@@ -204,16 +217,6 @@ export default function EmployeeFormModal({
                             <label className="block text-gray-700 dark:text-gray-300 mb-1 text-sm">PAN Number</label>
                             <input type="text" name="pan_number" value={formData.pan_number} onChange={handleChange} className={inputClass('pan_number')} maxLength="10" />
                             {errors.pan_number && <p className="text-red-500 text-xs mt-1">{errors.pan_number}</p>}
-                        </div>
-
-                        {/* Status */}
-                        <div>
-                            <label className="block text-gray-700 dark:text-gray-300 mb-1 text-sm">Status</label>
-                            <select name="status" value={formData.status} onChange={handleChange} className={selectClass('status')}>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                            {errors.status && <p className="text-red-500 text-xs mt-1">{errors.status}</p>}
                         </div>
 
                         {/* Member Roles */}

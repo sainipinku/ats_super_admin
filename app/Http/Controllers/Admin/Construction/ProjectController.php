@@ -547,16 +547,12 @@ class ProjectController extends Controller
 
     public function updateChecklistItem(
         Project $project,
-        TaskChecklist $checklist,
+        $checklist,
         Request $request,
         ConstructionActivityService $activityService
     ) {
         $this->authorizeProjectWrite($project);
         $actor = $this->constructionActor();
-
-        if (!$this->checklistBelongsToProject($checklist, $project)) {
-            return back()->with('error', 'The selected checklist item does not belong to this project.');
-        }
 
         $validated = $request->validate([
             'day_number' => ['nullable', 'integer', 'min:1', 'max:366'],
@@ -571,177 +567,270 @@ class ProjectController extends Controller
             'remove_image_2' => ['nullable', 'boolean'],
         ]);
 
-        try {
-            $attributes = [];
-            if (isset($validated['day_number'])) {
-                $attributes['day_number'] = $validated['day_number'];
+        $item = $checklist instanceof TaskChecklist
+            ? $checklist
+            : TaskChecklist::find($checklist);
+
+        if ($item) {
+            if (!$this->checklistBelongsToProject($item, $project)) {
+                return back()->with('error', 'The selected checklist item does not belong to this project.');
             }
-            if (array_key_exists('item_title', $validated)) {
-                $attributes['item_title'] = $validated['item_title'];
-            }
-            if (array_key_exists('assign_hours', $validated)) {
-                $attributes['assign_hours'] = $validated['assign_hours'];
-            }
-            if (array_key_exists('notes', $validated)) {
-                $attributes['notes'] = $validated['notes'];
-            }
-            if (array_key_exists('status', $validated)) {
-                $attributes['status'] = $validated['status'];
-                if ($validated['status'] === 'completed') {
-                    $attributes['is_completed'] = true;
-                    $attributes['completed_at'] = $checklist->completed_at ?? now();
-                    $attributes['completed_by_member_id'] = $checklist->completed_by_member_id ?? $actor?->getKey();
+
+            try {
+                $attributes = [];
+                if (isset($validated['day_number'])) {
+                    $attributes['day_number'] = $validated['day_number'];
                 }
-            }
-            if (array_key_exists('is_completed', $validated)) {
-                $attributes['is_completed'] = (bool) $validated['is_completed'];
-                if ((bool) $validated['is_completed']) {
-                    $attributes['status'] = 'completed';
-                    $attributes['completed_at'] = $checklist->completed_at ?? now();
-                    $attributes['completed_by_member_id'] = $checklist->completed_by_member_id ?? $actor?->getKey();
-                } else {
-                    $attributes['status'] = 'pending';
-                    $attributes['completed_at'] = null;
-                    $attributes['completed_by_member_id'] = null;
+                if (array_key_exists('item_title', $validated)) {
+                    $attributes['item_title'] = $validated['item_title'];
                 }
+                if (array_key_exists('assign_hours', $validated)) {
+                    $attributes['assign_hours'] = $validated['assign_hours'];
+                }
+                if (array_key_exists('notes', $validated)) {
+                    $attributes['notes'] = $validated['notes'];
+                }
+                if (array_key_exists('status', $validated)) {
+                    $attributes['status'] = $validated['status'];
+                    if ($validated['status'] === 'completed') {
+                        $attributes['is_completed'] = true;
+                        $attributes['completed_at'] = $item->completed_at ?? now();
+                        $attributes['completed_by_member_id'] = $item->completed_by_member_id ?? $actor?->getKey();
+                    }
+                }
+                if (array_key_exists('is_completed', $validated)) {
+                    $attributes['is_completed'] = (bool) $validated['is_completed'];
+                    if ((bool) $validated['is_completed']) {
+                        $attributes['status'] = 'completed';
+                        $attributes['completed_at'] = $item->completed_at ?? now();
+                        $attributes['completed_by_member_id'] = $item->completed_by_member_id ?? $actor?->getKey();
+                    } else {
+                        $attributes['status'] = 'pending';
+                        $attributes['completed_at'] = null;
+                        $attributes['completed_by_member_id'] = null;
+                    }
+                }
+
+                if ($request->hasFile('image_1')) {
+                    $path = $request->file('image_1')->store('checklists', 'public');
+                    $attributes['image_url_1'] = '/storage/' . $path;
+                } elseif ($request->boolean('remove_image_1')) {
+                    $attributes['image_url_1'] = null;
+                }
+
+                if ($request->hasFile('image_2')) {
+                    $path = $request->file('image_2')->store('checklists', 'public');
+                    $attributes['image_url_2'] = '/storage/' . $path;
+                } elseif ($request->boolean('remove_image_2')) {
+                    $attributes['image_url_2'] = null;
+                }
+
+                $item->update($attributes);
+            } catch (\Throwable $e) {
+                report($e);
+                return back()->with('error', 'Failed to update checklist item. ' . $e->getMessage());
             }
 
-            if ($request->hasFile('image_1')) {
-                $path = $request->file('image_1')->store('checklists', 'public');
-                $attributes['image_url_1'] = '/storage/' . $path;
-            } elseif ($request->boolean('remove_image_1')) {
-                $attributes['image_url_1'] = null;
-            }
+            $activityService->log(
+                module: 'task_checklist',
+                action: 'updated',
+                actor: $actor,
+                reference: $item,
+                companyId: $project->company_id,
+                projectId: $project->id,
+                meta: [
+                    'day_number' => $item->day_number,
+                    'is_completed' => $item->is_completed,
+                ],
+                request: $request
+            );
 
-            if ($request->hasFile('image_2')) {
-                $path = $request->file('image_2')->store('checklists', 'public');
-                $attributes['image_url_2'] = '/storage/' . $path;
-            } elseif ($request->boolean('remove_image_2')) {
-                $attributes['image_url_2'] = null;
-            }
-
-            $checklist->update($attributes);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return back()->with('error', 'Failed to update checklist item. ' . $e->getMessage());
+            return back()->with('success', 'Checklist item updated successfully.');
         }
 
-        $activityService->log(
-            module: 'task_checklist',
-            action: 'updated',
-            actor: $actor,
-            reference: $checklist,
-            companyId: $project->company_id,
-            projectId: $project->id,
-            meta: [
-                'day_number' => $checklist->day_number,
-                'is_completed' => $checklist->is_completed,
-            ],
-            request: $request
-        );
+        $unifiedItem = \App\Models\TaskChecklistItem::where('id', is_object($checklist) ? $checklist->id : $checklist)
+            ->where('project_id', $project->id)
+            ->first();
 
-        return back()->with(
-            'success',
-            'Checklist item updated successfully.'
-        );
+        if ($unifiedItem) {
+            try {
+                $uAttrs = [];
+                if (isset($validated['day_number'])) $uAttrs['day_number'] = $validated['day_number'];
+                if (array_key_exists('item_title', $validated)) $uAttrs['item_title'] = $validated['item_title'];
+                if (array_key_exists('assign_hours', $validated)) $uAttrs['assign_hours'] = $validated['assign_hours'];
+                if (array_key_exists('notes', $validated)) $uAttrs['notes'] = $validated['notes'];
+                if (array_key_exists('status', $validated)) $uAttrs['status'] = $validated['status'];
+                if (array_key_exists('is_completed', $validated)) {
+                    $uAttrs['is_completed'] = (bool) $validated['is_completed'];
+                    $uAttrs['status'] = (bool) $validated['is_completed'] ? 'completed' : 'pending';
+                    $uAttrs['completed_at'] = (bool) $validated['is_completed'] ? now() : null;
+                }
+                $unifiedItem->update($uAttrs);
+            } catch (\Throwable $e) {
+                report($e);
+                return back()->with('error', 'Failed to update checklist item. ' . $e->getMessage());
+            }
+            return back()->with('success', 'Checklist item updated successfully.');
+        }
+
+        return back()->with('error', 'The selected checklist item does not belong to this project.');
     }
 
     public function toggleChecklistItem(
         Project $project,
-        TaskChecklist $checklist,
+        $checklist,
         ConstructionActivityService $activityService
     ) {
         $this->authorizeProjectWrite($project);
         $actor = $this->constructionActor();
 
-        if (!$this->checklistBelongsToProject($checklist, $project)) {
-            return back()->with(
-                'error',
-                'The selected checklist item does not belong to this project.'
+        $item = $checklist instanceof TaskChecklist
+            ? $checklist
+            : TaskChecklist::find($checklist);
+
+        if ($item) {
+            if (!$this->checklistBelongsToProject($item, $project)) {
+                return back()->with('error', 'The selected checklist item does not belong to this project.');
+            }
+
+            $nextCompleted = !$item->is_completed;
+            try {
+                $item->update([
+                    'is_completed' => $nextCompleted,
+                    'status' => $nextCompleted ? 'completed' : 'pending',
+                    'completed_by_member_id' => $nextCompleted ? $actor?->getKey() : null,
+                    'completed_at' => $nextCompleted ? now() : null,
+                ]);
+
+                try {
+                    \App\Models\TaskChecklistItem::where('project_id', $project->id)
+                        ->where('item_title', $item->item_title)
+                        ->update([
+                            'is_completed' => $nextCompleted,
+                            'status' => $nextCompleted ? 'completed' : 'pending',
+                        ]);
+                } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                report($e);
+                return back()->with('error', 'Failed to toggle checklist item. ' . $e->getMessage());
+            }
+
+            $activityService->log(
+                module: 'task_checklist',
+                action: $nextCompleted ? 'completed' : 'reopened',
+                actor: $actor,
+                reference: $item,
+                companyId: $project->company_id,
+                projectId: $project->id,
+                meta: ['day_number' => $item->day_number],
+                request: request()
             );
+
+            return back()->with('success', $nextCompleted ? 'Checklist item marked complete.' : 'Checklist item reopened.');
         }
 
-        $nextCompleted = !$checklist->is_completed;
-        try {
-            $checklist->update([
-                'is_completed' => $nextCompleted,
-                'completed_by_member_id' => $nextCompleted ? $actor?->getKey() : null,
-                'completed_at' => $nextCompleted ? now() : null,
-            ]);
-        } catch (\Throwable $e) {
-            report($e);
+        $unifiedItem = \App\Models\TaskChecklistItem::where('id', is_object($checklist) ? $checklist->id : $checklist)
+            ->where('project_id', $project->id)
+            ->first();
 
-            return back()->with(
-                'error',
-                'Failed to toggle checklist item. ' . $e->getMessage()
-            );
+        if ($unifiedItem) {
+            $nextCompleted = !$unifiedItem->is_completed;
+            try {
+                $unifiedItem->update([
+                    'is_completed' => $nextCompleted,
+                    'status' => $nextCompleted ? 'completed' : 'pending',
+                    'completed_at' => $nextCompleted ? now() : null,
+                    'completed_by_id' => $nextCompleted ? $actor?->getKey() : null,
+                ]);
+
+                try {
+                    TaskChecklist::where('item_title', $unifiedItem->item_title)
+                        ->update([
+                            'is_completed' => $nextCompleted,
+                            'status' => $nextCompleted ? 'completed' : 'pending',
+                        ]);
+                } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                report($e);
+                return back()->with('error', 'Failed to toggle checklist item. ' . $e->getMessage());
+            }
+
+            return back()->with('success', $nextCompleted ? 'Checklist item marked complete.' : 'Checklist item reopened.');
         }
 
-        $activityService->log(
-            module: 'task_checklist',
-            action: $nextCompleted ? 'completed' : 'reopened',
-            actor: $actor,
-            reference: $checklist,
-            companyId: $project->company_id,
-            projectId: $project->id,
-            meta: ['day_number' => $checklist->day_number],
-            request: request()
-        );
-
-        return back()->with(
-            'success',
-            $nextCompleted ? 'Checklist item marked complete.' : 'Checklist item reopened.'
-        );
+        return back()->with('error', 'The selected checklist item does not belong to this project.');
     }
 
     public function destroyChecklistItem(
         Project $project,
-        TaskChecklist $checklist,
+        $checklist,
         ConstructionActivityService $activityService
     ) {
         $this->authorizeProjectWrite($project);
         $actor = $this->constructionActor();
 
-        if (!$this->checklistBelongsToProject($checklist, $project)) {
-            return back()->with(
-                'error',
-                'The selected checklist item does not belong to this project.'
+        $item = $checklist instanceof TaskChecklist
+            ? $checklist
+            : TaskChecklist::find($checklist);
+
+        if ($item) {
+            if (!$this->checklistBelongsToProject($item, $project)) {
+                return back()->with('error', 'The selected checklist item does not belong to this project.');
+            }
+
+            $title = $item->item_title;
+            $dayNumber = $item->day_number;
+
+            try {
+                $item->delete();
+                try {
+                    \App\Models\TaskChecklistItem::where('project_id', $project->id)
+                        ->where('item_title', $title)
+                        ->delete();
+                } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                report($e);
+                return back()->with('error', 'Failed to delete checklist item. ' . $e->getMessage());
+            }
+
+            $activityService->log(
+                module: 'task_checklist',
+                action: 'deleted',
+                actor: $actor,
+                reference: null,
+                companyId: $project->company_id,
+                projectId: $project->id,
+                meta: [
+                    'item_title' => $title,
+                    'day_number' => $dayNumber,
+                ],
+                request: request()
             );
+
+            return back()->with('success', "Checklist item removed from Day {$dayNumber}.");
         }
 
-        $title = $checklist->item_title;
-        $dayNumber = $checklist->day_number;
+        $unifiedItem = \App\Models\TaskChecklistItem::where('id', is_object($checklist) ? $checklist->id : $checklist)
+            ->where('project_id', $project->id)
+            ->first();
 
-        try {
-            $checklist->delete();
-        } catch (\Throwable $e) {
-            report($e);
+        if ($unifiedItem) {
+            $title = $unifiedItem->item_title;
+            $dayNumber = $unifiedItem->day_number;
+            try {
+                $unifiedItem->delete();
+                try {
+                    TaskChecklist::where('item_title', $title)->delete();
+                } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                report($e);
+                return back()->with('error', 'Failed to delete checklist item. ' . $e->getMessage());
+            }
 
-            return back()->with(
-                'error',
-                'Failed to delete checklist item. ' . $e->getMessage()
-            );
+            return back()->with('success', "Checklist item removed from Day {$dayNumber}.");
         }
 
-        $activityService->log(
-            module: 'task_checklist',
-            action: 'deleted',
-            actor: $actor,
-            reference: null,
-            companyId: $project->company_id,
-            projectId: $project->id,
-            meta: [
-                'item_title' => $title,
-                'day_number' => $dayNumber,
-            ],
-            request: request()
-        );
-
-        return back()->with(
-            'success',
-            "Checklist item removed from Day {$dayNumber}."
-        );
+        return back()->with('error', 'The selected checklist item does not belong to this project.');
     }
 
     public function seedDefaultChecklists(

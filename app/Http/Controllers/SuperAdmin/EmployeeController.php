@@ -16,6 +16,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use App\Models\SuperAdmin;
 use App\Http\Controllers\Concerns\IntersectsAdminDeletion;
 use Inertia\Inertia;
 
@@ -455,6 +458,7 @@ class EmployeeController extends Controller
                     'designations' => $designationArray,
                     'gender' => $validated['gender'] ?? null,
                     'dob' => $validated['dob'] ?? null,
+                    'status' => $request->has('status') && $request->input('status') !== '' ? (int) $request->input('status') : 1,
                     'is_calling_team' => false,
                     'created_by' => $creatorId,
                     'company_name' => $creatorCompanyName,
@@ -530,6 +534,10 @@ class EmployeeController extends Controller
                     'dob' => $validated['dob'] ?? null,
                     'is_calling_team' => false,
                 ];
+
+                if ($request->has('status') && $request->input('status') !== '') {
+                    $memberData['status'] = (int) $request->input('status');
+                }
 
                 if ($request->hasFile('profile_photo')) {
                     $memberData['image'] = $request->file('profile_photo');

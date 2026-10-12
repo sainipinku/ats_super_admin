@@ -4,8 +4,9 @@ import SectionCard from "@/Pages/Construction/Components/SectionCard";
 import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
 import Modal from "@/Components/Modal";
-import { useForm } from "@inertiajs/react";
-import { useState } from "react";
+import DeleteActionButton from "@/Components/DeleteActionButton";
+import { useForm, router } from "@inertiajs/react";
+import { useState, useEffect } from "react";
 
 const emptyClientForm = {
     company_id: "",
@@ -21,11 +22,17 @@ const emptyClientForm = {
     status: "active",
 };
 
-export default function ClientsIndex({ clients, companies }) {
+export default function ClientsIndex({ clients = [], companies = [], is_project_owner = false, user_company_id = null }) {
+    const isProjectOwner = Boolean(is_project_owner);
+    const effectiveCompanyId = user_company_id ? String(user_company_id) : null;
+    const defaultCompanyId = (!isProjectOwner && effectiveCompanyId)
+        ? effectiveCompanyId
+        : (companies[0]?.id ? String(companies[0].id) : "");
+
     const [editingClient, setEditingClient] = useState(null);
 
     const form = useForm({
-        company_id: companies[0]?.id || "",
+        company_id: defaultCompanyId,
         client_type: "individual",
         name: "",
         email: "",
@@ -40,10 +47,16 @@ export default function ClientsIndex({ clients, companies }) {
 
     const editForm = useForm(emptyClientForm);
 
+    useEffect(() => {
+        if (!isProjectOwner && effectiveCompanyId && String(form.data.company_id) !== String(effectiveCompanyId)) {
+            form.setData("company_id", String(effectiveCompanyId));
+        }
+    }, [isProjectOwner, effectiveCompanyId]);
+
     const openEditModal = (client) => {
         editForm.clearErrors();
         editForm.setData({
-            company_id: client.company_id || "",
+            company_id: client.company_id ? String(client.company_id) : defaultCompanyId,
             client_type: client.client_type || "individual",
             name: client.name || "",
             email: client.email || "",
@@ -72,6 +85,35 @@ export default function ClientsIndex({ clients, companies }) {
         });
     };
 
+    const handleToggleStatus = (client) => {
+        const nextStatus = client.status === "active" ? "inactive" : "active";
+        const actionLabel = client.status === "active" ? "deactivate" : "activate";
+        if (confirm(`Are you sure you want to ${actionLabel} client "${client.name}"?`)) {
+            router.post(
+                route("super.construction.clients.status", client.id),
+                { status: nextStatus },
+                { preserveScroll: true }
+            );
+        }
+    };
+
+    const handleDeleteClient = (client) => {
+        if (client.projects_count && client.projects_count > 0) {
+            alert(`Cannot delete client "${client.name}" because it is linked to ${client.projects_count} project(s). Please remove or reassign associated projects first.`);
+            return;
+        }
+        if (confirm(`Are you sure you want to delete client "${client.name}"? This action cannot be undone.`)) {
+            router.delete(route("super.construction.clients.destroy", client.id), {
+                preserveScroll: true,
+                onError: (errs) => {
+                    if (typeof window !== "undefined" && typeof window.alert === "function") {
+                        window.alert(Object.values(errs).find(Boolean) || "Failed to delete client.");
+                    }
+                },
+            });
+        }
+    };
+
     return (
         <ConstructionShell title="Clients" description="Register every client under a company before project creation begins." variant="super">
             <div className="grid gap-4 md:grid-cols-4">
@@ -93,15 +135,47 @@ export default function ClientsIndex({ clients, companies }) {
                         }}
                         className="space-y-4"
                     >
+                        {companies.length > 0 && (
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    Company {!isProjectOwner && effectiveCompanyId && <span className="text-xs text-slate-400 font-normal">(Locked)</span>}
+                                </label>
+                                <select
+                                    value={form.data.company_id}
+                                    disabled={!isProjectOwner && Boolean(effectiveCompanyId)}
+                                    onChange={(e) => form.setData("company_id", e.target.value)}
+                                    className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                                >
+                                    {companies.map((c) => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                                {form.errors.company_id ? <p className="mt-1 text-xs text-rose-600">{form.errors.company_id}</p> : null}
+                            </div>
+                        )}
                         <SelectField form={form} name="client_type" label="Client Type" options={[
                             { value: "individual", label: "Individual" },
                             { value: "company", label: "Company" },
                             { value: "government", label: "Government" },
                         ]} />
                         <InputField form={form} name="name" label="Client Name" />
-                        <InputField form={form} name="email" label="Email" />
-                        <InputField form={form} name="phone" label="Phone" />
-                        <InputField form={form} name="alternate_phone" label="Alternate Phone" />
+                        <InputField form={form} name="email" label="Email" type="email" />
+                        <InputField
+                            form={form}
+                            name="phone"
+                            label="Phone (Max 12 digits)"
+                            isNumeric={true}
+                            maxLength={12}
+                            placeholder="Enter phone number (max 12 digits)"
+                        />
+                        <InputField
+                            form={form}
+                            name="alternate_phone"
+                            label="Alternate Phone (Max 12 digits)"
+                            isNumeric={true}
+                            maxLength={12}
+                            placeholder="Enter alternate phone (max 12 digits)"
+                        />
                         <InputField form={form} name="gst_number" label="GST Number" />
                         <TextAreaField form={form} name="billing_address" label="Billing Address" rows={3} />
                         <TextAreaField form={form} name="site_address" label="Site Address" rows={3} />
@@ -138,13 +212,41 @@ export default function ClientsIndex({ clients, companies }) {
                                             </td>
                                             <td className="py-3"><StatusBadge value={client.status} /></td>
                                             <td className="py-3">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => openEditModal(client)}
-                                                    className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                                                >
-                                                    Edit
-                                                </button>
+                                                {client.can_manage ? (
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openEditModal(client)}
+                                                            className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                                        >
+                                                            Edit
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleToggleStatus(client)}
+                                                            className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                                                                client.status === "active"
+                                                                    ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                                                                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                                            }`}
+                                                            title={client.status === "active" ? "Deactivate Client" : "Activate Client"}
+                                                        >
+                                                            {client.status === "active" ? "Deactivate" : "Activate"}
+                                                        </button>
+
+                                                        <DeleteActionButton
+                                                            resourceType="client"
+                                                            resourceId={client.id}
+                                                            resourceName={client.name}
+                                                            onDelete={() => handleDeleteClient(client)}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-slate-400 dark:text-slate-500 italic">
+                                                        View Only
+                                                    </span>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -163,6 +265,24 @@ export default function ClientsIndex({ clients, companies }) {
                     <p className="mt-1 text-sm text-slate-500">Update the client master data.</p>
                 </div>
                 <form onSubmit={submitEdit} className="space-y-4 p-5">
+                    {companies.length > 0 && (
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                Company {!isProjectOwner && <span className="text-xs text-slate-400 font-normal">(Locked)</span>}
+                            </label>
+                            <select
+                                value={editForm.data.company_id}
+                                disabled={!isProjectOwner}
+                                onChange={(e) => editForm.setData("company_id", e.target.value)}
+                                className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100 dark:disabled:bg-slate-800"
+                            >
+                                {companies.map((c) => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                            {editForm.errors.company_id ? <p className="mt-1 text-xs text-rose-600">{editForm.errors.company_id}</p> : null}
+                        </div>
+                    )}
                     <div>
                         <SelectField form={editForm} name="client_type" label="Client Type" options={[
                             { value: "individual", label: "Individual" },
@@ -172,9 +292,23 @@ export default function ClientsIndex({ clients, companies }) {
                     </div>
                     <InputField form={editForm} name="name" label="Client Name" />
                     <div className="grid gap-4 md:grid-cols-2">
-                        <InputField form={editForm} name="email" label="Email" />
-                        <InputField form={editForm} name="phone" label="Phone" />
-                        <InputField form={editForm} name="alternate_phone" label="Alternate Phone" />
+                        <InputField form={editForm} name="email" label="Email" type="email" />
+                        <InputField
+                            form={editForm}
+                            name="phone"
+                            label="Phone (Max 12 digits)"
+                            isNumeric={true}
+                            maxLength={12}
+                            placeholder="Enter phone number (max 12 digits)"
+                        />
+                        <InputField
+                            form={editForm}
+                            name="alternate_phone"
+                            label="Alternate Phone (Max 12 digits)"
+                            isNumeric={true}
+                            maxLength={12}
+                            placeholder="Enter alternate phone (max 12 digits)"
+                        />
                         <InputField form={editForm} name="gst_number" label="GST Number" />
                     </div>
                     <TextAreaField form={editForm} name="billing_address" label="Billing Address" rows={3} />
@@ -207,11 +341,32 @@ export default function ClientsIndex({ clients, companies }) {
     );
 }
 
-function InputField({ form, name, label }) {
+function InputField({ form, name, label, type = "text", maxLength, isNumeric = false, placeholder = "" }) {
+    const handleChange = (e) => {
+        let val = e.target.value;
+        if (isNumeric) {
+            val = val.replace(/\D/g, "");
+            if (maxLength) {
+                val = val.slice(0, maxLength);
+            }
+        } else if (maxLength) {
+            val = val.slice(0, maxLength);
+        }
+        form.setData(name, val);
+    };
+
     return (
         <div>
             <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">{label}</label>
-            <input value={form.data[name]} onChange={(e) => form.setData(name, e.target.value)} className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white" />
+            <input
+                type={type}
+                maxLength={maxLength}
+                inputMode={isNumeric ? "numeric" : undefined}
+                placeholder={placeholder}
+                value={form.data[name] ?? ""}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:border-indigo-700 dark:focus:ring-indigo-900/60"
+            />
             {form.errors[name] ? <p className="mt-1 text-xs text-rose-600">{form.errors[name]}</p> : null}
         </div>
     );
