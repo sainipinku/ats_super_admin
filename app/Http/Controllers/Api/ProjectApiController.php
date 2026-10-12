@@ -145,13 +145,10 @@ class ProjectApiController extends Controller
             'priority' => ['required', 'in:low,medium,high,critical'],
         ]);
 
-        $nextId = (Project::max('id') ?? 0) + 1;
-        $nameSlug = Str::slug($validated['name']);
-
         $project = Project::create([
             ...$validated,
-            'project_code' => 'PRJ-' . str_pad((string) $nextId, 5, '0', STR_PAD_LEFT),
-            'slug' => $nameSlug . '-' . $nextId,
+            'project_code' => Project::generateUniqueProjectCode(),
+            'slug' => Project::generateUniqueSlug($validated['name']),
             'status' => 'draft',
             'current_stage' => 'budget_pending',
             'created_by_type' => $actor ? $actor::class : null,

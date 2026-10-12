@@ -10,6 +10,10 @@ use App\Models\ExecutionTask;
 use App\Models\ExecutionTaskAssignee;
 use App\Models\Project;
 use App\Models\ProjectTeamMember;
+use App\Models\Company;
+use App\Models\ConstructionRole;
+use App\Models\Member;
+use App\Models\SuperAdmin;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
@@ -521,9 +525,106 @@ class ConstructionExecutionService
             ->exists();
 
         if (!$belongsToProject) {
+            if ($this->memberBelongsToProjectCompany($project, $memberId)) {
+                $supervisorRoleId = ConstructionRole::where('slug', 'supervisor')->value('id')
+                    ?? ConstructionRole::where('slug', 'project_admin')->value('id');
+
+                ProjectTeamMember::updateOrCreate(
+                    [
+                        'project_id' => $project->id,
+                        'member_id' => $memberId,
+                    ],
+                    [
+                        'role_id' => $supervisorRoleId,
+                        'status' => 'active',
+                        'is_primary' => false,
+                    ]
+                );
+                return;
+            }
+
             throw ValidationException::withMessages([
                 $field => 'The selected member is not assigned to the chosen project.',
             ]);
         }
+    }
+
+    private function memberBelongsToProjectCompany(Project $project, int $memberId): bool
+    {
+        $member = Member::find($memberId);
+        if (!$member) {
+            return false;
+        }
+
+        $companyId = $project->company_id;
+        if (!$companyId && in_array($project->created_by_type, [SuperAdmin::class, 'App\Models\SuperAdmin', '\\App\\Models\\SuperAdmin'], true)) {
+            $companyId = SuperAdmin::where('id', $project->created_by_id)->value('company_id');
+        }
+
+        $company = $project->company ?: ($companyId ? Company::find($companyId) : null);
+
+        $companySuperAdminIds = SuperAdmin::query()
+            ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+            ->pluck('id')
+            ->toArray();
+
+        if (in_array($project->created_by_type, [SuperAdmin::class, 'App\Models\SuperAdmin', '\\App\\Models\\SuperAdmin'], true) && $project->created_by_id) {
+            $companySuperAdminIds[] = (int) $project->created_by_id;
+        }
+
+        // 1. Is the member created by a company SuperAdmin?
+        if (!empty($companySuperAdminIds) && in_array((int) $member->created_by, $companySuperAdminIds, true)) {
+            return true;
+        }
+
+        // 2. Is the member the SuperAdmin themselves (linked by email or phone)?
+        if (!empty($companySuperAdminIds) && SuperAdmin::whereIn('id', $companySuperAdminIds)
+            ->where(function ($q) use ($member) {
+                $hasClause = false;
+                if (!empty($member->email)) {
+                    $q->where('email', $member->email);
+                    $hasClause = true;
+                }
+                if (!empty($member->phone)) {
+                    if ($hasClause) {
+                        $q->orWhere('phone', $member->phone);
+                    } else {
+                        $q->where('phone', $member->phone);
+                        $hasClause = true;
+                    }
+                }
+                if (!$hasClause) {
+                    $q->whereRaw('1 = 0');
+                }
+            })->exists()) {
+            return true;
+        }
+
+        // 3. Is the member's company_name matching the project's company?
+        if ($company && !empty($company->name) && $member->company_name === $company->name) {
+            return true;
+        }
+        if ($company && !empty($company->legal_name) && $member->company_name === $company->legal_name) {
+            return true;
+        }
+
+        // 4. Was the member created by an Admin of this company?
+        if (!empty($companySuperAdminIds)) {
+            $adminIds = Member::whereIn('created_by', $companySuperAdminIds)
+                ->where(function ($q) {
+                    $q->whereJsonContains('roles', 1)
+                        ->orWhereJsonContains('roles', '1')
+                        ->orWhereJsonContains('roles', 'admin')
+                        ->orWhere('registration_source', 'admin_created');
+                })
+                ->pluck('id')
+                ->toArray();
+
+            if (!empty($adminIds) && in_array((int) $member->created_by, $adminIds, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

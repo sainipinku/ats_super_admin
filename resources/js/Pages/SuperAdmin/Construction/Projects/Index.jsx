@@ -1,4 +1,4 @@
-import { Link, useForm, router } from "@inertiajs/react";
+import { Link, useForm, router, usePage } from "@inertiajs/react";
 import ConstructionShell from "@/Pages/Construction/Components/ConstructionShell";
 import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
@@ -37,10 +37,25 @@ const projectStatusFlow = [
     { value: "completed", label: "Completed", color: "emerald", icon: FaFlagCheckered, description: "Project closed" },
 ];
 
-export default function ProjectsIndex({ projects, companies, clients }) {
+export default function ProjectsIndex({ projects, companies, clients, user_company_id, next_project_code }) {
+    const { auth } = usePage().props;
+    const effectiveCompanyId = user_company_id ?? auth?.user?.company_id ?? null;
+    const isCompanyLocked = Boolean(effectiveCompanyId);
+
+    const [nextCode, setNextCode] = useState(next_project_code || "PRJ-00001");
+    const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
+
+    const initialCompanyId = effectiveCompanyId
+        ? String(effectiveCompanyId)
+        : (companies[0]?.id ? String(companies[0].id) : "");
+
+    const initialClients = effectiveCompanyId
+        ? clients.filter((c) => String(c.company_id) === String(effectiveCompanyId))
+        : (companies[0]?.id ? clients.filter((c) => String(c.company_id) === String(companies[0].id)) : clients);
+
     const form = useForm({
-        company_id: companies[0]?.id || "",
-        client_id: clients[0]?.id || "",
+        company_id: initialCompanyId,
+        client_id: initialClients[0]?.id ? String(initialClients[0].id) : "",
         project_code: "",
         name: "",
         category: "",
@@ -54,7 +69,7 @@ export default function ProjectsIndex({ projects, companies, clients }) {
         priority: "medium",
         status: "draft",
         current_stage: "budget_pending",
-        client_review_status: "",
+        client_review_status: "pending",
         client_revision_comment: "",
     });
 
@@ -126,8 +141,36 @@ export default function ProjectsIndex({ projects, companies, clients }) {
         setOpenDropdownId(projectId);
     };
 
+    const openCreateModal = () => {
+        form.clearErrors();
+        setIsCodeManuallyEdited(false);
+        if (next_project_code) {
+            setNextCode(next_project_code);
+        }
+        fetch(route("super.construction.projects.next-code"))
+            .then((res) => res.json())
+            .then((data) => {
+                if (data?.code) {
+                    setNextCode(data.code);
+                }
+            })
+            .catch(() => {});
+        if (effectiveCompanyId) {
+            const compClients = clients.filter((c) => String(c.company_id) === String(effectiveCompanyId));
+            form.setData((prev) => ({
+                ...prev,
+                company_id: String(effectiveCompanyId),
+                client_id: prev.client_id && compClients.some((c) => String(c.id) === String(prev.client_id))
+                    ? prev.client_id
+                    : (compClients[0]?.id ? String(compClients[0].id) : ""),
+            }));
+        }
+        setCreateModalOpen(true);
+    };
+
     const closeCreateModal = () => {
         form.clearErrors();
+        setIsCodeManuallyEdited(false);
         form.reset(
             "name",
             "project_code",
@@ -142,14 +185,56 @@ export default function ProjectsIndex({ projects, companies, clients }) {
             "client_review_status",
             "client_revision_comment",
         );
+        if (effectiveCompanyId) {
+            form.setData("company_id", String(effectiveCompanyId));
+        }
         setCreateModalOpen(false);
     };
+
+    const handleNameChange = (e) => {
+        const enteredName = e.target.value;
+        const autoCode = nextCode || "PRJ-00001";
+        form.setData((prev) => {
+            const nextData = { ...prev, name: enteredName };
+            if (!isCodeManuallyEdited) {
+                if (enteredName.trim().length > 0) {
+                    nextData.project_code = autoCode;
+                } else {
+                    nextData.project_code = "";
+                }
+            }
+            return nextData;
+        });
+    };
+
+    const handleProjectCodeChange = (e) => {
+        setIsCodeManuallyEdited(true);
+        form.setData("project_code", e.target.value);
+    };
+
+    const handleResetAutoCode = () => {
+        setIsCodeManuallyEdited(false);
+        form.setData("project_code", form.data.name?.trim() ? (nextCode || "PRJ-00001") : "");
+    };
+
+    useEffect(() => {
+        if (!createModalOpen) return;
+        if (!isCodeManuallyEdited) {
+            const hasName = Boolean(form.data.name && form.data.name.trim().length > 0);
+            const currentAutoCode = nextCode || "PRJ-00001";
+            if (hasName && form.data.project_code !== currentAutoCode) {
+                form.setData("project_code", currentAutoCode);
+            } else if (!hasName && form.data.project_code === currentAutoCode) {
+                form.setData("project_code", "");
+            }
+        }
+    }, [form.data.name, nextCode, isCodeManuallyEdited, createModalOpen]);
 
     const openEditModal = (project) => {
         editForm.clearErrors();
         editForm.setData({
-            company_id: project.company_id || "",
-            client_id: project.client_id || "",
+            company_id: isCompanyLocked ? String(effectiveCompanyId) : (project.company_id ? String(project.company_id) : ""),
+            client_id: project.client_id ? String(project.client_id) : "",
             project_code: project.project_code || "",
             name: project.name || "",
             category: project.category || "",
@@ -163,7 +248,7 @@ export default function ProjectsIndex({ projects, companies, clients }) {
             priority: project.priority || "medium",
             status: project.status || "",
             current_stage: project.current_stage || "",
-            client_review_status: project.client_review_status || "",
+            client_review_status: project.client_review_status || "pending",
             client_revision_comment: project.client_revision_comment || "",
         });
         setEditingProject(project);
@@ -192,6 +277,23 @@ export default function ProjectsIndex({ projects, companies, clients }) {
         () => clients.filter((client) => String(client.company_id) === String(editForm.data.company_id)),
         [clients, editForm.data.company_id]
     );
+
+    useEffect(() => {
+        if (effectiveCompanyId && String(form.data.company_id) !== String(effectiveCompanyId)) {
+            form.setData("company_id", String(effectiveCompanyId));
+        }
+    }, [effectiveCompanyId, form.data.company_id]);
+
+    useEffect(() => {
+        if (filteredClients.length > 0) {
+            const hasCurrentClient = filteredClients.some((c) => String(c.id) === String(form.data.client_id));
+            if (!hasCurrentClient) {
+                form.setData("client_id", String(filteredClients[0].id));
+            }
+        } else if (form.data.client_id) {
+            form.setData("client_id", "");
+        }
+    }, [filteredClients]);
 
     const projectList = useMemo(() => projects || [], [projects]);
 
@@ -466,7 +568,7 @@ export default function ProjectsIndex({ projects, companies, clients }) {
                     </div>
                     <button
                         type="button"
-                        onClick={() => setCreateModalOpen(true)}
+                        onClick={openCreateModal}
                         className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:from-indigo-500 hover:to-violet-500"
                     >
                         <FaPlus size={13} />
@@ -684,7 +786,15 @@ export default function ProjectsIndex({ projects, companies, clients }) {
                     className="space-y-4 p-5 max-h-[82vh] overflow-y-auto"
                 >
                     <div className="grid gap-4 md:grid-cols-2">
-                        <SelectField form={form} name="company_id" label="Company" options={companies.map((company) => ({ value: company.id, label: company.name }))} />
+                        <SelectField
+                            form={form}
+                            name="company_id"
+                            label="Company"
+                            options={companies.map((company) => ({ value: company.id, label: company.name }))}
+                            disabled={isCompanyLocked}
+                            badge={isCompanyLocked ? "Auto-linked" : null}
+                            helper={isCompanyLocked ? "Locked to your company" : null}
+                        />
                         <SelectField
                             form={form}
                             name="client_id"
@@ -693,8 +803,35 @@ export default function ProjectsIndex({ projects, companies, clients }) {
                         />
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
-                        <InputField form={form} name="name" label="Project Name" />
-                        <InputField form={form} name="project_code" label="Project Code (optional, auto-generated)" />
+                        <InputField
+                            form={form}
+                            name="name"
+                            label="Project Name"
+                            placeholder="Enter project name"
+                            onChange={handleNameChange}
+                        />
+                        <InputField
+                            form={form}
+                            name="project_code"
+                            label="Project Code (auto-generated)"
+                            placeholder={nextCode || "e.g. PRJ-00001"}
+                            onChange={handleProjectCodeChange}
+                            extraAction={
+                                isCodeManuallyEdited ? (
+                                    <button
+                                        type="button"
+                                        onClick={handleResetAutoCode}
+                                        className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 hover:underline"
+                                    >
+                                        Reset to auto
+                                    </button>
+                                ) : form.data.project_code ? (
+                                    <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                                        ✓ Auto-generated
+                                    </span>
+                                ) : null
+                            }
+                        />
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                         <SelectField
@@ -776,9 +913,8 @@ export default function ProjectsIndex({ projects, companies, clients }) {
                         <SelectField
                             form={form}
                             name="client_review_status"
-                            label="Client Review (optional)"
+                            label="Client Review Status"
                             options={[
-                                { value: "", label: "-- Not reviewed --" },
                                 { value: "pending", label: "Pending" },
                                 { value: "requested", label: "Requested" },
                                 { value: "approved", label: "Approved" },
@@ -825,7 +961,15 @@ export default function ProjectsIndex({ projects, companies, clients }) {
                 </div>
                 <form onSubmit={submitEdit} className="space-y-4 p-5 max-h-[80vh] overflow-y-auto">
                     <div className="grid gap-4 md:grid-cols-2">
-                        <SelectField form={editForm} name="company_id" label="Company" options={companies.map((company) => ({ value: company.id, label: company.name }))} />
+                        <SelectField
+                            form={editForm}
+                            name="company_id"
+                            label="Company"
+                            options={companies.map((company) => ({ value: company.id, label: company.name }))}
+                            disabled={isCompanyLocked}
+                            badge={isCompanyLocked ? "Auto-linked" : null}
+                            helper={isCompanyLocked ? "Locked to your company" : null}
+                        />
                         <SelectField
                             form={editForm}
                             name="client_id"
@@ -921,7 +1065,6 @@ export default function ProjectsIndex({ projects, companies, clients }) {
                             name="client_review_status"
                             label="Client Review Status"
                             options={[
-                                { value: "", label: "-- Not reviewed --" },
                                 { value: "pending", label: "Pending" },
                                 { value: "requested", label: "Requested" },
                                 { value: "approved", label: "Approved" },
@@ -979,15 +1122,19 @@ function formatDate(value) {
     return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function InputField({ form, name, label, type = "text", step }) {
+function InputField({ form, name, label, type = "text", step, placeholder = "", onChange, extraAction }) {
     return (
         <div>
-            <label className="mb-1 block text-[13px] font-medium text-slate-700 dark:text-slate-200">{label}</label>
+            <div className="mb-1 flex items-center justify-between">
+                <label className="block text-[13px] font-medium text-slate-700 dark:text-slate-200">{label}</label>
+                {extraAction}
+            </div>
             <input
                 type={type}
                 step={step}
-                value={form.data[name]}
-                onChange={(e) => form.setData(name, e.target.value)}
+                placeholder={placeholder}
+                value={form.data[name] ?? ""}
+                onChange={onChange || ((e) => form.setData(name, e.target.value))}
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-[14px] dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:border-indigo-700 dark:focus:ring-indigo-900/60"
             />
             {form.errors[name] ? <p className="mt-1 text-xs text-rose-600">{form.errors[name]}</p> : null}
@@ -1010,14 +1157,26 @@ function TextAreaField({ form, name, label, rows = 4 }) {
     );
 }
 
-function SelectField({ form, name, label, options }) {
+function SelectField({ form, name, label, options, disabled = false, badge = null, helper = null }) {
     return (
         <div>
-            <label className="mb-1 block text-[13px] font-medium text-slate-700 dark:text-slate-200">{label}</label>
+            <div className="mb-1 flex items-center justify-between">
+                <label className="block text-[13px] font-medium text-slate-700 dark:text-slate-200">{label}</label>
+                {badge && (
+                    <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+                        {badge}
+                    </span>
+                )}
+            </div>
             <select
                 value={form.data[name]}
                 onChange={(e) => form.setData(name, e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-[14px] dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:border-indigo-700 dark:focus:ring-indigo-900/60"
+                disabled={disabled}
+                className={`w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-[14px] dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:border-indigo-700 dark:focus:ring-indigo-900/60 ${
+                    disabled
+                        ? "bg-slate-100 text-slate-500 cursor-not-allowed dark:bg-slate-800/80 dark:text-slate-400 opacity-90"
+                        : ""
+                }`}
             >
                 {options.map((option) => (
                     <option key={String(option.value)} value={option.value}>
@@ -1025,8 +1184,10 @@ function SelectField({ form, name, label, options }) {
                     </option>
                 ))}
             </select>
+            {helper ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{helper}</p> : null}
             {form.errors[name] ? <p className="mt-1 text-xs text-rose-600">{form.errors[name]}</p> : null}
         </div>
     );
 }
+
 

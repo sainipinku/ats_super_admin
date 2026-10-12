@@ -26,14 +26,21 @@ class CompanyController extends Controller
     {
         $actor = $this->constructionActor();
 
+        if ($request->filled('phone')) {
+            $request->merge(['phone' => substr(preg_replace('/\D/', '', (string) $request->input('phone')), 0, 12)]);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'legal_name' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'phone' => ['nullable', 'string', 'max:12', 'regex:/^[0-9]{1,12}$/'],
             'gst_number' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string'],
             'status' => ['required', 'in:active,inactive'],
+        ], [
+            'phone.max' => 'The phone number must not exceed 12 digits.',
+            'phone.regex' => 'The phone number must contain digits only (maximum 12 digits).',
         ]);
 
         $company = Company::create([
@@ -59,14 +66,21 @@ class CompanyController extends Controller
     {
         $actor = $this->constructionActor();
 
+        if ($request->filled('phone')) {
+            $request->merge(['phone' => substr(preg_replace('/\D/', '', (string) $request->input('phone')), 0, 12)]);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'legal_name' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'phone' => ['nullable', 'string', 'max:12', 'regex:/^[0-9]{1,12}$/'],
             'gst_number' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string'],
             'status' => ['required', 'in:active,inactive'],
+        ], [
+            'phone.max' => 'The phone number must not exceed 12 digits.',
+            'phone.regex' => 'The phone number must contain digits only (maximum 12 digits).',
         ]);
 
         $company->update($validated);

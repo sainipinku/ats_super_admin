@@ -19,6 +19,89 @@ class Project extends Model
 
     protected $table = 'construction_projects';
 
+    protected $attributes = [
+        'priority' => 'medium',
+        'status' => 'draft',
+        'current_stage' => 'budget_pending',
+        'client_review_status' => 'pending',
+        'is_locked' => 0,
+        'revision_iteration_count' => 0,
+    ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($project) {
+            if (empty($project->project_code) || static::withTrashed()->where('project_code', $project->project_code)->exists()) {
+                $project->project_code = static::generateUniqueProjectCode($project->project_code);
+            }
+            if (empty($project->slug) || static::withTrashed()->where('slug', $project->slug)->exists()) {
+                $project->slug = static::generateUniqueSlug($project->name ?? 'project');
+            }
+            if (empty($project->client_review_status)) {
+                $project->client_review_status = 'pending';
+            }
+            if (empty($project->status)) {
+                $project->status = 'draft';
+            }
+            if (empty($project->current_stage)) {
+                $project->current_stage = 'budget_pending';
+            }
+            if (empty($project->priority)) {
+                $project->priority = 'medium';
+            }
+        });
+    }
+
+    public static function generateUniqueProjectCode(?string $preferredCode = null): string
+    {
+        if (!empty($preferredCode)) {
+            $exists = static::withTrashed()->where('project_code', $preferredCode)->exists();
+            if (!$exists) {
+                return $preferredCode;
+            }
+        }
+
+        $baseNumber = (int) (static::withTrashed()->max('id') ?? 0) + 1;
+
+        $latestCode = static::withTrashed()
+            ->where('project_code', 'LIKE', 'PRJ-%')
+            ->orderByRaw("CAST(SUBSTRING(project_code, 5) AS UNSIGNED) DESC")
+            ->value('project_code');
+
+        if ($latestCode && preg_match('/PRJ-(\d+)/', $latestCode, $matches)) {
+            $highestCodeNum = (int) $matches[1];
+            if ($highestCodeNum >= $baseNumber) {
+                $baseNumber = $highestCodeNum + 1;
+            }
+        }
+
+        do {
+            $candidateCode = 'PRJ-' . str_pad((string) $baseNumber, 5, '0', STR_PAD_LEFT);
+            $exists = static::withTrashed()->where('project_code', $candidateCode)->exists();
+            if ($exists) {
+                $baseNumber++;
+            }
+        } while ($exists);
+
+        return $candidateCode;
+    }
+
+    public static function generateUniqueSlug(string $name, ?int $seedId = null): string
+    {
+        $baseSlug = \Illuminate\Support\Str::slug($name) ?: 'project';
+        $num = $seedId ?? ((int) (static::withTrashed()->max('id') ?? 0) + 1);
+        $candidate = $baseSlug . '-' . $num;
+
+        while (static::withTrashed()->where('slug', $candidate)->exists()) {
+            $num++;
+            $candidate = $baseSlug . '-' . $num;
+        }
+
+        return $candidate;
+    }
+
     protected $fillable = [
         'company_id',
         'client_id',

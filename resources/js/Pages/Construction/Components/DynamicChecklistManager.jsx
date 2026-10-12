@@ -180,7 +180,9 @@ export default function DynamicChecklistManager({
 
     const [groupingMode, setGroupingMode] = useState("group");
     const [activeGroup, setActiveGroup] = useState(initialActiveGroup || null);
-    const [selectedTaskKey, setSelectedTaskKey] = useState("all");
+    const [filterTaskKey, setFilterTaskKey] = useState("all");
+    const [createTaskKey, setCreateTaskKey] = useState("");
+    const [showAddForm, setShowAddForm] = useState(false);
     const [editing, setEditing] = useState(null);
     const [previewImage, setPreviewImage] = useState(null);
 
@@ -264,14 +266,14 @@ export default function DynamicChecklistManager({
         return list;
     }, [project]);
 
-    // Preselect first task if available
+    // Preselect first task for the create form if not already selected
     useEffect(() => {
-        if (taskOptions.length > 0 && selectedTaskKey === "all") {
+        if (taskOptions.length > 0 && (!createTaskKey || !taskOptions.some((t) => t.key === createTaskKey))) {
             const first = taskOptions[0];
-            setSelectedTaskKey(first.key);
+            setCreateTaskKey(first.key);
             updateCreateFormScope(first);
         }
-    }, [taskOptions]);
+    }, [taskOptions, createTaskKey]);
 
     const updateCreateFormScope = (taskOpt) => {
         if (!taskOpt) return;
@@ -302,9 +304,9 @@ export default function DynamicChecklistManager({
         }
     };
 
-    const handleTaskChange = (e) => {
+    const handleCreateTaskChange = (e) => {
         const val = e.target.value;
-        setSelectedTaskKey(val);
+        setCreateTaskKey(val);
         const opt = taskOptions.find((t) => t.key === val);
         if (opt) {
             updateCreateFormScope(opt);
@@ -333,14 +335,14 @@ export default function DynamicChecklistManager({
     const built = useMemo(() => buildGroupsFromProject(project), [project]);
     const activeGroups = groupingMode === "day" ? built.dayGroups : built.groups;
     const filteredGroups = useMemo(() => {
-        if (selectedTaskKey === "all") return activeGroups;
-        const opt = taskOptions.find((t) => t.key === selectedTaskKey);
+        if (filterTaskKey === "all") return activeGroups;
+        const opt = taskOptions.find((t) => t.key === filterTaskKey);
         if (!opt) return activeGroups;
         return activeGroups.filter((g) =>
             g.heading.toLowerCase().includes(opt.title.toLowerCase()) ||
             g.heading.toLowerCase().includes(opt.code.toLowerCase())
         );
-    }, [activeGroups, selectedTaskKey, taskOptions]);
+    }, [activeGroups, filterTaskKey, taskOptions]);
 
     const slicedGroups = typeof limitGroups === "number" ? filteredGroups.slice(0, limitGroups) : filteredGroups;
     const completionPct = built.totals.total
@@ -390,6 +392,7 @@ export default function DynamicChecklistManager({
                 createForm.setData("status", "pending");
                 setImg1Preview(null);
                 setImg2Preview(null);
+                setShowAddForm(false);
                 toast.success("Checklist item created successfully.");
             },
             onError: (errors) => {
@@ -459,9 +462,9 @@ export default function DynamicChecklistManager({
         });
     };
 
-    const selectedTask = useMemo(
-        () => taskOptions.find((t) => t.key === selectedTaskKey),
-        [taskOptions, selectedTaskKey]
+    const selectedCreateTask = useMemo(
+        () => taskOptions.find((t) => t.key === createTaskKey),
+        [taskOptions, createTaskKey]
     );
 
     return (
@@ -478,7 +481,7 @@ export default function DynamicChecklistManager({
                                 Dynamic Checklist Manager
                             </h2>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
-                                Total {built.totals.completed} of {built.totals.total} tasks completed ({completionPct}%)
+                                Total {built.totals.completed} of {built.totals.total} items completed ({completionPct}%)
                             </p>
                         </div>
                     </div>
@@ -491,6 +494,27 @@ export default function DynamicChecklistManager({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
+                    {/* Filter by Task */}
+                    {taskOptions.length > 0 && (
+                        <div className="flex items-center gap-1.5">
+                            <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                                Filter:
+                            </label>
+                            <select
+                                value={filterTaskKey}
+                                onChange={(e) => setFilterTaskKey(e.target.value)}
+                                className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                            >
+                                <option value="all">All Project Tasks ({taskOptions.length})</option>
+                                {taskOptions.map((opt) => (
+                                    <option key={opt.key} value={opt.key}>
+                                        {opt.code} - {opt.title}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
                     <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-950">
                         <button
                             type="button"
@@ -515,17 +539,46 @@ export default function DynamicChecklistManager({
                             Group by Day
                         </button>
                     </div>
+
+                    {variant === "project-show" && canManage && (
+                        <button
+                            type="button"
+                            onClick={() => setShowAddForm((prev) => !prev)}
+                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold shadow-sm transition ${
+                                showAddForm
+                                    ? "bg-slate-200 text-slate-800 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200"
+                                    : "bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-500/20"
+                            }`}
+                        >
+                            {showAddForm ? (
+                                <>
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    Close Form
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Add Checklist Item
+                                </>
+                            )}
+                        </button>
+                    )}
+
                     {headerExtra || null}
                 </div>
             </div>
 
-            {/* Task Selection & Creation Flow */}
-            {variant === "project-show" && canManage ? (
-                <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/30 p-5 shadow-sm dark:border-indigo-950 dark:from-slate-900 dark:to-indigo-950/20">
+            {/* Task Selection & Creation Flow (Collapsible) */}
+            {variant === "project-show" && canManage && showAddForm ? (
+                <div className="rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/40 p-5 shadow-sm dark:border-indigo-900/50 dark:from-slate-900 dark:to-indigo-950/30">
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100/80 pb-4 dark:border-slate-800">
                         <div>
                             <h3 className="text-sm font-bold text-indigo-950 dark:text-indigo-200">
-                                Step 1: Select Task & Add Checklist Items
+                                Attach Checklist Item to Task or Survey Plan
                             </h3>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
                                 Select any assigned task below to attach dynamic checklists with title, hours, status, notes & images.
@@ -533,13 +586,15 @@ export default function DynamicChecklistManager({
                         </div>
 
                         {/* Task Select Dropdown */}
-                        <div className="min-w-[260px]">
+                        <div className="min-w-[280px]">
+                            <label className="mb-1 block text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                                Target Task / Plan:
+                            </label>
                             <select
-                                value={selectedTaskKey}
-                                onChange={handleTaskChange}
+                                value={createTaskKey}
+                                onChange={handleCreateTaskChange}
                                 className="w-full rounded-xl border border-indigo-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-indigo-800 dark:bg-slate-900 dark:text-white"
                             >
-                                <option value="all">-- All Project Tasks ({taskOptions.length}) --</option>
                                 {taskOptions.map((opt) => (
                                     <option key={opt.key} value={opt.key}>
                                         {opt.label}
@@ -550,17 +605,17 @@ export default function DynamicChecklistManager({
                     </div>
 
                     {/* Active Selected Task Badge Card */}
-                    {selectedTask ? (
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200/70 bg-indigo-50/70 px-4 py-2.5 text-xs dark:border-indigo-900/40 dark:bg-indigo-950/40">
+                    {selectedCreateTask ? (
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200/70 bg-indigo-50/70 px-4 py-2 text-xs dark:border-indigo-900/40 dark:bg-indigo-950/40">
                             <div className="flex items-center gap-2">
-                                <span className="font-bold text-indigo-900 dark:text-indigo-200">Selected Task:</span>
+                                <span className="font-bold text-indigo-900 dark:text-indigo-200">Target Task:</span>
                                 <span className="rounded-md bg-indigo-600 px-2 py-0.5 font-mono text-[11px] text-white">
-                                    {selectedTask.code}
+                                    {selectedCreateTask.code}
                                 </span>
-                                <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedTask.title}</span>
+                                <span className="font-semibold text-slate-800 dark:text-slate-200">{selectedCreateTask.title}</span>
                             </div>
-                            {selectedTask.status ? (
-                                <StatusBadge value={selectedTask.status} />
+                            {selectedCreateTask.status ? (
+                                <StatusBadge value={selectedCreateTask.status} />
                             ) : null}
                         </div>
                     ) : null}
@@ -703,7 +758,14 @@ export default function DynamicChecklistManager({
                             </div>
                         </div>
 
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowAddForm(false)}
+                                className="rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                            >
+                                Cancel
+                            </button>
                             <button
                                 type="submit"
                                 disabled={createForm.processing}

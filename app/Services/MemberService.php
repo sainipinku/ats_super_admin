@@ -45,6 +45,7 @@ class MemberService
             'dob' => $validated['dob'] ?? null,
             'is_calling_team' => $isCallingTeamMember,
             'assigned_admin_id' => $validated['assigned_admin_id'] ?? null,
+            'status' => isset($validated['status']) ? (int) $validated['status'] : ($existingMember ? $existingMember->status : 1),
         ];
 
         if (!$isUpdate) {
