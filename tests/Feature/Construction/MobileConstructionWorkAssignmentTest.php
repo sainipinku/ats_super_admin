@@ -173,6 +173,33 @@ class MobileConstructionWorkAssignmentTest extends TestCase
         ]);
     }
 
+    public function test_member_dashboard_includes_today_execution_task_assigned_to_member(): void
+    {
+        $admin = $this->createSuperAdmin();
+        $member = $this->createMember($admin, 'Execution Task Member');
+        $project = $this->createProject('PRJ-MD-ET', 'project-md-et', 'Dashboard Execution Project');
+        $task = $this->createExecutionTask($project, 'TASK-MD-ET');
+        $today = now('Asia/Kolkata')->toDateString();
+        $task->update([
+            'planned_start_date' => $today,
+            'planned_end_date' => $today,
+            'status' => 'planned',
+        ]);
+
+        ExecutionTaskAssignee::create([
+            'project_id' => $project->id,
+            'execution_task_id' => $task->id,
+            'member_id' => $member->id,
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($member, 'sanctum')->getJson('/api/member/dashboard');
+
+        $response->assertOk()
+            ->assertJsonPath('todays_tasks.0.id', $task->id)
+            ->assertJsonPath('todays_tasks.0.title', $task->title);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | SURVEY WORK ASSIGNMENT

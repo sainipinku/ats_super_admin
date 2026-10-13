@@ -60,6 +60,14 @@ class MemberDashboardController extends Controller
             ->unique()
             ->all();
 
+        $viaLegacyAssignee = ExecutionTaskAssignee::query()
+            ->where('member_id', $member->getKey())
+            ->where('status', 'active')
+            ->whereNotNull('project_id')
+            ->pluck('project_id')
+            ->unique()
+            ->all();
+
         $viaUnifiedSupervisor = \App\Models\Task::query()
             ->where('assigned_supervisor_member_id', $member->getKey())
             ->whereNotNull('project_id')
@@ -76,7 +84,7 @@ class MemberDashboardController extends Controller
             ->unique()
             ->all();
 
-        $merged = array_merge($team, $viaLegacySupervisor, $viaUnifiedSupervisor, $viaAssigneeUnified);
+        $merged = array_merge($team, $viaLegacySupervisor, $viaLegacyAssignee, $viaUnifiedSupervisor, $viaAssigneeUnified);
         return array_values(array_unique(array_map('intval', $merged)));
     }
 
@@ -384,6 +392,30 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
                         $assignmentOrSupervisor->whereHas('assignees', function (Builder $sub) use ($memberId) {
                             $sub->where('member_id', $memberId)->where('status', 'active');
                         })->orWhere('supervisor_member_id', $memberId);
+                    });
+                    if ($accessibleProjectIds !== []) {
+                        $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
+                            $scope->whereNull('project_id')
+                                ->orWhereIn('project_id', $accessibleProjectIds);
+                        });
+                    } else {
+                        $direct->whereNull('project_id');
+                    }
+                });
+
+                if ($adminProjectIds !== []) {
+                    $q->orWhere(function (Builder $admin) use ($adminProjectIds) {
+                        $admin->whereIn('project_id', $adminProjectIds);
+                    });
+                }
+            };
+
+            $unifiedScope = function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
+                $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
+                    $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
+                        $assignmentOrSupervisor->whereHas('assignedMembers', function (Builder $sub) use ($memberId) {
+                            $sub->where('assigned_to', $memberId);
+                        })->orWhere('assigned_supervisor_member_id', $memberId);
                     });
                     if ($accessibleProjectIds !== []) {
                         $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
