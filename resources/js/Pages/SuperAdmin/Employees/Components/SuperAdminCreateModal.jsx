@@ -10,6 +10,7 @@ export default function SuperAdminCreateModal({ isOpen, onClose, constructionRol
     const [accountType, setAccountType] = useState(isProjectOwner ? 'superadmin' : 'admin'); // 'superadmin' or 'admin'
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
+    const [localErrors, setLocalErrors] = useState({});
 
     useEffect(() => {
         if (!isProjectOwner) {
@@ -21,6 +22,7 @@ export default function SuperAdminCreateModal({ isOpen, onClose, constructionRol
         if (!isOpen) {
             setShowPassword(false);
             setShowPasswordConfirmation(false);
+            setLocalErrors({});
         }
     }, [isOpen]);
 
@@ -49,11 +51,31 @@ export default function SuperAdminCreateModal({ isOpen, onClose, constructionRol
         setAccountType(type);
         setShowPassword(false);
         setShowPasswordConfirmation(false);
+        setLocalErrors({});
         clearErrors();
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
+
+        const newErrors = {};
+        const cleanedPhone = data.phone ? data.phone.replace(/\D/g, '') : '';
+        const cleanedCompanyPhone = data.company_phone ? data.company_phone.replace(/\D/g, '') : '';
+
+        if (cleanedPhone && cleanedPhone.length !== 10) {
+            newErrors.phone = 'Phone number must be exactly 10 digits (min and max 10 digits).';
+        }
+
+        if (accountType === 'superadmin' && cleanedCompanyPhone && cleanedCompanyPhone.length !== 10) {
+            newErrors.company_phone = 'Company phone must be exactly 10 digits (min and max 10 digits).';
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+            setLocalErrors(newErrors);
+            return;
+        }
+
+        setLocalErrors({});
         const routeName = accountType === 'superadmin'
             ? route('super.super_admins.store_superadmin')
             : route('super.super_admins.store_admin');
@@ -61,6 +83,7 @@ export default function SuperAdminCreateModal({ isOpen, onClose, constructionRol
         post(routeName, {
             onSuccess: () => {
                 reset();
+                setLocalErrors({});
                 onClose();
             },
         });
@@ -184,19 +207,35 @@ export default function SuperAdminCreateModal({ isOpen, onClose, constructionRol
 
                             {/* Phone */}
                             <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number (Max 12 digits)</label>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number (10 digits)</label>
                                 <div className="relative">
                                     <Phone className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                                     <input
-                                        type="text"
-                                        maxLength={12}
+                                        type="tel"
+                                        maxLength={10}
+                                        minLength={10}
+                                        pattern="[0-9]{10}"
+                                        inputMode="numeric"
                                         value={data.phone}
-                                        onChange={(e) => setData('phone', e.target.value.replace(/\D/g, '').slice(0, 12))}
-                                        placeholder="Enter phone number (max 12 digits)"
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                            setData('phone', val);
+                                            if (errors.phone) clearErrors('phone');
+                                            if (localErrors.phone) {
+                                                setLocalErrors((prev) => {
+                                                    const next = { ...prev };
+                                                    delete next.phone;
+                                                    return next;
+                                                });
+                                            }
+                                        }}
+                                        placeholder="Enter 10-digit phone number"
                                         className={inputClasses}
                                     />
                                 </div>
-                                {errors.phone && <p className="text-xs text-rose-500 mt-1">{errors.phone}</p>}
+                                {(localErrors.phone || errors.phone) && (
+                                    <p className="text-xs text-rose-500 mt-1">{localErrors.phone || errors.phone}</p>
+                                )}
                             </div>
 
                             {/* Username or Role */}
@@ -349,19 +388,35 @@ export default function SuperAdminCreateModal({ isOpen, onClose, constructionRol
 
                                 {/* Company Phone */}
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1">Company Phone (Max 12 digits)</label>
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">Company Phone (10 digits)</label>
                                     <div className="relative">
                                         <Phone className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                                         <input
-                                            type="text"
-                                            maxLength={12}
+                                            type="tel"
+                                            maxLength={10}
+                                            minLength={10}
+                                            pattern="[0-9]{10}"
+                                            inputMode="numeric"
                                             value={data.company_phone}
-                                            onChange={(e) => setData('company_phone', e.target.value.replace(/\D/g, '').slice(0, 12))}
-                                            placeholder="Enter company phone"
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                                setData('company_phone', val);
+                                                if (errors.company_phone) clearErrors('company_phone');
+                                                if (localErrors.company_phone) {
+                                                    setLocalErrors((prev) => {
+                                                        const next = { ...prev };
+                                                        delete next.company_phone;
+                                                        return next;
+                                                    });
+                                                }
+                                            }}
+                                            placeholder="Enter 10-digit company phone"
                                             className={inputClasses}
                                         />
                                     </div>
-                                    {errors.company_phone && <p className="text-xs text-rose-500 mt-1">{errors.company_phone}</p>}
+                                    {(localErrors.company_phone || errors.company_phone) && (
+                                        <p className="text-xs text-rose-500 mt-1">{localErrors.company_phone || errors.company_phone}</p>
+                                    )}
                                 </div>
 
                                 {/* GST Number */}

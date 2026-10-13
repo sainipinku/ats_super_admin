@@ -10,16 +10,25 @@ use App\Services\Construction\TaskManagementService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
-class ProjectTaskApiController extends Controller
+class ProjectTaskApiController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('auth:sanctum'),
+            new Middleware('ability:task.manage,construction.view'),
+        ];
+    }
+
     public function __construct(
         public readonly TaskManagementService $tasks,
     ) {
-        $this->middleware(['auth:sanctum', 'ability:task.manage,construction.view']);
     }
 
     public function index(Request $request, Project $project): JsonResponse

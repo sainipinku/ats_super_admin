@@ -256,13 +256,13 @@ export default function EmployeeFormModal({
                                 name="alternate_number"
                                 value={formData.alternate_number}
                                 onChange={(e) => {
-                                    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 12);
+                                    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
                                     handleChange({ target: { name: 'alternate_number', value: val } });
                                 }}
-                                maxLength={12}
+                                maxLength={10}
                                 className={inputClass('alternate_number')}
                                 inputMode="numeric"
-                                pattern="[0-9]*"
+                                pattern="[0-9]{10}"
                             />
                             {errors.alternate_number && <p className="text-red-500 text-xs mt-1">{errors.alternate_number}</p>}
                         </div>

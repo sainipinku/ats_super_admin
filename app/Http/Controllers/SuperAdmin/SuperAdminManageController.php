@@ -168,11 +168,18 @@ class SuperAdminManageController extends Controller
             return back()->with('error', 'Only the Project Owner can create new Super Admin accounts.');
         }
 
+        if ($request->filled('phone')) {
+            $request->merge(['phone' => preg_replace('/\D/', '', (string) $request->phone) ?: null]);
+        }
+        if ($request->filled('company_phone')) {
+            $request->merge(['company_phone' => preg_replace('/\D/', '', (string) $request->company_phone) ?: null]);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:super_admins,email|unique:members,email',
             'username' => 'nullable|string|max:255|unique:super_admins,username|unique:members,username',
-            'phone' => 'nullable|string|max:15|unique:super_admins,phone|unique:members,phone',
+            'phone' => ['nullable', 'string', 'digits:10', 'unique:super_admins,phone', 'unique:members,phone'],
             'password' => 'required|string|min:6|confirmed',
             'profile_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
 
@@ -180,9 +187,12 @@ class SuperAdminManageController extends Controller
             'company_name' => 'required|string|max:255',
             'company_legal_name' => 'nullable|string|max:255',
             'company_email' => 'nullable|email|max:255',
-            'company_phone' => 'nullable|string|max:15',
+            'company_phone' => ['nullable', 'string', 'digits:10'],
             'company_gst_number' => 'nullable|string|max:50',
             'company_address' => 'nullable|string',
+        ], [
+            'phone.digits' => 'The phone number must be exactly 10 digits (min and max 10 digits).',
+            'company_phone.digits' => 'The company phone number must be exactly 10 digits (min and max 10 digits).',
         ]);
 
         $imagePath = null;
@@ -233,13 +243,19 @@ class SuperAdminManageController extends Controller
 
     public function storeAdmin(Request $request)
     {
+        if ($request->filled('phone')) {
+            $request->merge(['phone' => preg_replace('/\D/', '', (string) $request->phone) ?: null]);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:members,email|unique:super_admins,email',
-            'phone' => 'nullable|string|max:15|unique:members,phone|unique:super_admins,phone',
+            'phone' => ['nullable', 'string', 'digits:10', 'unique:members,phone', 'unique:super_admins,phone'],
             'password' => 'required|string|min:6|confirmed',
             'role_slug' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ], [
+            'phone.digits' => 'The phone number must be exactly 10 digits (min and max 10 digits).',
         ]);
 
         $imagePath = null;
