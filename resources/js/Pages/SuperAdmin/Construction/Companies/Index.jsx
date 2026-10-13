@@ -75,10 +75,10 @@ export default function CompaniesIndex({ companies }) {
                         <InputField
                             form={form}
                             name="phone"
-                            label="Phone (Max 12 digits)"
+                            label="Phone (10 digits)"
                             isNumeric={true}
-                            maxLength={12}
-                            placeholder="Enter phone number (max 12 digits)"
+                            maxLength={10}
+                            placeholder="Enter 10-digit phone number"
                         />
                         <InputField form={form} name="gst_number" label="GST Number" />
                         <TextAreaField form={form} name="address" label="Address" rows={4} />
@@ -150,10 +150,10 @@ export default function CompaniesIndex({ companies }) {
                     <InputField
                         form={editForm}
                         name="phone"
-                        label="Phone (Max 12 digits)"
+                        label="Phone (10 digits)"
                         isNumeric={true}
-                        maxLength={12}
-                        placeholder="Enter phone number (max 12 digits)"
+                        maxLength={10}
+                        placeholder="Enter 10-digit phone number"
                     />
                     <InputField form={editForm} name="gst_number" label="GST Number" />
                     <TextAreaField form={editForm} name="address" label="Address" rows={4} />

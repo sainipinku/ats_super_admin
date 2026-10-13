@@ -163,18 +163,18 @@ export default function ClientsIndex({ clients = [], companies = [], is_project_
                         <InputField
                             form={form}
                             name="phone"
-                            label="Phone (Max 10 digits)"
+                            label="Phone (10 digits)"
                             isNumeric={true}
                             maxLength={10}
-                            placeholder="Enter phone number (max 10 digits)"
+                            placeholder="Enter 10-digit phone number"
                         />
                         <InputField
                             form={form}
                             name="alternate_phone"
-                            label="Alternate Phone (Max 10 digits)"
+                            label="Alternate Phone (10 digits)"
                             isNumeric={true}
                             maxLength={10}
-                            placeholder="Enter alternate phone (max 10 digits)"
+                            placeholder="Enter 10-digit alternate phone"
                         />
                         <InputField form={form} name="gst_number" label="GST Number" />
                         <TextAreaField form={form} name="billing_address" label="Billing Address" rows={3} />
@@ -296,18 +296,18 @@ export default function ClientsIndex({ clients = [], companies = [], is_project_
                         <InputField
                             form={editForm}
                             name="phone"
-                            label="Phone (Max 10 digits)"
+                            label="Phone (10 digits)"
                             isNumeric={true}
                             maxLength={10}
-                            placeholder="Enter phone number (max 10 digits)"
+                            placeholder="Enter 10-digit phone number"
                         />
                         <InputField
                             form={editForm}
                             name="alternate_phone"
-                            label="Alternate Phone (Max 10 digits)"
+                            label="Alternate Phone (10 digits)"
                             isNumeric={true}
                             maxLength={10}
-                            placeholder="Enter alternate phone (max 10 digits)"
+                            placeholder="Enter 10-digit alternate phone"
                         />
                         <InputField form={editForm} name="gst_number" label="GST Number" />
                     </div>

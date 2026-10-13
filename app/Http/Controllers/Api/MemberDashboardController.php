@@ -53,6 +53,13 @@ class MemberDashboardController extends Controller
             ->unique()
             ->all();
 
+        $viaLegacyAssignee = \App\Models\ExecutionTaskAssignee::query()
+            ->where('member_id', $member->getKey())
+            ->where('status', 'active')
+            ->pluck('project_id')
+            ->unique()
+            ->all();
+
         $viaLegacySupervisor = \App\Models\ExecutionTask::query()
             ->where('supervisor_member_id', $member->getKey())
             ->whereNotNull('project_id')
@@ -76,7 +83,21 @@ class MemberDashboardController extends Controller
             ->unique()
             ->all();
 
-        $merged = array_merge($team, $viaLegacySupervisor, $viaUnifiedSupervisor, $viaAssigneeUnified);
+        $viaDirectMember = \App\Models\Task::query()
+            ->where('member_id', $member->getKey())
+            ->whereNotNull('project_id')
+            ->pluck('project_id')
+            ->unique()
+            ->all();
+
+        $merged = array_merge(
+            $team,
+            $viaLegacyAssignee,
+            $viaLegacySupervisor,
+            $viaUnifiedSupervisor,
+            $viaAssigneeUnified,
+            $viaDirectMember
+        );
         return array_values(array_unique(array_map('intval', $merged)));
     }
 
@@ -303,9 +324,31 @@ class MemberDashboardController extends Controller
             ->where('status', 'active')
             ->pluck('project_id');
 
+        $unifiedTaskProjectIds = \App\Models\TaskAssignment::where('assigned_to', $memberId)
+            ->where(fn ($q) => $q->whereNull('is_transferred')->orWhere('is_transferred', 0))
+            ->whereNull('deleted_at')
+            ->whereNotNull('project_id')
+            ->pluck('project_id');
+
+        $directTaskProjectIds = \App\Models\Task::where('member_id', $memberId)
+            ->whereNotNull('project_id')
+            ->pluck('project_id');
+
+        $supervisorTaskProjectIds = \App\Models\ExecutionTask::where('supervisor_member_id', $memberId)
+            ->whereNotNull('project_id')
+            ->pluck('project_id')
+            ->merge(
+                \App\Models\Task::where('assigned_supervisor_member_id', $memberId)
+                    ->whereNotNull('project_id')
+                    ->pluck('project_id')
+            );
+
         $projectIds = $teamProjectIds
             ->merge($surveyProjectIds)
             ->merge($taskProjectIds)
+            ->merge($unifiedTaskProjectIds)
+            ->merge($directTaskProjectIds)
+            ->merge($supervisorTaskProjectIds)
             ->unique()
             ->values();
 
@@ -402,6 +445,35 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
                 }
             };
 
+            $unifiedScope = function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
+                $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
+                    $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
+                        $assignmentOrSupervisor->whereHas('assignments', function (Builder $sub) use ($memberId) {
+                            $sub->where('assigned_to', $memberId);
+                        })
+                        ->orWhereHas('assignedMembers', function (Builder $sub) use ($memberId) {
+                            $sub->where('members.id', $memberId);
+                        })
+                        ->orWhere('assigned_supervisor_member_id', $memberId)
+                        ->orWhere('member_id', $memberId);
+                    });
+                    if ($accessibleProjectIds !== []) {
+                        $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
+                            $scope->whereNull('project_id')
+                                ->orWhereIn('project_id', $accessibleProjectIds);
+                        });
+                    } else {
+                        $direct->whereNull('project_id');
+                    }
+                });
+
+                if ($adminProjectIds !== []) {
+                    $q->orWhere(function (Builder $admin) use ($adminProjectIds) {
+                        $admin->whereIn('project_id', $adminProjectIds);
+                    });
+                }
+            };
+
             $requestedProjectId = $request->filled('project_id') ? (int) $request->input('project_id') : null;
 
             $legacyQuery = ExecutionTask::with([
@@ -427,22 +499,24 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             $legacy = $legacyQuery->latest()->get()->each->setAttribute('_source', 'legacy');
             $unified = $unifiedQuery->latest()->get()->each->setAttribute('_source', 'unified');
 
-            $seenIds = [];
             $seenCodes = [];
+            $seenTitleProject = [];
             $dedupedTasks = collect();
 
             foreach ($legacy as $t) {
-                $seenIds[(int) $t->id] = true;
                 if (!empty($t->task_code)) {
                     $seenCodes[(string) $t->task_code] = true;
                 }
+                $key = ($t->project_id ?? 0) . ':' . trim(strtolower($t->title ?? ''));
+                $seenTitleProject[$key] = true;
                 $dedupedTasks->push($t);
             }
 
             foreach ($unified as $t) {
-                $isSeenId = isset($seenIds[(int) $t->id]);
                 $isSeenCode = !empty($t->task_code) && isset($seenCodes[(string) $t->task_code]);
-                if ($isSeenId || $isSeenCode) {
+                $key = ($t->project_id ?? 0) . ':' . trim(strtolower($t->title ?? ''));
+                $isSeenTitleProject = isset($seenTitleProject[$key]);
+                if ($isSeenCode || $isSeenTitleProject) {
                     continue;
                 }
                 $dedupedTasks->push($t);
@@ -588,8 +662,39 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
         $headerInfo = $this->getHeaderInfo($member);
         $checkInCard = $this->getCheckInCard($todayAttendance);
         $todaysSummaryCard = $this->getTodaysSummary($projects, $tasks, $hoursWorked);
-        $currentProjectCard = $this->getCurrentProject($projects);
         $todaysTasksList = $this->getTodaysTasks($tasks, $requestedProjectId, $targetDate);
+        $last20TasksFormatted = $tasks->take(20)->map(fn ($t) => $this->formatTaskItem($t))->values()->all();
+
+        // Group formatted today's tasks by project_id
+        $todayTasksByProject = collect($todaysTasksList)->groupBy('project_id');
+
+        // Group all deduped tasks by project_id
+        $tasksByProject = $tasks->groupBy(fn ($t) => (int) ($t->project_id ?? 0));
+
+        $attachTasksToProject = function (Project $project) use ($todayTasksByProject, $tasksByProject) {
+            $projId = (int) $project->id;
+            $projTodayTasks = $todayTasksByProject->get($projId, collect())->values()->all();
+
+            $projAllTasksModels = $tasksByProject->get($projId, collect());
+            $projLast20Tasks = $projAllTasksModels->take(20)->map(fn ($t) => $this->formatTaskItem($t))->values()->all();
+
+            $project->setAttribute('today_tasks', $projTodayTasks);
+            $project->setAttribute('today_task', $projTodayTasks);
+            $project->setAttribute('tasks', $projLast20Tasks);
+            $project->setAttribute('task', $projLast20Tasks);
+            $project->setAttribute('today_tasks_count', count($projTodayTasks));
+            $project->setAttribute('tasks_count', $projAllTasksModels->count());
+        };
+
+        foreach ($projects as $project) {
+            $attachTasksToProject($project);
+        }
+
+        foreach ($primaryProjects as $primaryProject) {
+            $attachTasksToProject($primaryProject);
+        }
+
+        $currentProjectCard = $this->getCurrentProject($projects);
         $quickActionsList = $this->getQuickActions();
         $fieldActivityCard = $this->getFieldActivity($todayAttendance);
         $performanceCard = $this->getPerformance($attendanceLast30, $tasks, $hoursWorked);
@@ -604,6 +709,11 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             'todays_summary' => $todaysSummaryCard,
             'current_project' => $currentProjectCard,
             'todays_tasks' => $todaysTasksList,
+            'today_tasks' => $todaysTasksList,
+            'today_task' => $todaysTasksList,
+            'tasks' => $last20TasksFormatted,
+            'task' => $last20TasksFormatted,
+            'all_tasks' => $last20TasksFormatted,
             'quick_actions' => $quickActionsList,
             'field_activity' => $fieldActivityCard,
             'performance' => $performanceCard,
@@ -626,6 +736,7 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
                 'survey_plans_count' => $surveyPlans->count(),
                 'pending_surveys' => $pendingSurveyPlans,
                 'tasks_count' => $taskCounts,
+                'today_tasks_count' => count($todaysTasksList),
                 'attendance' => $attendanceSummary,
                 'drafting_count' => $draftingJobs->count(),
                 'vehicles_assigned_count' => $vehiclesAssigned->count(),
@@ -639,7 +750,9 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             'projects_by_stage' => $projectStageCounts,
             'survey_plans' => $surveyPlans,
             'today_survey_visits' => $todayVisits,
-            'tasks' => $tasks,
+            'tasks' => $last20TasksFormatted,
+            'task' => $last20TasksFormatted,
+            'all_tasks' => $last20TasksFormatted,
             'task_summary' => $taskCounts,
             'drafting_jobs' => $draftingJobs,
             'recent_dprs' => $recentDPRs,
@@ -922,9 +1035,14 @@ $completed = SurveyPlan::whereHas(
         ])->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
             $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
                 $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
-                    $assignmentOrSupervisor->whereHas('assignedMembers', function (Builder $sub) use ($memberId) {
+                    $assignmentOrSupervisor->whereHas('assignments', function (Builder $sub) use ($memberId) {
                         $sub->where('assigned_to', $memberId);
-                    })->orWhere('assigned_supervisor_member_id', $memberId);
+                    })
+                    ->orWhereHas('assignedMembers', function (Builder $sub) use ($memberId) {
+                        $sub->where('members.id', $memberId);
+                    })
+                    ->orWhere('assigned_supervisor_member_id', $memberId)
+                    ->orWhere('member_id', $memberId);
                 });
                 if ($accessibleProjectIds !== []) {
                     $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
@@ -1111,9 +1229,14 @@ $completed = SurveyPlan::whereHas(
         ])->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
             $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
                 $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
-                    $assignmentOrSupervisor->whereHas('assignedMembers', function (Builder $sub) use ($memberId) {
+                    $assignmentOrSupervisor->whereHas('assignments', function (Builder $sub) use ($memberId) {
                         $sub->where('assigned_to', $memberId);
-                    })->orWhere('assigned_supervisor_member_id', $memberId);
+                    })
+                    ->orWhereHas('assignedMembers', function (Builder $sub) use ($memberId) {
+                        $sub->where('members.id', $memberId);
+                    })
+                    ->orWhere('assigned_supervisor_member_id', $memberId)
+                    ->orWhere('member_id', $memberId);
                 });
                 if ($accessibleProjectIds !== []) {
                     $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
@@ -1160,22 +1283,24 @@ $completed = SurveyPlan::whereHas(
         $currentDate = $now->copy()->startOfDay();
         $effectiveTargetDate = $targetDate ?? $currentDate;
 
-        $seenIds = [];
         $seenCodes = [];
+        $seenTitleProject = [];
         $dedupedTasks = collect();
 
         foreach ($legacy as $t) {
-            $seenIds[(int) $t->id] = true;
             if (!empty($t->task_code)) {
                 $seenCodes[(string) $t->task_code] = true;
             }
+            $key = ($t->project_id ?? 0) . ':' . trim(strtolower($t->title ?? ''));
+            $seenTitleProject[$key] = true;
             $dedupedTasks->push($t);
         }
 
         foreach ($unified as $t) {
-            $isSeenId = isset($seenIds[(int) $t->id]);
             $isSeenCode = !empty($t->task_code) && isset($seenCodes[(string) $t->task_code]);
-            if ($isSeenId || $isSeenCode) {
+            $key = ($t->project_id ?? 0) . ':' . trim(strtolower($t->title ?? ''));
+            $isSeenTitleProject = isset($seenTitleProject[$key]);
+            if ($isSeenCode || $isSeenTitleProject) {
                 continue;
             }
             $dedupedTasks->push($t);
@@ -2446,7 +2571,10 @@ $completed = SurveyPlan::whereHas(
             return null;
         }
 
-        $tasksCount = $primary->executionTasks ? $primary->executionTasks->count() : 0;
+        $tasksCount = $primary->tasks_count ?? ($primary->executionTasks ? $primary->executionTasks->count() : 0);
+        $todayTasks = $primary->today_tasks ?? [];
+        $todayTasksCount = $primary->today_tasks_count ?? count($todayTasks);
+        $tasks = $primary->tasks ?? [];
         $startDate = $primary->start_date ? $primary->start_date->format('d M') : null;
         $endDate = $primary->expected_end_date ? $primary->expected_end_date->format('d M') : null;
 
@@ -2460,7 +2588,68 @@ $completed = SurveyPlan::whereHas(
             'start_date' => $startDate,
             'deadline' => $endDate,
             'tasks_count' => $tasksCount,
+            'today_tasks_count' => $todayTasksCount,
+            'today_tasks' => $todayTasks,
+            'today_task' => $todayTasks,
+            'tasks' => $tasks,
+            'task' => $tasks,
             'manager_name' => $primary->client?->name ?? $primary->company?->name ?? null,
+        ];
+    }
+
+    protected function formatTaskItem($t): array
+    {
+        $parseDate = static function ($value): ?\Illuminate\Support\Carbon {
+            if ($value === null || $value === '') {
+                return null;
+            }
+            if ($value instanceof \DateTimeInterface) {
+                return \Illuminate\Support\Carbon::instance($value)->startOfDay();
+            }
+            try {
+                return \Illuminate\Support\Carbon::parse($value)->startOfDay();
+            } catch (\Throwable) {
+                return null;
+            }
+        };
+
+        $statusRaw = $t->status ?? '';
+        $statusStr = is_object($statusRaw) ? ($statusRaw->value ?? (string) $statusRaw) : (string) $statusRaw;
+        $isCompleted = (strtolower($statusStr) === 'completed');
+        $priority = $this->formatPriorityValue($t->priority ?? null, 'medium');
+        $isLegacy = ($t->_source ?? null) === 'legacy' || $t instanceof \App\Models\ExecutionTask;
+        $startVal = $isLegacy
+            ? ($t->planned_start_date ?? null)
+            : ($t->start_date ?? ($t->planned_start_date ?? null));
+        $endVal = $isLegacy
+            ? ($t->planned_end_date ?? null)
+            : ($t->end_date ?? ($t->planned_end_date ?? null));
+        $startParsed = $parseDate($startVal);
+        $endParsed = $parseDate($endVal);
+        $due = $endParsed;
+        $supervisor = $t->supervisor ?? $t->assignedSupervisor ?? null;
+
+        return [
+            'id' => $t->id,
+            'title' => $t->title,
+            'description' => $t->description ?? null,
+            'project_id' => $t->project_id ? (int) $t->project_id : null,
+            'project_name' => $t->project?->name ?? null,
+            'location' => $t->project?->project_address ?? ($t->project?->location ?? null),
+            'progress_percent' => (int) ($t->progress_percent ?? 0),
+            'start_date' => $startVal ? $startParsed?->toDateString() : null,
+            'end_date' => $endVal ? $endParsed?->toDateString() : null,
+            'start_date_formatted' => $startVal ? $startParsed?->format('d/m/Y') : null,
+            'end_date_formatted' => $endVal ? $endParsed?->format('d/m/Y') : null,
+            'due_time_formatted' => $due ? $due->format('d M, h:i A') : null,
+            'priority' => $priority,
+            'priority_label' => ucfirst($priority),
+            'is_completed' => $isCompleted,
+            'status' => $statusStr,
+            'source' => $isLegacy ? 'legacy' : 'unified',
+            'task_code' => $t->task_code ?? null,
+            'supervisor_name' => $supervisor?->name ?? null,
+            'created_at' => $t->created_at?->toIso8601String(),
         ];
     }
 
@@ -2545,43 +2734,7 @@ $completed = SurveyPlan::whereHas(
             }
 
             return false;
-        })->map(function ($t) use ($parseDate) {
-            $statusRaw = $t->status ?? '';
-            $statusStr = is_object($statusRaw) ? ($statusRaw->value ?? (string) $statusRaw) : (string) $statusRaw;
-            $isCompleted = (strtolower($statusStr) === 'completed');
-            $priority = $this->formatPriorityValue($t->priority, 'medium');
-            $isLegacy = ($t->_source ?? null) === 'legacy' || $t instanceof \App\Models\ExecutionTask;
-            $startVal = $isLegacy
-                ? ($t->planned_start_date ?? null)
-                : ($t->start_date ?? ($t->planned_start_date ?? null));
-            $endVal = $isLegacy
-                ? ($t->planned_end_date ?? null)
-                : ($t->end_date ?? ($t->planned_end_date ?? null));
-            $startParsed = $parseDate($startVal);
-            $endParsed = $parseDate($endVal);
-            $due = $endParsed;
-            $supervisor = $t->supervisor ?? $t->assignedSupervisor ?? null;
-
-            return [
-                'id' => $t->id,
-                'title' => $t->title,
-                'project_id' => $t->project_id ? (int) $t->project_id : null,
-                'project_name' => $t->project?->name ?? null,
-                'location' => $t->project?->project_address ?? ($t->project?->location ?? null),
-                'start_date' => $startVal ? $startParsed?->toDateString() : null,
-                'end_date' => $endVal ? $endParsed?->toDateString() : null,
-                'start_date_formatted' => $startVal ? $startParsed?->format('d/m/Y') : null,
-                'end_date_formatted' => $endVal ? $endParsed?->format('d/m/Y') : null,
-                'due_time_formatted' => $due ? $due->format('d M, h:i A') : null,
-                'priority' => $priority,
-                'priority_label' => ucfirst($priority),
-                'is_completed' => $isCompleted,
-                'status' => $statusStr,
-                'source' => $isLegacy ? 'legacy' : 'unified',
-                'task_code' => $t->task_code ?? null,
-                'supervisor_name' => $supervisor?->name ?? null,
-            ];
-        })->values()->toArray();
+        })->map(fn ($t) => $this->formatTaskItem($t))->values()->toArray();
     }
 
     protected function getQuickActions()

@@ -64,7 +64,7 @@ class AdminEmulationTest extends TestCase
             'name' => 'Existing Member',
             'email' => 'existing@example.com',
             'username' => 'existing_user',
-            'phone' => '08876465646',
+            'phone' => '9887646564',
             'password' => Hash::make('password'),
             'created_by' => $superAdmin->id,
             'slug' => 'existing-user',
@@ -75,12 +75,61 @@ class AdminEmulationTest extends TestCase
             ->post(route('super.super_admins.store_admin'), [
                 'name' => 'New Admin',
                 'email' => 'newadmin@example.com',
-                'phone' => '08876465646', // Same duplicate phone number
+                'phone' => '9887646564', // Same duplicate phone number
                 'password' => 'password123',
                 'password_confirmation' => 'password123',
                 'role_slug' => 'admin',
             ]);
 
         $response->assertSessionHasErrors(['phone']);
+    }
+
+    public function test_phone_number_must_be_exactly_10_digits_when_creating_admin(): void
+    {
+        $superAdmin = SuperAdmin::create([
+            'name' => 'Owner Admin',
+            'email' => 'owner2@example.com',
+            'password' => Hash::make('password'),
+            'status' => 1,
+        ]);
+
+        // Test with fewer than 10 digits (e.g., 4 digits '7878')
+        $responseShort = $this->actingAs($superAdmin, 'superadmin')
+            ->post(route('super.super_admins.store_admin'), [
+                'name' => 'Admin Short Phone',
+                'email' => 'shortphone@example.com',
+                'phone' => '7878',
+                'password' => 'password123',
+                'password_confirmation' => 'password123',
+                'role_slug' => 'admin',
+            ]);
+
+        $responseShort->assertSessionHasErrors(['phone']);
+
+        // Test with more than 10 digits (e.g., 12 digits)
+        $responseLong = $this->actingAs($superAdmin, 'superadmin')
+            ->post(route('super.super_admins.store_admin'), [
+                'name' => 'Admin Long Phone',
+                'email' => 'longphone@example.com',
+                'phone' => '987654321012',
+                'password' => 'password123',
+                'password_confirmation' => 'password123',
+                'role_slug' => 'admin',
+            ]);
+
+        $responseLong->assertSessionHasErrors(['phone']);
+
+        // Test with valid 10 digits
+        $responseValid = $this->actingAs($superAdmin, 'superadmin')
+            ->post(route('super.super_admins.store_admin'), [
+                'name' => 'Admin Valid Phone',
+                'email' => 'validphone@example.com',
+                'phone' => '9876543210',
+                'password' => 'password123',
+                'password_confirmation' => 'password123',
+                'role_slug' => 'admin',
+            ]);
+
+        $responseValid->assertSessionHasNoErrors();
     }
 }
