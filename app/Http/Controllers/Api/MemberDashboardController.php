@@ -67,6 +67,14 @@ class MemberDashboardController extends Controller
             ->unique()
             ->all();
 
+        $viaLegacyAssignee = ExecutionTaskAssignee::query()
+            ->where('member_id', $member->getKey())
+            ->where('status', 'active')
+            ->whereNotNull('project_id')
+            ->pluck('project_id')
+            ->unique()
+            ->all();
+
         $viaUnifiedSupervisor = \App\Models\Task::query()
             ->where('assigned_supervisor_member_id', $member->getKey())
             ->whereNotNull('project_id')
