@@ -29,6 +29,8 @@ Route::get('/', function () {
     ]);
 });
 
+
+
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::get('/registration-status', [AuthController::class, 'registrationStatus']);
