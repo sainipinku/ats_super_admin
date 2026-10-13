@@ -563,14 +563,17 @@ class ConstructionExecutionService
 
         $company = $project->company ?: ($companyId ? Company::find($companyId) : null);
 
+        // If member explicitly has a company_name that belongs to another company, return false
+        if (!empty($member->company_name) && $company) {
+            if ($member->company_name !== $company->name && $member->company_name !== $company->legal_name) {
+                return false;
+            }
+        }
+
         $companySuperAdminIds = SuperAdmin::query()
             ->when($companyId, fn($q) => $q->where('company_id', $companyId))
             ->pluck('id')
             ->toArray();
-
-        if (in_array($project->created_by_type, [SuperAdmin::class, 'App\Models\SuperAdmin', '\\App\\Models\\SuperAdmin'], true) && $project->created_by_id) {
-            $companySuperAdminIds[] = (int) $project->created_by_id;
-        }
 
         // 1. Is the member created by a company SuperAdmin?
         if (!empty($companySuperAdminIds) && in_array((int) $member->created_by, $companySuperAdminIds, true)) {

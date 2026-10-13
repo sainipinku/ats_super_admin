@@ -339,16 +339,28 @@ class Member extends Authenticatable
     }
     public function isAdmin(): bool
     {
-        if ($this->slug === 'admin') {
+        if ($this->slug === 'admin' || $this->slug === 'super-admin') {
             return true;
         }
+
         $assignedSlugs = $this->assigned_role_details['slugs'] ?? [];
-        if (is_array($assignedSlugs) && in_array('admin', $assignedSlugs, true)) {
-            return true;
+        if (is_array($assignedSlugs) && !empty($assignedSlugs)) {
+            if (in_array('admin', $assignedSlugs, true) || in_array('project_admin', $assignedSlugs, true) || in_array('super_admin', $assignedSlugs, true)) {
+                return true;
+            }
+            return false;
         }
-        if (is_array($this->roles) && (in_array(1, $this->roles, true) || in_array('1', $this->roles, true))) {
-            return true;
+
+        if (is_array($this->roles) && !empty($this->roles)) {
+            $adminRoleIds = Role::whereIn('slug', ['admin', 'project_admin', 'super_admin'])->pluck('id')->toArray();
+            if (!empty(array_intersect($this->roles, $adminRoleIds))) {
+                return true;
+            }
+            if (in_array('admin', $this->roles, true) || in_array('project_admin', $this->roles, true) || in_array('super_admin', $this->roles, true)) {
+                return true;
+            }
         }
+
         return false;
     }
  public function isSuperAdmin(): bool
@@ -436,22 +448,17 @@ class Member extends Authenticatable
         $assignedSlugs = [];
         $assignedNames = [];
 
-        $excludedSlugs = ['super_admin', 'superadmin', 'admin', 'project_admin', 'project-admin'];
-        $excludedNames = ['super admin', 'admin', 'project admin'];
-
         foreach ($assignments as $assignment) {
             if ($assignment->role) {
                 $slug = strtolower(trim($assignment->role->slug ?? ''));
-                $name = trim($assignment->role->name ?? '');
 
-                if (in_array($slug, $excludedSlugs, true) || in_array(strtolower($name), $excludedNames, true)) {
-                    continue;
-                }
-
-                $formattedName = match ($assignment->role->slug) {
+                $formattedName = match ($slug) {
                     'surveyor' => 'Survey Man',
                     'vehicle_driver' => 'Driver',
                     'draft_person' => 'Draft Man',
+                    'admin' => 'Admin',
+                    'project_admin' => 'Project Admin',
+                    'super_admin', 'superadmin' => 'Super Admin',
                     default => $assignment->role->name,
                 };
                 $assignedSlugs[] = $assignment->role->slug;
@@ -472,30 +479,55 @@ class Member extends Authenticatable
 
     public function getAssignedRolesAttribute(): array
     {
-        $slugs = $this->assigned_role_details['slugs'];
+        $slugs = $this->assigned_role_details['slugs'] ?? [];
         if (!empty($slugs)) {
             return $slugs;
         }
 
-        return [$this->slug ?? 'member'];
+        if ($this->isAdmin() || $this->slug === 'admin') {
+            return ['admin'];
+        }
+
+        if (is_array($this->roles) && !empty($this->roles)) {
+            $roleSlugs = \App\Models\ConstructionRole::whereIn('id', $this->roles)
+                ->pluck('slug')
+                ->toArray();
+            if (!empty($roleSlugs)) {
+                return $roleSlugs;
+            }
+
+            $sysRoleSlugs = Role::whereIn('id', $this->roles)->pluck('slug')->toArray();
+            if (!empty($sysRoleSlugs)) {
+                return $sysRoleSlugs;
+            }
+        }
+
+        return ['member'];
     }
 
     public function getAssignedRoleNamesAttribute(): array
     {
-        $names = $this->assigned_role_details['names'];
+        $names = $this->assigned_role_details['names'] ?? [];
         if (!empty($names)) {
             return $names;
         }
 
-        $excludedNames = ['super admin', 'admin', 'project admin'];
         if (is_array($this->roles) && !empty($this->roles)) {
-            $systemRoleNames = Role::whereIn('id', $this->roles)->pluck('name')->toArray();
-            $filtered = array_values(array_filter($systemRoleNames, function($n) use ($excludedNames) {
-                return !in_array(strtolower(trim($n)), $excludedNames, true);
-            }));
-            if (!empty($filtered)) {
-                return $filtered;
+            $systemRoles = Role::whereIn('id', $this->roles)->get();
+            $mappedNames = [];
+            foreach ($systemRoles as $sr) {
+                $srSlug = strtolower(trim($sr->slug ?? ''));
+                if (in_array($srSlug, ['admin', 'project_admin', 'super_admin'], true)) {
+                    $mappedNames[] = $sr->name;
+                }
             }
+            if (!empty($mappedNames)) {
+                return array_values(array_unique($mappedNames));
+            }
+        }
+
+        if ($this->isAdmin() || $this->slug === 'admin') {
+            return ['Admin'];
         }
 
         return ['Member'];
@@ -508,11 +540,15 @@ class Member extends Authenticatable
             return implode(', ', $assignedNames);
         }
 
+        if ($this->isAdmin() || $this->slug === 'admin') {
+            return 'Admin';
+        }
+
         if (is_array($this->roles) && !empty($this->roles)) {
             return Role::whereIn('id', $this->roles)->pluck('name')->implode(', ');
         }
 
-        return '';
+        return 'Member';
     }
 
     public function getDesignationNamesAttribute()
