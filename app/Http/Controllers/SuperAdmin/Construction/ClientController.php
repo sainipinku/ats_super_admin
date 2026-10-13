@@ -103,10 +103,10 @@ class ClientController extends Controller
         }
 
         if ($request->filled('phone')) {
-            $request->merge(['phone' => substr(preg_replace('/\D/', '', (string) $request->input('phone')), 0, 12)]);
+            $request->merge(['phone' => preg_replace('/\D/', '', (string) $request->input('phone'))]);
         }
         if ($request->filled('alternate_phone')) {
-            $request->merge(['alternate_phone' => substr(preg_replace('/\D/', '', (string) $request->input('alternate_phone')), 0, 12)]);
+            $request->merge(['alternate_phone' => preg_replace('/\D/', '', (string) $request->input('alternate_phone'))]);
         }
 
         $validated = $request->validate([
@@ -115,18 +115,18 @@ class ClientController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'contact_person' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:12', 'regex:/^[0-9]{1,12}$/'],
-            'alternate_phone' => ['nullable', 'string', 'max:12', 'regex:/^[0-9]{1,12}$/'],
+            'phone' => ['nullable', 'string', 'max:10', 'regex:/^[0-9]{1,10}$/'],
+            'alternate_phone' => ['nullable', 'string', 'max:10', 'regex:/^[0-9]{1,10}$/'],
             'gst_number' => ['nullable', 'string', 'max:50'],
             'billing_address' => ['nullable', 'string'],
             'site_address' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'status' => ['required', 'in:active,inactive'],
         ], [
-            'phone.max' => 'The phone number must not exceed 12 digits.',
-            'phone.regex' => 'The phone number must contain digits only (maximum 12 digits).',
-            'alternate_phone.max' => 'The alternate phone number must not exceed 12 digits.',
-            'alternate_phone.regex' => 'The alternate phone number must contain digits only (maximum 12 digits).',
+            'phone.max' => 'The phone number must not exceed 10 digits.',
+            'phone.regex' => 'The phone number must contain digits only (maximum 10 digits).',
+            'alternate_phone.max' => 'The alternate phone number must not exceed 10 digits.',
+            'alternate_phone.regex' => 'The alternate phone number must contain digits only (maximum 10 digits).',
         ]);
 
         $client = Client::create([
@@ -173,10 +173,10 @@ class ClientController extends Controller
         }
 
         if ($request->filled('phone')) {
-            $request->merge(['phone' => substr(preg_replace('/\D/', '', (string) $request->input('phone')), 0, 12)]);
+            $request->merge(['phone' => preg_replace('/\D/', '', (string) $request->input('phone'))]);
         }
         if ($request->filled('alternate_phone')) {
-            $request->merge(['alternate_phone' => substr(preg_replace('/\D/', '', (string) $request->input('alternate_phone')), 0, 12)]);
+            $request->merge(['alternate_phone' => preg_replace('/\D/', '', (string) $request->input('alternate_phone'))]);
         }
 
         $validated = $request->validate([
@@ -184,18 +184,18 @@ class ClientController extends Controller
             'client_type' => ['required', 'in:individual,company,government'],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:12', 'regex:/^[0-9]{1,12}$/'],
-            'alternate_phone' => ['nullable', 'string', 'max:12', 'regex:/^[0-9]{1,12}$/'],
+            'phone' => ['nullable', 'string', 'max:10', 'regex:/^[0-9]{1,10}$/'],
+            'alternate_phone' => ['nullable', 'string', 'max:10', 'regex:/^[0-9]{1,10}$/'],
             'gst_number' => ['nullable', 'string', 'max:50'],
             'billing_address' => ['nullable', 'string'],
             'site_address' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'status' => ['required', 'in:active,inactive'],
         ], [
-            'phone.max' => 'The phone number must not exceed 12 digits.',
-            'phone.regex' => 'The phone number must contain digits only (maximum 12 digits).',
-            'alternate_phone.max' => 'The alternate phone number must not exceed 12 digits.',
-            'alternate_phone.regex' => 'The alternate phone number must contain digits only (maximum 12 digits).',
+            'phone.max' => 'The phone number must not exceed 10 digits.',
+            'phone.regex' => 'The phone number must contain digits only (maximum 10 digits).',
+            'alternate_phone.max' => 'The alternate phone number must not exceed 10 digits.',
+            'alternate_phone.regex' => 'The alternate phone number must contain digits only (maximum 10 digits).',
         ]);
 
         $client->update($validated);
@@ -281,4 +281,3 @@ class ClientController extends Controller
         return back()->with('success', "Client '{$clientName}' deleted successfully.");
     }
 }
-

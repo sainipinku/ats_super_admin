@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use App\Http\Controllers\SuperAdmin\EmployeeController;
+use Illuminate\Support\Facades\Auth;
 
 class StoreEmployeeRequest extends FormRequest
 {
@@ -35,6 +36,7 @@ class StoreEmployeeRequest extends FormRequest
         $memberId = null;
         $department = $this->input('department');
         $designationOptions = EmployeeController::getDepartmentDesignationsMap()[$department] ?? [];
+        $isProjectOwner = (int) Auth::guard('superadmin')->id() === 1;
 
         if ($employeeUuid) {
             $employee = \App\Models\Employee::where('uuid', $employeeUuid)->first();
@@ -68,6 +70,13 @@ class StoreEmployeeRequest extends FormRequest
                     ->where('slug', '!=', 'super_admin'),
             ],
             'role' => ['required', Rule::in(['member'])],
+            'company_id' => [
+                $isProjectOwner ? 'required' : 'nullable',
+                'integer',
+                Rule::exists('construction_companies', 'id')
+                    ->where('status', 'active')
+                    ->whereNull('deleted_at'),
+            ],
             'department' => ['required', 'string', Rule::in(EmployeeController::getDepartmentOptions())],
             'designation' => ['required', 'string', Rule::in($designationOptions)],
             'gender' => ['nullable', 'in:male,female,other'],

@@ -14,6 +14,7 @@ export default function EmployeeTable({
     toggleStatus,
     handleAssignRole,
     handleOpenPasswordModal,
+    isProjectOwner = false,
 }) {
     const [openDropdownId, setOpenDropdownId] = useState(null);
     const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -102,7 +103,7 @@ export default function EmployeeTable({
                             <th className="p-3">Full Name</th>
                             <th className="p-3">Email</th>
                             <th className="p-3">Phone</th>
-                            <th className="p-3">Company</th>
+                            {isProjectOwner && <th className="p-3">Company</th>}
                             <th className="p-3">Added By</th>
                             <th className="p-3">Role</th>
                             <th className="p-3">Department</th>
@@ -114,7 +115,7 @@ export default function EmployeeTable({
                     <tbody>
                         {isLoading ? (
                             <tr>
-                                <td colSpan="13" className="text-center py-10"><Loading /></td>
+                                <td colSpan={isProjectOwner ? 13 : 12} className="text-center py-10"><Loading /></td>
                             </tr>
                         ) : employees.data.length > 0 ? (
                             employees.data.map((employee, index) => {
@@ -156,19 +157,21 @@ export default function EmployeeTable({
                                         <td className="p-3">{member.name || '-'}</td>
                                         <td className="p-3">{member.email || '-'}</td>
                                         <td className="p-3">{member.phone || '-'}</td>
-                                        <td className="p-3">
-                                            {member.company?.name ? (
-                                                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                                                    {member.company.name}
-                                                </span>
-                                            ) : member.company_name ? (
-                                                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                                                    {member.company_name}
-                                                </span>
-                                            ) : (
-                                                <span className="text-gray-400 text-xs">-</span>
-                                            )}
-                                        </td>
+                                        {isProjectOwner && (
+                                            <td className="p-3">
+                                                {member.company?.name ? (
+                                                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                                        {member.company.name}
+                                                    </span>
+                                                ) : member.company_name ? (
+                                                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                                        {member.company_name}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-gray-400 text-xs">-</span>
+                                                )}
+                                            </td>
+                                        )}
                                         <td className="p-3">
                                             {member.created_by_user ? (
                                                 <div>
@@ -319,7 +322,7 @@ export default function EmployeeTable({
                             })
                         ) : (
                             <tr>
-                                <td colSpan="13" className="p-0">
+                                <td colSpan={isProjectOwner ? 13 : 12} className="p-0">
                                     <NoData message="No Employees found" iconSize={48} className="w-full" />
                                 </td>
                             </tr>

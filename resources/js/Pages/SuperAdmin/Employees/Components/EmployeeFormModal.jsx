@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Modal from "@/Components/Modal";
-import { FiCamera } from "react-icons/fi";
+import { FiCamera, FiEye, FiEyeOff } from "react-icons/fi";
 
 export default function EmployeeFormModal({
     isOpen,
@@ -20,7 +20,17 @@ export default function EmployeeFormModal({
     designationOptions,
     departmentDesignationMap,
     roleOptions,
+    companies = [],
+    isProjectOwner = false,
 }) {
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    useEffect(() => {
+        setShowPassword(false);
+        setShowConfirmPassword(false);
+    }, [isOpen, currentEmployee]);
+
     const DEFAULT_DEPT_DESIG_MAP = {
         'Administration': ['CEO', 'Director', 'General Manager', 'Manager (Admin)', 'Admin Executive', 'Receptionist', 'Office Assistant', 'Assistant', 'Office Boy'],
         'Architecture': ['Architect', 'Senior Architect', 'AutoCAD Designer'],
@@ -79,6 +89,27 @@ export default function EmployeeFormModal({
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {isProjectOwner && (
+                            <div>
+                                <label className="block text-gray-700 dark:text-gray-300 mb-1 text-sm">
+                                    Company Name <em className="text-red-500">*</em>
+                                </label>
+                                <select
+                                    name="company_id"
+                                    value={formData.company_id || ""}
+                                    onChange={handleChange}
+                                    className={selectClass("company_id")}
+                                    required
+                                >
+                                    <option value="">Select Company</option>
+                                    {companies.map((company) => (
+                                        <option key={company.id} value={company.id}>{company.name}</option>
+                                    ))}
+                                </select>
+                                {errors.company_id && <p className="text-red-500 text-xs mt-1">{errors.company_id}</p>}
+                            </div>
+                        )}
+
                         {/* Full Name */}
                         <div>
                             <label className="block text-gray-700 dark:text-gray-300 mb-1 text-sm">Full Name <em className="text-red-500">*</em></label>
@@ -125,22 +156,44 @@ export default function EmployeeFormModal({
                             <label className="block text-gray-700 dark:text-gray-300 mb-1 text-sm">
                                 Password {!currentEmployee && <em className="text-red-500">*</em>}
                             </label>
-                            <input type="password" name="password" value={formData.password} onChange={handleChange} className={inputClass('password')} placeholder={currentEmployee ? "Leave blank to keep current" : ""} minLength={6} required={!currentEmployee} />
+                            <div className="relative">
+                                <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} className={`${inputClass('password')} pr-10`} placeholder={currentEmployee ? "Leave blank to keep current" : ""} minLength={6} required={!currentEmployee} />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((visible) => !visible)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                    title={showPassword ? "Hide password" : "Show password"}
+                                >
+                                    {showPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                                </button>
+                            </div>
                             {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
                         </div>
 
                         {/* Confirm Password */}
                         <div>
                             <label className="block text-gray-700 dark:text-gray-300 mb-1 text-sm">Confirm Password</label>
-                            <input
-                                type="password"
-                                name="confirm_password"
-                                value={formData.confirm_password}
-                                onChange={handleChange}
-                                className={inputClass('confirm_password')}
-                                minLength={6}
-                                required={!currentEmployee || Boolean(formData.password)}
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showConfirmPassword ? "text" : "password"}
+                                    name="confirm_password"
+                                    value={formData.confirm_password}
+                                    onChange={handleChange}
+                                    className={`${inputClass('confirm_password')} pr-10`}
+                                    minLength={6}
+                                    required={!currentEmployee || Boolean(formData.password)}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword((visible) => !visible)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                                    title={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                                >
+                                    {showConfirmPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                                </button>
+                            </div>
                             {errors.confirm_password && <p className="text-red-500 text-xs mt-1">{errors.confirm_password}</p>}
                         </div>
 

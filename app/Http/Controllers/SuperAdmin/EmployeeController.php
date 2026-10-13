@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\SuperAdmin;
+use App\Models\Company;
 use App\Http\Controllers\Concerns\IntersectsAdminDeletion;
 use Inertia\Inertia;
 
@@ -340,10 +341,10 @@ class EmployeeController extends Controller
                     $current = $allMembersMap->get($current->created_by);
                 }
 
-                if ($employeeCompany) {
-                    $member->company = $employeeCompany;
-                } elseif (!empty($member->company_name)) {
+                if (!empty($member->company_name)) {
                     $member->company = (object) ['name' => $member->company_name];
+                } elseif ($employeeCompany) {
+                    $member->company = $employeeCompany;
                 } else {
                     $member->company = null;
                 }
@@ -410,6 +411,9 @@ class EmployeeController extends Controller
             'roleOptions' => static::getRoleOptions(),
             'memberRoleOptions' => static::getMemberRoleOptions(),
             'isProjectOwner' => $isProjectOwner,
+            'companies' => $isProjectOwner
+                ? Company::where('status', 'active')->orderBy('name')->get(['id', 'name'])
+                : [],
             'filters' => $request->only(['search', 'department', 'designation', 'status', 'per_page']),
         ]);
     }
@@ -432,6 +436,9 @@ class EmployeeController extends Controller
                 } elseif ($currentUser instanceof Member) {
                     $creatorCompanyName = $currentUser->company_name;
                 }
+            }
+            if ($currentUser instanceof SuperAdmin && (int) $currentUser->id === 1) {
+                $creatorCompanyName = Company::findOrFail($validated['company_id'])->name;
             }
 
             DB::transaction(function () use ($validated, $request, $creatorId, $creatorCompanyName) {
@@ -534,6 +541,9 @@ class EmployeeController extends Controller
                     'dob' => $validated['dob'] ?? null,
                     'is_calling_team' => false,
                 ];
+                if ((int) Auth::guard('superadmin')->id() === 1) {
+                    $memberData['company_name'] = Company::findOrFail($validated['company_id'])->name;
+                }
 
                 if ($request->has('status') && $request->input('status') !== '') {
                     $memberData['status'] = (int) $request->input('status');

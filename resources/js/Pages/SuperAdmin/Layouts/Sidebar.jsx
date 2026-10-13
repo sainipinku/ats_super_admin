@@ -187,6 +187,7 @@ export default function Sidebar({ isOpen, onClose }) {
     const auth = props?.auth;
     const user = auth?.user;
     const guard = auth?.guard;
+    const companyName = auth?.company_name;
     const isImpersonating = Boolean(props?.is_impersonating || auth?.is_impersonating);
     const currentProject = props?.current_project;
     const userPermissions = auth?.permissions || auth?.construction_permissions || [];
@@ -284,6 +285,14 @@ export default function Sidebar({ isOpen, onClose }) {
                         <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-300">
                             {isEmployeeView ? "Employee Workspace" : "Super Admin"}
                         </p>
+                        {companyName && !isEmployeeView && (
+                            <p
+                                className="truncate text-[10px] font-medium text-slate-500 dark:text-slate-400"
+                                title={companyName}
+                            >
+                                {companyName}
+                            </p>
+                        )}
                     </div>
                 </div>
 
