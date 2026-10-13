@@ -8,18 +8,26 @@ use App\Models\Task;
 use App\Services\Construction\TaskManagementService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
 
-class ProjectTaskController extends Controller
+class ProjectTaskController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('construction.permission:execution_task.manage', except: ['index', 'show']),
+        ];
+    }
+
     public function __construct(
         public readonly TaskManagementService $tasks,
     ) {
-        $this->middleware('construction.permission:execution_task.manage')->except(['index','show']);
     }
 
     private function mapLegacyStatus(string $in): string
