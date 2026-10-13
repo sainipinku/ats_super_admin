@@ -12,7 +12,7 @@ import EmployeeTable from "./Components/EmployeeTable";
 import AssignRoleModal from "./Components/AssignRoleModal";
 import ChangePasswordModal from "./Components/ChangePasswordModal";
 
-export default function List({ employees, departmentOptions, designationOptions, departmentDesignationMap, roleOptions, memberRoleOptions = [], filters }) {
+export default function List({ employees, departmentOptions, designationOptions, departmentDesignationMap, roleOptions, memberRoleOptions = [], companies = [], isProjectOwner = false, filters }) {
     const [isOpen, setIsOpen] = useState(false);
     const [currentEmployee, setCurrentEmployee] = useState(null);
     const [isAssignRoleModalOpen, setIsAssignRoleModalOpen] = useState(false);
@@ -55,6 +55,7 @@ export default function List({ employees, departmentOptions, designationOptions,
         alternate_number: "",
         aadhaar_number: "",
         pan_number: "",
+        company_id: "",
     });
 
     const updateUrl = (newPage = 1) => {
@@ -111,6 +112,8 @@ export default function List({ employees, departmentOptions, designationOptions,
             const member = currentEmployee.member || {};
             const memberDept = member.departments ? (Array.isArray(member.departments) ? member.departments[0] : member.departments) : "";
             const memberDesig = member.designation ? (Array.isArray(member.designation) ? member.designation[0] : member.designation) : "";
+            const employeeCompanyName = member.company?.name || member.company_name || "";
+            const employeeCompany = companies.find((company) => company.name === employeeCompanyName);
             setFormData({
                 full_name: member.name || "",
                 email: member.email || "",
@@ -128,6 +131,7 @@ export default function List({ employees, departmentOptions, designationOptions,
                 alternate_number: currentEmployee.alternate_number || "",
                 aadhaar_number: currentEmployee.aadhaar_number || "",
                 pan_number: currentEmployee.pan_number || "",
+                company_id: employeeCompany ? String(employeeCompany.id) : "",
             });
             setProfilePreview(member.profile_photo_url || null);
         }
@@ -140,6 +144,7 @@ export default function List({ employees, departmentOptions, designationOptions,
             role: "member", roles: [], department: "", designation: "",
             gender: "", dob: "", status: "active",
             profile_photo: null, alternate_number: "", aadhaar_number: "", pan_number: "",
+            company_id: "",
         });
         setProfilePreview(null);
         setIsOpen(true);
@@ -199,6 +204,9 @@ export default function List({ employees, departmentOptions, designationOptions,
         formDataObj.append("role", formData.role || "member");
         formDataObj.append("department", formData.department);
         formDataObj.append("designation", formData.designation);
+        if (isProjectOwner) {
+            formDataObj.append("company_id", formData.company_id);
+        }
 
         if (Array.isArray(formData.roles)) {
             formData.roles.forEach((r) => formDataObj.append("roles[]", r));
@@ -355,6 +363,7 @@ export default function List({ employees, departmentOptions, designationOptions,
                     toggleStatus={toggleStatus}
                     handleAssignRole={handleOpenAssignRoleModal}
                     handleOpenPasswordModal={handleOpenPasswordModal}
+                    isProjectOwner={isProjectOwner}
                 />
 
                 {employees.data.length > 0 && (
@@ -423,6 +432,8 @@ export default function List({ employees, departmentOptions, designationOptions,
                 designationOptions={designationOptions}
                 departmentDesignationMap={departmentDesignationMap}
                 roleOptions={roleOptions}
+                companies={companies}
+                isProjectOwner={isProjectOwner}
             />
 
             <AssignRoleModal

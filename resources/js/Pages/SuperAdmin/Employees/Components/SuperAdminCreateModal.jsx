@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm, usePage } from '@inertiajs/react';
-import { UserCheck, Key, Mail, Phone, User, Shield, Building, ShieldCheck, MapPin, FileText } from 'lucide-react';
+import { UserCheck, Key, Mail, Phone, User, Shield, Building, ShieldCheck, MapPin, FileText, Eye, EyeOff } from 'lucide-react';
 
 export default function SuperAdminCreateModal({ isOpen, onClose, constructionRoles = [], isProjectOwner: isProjectOwnerProp }) {
     const { auth } = usePage().props;
@@ -8,12 +8,21 @@ export default function SuperAdminCreateModal({ isOpen, onClose, constructionRol
     const isProjectOwner = isProjectOwnerProp ?? (currentUser?.is_project_owner == 1 || (currentUser && (currentUser.id == 1 || currentUser.id === '1')));
 
     const [accountType, setAccountType] = useState(isProjectOwner ? 'superadmin' : 'admin'); // 'superadmin' or 'admin'
+    const [showPassword, setShowPassword] = useState(false);
+    const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
 
     useEffect(() => {
         if (!isProjectOwner) {
             setAccountType('admin');
         }
     }, [isProjectOwner]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setShowPassword(false);
+            setShowPasswordConfirmation(false);
+        }
+    }, [isOpen]);
 
     const { data, setData, post, processing, reset, errors, clearErrors } = useForm({
         // User Details
@@ -38,6 +47,8 @@ export default function SuperAdminCreateModal({ isOpen, onClose, constructionRol
 
     const handleAccountTypeChange = (type) => {
         setAccountType(type);
+        setShowPassword(false);
+        setShowPasswordConfirmation(false);
         clearErrors();
     };
 
@@ -233,13 +244,22 @@ export default function SuperAdminCreateModal({ isOpen, onClose, constructionRol
                                 <div className="relative">
                                     <Key className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                                     <input
-                                        type="password"
+                                        type={showPassword ? 'text' : 'password'}
                                         required
                                         value={data.password}
                                         onChange={(e) => setData('password', e.target.value)}
                                         placeholder="••••••••"
-                                        className={inputClasses}
+                                        className={`${inputClasses} pr-10`}
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword((visible) => !visible)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                        title={showPassword ? 'Hide password' : 'Show password'}
+                                    >
+                                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
                                 </div>
                                 {errors.password && <p className="text-xs text-rose-500 mt-1">{errors.password}</p>}
                             </div>
@@ -249,13 +269,22 @@ export default function SuperAdminCreateModal({ isOpen, onClose, constructionRol
                                 <div className="relative">
                                     <Key className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                                     <input
-                                        type="password"
+                                        type={showPasswordConfirmation ? 'text' : 'password'}
                                         required
                                         value={data.password_confirmation}
                                         onChange={(e) => setData('password_confirmation', e.target.value)}
                                         placeholder="••••••••"
-                                        className={inputClasses}
+                                        className={`${inputClasses} pr-10`}
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPasswordConfirmation((visible) => !visible)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                                        aria-label={showPasswordConfirmation ? 'Hide confirm password' : 'Show confirm password'}
+                                        title={showPasswordConfirmation ? 'Hide confirm password' : 'Show confirm password'}
+                                    >
+                                        {showPasswordConfirmation ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
                                 </div>
                             </div>
                         </div>

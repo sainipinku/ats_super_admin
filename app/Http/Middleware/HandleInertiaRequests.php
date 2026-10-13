@@ -119,6 +119,9 @@ class HandleInertiaRequests extends Middleware
         $impersonator = $request->session()->get('impersonator');
         $isImpersonating = !empty($impersonator);
         $pendingApprovalCount = ($guard === 'superadmin') ? \App\Models\ActionApprovalRequest::pending()->count() : 0;
+        $companyName = $user instanceof \App\Models\SuperAdmin && (int) $user->id !== 1
+            ? $user->company?->name
+            : null;
 
         $deleteApprovalRequestsMap = [];
         $userAvailableRoles = [];
@@ -172,6 +175,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user,
                 'guard' => $guard,
+                'company_name' => $companyName,
                 'permissions' => $mergedPermissions,
                 'construction_permissions' => $constructionPermissions,
                 'is_impersonating' => $isImpersonating,
