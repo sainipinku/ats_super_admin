@@ -203,6 +203,10 @@ class ProjectController extends Controller
 
     public function show(Project $project, SurveyDataService $surveyData): Response
     {
+        $actor = $this->constructionActor();
+        $accessibleProjectIds = $this->getAccessibleProjectIds($actor);
+        abort_unless($accessibleProjectIds->contains($project->id), 403, 'Unauthorized project access.');
+
         $project->load([
             'company',
             'client',
@@ -2246,24 +2250,35 @@ class ProjectController extends Controller
         }
 
         $company = $project->company ?: ($companyId ? Company::find($companyId) : null);
+        if (!$company && $project->created_by_id) {
+            $creatorMember = Member::find($project->created_by_id);
+            if ($creatorMember && !empty($creatorMember->company_name)) {
+                $company = Company::where('name', $creatorMember->company_name)
+                    ->orWhere('legal_name', $creatorMember->company_name)
+                    ->first();
+                if ($company) {
+                    $companyId = $company->id;
+                }
+            }
+        }
 
-        // 2. Resolve SuperAdmins associated with this company or project
+        $companyNames = [];
+        if ($company) {
+            if (!empty($company->name)) {
+                $companyNames[] = trim($company->name);
+            }
+            if (!empty($company->legal_name) && $company->legal_name !== $company->name) {
+                $companyNames[] = trim($company->legal_name);
+            }
+        }
+        $companyNames = array_values(array_unique(array_filter($companyNames)));
+
+        // 2. Resolve SuperAdmins strictly associated with this company
         $companySuperAdmins = collect();
         if ($companyId) {
             $companySuperAdmins = SuperAdmin::where('company_id', $companyId)->get();
         }
-
-        if ($project->created_by_id && in_array($project->created_by_type, [SuperAdmin::class, 'App\Models\SuperAdmin', '\\App\\Models\\SuperAdmin'], true)) {
-            $creatorSa = SuperAdmin::find($project->created_by_id);
-            if ($creatorSa && !$companySuperAdmins->contains('id', $creatorSa->id)) {
-                $companySuperAdmins->push($creatorSa);
-            }
-        }
-
-        $actor = $this->constructionActor();
-        if ($companySuperAdmins->isEmpty() && $actor instanceof SuperAdmin) {
-            $companySuperAdmins->push($actor);
-        }
+        $companySuperAdminIds = $companySuperAdmins->pluck('id')->filter()->toArray();
 
         // 3. Ensure each company SuperAdmin has a corresponding Member record so they can be assigned / selected as supervisor
         $companySuperAdminMemberIds = [];
@@ -2315,70 +2330,146 @@ class ProjectController extends Controller
                 if ((int) $member->status !== 1) {
                     $member->update(['status' => 1]);
                 }
+                if (empty($member->company_name) && $company) {
+                    $member->update(['company_name' => $company->name]);
+                }
             }
 
             $companySuperAdminMemberIds[] = $member->id;
         }
 
-        $companySuperAdminIds = $companySuperAdmins->pluck('id')->filter()->toArray();
-
         // 4. Resolve Admins for this company
         $companyAdminMemberIds = [];
-        if (!empty($companySuperAdminIds)) {
-            $companyAdminMemberIds = Member::whereIn('created_by', $companySuperAdminIds)
-                ->where(function ($q) {
-                    $q->whereJsonContains('roles', 1)
-                        ->orWhereJsonContains('roles', '1')
-                        ->orWhereJsonContains('roles', 'admin')
-                        ->orWhere('registration_source', 'admin_created')
-                        ->orWhere('slug', 'like', 'admin%');
-                })
-                ->pluck('id')
-                ->toArray();
-        }
+        $adminQuery = Member::query()->where(function ($q) {
+            $q->whereJsonContains('roles', 'admin')
+                ->orWhereJsonContains('roles', 9)
+                ->orWhereJsonContains('roles', '9')
+                ->orWhereJsonContains('roles', 3)
+                ->orWhereJsonContains('roles', '3')
+                ->orWhere('slug', 'admin')
+                ->orWhere('slug', 'like', 'admin-%')
+                ->orWhere('slug', 'like', 'admin_%');
+        });
+
+        $adminQuery->where(function ($q) use ($companyNames, $companySuperAdminIds) {
+            $has = false;
+            if (!empty($companyNames)) {
+                $q->whereIn('company_name', $companyNames);
+                $has = true;
+            }
+            if (!empty($companySuperAdminIds)) {
+                if ($has) {
+                    $q->orWhereIn('created_by', $companySuperAdminIds);
+                } else {
+                    $q->whereIn('created_by', $companySuperAdminIds);
+                    $has = true;
+                }
+            }
+            if (!$has) {
+                $q->whereRaw('1 = 0');
+            }
+        });
+
+        $companyAdminMemberIds = $adminQuery->pluck('id')->toArray();
 
         // 5. Resolve all Company Employees / Members
         $assignedProjectMemberIds = ProjectTeamMember::where('project_id', $project->id)
             ->pluck('member_id')
             ->toArray();
 
-        $companyMemberIdsQuery = Member::query()->where(function ($q) use ($companySuperAdminIds, $companyAdminMemberIds, $company, $assignedProjectMemberIds) {
-            $hasCondition = false;
-            if (!empty($companySuperAdminIds)) {
-                $q->whereIn('created_by', $companySuperAdminIds);
-                $hasCondition = true;
+        $companyMembersQuery = Member::query()
+            ->where('status', 1)
+            ->where(function ($q) use ($companySuperAdminIds, $companyAdminMemberIds, $companyNames, $assignedProjectMemberIds) {
+                $hasCondition = false;
+                if (!empty($companyNames)) {
+                    $q->whereIn('company_name', $companyNames);
+                    $hasCondition = true;
+                }
+                if (!empty($companySuperAdminIds)) {
+                    if ($hasCondition) {
+                        $q->orWhereIn('created_by', $companySuperAdminIds);
+                    } else {
+                        $q->whereIn('created_by', $companySuperAdminIds);
+                        $hasCondition = true;
+                    }
+                }
+                if (!empty($companyAdminMemberIds)) {
+                    if ($hasCondition) {
+                        $q->orWhereIn('created_by', $companyAdminMemberIds);
+                    } else {
+                        $q->whereIn('created_by', $companyAdminMemberIds);
+                        $hasCondition = true;
+                    }
+                }
+                if (!empty($assignedProjectMemberIds)) {
+                    if ($hasCondition) {
+                        $q->orWhereIn('id', $assignedProjectMemberIds);
+                    } else {
+                        $q->whereIn('id', $assignedProjectMemberIds);
+                        $hasCondition = true;
+                    }
+                }
+                if (!$hasCondition) {
+                    $q->whereRaw('1 = 0');
+                }
+            });
+
+        // Ensure we do NOT include members whose company_name belongs to a DIFFERENT company
+        if (!empty($companyNames)) {
+            $companyMembersQuery->where(function ($q) use ($companyNames, $assignedProjectMemberIds) {
+                $q->whereNull('company_name')
+                  ->orWhere('company_name', '')
+                  ->orWhereIn('company_name', $companyNames);
+
+                if (!empty($assignedProjectMemberIds)) {
+                    $q->orWhereIn('id', $assignedProjectMemberIds);
+                }
+            });
+        }
+
+        // Exclude global platform Super Admin (ID 1) unless the project belongs to company 1
+        $isGlobalOwnerCompany = ($companyId && (int)$companyId === 1);
+        if (!$isGlobalOwnerCompany) {
+            $globalSuperAdminEmails = SuperAdmin::where('id', 1)
+                ->pluck('email')
+                ->filter()
+                ->toArray();
+
+            if (!empty($globalSuperAdminEmails)) {
+                $companyMembersQuery->whereNotIn('email', $globalSuperAdminEmails);
             }
-            if (!empty($companyAdminMemberIds)) {
-                $q->orWhereIn('created_by', $companyAdminMemberIds);
-                $hasCondition = true;
-            }
-            if ($company && !empty($company->name)) {
-                $q->orWhere('company_name', $company->name);
-                $hasCondition = true;
-            }
-            if ($company && !empty($company->legal_name) && $company->legal_name !== $company->name) {
-                $q->orWhere('company_name', $company->legal_name);
-                $hasCondition = true;
-            }
-            if (!empty($assignedProjectMemberIds)) {
-                $q->orWhereIn('id', $assignedProjectMemberIds);
-                $hasCondition = true;
-            }
-            if (!$hasCondition) {
-                $q->whereRaw('1 = 0');
-            }
-        })->pluck('id')->toArray();
+        }
 
         $allTargetMemberIds = collect($companySuperAdminMemberIds)
             ->concat($companyAdminMemberIds)
+            ->concat($companyMembersQuery->pluck('id'))
             ->concat($assignedProjectMemberIds)
-            ->concat($companyMemberIdsQuery)
             ->unique()
             ->filter()
             ->values();
 
         $members = Member::whereIn('id', $allTargetMemberIds)
             ->where('status', 1)
+            ->when(!empty($companyNames), function ($q) use ($companyNames, $assignedProjectMemberIds) {
+                $q->where(function ($sq) use ($companyNames, $assignedProjectMemberIds) {
+                    $sq->whereNull('company_name')
+                      ->orWhere('company_name', '')
+                      ->orWhereIn('company_name', $companyNames);
+
+                    if (!empty($assignedProjectMemberIds)) {
+                        $sq->orWhereIn('id', $assignedProjectMemberIds);
+                    }
+                });
+            })
+            ->when(!$isGlobalOwnerCompany, function ($q) {
+                $globalEmails = SuperAdmin::where('id', 1)
+                    ->pluck('email')
+                    ->filter()
+                    ->toArray();
+                if (!empty($globalEmails)) {
+                    $q->whereNotIn('email', $globalEmails);
+                }
+            })
             ->orderBy('name')
             ->get([
                 'id',
@@ -2389,6 +2480,7 @@ class ProjectController extends Controller
                 'roles',
                 'registration_source',
                 'created_by',
+                'company_name',
             ]);
 
         // Collect all numeric designation IDs from all members.
@@ -2439,11 +2531,17 @@ class ProjectController extends Controller
             }
 
             $isSuperAdmin = in_array($member->id, $companySuperAdminMemberIds, true)
-                || (is_array($member->roles) && (in_array('super_admin', $member->roles, true) || in_array('superadmin', $member->roles, true)));
+                || (is_array($member->roles) && (in_array('super_admin', $member->roles, true) || in_array('superadmin', $member->roles, true) || in_array(2, $member->roles, true) || in_array('2', $member->roles, true)))
+                || $member->slug === 'super-admin';
 
-            $isAdmin = in_array($member->id, $companyAdminMemberIds, true)
-                || (is_array($member->roles) && (in_array(1, $member->roles, true) || in_array('1', $member->roles, true) || in_array('admin', $member->roles, true)))
-                || $member->registration_source === 'admin_created';
+            $isAdmin = !$isSuperAdmin && (
+                in_array($member->id, $companyAdminMemberIds, true)
+                || $member->isAdmin()
+                || (is_array($member->roles) && (in_array(9, $member->roles, true) || in_array('9', $member->roles, true) || in_array(3, $member->roles, true) || in_array('3', $member->roles, true) || in_array('admin', $member->roles, true) || in_array('project_admin', $member->roles, true)))
+                || $member->slug === 'admin'
+                || str_starts_with($member->slug, 'admin-')
+                || str_starts_with($member->slug, 'admin_')
+            );
 
             if ($isSuperAdmin) {
                 $member->role_badge = 'Super Admin';

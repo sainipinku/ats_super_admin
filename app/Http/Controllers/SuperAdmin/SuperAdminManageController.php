@@ -77,6 +77,10 @@ class SuperAdminManageController extends Controller
             ->where(function ($q) use ($assignedMemberIds) {
                 $q->whereJsonContains('roles', '1')
                   ->orWhereJsonContains('roles', 1)
+                  ->orWhereJsonContains('roles', '9')
+                  ->orWhereJsonContains('roles', 9)
+                  ->orWhereJsonContains('roles', '3')
+                  ->orWhereJsonContains('roles', 3)
                   ->orWhere('registration_source', 'admin_created')
                   ->orWhere('slug', 'like', 'admin%');
 
@@ -243,10 +247,13 @@ class SuperAdminManageController extends Controller
             $imagePath = $request->file('image')->store('members_photos', 'public');
         }
 
-        $roleSlug = strtolower($request->role_slug ?: 'admin');
-        $constructionRole = \App\Models\ConstructionRole::whereIn('slug', [$roleSlug, 'admin', 'project_admin'])->first();
+        $roleSlug = strtolower(trim($request->role_slug ?: 'admin'));
+        $constructionRole = \App\Models\ConstructionRole::where('slug', $roleSlug)->first()
+            ?: \App\Models\ConstructionRole::whereIn('slug', ['admin', 'project_admin'])->first();
 
-        $adminRole = Role::where('id', 1)->orWhere('slug', 'admin')->first();
+        $adminRole = Role::where('slug', $roleSlug)->first()
+            ?: Role::where('slug', 'admin')->first()
+            ?: Role::where('slug', 'project_admin')->first();
         $adminRoleId = $adminRole ? $adminRole->id : 1;
 
         $superAdminId = Auth::guard('superadmin')->id() ?? 1;
@@ -366,7 +373,7 @@ class SuperAdminManageController extends Controller
             'role_slug' => 'required|string',
         ]);
 
-        $roleSlug = strtolower($request->role_slug);
+        $roleSlug = strtolower(trim($request->role_slug));
         $roleObj = \App\Models\ConstructionRole::where('slug', $roleSlug)->first();
 
         if ($roleObj) {
@@ -381,6 +388,15 @@ class SuperAdminManageController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            $sysRole = Role::where('slug', $roleSlug)->first()
+                ?: Role::where('slug', 'admin')->first()
+                ?: Role::where('slug', 'project_admin')->first();
+            if ($sysRole) {
+                $member->update([
+                    'roles' => [$sysRole->id],
+                ]);
+            }
         }
 
         return back()->with('success', 'Admin account role updated successfully.');

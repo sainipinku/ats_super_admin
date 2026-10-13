@@ -77,7 +77,9 @@ export default function SuperAdminsIndex({ superAdmins, admins, constructionRole
     };
 
     const openRoleModal = (user, targetType) => {
-        const currentSlug = user.assigned_roles?.[0] || (targetType === 'superadmin' ? 'super_admin' : 'admin');
+        const userRoles = Array.isArray(user.assigned_roles) ? user.assigned_roles : [];
+        const matchedRole = userRoles.find(r => availableRoles.some(ar => ar.slug === r));
+        const currentSlug = matchedRole || (targetType === 'superadmin' ? 'super_admin' : 'admin');
         setRoleModalUser({ user, targetType });
         roleForm.setData('role_slug', currentSlug);
     };
@@ -96,7 +98,8 @@ export default function SuperAdminsIndex({ superAdmins, admins, constructionRole
     };
 
     const defaultRoleOptions = [
-        { slug: 'admin', name: 'Admin / Project Admin' },
+        { slug: 'admin', name: 'Admin' },
+        { slug: 'project_admin', name: 'Project Admin' },
         { slug: 'super_admin', name: 'Super Admin' },
         { slug: 'surveyor', name: 'Surveyor / Survey Man' },
         { slug: 'draft_person', name: 'Draft Person / Draft Man' },
@@ -312,7 +315,9 @@ export default function SuperAdminsIndex({ superAdmins, admins, constructionRole
                                 ) : (
                                     admins?.length > 0 ? (
                                         admins.map((user) => {
-                                            const roleName = user.assigned_role_names?.[0] || 'Admin';
+                                            const roleName = (user.assigned_role_names?.[0] && user.assigned_role_names[0] !== 'Member')
+                                                ? user.assigned_role_names[0]
+                                                : 'Admin';
                                             return (
                                                 <tr key={user.id} className="hover:bg-slate-50/80 transition-colors">
                                                     <td className="px-6 py-4">

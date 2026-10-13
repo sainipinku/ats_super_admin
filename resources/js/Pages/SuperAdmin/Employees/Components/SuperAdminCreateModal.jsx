@@ -58,8 +58,8 @@ export default function SuperAdminCreateModal({ isOpen, onClose, constructionRol
     const inputClasses = "w-full pl-9 pr-3 py-2.5 text-xs text-slate-900 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 placeholder:text-slate-400 font-medium";
 
     const defaultRoleOptions = [
-        { slug: 'admin', name: 'Admin / Project Admin' },
-        { slug: 'super_admin', name: 'Super Admin' },
+        { slug: 'admin', name: 'Admin' },
+        { slug: 'project_admin', name: 'Project Admin' },
         { slug: 'surveyor', name: 'Surveyor / Survey Man' },
         { slug: 'draft_person', name: 'Draft Person / Draft Man' },
         { slug: 'vehicle_driver', name: 'Vehicle Driver / Driver' },
@@ -67,7 +67,9 @@ export default function SuperAdminCreateModal({ isOpen, onClose, constructionRol
     ];
 
     const availableRoles = constructionRoles.length > 0
-        ? constructionRoles.map(r => ({ slug: r.slug, name: r.name }))
+        ? constructionRoles
+            .filter(r => r.slug !== 'super_admin' && r.slug !== 'superadmin')
+            .map(r => ({ slug: r.slug, name: r.name }))
         : defaultRoleOptions;
 
     return (

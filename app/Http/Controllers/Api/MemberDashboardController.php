@@ -2091,63 +2091,277 @@ $completed = SurveyPlan::whereHas(
     public function checkIn(Request $request)
     {
         $member = $request->user();
+        if (!$member) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
         $nowKolkata = now()->setTimezone('Asia/Kolkata');
         $today = $nowKolkata->toDateString();
 
         $existing = AttendanceRecord::where('member_id', $member->id)
             ->where('attendance_date', $today)
-            ->whereNull('check_out_at')
             ->first();
 
         if ($existing) {
+            if ($existing->check_out_at) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Already checked in and checked out for today.',
+                    'attendance' => $existing,
+                    'data' => $existing,
+                    'check_in_time_formatted' => $existing->check_in_at ? $existing->check_in_at->setTimezone('Asia/Kolkata')->format('h:i A') : null,
+                    'check_out_time_formatted' => $existing->check_out_at ? $existing->check_out_at->setTimezone('Asia/Kolkata')->format('h:i A') : null,
+                ]);
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Already checked in for today.',
                 'attendance' => $existing,
+                'data' => $existing,
                 'check_in_time_formatted' => $existing->check_in_at ? $existing->check_in_at->setTimezone('Asia/Kolkata')->format('h:i A') : null,
             ]);
         }
 
-        $attendance = AttendanceRecord::create([
-            'member_id' => $member->id,
-            'project_id' => $request->project_id ?? Project::value('id'),
-            'attendance_date' => $today,
-            'check_in_at' => now(),
-            'check_in_latitude' => $request->latitude,
-            'check_in_longitude' => $request->longitude,
-            'attendance_type' => 'present',
-            'status' => 'submitted',
-        ]);
+        // Auto-close any unclosed records from earlier dates
+        AttendanceRecord::where('member_id', $member->id)
+            ->where('attendance_date', '<', $today)
+            ->whereNull('check_out_at')
+            ->update([
+                'check_out_at' => now(),
+            ]);
+
+        $projectId = $request->input('project_id');
+        if (!$projectId) {
+            $projectId = ProjectTeamMember::where('member_id', $member->id)
+                ->where(function ($q) {
+                    $q->whereNull('status')->orWhere('status', '!=', 'inactive');
+                })
+                ->value('project_id');
+        }
+        if (!$projectId) {
+            $projectId = MemberRoleAssignment::where('member_id', $member->id)
+                ->where('status', 1)
+                ->whereNotNull('project_id')
+                ->value('project_id');
+        }
+        if (!$projectId) {
+            $accessible = $this->accessibleProjectIds($member);
+            if (!empty($accessible)) {
+                $projectId = $accessible[0];
+            }
+        }
+        if (!$projectId) {
+            $companyId = !empty($member->company_id) ? (int) $member->company_id : null;
+            if (!$companyId && $member->created_by) {
+                $creator = SuperAdmin::find($member->created_by);
+                if ($creator && $creator->company_id) {
+                    $companyId = (int) $creator->company_id;
+                }
+            }
+            if (!$companyId && !empty($member->company_name)) {
+                $companyId = Company::where('name', $member->company_name)->orWhere('legal_name', $member->company_name)->value('id');
+            }
+            if ($companyId) {
+                $projectId = Project::where('company_id', $companyId)->value('id');
+            }
+        }
+        if (!$projectId) {
+            $projectId = Project::value('id');
+        }
+
+        $latitude = $request->input('check_in_latitude', $request->input('latitude'));
+        $longitude = $request->input('check_in_longitude', $request->input('longitude'));
+        $accuracy = $request->input('gps_accuracy_meters', $request->input('accuracy'));
+        $notes = $request->input('notes', $request->input('check_in_notes'));
+        $attendanceType = $request->input('attendance_type', 'present');
+
+        $attendance = AttendanceRecord::updateOrCreate(
+            [
+                'member_id' => $member->id,
+                'attendance_date' => $today,
+            ],
+            [
+                'project_id' => $projectId,
+                'execution_task_id' => $request->input('execution_task_id'),
+                'check_in_at' => now(),
+                'check_in_latitude' => $latitude,
+                'check_in_longitude' => $longitude,
+                'gps_accuracy_meters' => $accuracy,
+                'attendance_type' => $attendanceType,
+                'notes' => $notes,
+                'status' => 'submitted',
+            ]
+        );
+
+        try {
+            \App\Models\CheckInOut::updateOrCreate(
+                [
+                    'member_id' => $member->id,
+                    'date' => $today,
+                ],
+                [
+                    'check_in' => now()->toTimeString(),
+                    'check_in_ip' => $request->ip(),
+                    'check_in_notes' => $notes,
+                    'role' => $member->roles,
+                ]
+            );
+        } catch (\Throwable $e) {
+            // Silently ignore if table/columns differ
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Checked in successfully.',
             'attendance' => $attendance,
+            'data' => $attendance,
             'check_in_time_formatted' => $nowKolkata->format('h:i A'),
         ]);
     }
 
-    public function checkOut(Request $request, AttendanceRecord $attendance)
+    public function checkOut(Request $request, $attendance = null)
     {
-        $now = now();
-        $nowKolkata = now()->setTimezone('Asia/Kolkata');
-        $hoursWorked = 0;
-        if ($attendance->check_in_at) {
-            $hoursWorked = round($now->diffInMinutes($attendance->check_in_at) / 60, 2);
+        $member = $request->user();
+        if (!$member) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
         }
 
-        $attendance->update([
+        $now = now();
+        $nowKolkata = now()->setTimezone('Asia/Kolkata');
+        $today = $nowKolkata->toDateString();
+
+        $record = null;
+
+        // 1. If AttendanceRecord instance was resolved
+        if ($attendance instanceof AttendanceRecord && $attendance->exists) {
+            $record = $attendance;
+        } elseif (!empty($attendance) && is_numeric($attendance)) {
+            // 2. If ID was provided in route parameter
+            $record = AttendanceRecord::find((int) $attendance);
+        } elseif ($request->filled('attendance_id') && is_numeric($request->input('attendance_id'))) {
+            // 3. If ID was provided in request body
+            $record = AttendanceRecord::find((int) $request->input('attendance_id'));
+        } elseif ($request->filled('attendance') && is_numeric($request->input('attendance'))) {
+            $record = AttendanceRecord::find((int) $request->input('attendance'));
+        }
+
+        // 4. If a specific attendance was specified, ensure it belongs to the token member
+        if ($record) {
+            if ((int) $record->member_id !== (int) $member->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. This attendance record does not belong to you.',
+                ], 403);
+            }
+        } else {
+            // 5. Token-based lookup: resolve active open check-in strictly from the token user
+            $record = AttendanceRecord::where('member_id', $member->id)
+                ->where('attendance_date', $today)
+                ->whereNull('check_out_at')
+                ->latest('id')
+                ->first();
+
+            if (!$record) {
+                $record = AttendanceRecord::where('member_id', $member->id)
+                    ->whereNull('check_out_at')
+                    ->latest('id')
+                    ->first();
+            }
+        }
+
+        // If no active record to check out
+        if (!$record) {
+            $alreadyCheckedOut = AttendanceRecord::where('member_id', $member->id)
+                ->where('attendance_date', $today)
+                ->whereNotNull('check_out_at')
+                ->latest('id')
+                ->first();
+
+            if ($alreadyCheckedOut) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Already checked out for today.',
+                    'attendance' => $alreadyCheckedOut,
+                    'data' => $alreadyCheckedOut,
+                    'check_out_time_formatted' => $alreadyCheckedOut->check_out_at ? $alreadyCheckedOut->check_out_at->setTimezone('Asia/Kolkata')->format('h:i A') : null,
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'No active check-in record found to check out.',
+            ], 422);
+        }
+
+        if ($record->check_out_at) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Already checked out.',
+                'attendance' => $record,
+                'data' => $record,
+                'check_out_time_formatted' => $record->check_out_at->setTimezone('Asia/Kolkata')->format('h:i A'),
+            ]);
+        }
+
+        $hoursWorked = 0;
+        if ($record->check_in_at) {
+            $hoursWorked = round($now->diffInMinutes($record->check_in_at) / 60, 2);
+        }
+
+        $latitude = $request->input('check_out_latitude', $request->input('latitude'));
+        $longitude = $request->input('check_out_longitude', $request->input('longitude'));
+        $accuracy = $request->input('gps_accuracy_meters', $request->input('accuracy'));
+        $notes = $request->input('notes', $request->input('check_out_notes'));
+
+        $updateData = [
             'check_out_at' => $now,
-            'check_out_latitude' => $request->latitude,
-            'check_out_longitude' => $request->longitude,
-            'hours_worked' => $hoursWorked,
-        ]);
+            'check_out_latitude' => $latitude,
+            'check_out_longitude' => $longitude,
+        ];
+
+        if ($accuracy !== null) {
+            $updateData['gps_accuracy_meters'] = $accuracy;
+        }
+        if ($notes !== null) {
+            $updateData['notes'] = $record->notes ? ($record->notes . ' | Checkout: ' . $notes) : $notes;
+        }
+
+        $record->update($updateData);
+
+        try {
+            $checkInOut = \App\Models\CheckInOut::where('member_id', $member->id)
+                ->where('date', $record->attendance_date ? $record->attendance_date->toDateString() : $today)
+                ->latest('id')
+                ->first();
+            if ($checkInOut) {
+                $checkInOut->check_out = now()->toTimeString();
+                $checkInOut->check_out_ip = $request->ip();
+                if ($notes) {
+                    $checkInOut->check_out_notes = $notes;
+                }
+                if ($checkInOut->check_in) {
+                    $checkInOut->total_minutes = \Carbon\Carbon::parse($checkInOut->check_in)->diffInMinutes(now());
+                }
+                $checkInOut->save();
+            }
+        } catch (\Throwable $e) {
+            // Silently ignore
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Checked out successfully.',
-            'attendance' => $attendance,
+            'attendance' => $record->fresh(),
+            'data' => $record->fresh(),
             'check_out_time_formatted' => $nowKolkata->format('h:i A'),
+            'hours_worked' => $hoursWorked,
         ]);
     }
 
