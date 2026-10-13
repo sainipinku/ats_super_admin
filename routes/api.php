@@ -74,6 +74,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tasks/{task}/notes', [TaskController::class, 'notesStore']);
     Route::delete('/notes/{note}', [TaskController::class, 'notesDestroy']);
 
+    // Direct Attendance APIs (Token-based)
+    Route::get('/attendance', [MemberDashboardController::class, 'myAttendance']);
+    Route::post('/attendance/check-in', [MemberDashboardController::class, 'checkIn']);
+    Route::post('/attendance/check-out', [MemberDashboardController::class, 'checkOut']);
+    Route::post('/attendance/{attendance}/check-out', [MemberDashboardController::class, 'checkOut']);
+
     Route::prefix('member')->name('member.')->group(function () {
         Route::get('/dashboard', [MemberDashboardController::class, 'index']);
         Route::get('/dashboard/projects', [MemberDashboardController::class, 'myProjects']);
@@ -93,6 +99,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/tasks/{task}/toggle', [MemberDashboardController::class, 'toggleTask']);
         Route::post('/tasks/{task}/status', [MemberDashboardController::class, 'updateTaskStatus']);
         Route::post('/attendance/check-in', [MemberDashboardController::class, 'checkIn']);
+        Route::post('/attendance/check-out', [MemberDashboardController::class, 'checkOut']);
         Route::post('/attendance/{attendance}/check-out', [MemberDashboardController::class, 'checkOut']);
         Route::get('/notifications', [MemberDashboardController::class, 'notifications']);
 
@@ -240,6 +247,8 @@ Route::patch(
         Route::get('/tasks/assigned', [ConstructionController::class, 'assignedTasks'])
             ->middleware('construction.permission:execution_task.manage');
         Route::post('/attendance/check-in', [ConstructionController::class, 'attendanceCheckIn'])
+            ->middleware('construction.permission:attendance.manage');
+        Route::post('/attendance/check-out', [ConstructionController::class, 'attendanceCheckOut'])
             ->middleware('construction.permission:attendance.manage');
         Route::post('/attendance/{attendance}/check-out', [ConstructionController::class, 'attendanceCheckOut'])
             ->middleware('construction.permission:attendance.manage');

@@ -58,15 +58,8 @@ class ProjectController extends Controller
     public function show(Project $project, SurveyDataService $surveyData): Response
     {
         $actor = $this->constructionActor();
-        $memberId = $actor?->getKey();
-        $assigned = ProjectTeamMember::where('project_id', $project->id)
-            ->where('member_id', $memberId)
-            ->exists();
-        if (!$assigned && $actor) {
-            if (!$this->isFullAdminActor($actor)) {
-                abort(403, 'You are not assigned to this project.');
-            }
-        }
+        $accessibleProjectIds = $this->getAccessibleProjectIds($actor);
+        abort_unless($accessibleProjectIds->contains($project->id), 403, 'You are not assigned to this project.');
 
         $project->load([
             'company',

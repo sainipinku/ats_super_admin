@@ -356,13 +356,6 @@ class ConstructionAuthorizationService
                 ->get();
         }
 
-        if ($companyId) {
-            return Project::query()
-                ->where('company_id', $companyId)
-                ->latest()
-                ->get();
-        }
-
         return new Collection();
     }
 

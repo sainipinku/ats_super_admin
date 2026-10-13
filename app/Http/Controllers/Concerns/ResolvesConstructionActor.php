@@ -18,6 +18,25 @@ trait ResolvesConstructionActor
         return Auth::user();
     }
 
+    protected function isCompanyAdminActor(?Model $actor = null): bool
+    {
+        $actor = $actor ?? $this->constructionActor();
+
+        if (!$actor) {
+            return false;
+        }
+
+        if (Auth::guard('admin')->check()) {
+            return true;
+        }
+
+        if ($actor instanceof \App\Models\Member) {
+            return $actor->isAdmin();
+        }
+
+        return false;
+    }
+
     protected function isFullAdminActor(?Model $actor = null): bool
     {
         $actor = $actor ?? $this->constructionActor();
@@ -30,7 +49,7 @@ trait ResolvesConstructionActor
             return true;
         }
 
-        if ($actor && method_exists($actor, 'isAdmin') && $actor->isAdmin()) {
+        if ($actor instanceof \App\Models\Member && $actor->isAdmin()) {
             return true;
         }
 
@@ -46,7 +65,7 @@ trait ResolvesConstructionActor
         }
 
         if ($actor instanceof \App\Models\SuperAdmin) {
-            return (int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1);
+            return (int) $actor->id === 1 || (string) $actor->id === '1' || empty($actor->company_id) || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1);
         }
 
         return false;
@@ -60,57 +79,58 @@ trait ResolvesConstructionActor
             return collect();
         }
 
-        // 1. Check if Project Owner (SuperAdmin id == 1 or is_project_owner == 1)
+        // 1. Platform Super Admin (SuperAdmin id == 1, is_project_owner == 1, or without company_id): always sees ALL projects
         if ($this->isProjectOwner($actor)) {
             return \App\Models\Project::pluck('id');
         }
 
-        // 2. Resolve Company ID for actor
-        $companyId = null;
+        // 2. Company Owner / Company SuperAdmin (SuperAdmin with company_id): always sees ALL projects of that company
         if ($actor instanceof \App\Models\SuperAdmin) {
             $companyId = $actor->company_id;
-        } elseif ($actor instanceof \App\Models\Member) {
-            if ($actor->created_by) {
-                $creator = \App\Models\SuperAdmin::find($actor->created_by);
-                if ($creator) {
-                    $companyId = $creator->company_id;
-                }
-            }
-        }
-
-        // 3. Assigned project IDs from ProjectTeamMember
-        $assignedProjectIds = \App\Models\ProjectTeamMember::where('member_id', $actor->getKey())->pluck('project_id');
-
-        $query = \App\Models\Project::query();
-
-        if ($companyId) {
-            $query->where(function ($q) use ($companyId, $assignedProjectIds, $actor) {
-                $q->where('company_id', $companyId);
-
-                if ($assignedProjectIds->isNotEmpty()) {
-                    $q->orWhereIn('id', $assignedProjectIds);
-                }
-
-                if ($actor instanceof \App\Models\SuperAdmin) {
-                    $q->orWhere(function ($sq) use ($actor) {
-                        $sq->where('created_by_type', \App\Models\SuperAdmin::class)
-                           ->where('created_by_id', $actor->id);
-                    });
-                }
-            });
-        } elseif ($assignedProjectIds->isNotEmpty()) {
-            $query->whereIn('id', $assignedProjectIds);
-        } else {
-            if ($actor instanceof \App\Models\SuperAdmin) {
+            $query = \App\Models\Project::query();
+            if ($companyId) {
+                $query->where('company_id', $companyId);
+            } else {
                 $query->where('created_by_type', \App\Models\SuperAdmin::class)
                       ->where('created_by_id', $actor->id);
-            } elseif ($actor instanceof \App\Models\Member) {
-                $query->where('created_by_type', \App\Models\Member::class)
-                      ->where('created_by_id', $actor->id);
             }
+            return $query->pluck('id');
         }
 
-        return $query->pluck('id');
+        // 3. Company Admin (Admin guard or Member with Admin role): always sees ALL projects of that company
+        if ($this->isCompanyAdminActor($actor)) {
+            $companyId = $this->getAccessibleCompanyId($actor);
+            $query = \App\Models\Project::query();
+            if ($companyId) {
+                $query->where('company_id', $companyId);
+            } else {
+                $query->where('created_by_type', $actor::class)
+                      ->where('created_by_id', $actor->getKey());
+            }
+            return $query->pluck('id');
+        }
+
+        // 4. Regular Member / Employee: ONLY sees projects they are explicitly assigned to
+        $assignedProjectIds = \App\Models\ProjectTeamMember::where('member_id', $actor->getKey())
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', '!=', 'inactive');
+            })
+            ->pluck('project_id')
+            ->merge(
+                \App\Models\MemberRoleAssignment::where('member_id', $actor->getKey())
+                    ->where('status', 1)
+                    ->whereNotNull('project_id')
+                    ->pluck('project_id')
+            )
+            ->unique()
+            ->filter()
+            ->values();
+
+        if ($assignedProjectIds->isEmpty()) {
+            return collect();
+        }
+
+        return \App\Models\Project::whereIn('id', $assignedProjectIds)->pluck('id');
     }
 
     protected function getAccessibleCompanyId(?Model $actor = null): ?int
@@ -133,6 +153,14 @@ trait ResolvesConstructionActor
                 $creator = \App\Models\SuperAdmin::find($actor->created_by);
                 if ($creator && $creator->company_id) {
                     return (int) $creator->company_id;
+                }
+            }
+            if (!empty($actor->company_name)) {
+                $company = \App\Models\Company::where('name', $actor->company_name)
+                    ->orWhere('legal_name', $actor->company_name)
+                    ->first();
+                if ($company) {
+                    return (int) $company->id;
                 }
             }
         }

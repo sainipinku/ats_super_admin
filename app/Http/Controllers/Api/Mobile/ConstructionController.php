@@ -924,46 +924,59 @@ public function updateSurveyChecklistWork(
         ConstructionExecutionService $executionService
     ) {
         $member = $request->user();
+        if (!$member) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
 
-        $validated = $request->validate([
-            'project_id' => [
-                'required',
-                'exists:construction_projects,id',
-            ],
-            'execution_task_id' => [
-                'nullable',
-                'exists:construction_execution_tasks,id',
-            ],
-            'attendance_date' => [
-                'required',
-                'date',
-            ],
-            'check_in_latitude' => [
-                'nullable',
-                'numeric',
-            ],
-            'check_in_longitude' => [
-                'nullable',
-                'numeric',
-            ],
-            'gps_accuracy_meters' => [
-                'nullable',
-                'numeric',
-                'min:0',
-            ],
-            'attendance_type' => [
-                'nullable',
-                'in:present,half_day,overtime',
-            ],
-            'notes' => [
-                'nullable',
-                'string',
-            ],
-        ]);
+        $today = now()->toDateString();
+        $attendanceDate = $request->input('attendance_date', $today);
 
-        $project = Project::findOrFail(
-            $validated['project_id']
-        );
+        // Check if already checked in
+        $existing = AttendanceRecord::where('member_id', $member->getKey())
+            ->where('attendance_date', $attendanceDate)
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'success' => true,
+                'message' => $existing->check_out_at ? 'Already checked out for today.' : 'Already checked in for today.',
+                'attendance' => $existing,
+                'data' => $existing,
+            ]);
+        }
+
+        $projectId = $request->input('project_id');
+        if (!$projectId) {
+            $projectId = ProjectTeamMember::where('member_id', $member->getKey())
+                ->where(function ($q) {
+                    $q->whereNull('status')->orWhere('status', '!=', 'inactive');
+                })
+                ->value('project_id')
+                ?? Project::where('company_id', $member->company_id)->value('id')
+                ?? Project::value('id');
+        }
+
+        $project = Project::findOrFail($projectId);
+
+        $lat = $request->input('check_in_latitude', $request->input('latitude'));
+        $lng = $request->input('check_in_longitude', $request->input('longitude'));
+        $acc = $request->input('gps_accuracy_meters', $request->input('accuracy'));
+        $notes = $request->input('notes', $request->input('check_in_notes'));
+        $type = $request->input('attendance_type', 'present');
+
+        $validated = [
+            'project_id' => $project->id,
+            'execution_task_id' => $request->input('execution_task_id'),
+            'attendance_date' => $attendanceDate,
+            'check_in_latitude' => is_numeric($lat) ? $lat : null,
+            'check_in_longitude' => is_numeric($lng) ? $lng : null,
+            'gps_accuracy_meters' => is_numeric($acc) ? $acc : null,
+            'attendance_type' => in_array($type, ['present', 'half_day', 'overtime']) ? $type : 'present',
+            'notes' => $notes,
+        ];
 
         $attendance = $executionService->checkInAttendance(
             $project,
@@ -974,46 +987,104 @@ public function updateSurveyChecklistWork(
 
         return response()->json([
             'success' => true,
+            'message' => 'Checked in successfully.',
+            'attendance' => $attendance,
             'data' => $attendance,
         ], 201);
     }
 
     public function attendanceCheckOut(
-        AttendanceRecord $attendance,
         Request $request,
-        ConstructionExecutionService $executionService
+        ConstructionExecutionService $executionService,
+        $attendance = null
     ) {
         $member = $request->user();
+        if (!$member) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
 
-        abort_unless(
-            (int) $attendance->member_id
-                === (int) $member->getKey(),
-            403,
-            'You can only check out your own attendance record.'
-        );
+        $record = null;
+        if ($attendance instanceof AttendanceRecord && $attendance->exists) {
+            $record = $attendance;
+        } elseif (!empty($attendance) && is_numeric($attendance)) {
+            $record = AttendanceRecord::find((int) $attendance);
+        } elseif ($request->filled('attendance_id') && is_numeric($request->input('attendance_id'))) {
+            $record = AttendanceRecord::find((int) $request->input('attendance_id'));
+        } elseif ($request->filled('attendance') && is_numeric($request->input('attendance'))) {
+            $record = AttendanceRecord::find((int) $request->input('attendance'));
+        }
 
-        $validated = $request->validate([
-            'check_out_latitude' => [
-                'nullable',
-                'numeric',
-            ],
-            'check_out_longitude' => [
-                'nullable',
-                'numeric',
-            ],
-            'gps_accuracy_meters' => [
-                'nullable',
-                'numeric',
-                'min:0',
-            ],
-            'notes' => [
-                'nullable',
-                'string',
-            ],
-        ]);
+        if ($record) {
+            abort_unless(
+                (int) $record->member_id === (int) $member->getKey(),
+                403,
+                'You can only check out your own attendance record.'
+            );
+        } else {
+            // Find active open record for the token member
+            $today = now()->toDateString();
+            $record = AttendanceRecord::where('member_id', $member->getKey())
+                ->where('attendance_date', $today)
+                ->whereNull('check_out_at')
+                ->latest('id')
+                ->first();
 
-        $attendance = $executionService->checkOutAttendance(
-            $attendance,
+            if (!$record) {
+                $record = AttendanceRecord::where('member_id', $member->getKey())
+                    ->whereNull('check_out_at')
+                    ->latest('id')
+                    ->first();
+            }
+        }
+
+        if (!$record) {
+            $alreadyCheckedOut = AttendanceRecord::where('member_id', $member->getKey())
+                ->where('attendance_date', now()->toDateString())
+                ->whereNotNull('check_out_at')
+                ->latest('id')
+                ->first();
+
+            if ($alreadyCheckedOut) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Already checked out for today.',
+                    'attendance' => $alreadyCheckedOut,
+                    'data' => $alreadyCheckedOut,
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'No active check-in record found to check out.',
+            ], 422);
+        }
+
+        if ($record->check_out_at) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Already checked out.',
+                'attendance' => $record,
+                'data' => $record,
+            ]);
+        }
+
+        $lat = $request->input('check_out_latitude', $request->input('latitude'));
+        $lng = $request->input('check_out_longitude', $request->input('longitude'));
+        $acc = $request->input('gps_accuracy_meters', $request->input('accuracy'));
+        $notes = $request->input('notes', $request->input('check_out_notes'));
+
+        $validated = [
+            'check_out_latitude' => is_numeric($lat) ? $lat : null,
+            'check_out_longitude' => is_numeric($lng) ? $lng : null,
+            'gps_accuracy_meters' => is_numeric($acc) ? $acc : null,
+            'notes' => $notes,
+        ];
+
+        $attendanceResult = $executionService->checkOutAttendance(
+            $record,
             $validated,
             $member,
             $request
@@ -1021,7 +1092,9 @@ public function updateSurveyChecklistWork(
 
         return response()->json([
             'success' => true,
-            'data' => $attendance,
+            'message' => 'Checked out successfully.',
+            'attendance' => $attendanceResult,
+            'data' => $attendanceResult,
         ]);
     }
 
