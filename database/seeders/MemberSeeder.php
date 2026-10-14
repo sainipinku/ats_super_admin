@@ -37,7 +37,7 @@ class MemberSeeder extends Seeder
             'phone' => '9876543210',
             'password' => Hash::make('member@123'),
             'status' => '1',
-            'roles' => ['member'], // Member role slug
+            'roles' => [1], // Member role ID (roles.id = 1)
             'slug' => 'test-member',
             'dob' => '1995-01-01',
             'gender' => 'male',
