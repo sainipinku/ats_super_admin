@@ -1020,6 +1020,16 @@ class SurveyController extends Controller
                 'string',
                 'max:5000',
             ],
+
+            'assigned_to_member_id' => [
+                'nullable',
+                'exists:members,id',
+            ],
+
+            'due_date' => [
+                'nullable',
+                'date',
+            ],
         ]);
 
         DB::transaction(
@@ -1121,6 +1131,36 @@ class SurveyController extends Controller
                         'current_stage' =>
                             'drafting_in_progress',
                     ]);
+
+                    // Assign to next teammate in project workflow (Draft Person)
+                    if (!empty($validated['assigned_to_member_id'])) {
+                        \App\Models\DraftingJob::updateOrCreate(
+                            [
+                                'project_id' => $project->getKey(),
+                                'survey_submission_id' => $lockedSubmission->getKey(),
+                            ],
+                            [
+                                'assigned_to_member_id' => $validated['assigned_to_member_id'],
+                                'assigned_by_type' => $actor ? $actor::class : null,
+                                'assigned_by_id' => $actor?->getKey(),
+                                'assigned_at' => now(),
+                                'due_date' => $validated['due_date'] ?? null,
+                                'status' => 'queued',
+                            ]
+                        );
+                    }
+
+                    // Update task status to completed
+                    if ($surveyVisit?->task_id) {
+                        \App\Models\ExecutionTask::where('id', $surveyVisit->task_id)->update([
+                            'status' => 'completed',
+                            'progress_percent' => 100,
+                        ]);
+                        \App\Models\Task::where('id', $surveyVisit->task_id)->update([
+                            'status' => 'completed',
+                            'progress_percent' => 100,
+                        ]);
+                    }
                 } elseif (
                     $validated['status']
                     === SurveySubmission::STATUS_REVISION_REQUESTED
@@ -1129,6 +1169,16 @@ class SurveyController extends Controller
                         'current_stage' =>
                             'survey_in_progress',
                     ]);
+
+                    // Update task status back to in_progress so surveyor can revise and resubmit
+                    if ($surveyVisit?->task_id) {
+                        \App\Models\ExecutionTask::where('id', $surveyVisit->task_id)->update([
+                            'status' => 'in_progress',
+                        ]);
+                        \App\Models\Task::where('id', $surveyVisit->task_id)->update([
+                            'status' => 'in_progress',
+                        ]);
+                    }
                 }
 
                 $activityService->log(

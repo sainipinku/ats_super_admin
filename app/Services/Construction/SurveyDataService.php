@@ -197,22 +197,26 @@ class SurveyDataService
                 }
 
                 return [
-                    'Check instrument & battery',
-                    'Calibrate total station',
-                    'Record existing benchmarks',
-                    'Capture elevation points',
-                    'Cross-check measurements',
+                    'Site reached and safety briefing done',
+                    'Instruments set up and calibrated',
+                    'Control points verified',
+                    'Survey points collected',
+                    'Reference points and benchmarks captured',
+                    'Site notes updated',
+                    'Survey data exported (CSV / RAW)',
                 ];
             });
         } catch (Throwable $e) {
             report($e);
 
             return [
-                'Check instrument & battery',
-                'Calibrate total station',
-                'Record existing benchmarks',
-                'Capture elevation points',
-                'Cross-check measurements',
+                'Site reached and safety briefing done',
+                'Instruments set up and calibrated',
+                'Control points verified',
+                'Survey points collected',
+                'Reference points and benchmarks captured',
+                'Site notes updated',
+                'Survey data exported (CSV / RAW)',
             ];
         }
     }

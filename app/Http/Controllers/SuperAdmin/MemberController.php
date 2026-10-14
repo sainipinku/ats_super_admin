@@ -114,9 +114,9 @@ class MemberController extends Controller
         ->orderByRaw("
             CASE
                 WHEN status = 0 THEN 0
-                WHEN JSON_CONTAINS(roles, '\"2\"') THEN 1
-                WHEN JSON_CONTAINS(roles, '\"1\"') THEN 2
-                WHEN JSON_CONTAINS(roles, '\"3\"') THEN 3
+                WHEN JSON_CONTAINS(roles, '2') OR JSON_CONTAINS(roles, '\"2\"') THEN 1
+                WHEN JSON_CONTAINS(roles, '1') OR JSON_CONTAINS(roles, '\"1\"') THEN 2
+                WHEN JSON_CONTAINS(roles, '3') OR JSON_CONTAINS(roles, '\"3\"') THEN 3
                 ELSE 4
             END
         ")
@@ -168,8 +168,14 @@ class MemberController extends Controller
     $roles = Role::where('status', 1)->get(['id', 'name']);
     $admins = Member::query()
         ->where('status', 1)
-        ->whereJsonContains('roles', '1')
-        ->whereJsonDoesntContain('roles', '2')
+        ->where(function ($q) {
+            $q->whereJsonContains('roles', 1)
+              ->orWhereJsonContains('roles', '1');
+        })
+        ->where(function ($q) {
+            $q->whereJsonDoesntContain('roles', 2)
+              ->whereJsonDoesntContain('roles', '2');
+        })
         ->orderBy('name')
         ->get(['id', 'name', 'email', 'phone']);
 
@@ -235,7 +241,30 @@ class MemberController extends Controller
         $existingMember = $id ? Member::findOrFail($id) : null;
         $isCallingTeamMember = $existingMember?->is_calling_team || $request->boolean('is_calling_team');
         $requestRoles = collect($request->input('roles', []))
-            ->map(fn ($role) => (int) $role)
+            ->map(function ($r) {
+                if (is_numeric($r)) {
+                    return (int) $r;
+                }
+                if (is_string($r) && !empty(trim($r))) {
+                    $slug = strtolower(trim($r));
+                    $mappedId = match ($slug) {
+                        'super_admin', 'superadmin' => 2,
+                        'member' => 1,
+                        'admin' => 9,
+                        'project_admin', 'project-admin' => 3,
+                        default => null,
+                    };
+                    if ($mappedId) {
+                        return $mappedId;
+                    }
+                    $dbRole = Role::where('slug', $slug)->first();
+                    return $dbRole ? (int) $dbRole->id : null;
+                }
+                return null;
+            })
+            ->filter()
+            ->unique()
+            ->values()
             ->all();
         $shouldAutoGeneratePassword = is_null($id)
             && ($isCallingTeamMember || in_array(1, $requestRoles, true))
@@ -303,7 +332,7 @@ class MemberController extends Controller
             'phone' => $validated['phone'],
             'email' => $validated['email'] ?? null,
             'departments' => $isCallingTeamMember ? [] : ($validated['departments'] ?? []),
-            'roles' => $isCallingTeamMember ? [] : ($validated['roles'] ?? []),
+            'roles' => $isCallingTeamMember ? [] : $requestRoles,
             'slug' => Str::slug($validated['name'] . '-' . Str::random(4)),
             'gender' => $validated['gender'] ?? null,
             'designation' => $isCallingTeamMember ? [] : ($validated['designations'] ?? []),
