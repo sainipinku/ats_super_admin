@@ -34,6 +34,9 @@ use Illuminate\Support\Facades\Log;
 class MemberController extends Controller
 {
 
+
+    
+
     /**
      * Display a listing of the members with optional filters.
      *
