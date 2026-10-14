@@ -42,6 +42,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
+/**
+ * @tags Mobile Field Operations
+ */
 class ConstructionController extends Controller
 {
     /**

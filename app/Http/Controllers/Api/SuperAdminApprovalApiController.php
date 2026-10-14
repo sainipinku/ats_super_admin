@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
+/**
+ * @tags Super Admin Approvals
+ */
 class SuperAdminApprovalApiController extends Controller
 {
     public function approvalStats(Request $request)

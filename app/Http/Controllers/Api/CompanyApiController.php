@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+/**
+ * @tags Companies & Organizations
+ */
 class CompanyApiController extends Controller
 {
     public function index(Request $request)

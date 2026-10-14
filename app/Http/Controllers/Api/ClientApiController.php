@@ -7,6 +7,9 @@ use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
+/**
+ * @tags Clients
+ */
 class ClientApiController extends Controller
 {
     public function index(Request $request)

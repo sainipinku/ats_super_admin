@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
+/**
+ * @tags Member Tasks
+ */
 class TaskController extends Controller
 {
     public function __construct(

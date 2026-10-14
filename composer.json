@@ -11,6 +11,7 @@
     "require": {
         "php": "^8.2",
         "carlos-meneses/laravel-mpdf": "^2.1",
+        "dedoc/scramble": "^0.13.47",
         "guzzlehttp/guzzle": "^7.9",
         "inertiajs/inertia-laravel": "^2.0",
         "kreait/firebase-php": "^7.21",

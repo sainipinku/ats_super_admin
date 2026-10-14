@@ -10,6 +10,9 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
+/**
+ * @tags Member Profile
+ */
 class ProfileController extends Controller
 {
     private function getProfileCompletionData($member): array
@@ -87,14 +90,14 @@ class ProfileController extends Controller
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('members', 'email')->ignore($member->id),
+                Rule::unique('members', 'email')->ignore($member?->id),
             ],
             'phone' => [
                 'sometimes',
                 'nullable',
                 'string',
                 'max:20',
-                Rule::unique('members', 'phone')->ignore($member->id),
+                Rule::unique('members', 'phone')->ignore($member?->id),
             ],
             'dob' => ['sometimes', 'nullable', 'date'],
             'gender' => ['sometimes', 'nullable', Rule::in(['male', 'female', 'other'])],

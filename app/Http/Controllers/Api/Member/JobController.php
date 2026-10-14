@@ -11,6 +11,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+/**
+ * @tags Member Jobs
+ */
 class JobController extends Controller
 {
     private function getProfileCompletionData($member): array

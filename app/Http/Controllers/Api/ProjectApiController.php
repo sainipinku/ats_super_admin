@@ -21,6 +21,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * @tags Construction Projects
+ */
 class ProjectApiController extends Controller
 {
     public function __construct(

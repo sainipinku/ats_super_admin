@@ -59,5 +59,9 @@ class AppServiceProvider extends ServiceProvider
             'dpr' => DailyProgressReport::class,
             'construction_document' => ConstructionDocument::class,
         ]);
+
+        \Illuminate\Support\Facades\Gate::define('viewApiDocs', function ($user = null) {
+            return true;
+        });
     }
 }
