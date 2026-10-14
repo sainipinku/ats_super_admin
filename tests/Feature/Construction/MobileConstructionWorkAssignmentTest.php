@@ -196,8 +196,9 @@ class MobileConstructionWorkAssignmentTest extends TestCase
         $response = $this->actingAs($member, 'sanctum')->getJson('/api/member/dashboard');
 
         $response->assertOk()
-            ->assertJsonPath('todays_tasks.0.id', $task->id)
-            ->assertJsonPath('todays_tasks.0.title', $task->title);
+            ->assertJsonPath('tasks.0.id', $task->id)
+            ->assertJsonPath('tasks.0.title', $task->title)
+            ->assertJsonPath('tasks.0.is_today', true);
     }
 
     /*

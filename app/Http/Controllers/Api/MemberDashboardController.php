@@ -671,26 +671,35 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
         $checkInCard = $this->getCheckInCard($todayAttendance);
         $todaysSummaryCard = $this->getTodaysSummary($projects, $tasks, $hoursWorked);
         $todaysTasksList = $this->getTodaysTasks($tasks, $requestedProjectId, $targetDate);
-        $last20TasksFormatted = $tasks->take(20)->map(fn ($t) => $this->formatTaskItem($t))->values()->all();
+        $todayTaskKeys = collect($todaysTasksList)->mapWithKeys(
+            fn ($task) => [($task['source'] ?? 'unified') . ':' . ($task['id'] ?? '') => true]
+        );
+        $dashboardTasks = $tasks
+            ->filter(function ($task, $index) use ($todayTaskKeys) {
+                $key = (($task->_source ?? null) === 'legacy' || $task instanceof \App\Models\ExecutionTask ? 'legacy' : 'unified')
+                    . ':' . ($task->id ?? '');
 
-        // Group formatted today's tasks by project_id
+                return $index < 20 || $todayTaskKeys->has($key);
+            })
+            ->map(function ($task) use ($todayTaskKeys) {
+                $formatted = $this->formatTaskItem($task);
+                $key = $formatted['source'] . ':' . ($formatted['id'] ?? '');
+                $formatted['is_today'] = $todayTaskKeys->has($key);
+
+                return $formatted;
+            })
+            ->values()
+            ->all();
+
         $todayTasksByProject = collect($todaysTasksList)->groupBy('project_id');
 
-        // Group all deduped tasks by project_id
         $tasksByProject = $tasks->groupBy(fn ($t) => (int) ($t->project_id ?? 0));
 
         $attachTasksToProject = function (Project $project) use ($todayTasksByProject, $tasksByProject) {
             $projId = (int) $project->id;
-            $projTodayTasks = $todayTasksByProject->get($projId, collect())->values()->all();
-
             $projAllTasksModels = $tasksByProject->get($projId, collect());
-            $projLast20Tasks = $projAllTasksModels->take(20)->map(fn ($t) => $this->formatTaskItem($t))->values()->all();
 
-            $project->setAttribute('today_tasks', $projTodayTasks);
-            $project->setAttribute('today_task', $projTodayTasks);
-            $project->setAttribute('tasks', $projLast20Tasks);
-            $project->setAttribute('task', $projLast20Tasks);
-            $project->setAttribute('today_tasks_count', count($projTodayTasks));
+            $project->setAttribute('today_tasks_count', $todayTasksByProject->get($projId, collect())->count());
             $project->setAttribute('tasks_count', $projAllTasksModels->count());
         };
 
@@ -716,12 +725,7 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             'check_in_card' => $checkInCard,
             'todays_summary' => $todaysSummaryCard,
             'current_project' => $currentProjectCard,
-            'todays_tasks' => $todaysTasksList,
-            'today_tasks' => $todaysTasksList,
-            'today_task' => $todaysTasksList,
-            'tasks' => $last20TasksFormatted,
-            'task' => $last20TasksFormatted,
-            'all_tasks' => $last20TasksFormatted,
+            'tasks' => $dashboardTasks,
             'quick_actions' => $quickActionsList,
             'field_activity' => $fieldActivityCard,
             'performance' => $performanceCard,
@@ -758,9 +762,6 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             'projects_by_stage' => $projectStageCounts,
             'survey_plans' => $surveyPlans,
             'today_survey_visits' => $todayVisits,
-            'tasks' => $last20TasksFormatted,
-            'task' => $last20TasksFormatted,
-            'all_tasks' => $last20TasksFormatted,
             'task_summary' => $taskCounts,
             'drafting_jobs' => $draftingJobs,
             'recent_dprs' => $recentDPRs,
@@ -2580,9 +2581,7 @@ $completed = SurveyPlan::whereHas(
         }
 
         $tasksCount = $primary->tasks_count ?? ($primary->executionTasks ? $primary->executionTasks->count() : 0);
-        $todayTasks = $primary->today_tasks ?? [];
-        $todayTasksCount = $primary->today_tasks_count ?? count($todayTasks);
-        $tasks = $primary->tasks ?? [];
+        $todayTasksCount = $primary->today_tasks_count ?? 0;
         $startDate = $primary->start_date ? $primary->start_date->format('d M') : null;
         $endDate = $primary->expected_end_date ? $primary->expected_end_date->format('d M') : null;
 
@@ -2597,10 +2596,6 @@ $completed = SurveyPlan::whereHas(
             'deadline' => $endDate,
             'tasks_count' => $tasksCount,
             'today_tasks_count' => $todayTasksCount,
-            'today_tasks' => $todayTasks,
-            'today_task' => $todayTasks,
-            'tasks' => $tasks,
-            'task' => $tasks,
             'manager_name' => $primary->client?->name ?? $primary->company?->name ?? null,
         ];
     }

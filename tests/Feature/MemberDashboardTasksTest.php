@@ -68,7 +68,7 @@ class MemberDashboardTasksTest extends TestCase
         ]);
     }
 
-    public function test_member_dashboard_returns_today_tasks_and_tasks_with_inner_project_keys(): void
+    public function test_member_dashboard_returns_one_consolidated_today_task_list(): void
     {
         $admin = $this->createSuperAdmin();
         $company = Company::create(['name' => 'Acme Corp', 'status' => 'active']);
@@ -169,48 +169,42 @@ class MemberDashboardTasksTest extends TestCase
         // Verify top-level keys
         $responseData = $response->json();
 
-        $this->assertArrayHasKey('today_tasks', $responseData);
-        $this->assertArrayHasKey('today_task', $responseData);
-        $this->assertArrayHasKey('todays_tasks', $responseData);
+        $this->assertArrayNotHasKey('todays_tasks', $responseData);
+        $this->assertArrayNotHasKey('today_tasks', $responseData);
+        $this->assertArrayNotHasKey('today_task', $responseData);
         $this->assertArrayHasKey('tasks', $responseData);
-        $this->assertArrayHasKey('task', $responseData);
-        $this->assertArrayHasKey('all_tasks', $responseData);
+        $this->assertArrayNotHasKey('task', $responseData);
+        $this->assertArrayNotHasKey('all_tasks', $responseData);
 
-        // Both assigned tasks should be in tasks list
+        $todayTaskTitles = collect($responseData['tasks'])
+            ->where('is_today', true)
+            ->pluck('title')
+            ->all();
+        $this->assertContains('Unified Today Task', $todayTaskTitles);
+        $this->assertContains('Legacy Assigned Task', $todayTaskTitles);
+        $this->assertNotContains('Other Member Task', $todayTaskTitles);
+
         $taskTitles = collect($responseData['tasks'])->pluck('title')->all();
         $this->assertContains('Unified Today Task', $taskTitles);
         $this->assertContains('Legacy Assigned Task', $taskTitles);
         $this->assertNotContains('Other Member Task', $taskTitles);
 
-        // Check inner project keys for projects array
         $this->assertNotEmpty($responseData['projects']);
         foreach ($responseData['projects'] as $proj) {
-            $this->assertArrayHasKey('today_task', $proj);
-            $this->assertArrayHasKey('today_tasks', $proj);
-            $this->assertArrayHasKey('task', $proj);
-            $this->assertArrayHasKey('tasks', $proj);
-
-            if ($proj['id'] === $project1->id) {
-                $projTaskTitles = collect($proj['tasks'])->pluck('title')->all();
-                $this->assertContains('Unified Today Task', $projTaskTitles);
-                $this->assertNotContains('Legacy Assigned Task', $projTaskTitles);
-            }
-            if ($proj['id'] === $project2->id) {
-                $projTaskTitles = collect($proj['tasks'])->pluck('title')->all();
-                $this->assertContains('Legacy Assigned Task', $projTaskTitles);
-                $this->assertNotContains('Unified Today Task', $projTaskTitles);
-            }
+            $this->assertArrayNotHasKey('today_task', $proj);
+            $this->assertArrayNotHasKey('today_tasks', $proj);
+            $this->assertArrayNotHasKey('task', $proj);
+            $this->assertArrayNotHasKey('tasks', $proj);
         }
 
-        // Check inner project keys for current_project
         $this->assertNotNull($responseData['current_project']);
-        $this->assertArrayHasKey('today_task', $responseData['current_project']);
-        $this->assertArrayHasKey('today_tasks', $responseData['current_project']);
-        $this->assertArrayHasKey('task', $responseData['current_project']);
-        $this->assertArrayHasKey('tasks', $responseData['current_project']);
+        $this->assertArrayNotHasKey('today_task', $responseData['current_project']);
+        $this->assertArrayNotHasKey('today_tasks', $responseData['current_project']);
+        $this->assertArrayNotHasKey('task', $responseData['current_project']);
+        $this->assertArrayNotHasKey('tasks', $responseData['current_project']);
     }
 
-    public function test_tasks_list_is_capped_at_last_20(): void
+    public function test_tasks_list_includes_recent_and_today_tasks_without_duplicates(): void
     {
         $admin = $this->createSuperAdmin();
         $company = Company::create(['name' => 'Acme Corp 2', 'status' => 'active']);
@@ -248,13 +242,12 @@ class MemberDashboardTasksTest extends TestCase
         $response->assertOk();
 
         $responseData = $response->json();
-        // Top-level tasks must be capped at 20
-        $this->assertCount(20, $responseData['tasks']);
-        $this->assertCount(20, $responseData['task']);
-        $this->assertCount(20, $responseData['all_tasks']);
-
-        // Inner project tasks must also be capped at 20
-        $this->assertCount(20, $responseData['projects'][0]['tasks']);
-        $this->assertCount(20, $responseData['projects'][0]['task']);
+        $this->assertCount(25, $responseData['tasks']);
+        $this->assertCount(25, collect($responseData['tasks'])->pluck('id')->unique());
+        $this->assertCount(25, collect($responseData['tasks'])->where('is_today', true));
+        $this->assertArrayNotHasKey('task', $responseData);
+        $this->assertArrayNotHasKey('all_tasks', $responseData);
+        $this->assertArrayNotHasKey('tasks', $responseData['projects'][0]);
+        $this->assertArrayNotHasKey('task', $responseData['projects'][0]);
     }
 }
