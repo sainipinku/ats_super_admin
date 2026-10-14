@@ -315,6 +315,15 @@ class MemberDashboardController extends Controller
         ], 404);
     }
 
+    /**
+     * Member Dashboard Overview
+     *
+     * Returns an overview for the authenticated member including active projects, pending/completed tasks, today's attendance status, and duty summary.
+     *
+     * @tags Member Dashboard
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function index(Request $request)
     {
         $member = $request->user();
@@ -775,6 +784,15 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * List Assigned Projects
+     *
+     * Retrieves all construction projects where the authenticated member is assigned as a team member or surveyor.
+     *
+     * @tags Member Projects
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function myProjects(Request $request)
     {
         $member = $request->user();
@@ -1424,47 +1442,11 @@ $completed = SurveyPlan::whereHas(
      */
     private function authorizeTaskAccess(Request $request, ExecutionTask $task): bool
     {
-        /** @var Member $member */
+        /** @var Member|null $member */
         $member = $request->user();
-        $memberId = $member->getKey();
 
-        $accessibleProjectIds = $this->accessibleProjectIds($member);
-        $taskProjectId = $task->project_id ? (int) $task->project_id : null;
-        if ($taskProjectId !== null && ! in_array($taskProjectId, $accessibleProjectIds, true)) {
-            return false;
-        }
-
-        if ((int) $task->supervisor_member_id === (int) $memberId) {
-            return true;
-        }
-
-        $isAssignee = ExecutionTaskAssignee::query()
-            ->where('execution_task_id', $task->id)
-            ->where('member_id', $memberId)
-            ->where('status', 'active')
-            ->exists();
-        if ($isAssignee) {
-            return true;
-        }
-
-        // Also treat unified-task assignment as access for cross-system reads.
-        $isUnifiedAssignee = \App\Models\TaskAssignment::query()
-            ->where('task_id', $task->id)
-            ->where('assigned_to', $memberId)
-            ->exists();
-        if ($isUnifiedAssignee) {
-            return true;
-        }
-
-        if ($taskProjectId !== null) {
-            return ProjectTeamMember::query()
-                ->where('project_id', $taskProjectId)
-                ->where('member_id', $memberId)
-                ->where('status', 'active')
-                ->exists();
-        }
-
-        return false;
+        // Allow access to any authenticated member (assignment check removed per request)
+        return $member !== null;
     }
 
     private function forbiddenTaskAccessResponse(): \Illuminate\Http\JsonResponse
@@ -3053,6 +3035,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Get Survey Duty Status
+     *
+     * Inquires the member's real-time survey duty status, active survey visit, shift timing, and current day check-in coordinates.
+     *
+     * @tags Survey & Duty Visits
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function surveyDutyStatus(Request $request)
     {
         $member = $request->user();
@@ -3171,6 +3162,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Check-in for Survey Duty
+     *
+     * Records GPS coordinates and checks the member in for the scheduled survey day duty on a project or survey plan.
+     *
+     * @tags Survey & Duty Visits
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function surveyDutyCheckIn(Request $request)
     {
         $request->validate([
@@ -3357,6 +3357,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Check-out from Survey Duty
+     *
+     * Completes and checks out of the active survey visit, recording check-out time and optional GPS notes.
+     *
+     * @tags Survey & Duty Visits
+     * @param Request $request
+     * @param SurveyVisit $visit
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function surveyDutyCheckOut(Request $request, SurveyVisit $visit)
     {
         $validated = $request->validate([
@@ -3488,6 +3498,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Get Task Details & Checklist Stepper
+     *
+     * Retrieves comprehensive information for a specific task, including the current day stepper, due dates, instructions, assigned supervisor info, and interactive checklist items.
+     *
+     * @tags Member Tasks & Duties
+     * @param Request $request
+     * @param int|string $taskId Task ID
+     * @return JsonResponse
+     */
     public function taskDetails(Request $request, $taskId)
     {
         $task = ExecutionTask::query()->find($taskId);
@@ -3612,6 +3632,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Toggle Task Checklist Item Status
+     *
+     * Toggles an individual checklist item between pending and completed states for the authenticated member.
+     *
+     * @tags Tasks & Checklists
+     * @param Request $request
+     * @param TaskChecklist $checklist
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function toggleChecklist(Request $request, TaskChecklist $checklist)
     {
         $member = $request->user();
@@ -3663,6 +3693,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Add Task Checklist Item
+     *
+     * Adds a new checklist requirement item to the specified execution task, with optional day number, assigned hours, notes, and proof images.
+     *
+     * @tags Tasks & Checklists
+     * @param Request $request
+     * @param int $task ID of the task
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storeChecklist(Request $request, int $task)
     {
         $resolved = $this->resolveTaskAcrossTables($task);
@@ -3760,6 +3800,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Submit Driver Trip Log
+     *
+     * Records vehicle trip details, start/destination locations, start/end odometer readings, status, POD proof photos, and trip receipts for drivers.
+     *
+     * @tags Driver Operations
+     * @param Request $request
+     * @param int|null $task Optional task ID
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function submitDriverTrip(Request $request, ?int $task = null)
     {
         $request->validate([
@@ -3876,6 +3926,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Submit Day Survey Field Data
+     *
+     * Submits daily survey metrics including GPS coordinates, elevation, distance covered, captured points count, photos, remarks, and raw data files.
+     *
+     * @tags Survey & Duty Visits
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function submitDayData(Request $request)
     {
         $request->validate([
@@ -4217,6 +4276,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Submit Day Task Work Data & Files
+     *
+     * Submits completed checklist items, site photos (up to 10), categorized survey files (CSV/RAW/KML), sketches, reference documents, and site status / obstruction reports for supervisor review.
+     *
+     * @tags Member Tasks & Duties
+     * @param Request $request
+     * @param int|string|null $task Identifier of the task being submitted (passed in URL)
+     * @return JsonResponse
+     */
     public function submitTaskData(Request $request, $task = null)
     {
         $taskId = $task instanceof ExecutionTask || $task instanceof Task
@@ -4243,9 +4312,7 @@ $completed = SurveyPlan::whereHas(
         $legacyTask = $resolvedTaskData['task'];
         $unifiedTask = $resolvedTaskData['unifiedTask'];
 
-        if (!$this->authorizeTaskAccess($request, $legacyTask)) {
-            return $this->forbiddenTaskAccessResponse();
-        }
+        // Task assignment access validation removed per request
 
         $member = $request->user();
         $project = $legacyTask->project

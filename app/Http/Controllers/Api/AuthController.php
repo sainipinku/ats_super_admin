@@ -16,6 +16,15 @@ use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
+    /**
+     * Register New Member
+     *
+     * Registers a new construction team member or contractor into the system. The account is created in a pending state until approved by a super admin.
+     *
+     * @tags Authentication
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function register(Request $request)
     {
         $validated = $request->validate([
@@ -102,6 +111,15 @@ class AuthController extends Controller
         return response()->json($payload, 201);
     }
 
+    /**
+     * Check Registration & Approval Status
+     *
+     * Inquires whether a registered member account is pending approval, approved, or rejected based on phone number.
+     *
+     * @tags Authentication
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function registrationStatus(Request $request)
     {
         $validated = $request->validate([
@@ -173,6 +191,15 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Member Login (Password-based)
+     *
+     * Authenticates an approved member using phone, email, or username along with their password, returning a Sanctum Bearer token and member profile.
+     *
+     * @tags Authentication
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function login(Request $request)
     {
         $validated = $request->validate([
@@ -271,6 +298,15 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Send OTP for Member Authentication
+     *
+     * Issues and sends a 6-digit One-Time Password (OTP) to the member's registered phone number.
+     *
+     * @tags Authentication
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function sendOtp(Request $request)
     {
         $validated = $request->validate([
@@ -323,6 +359,15 @@ class AuthController extends Controller
         return response()->json($payload);
     }
 
+    /**
+     * Verify OTP & Login
+     *
+     * Verifies the 6-digit OTP received by the member and generates a Sanctum Bearer access token upon success.
+     *
+     * @tags Authentication
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function verifyOtp(Request $request)
     {
         $validated = $request->validate([
@@ -414,6 +459,15 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Get Authenticated Member Profile
+     *
+     * Returns the currently authenticated member's details, roles, employee ID, and approval status.
+     *
+     * @tags Authentication
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function me(Request $request)
     {
         $member = $request->user();
@@ -441,6 +495,15 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Logout Member
+     *
+     * Revokes the current Sanctum Bearer access token and logs the activity.
+     *
+     * @tags Authentication
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function logout(Request $request)
     {
         $member = $request->user();

@@ -16,6 +16,9 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
+/**
+ * @tags Project Tasks
+ */
 class ProjectTaskApiController extends Controller implements HasMiddleware
 {
     public static function middleware(): array
