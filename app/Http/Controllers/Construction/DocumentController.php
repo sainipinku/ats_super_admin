@@ -17,6 +17,16 @@ class DocumentController extends Controller
 {
     use ResolvesConstructionActor;
 
+    /**
+     * View Construction Document
+     *
+     * Streams an authenticated inline preview of a project document or attachment.
+     *
+     * @tags Documents & Files
+     * @param ConstructionDocument $document
+     * @param Request $request
+     * @return BinaryFileResponse
+     */
     public function view(ConstructionDocument $document, Request $request): BinaryFileResponse
     {
         $this->ensureDocumentAccess($document, $request);
@@ -31,6 +41,16 @@ class DocumentController extends Controller
         ]);
     }
 
+    /**
+     * Download Construction Document
+     *
+     * Downloads an authenticated copy of a project document with original filename.
+     *
+     * @tags Documents & Files
+     * @param ConstructionDocument $document
+     * @param Request $request
+     * @return StreamedResponse
+     */
     public function download(ConstructionDocument $document, Request $request): StreamedResponse
     {
         $this->ensureDocumentAccess($document, $request);

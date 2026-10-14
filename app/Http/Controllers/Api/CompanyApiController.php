@@ -13,6 +13,11 @@ use Illuminate\Support\Str;
  */
 class CompanyApiController extends Controller
 {
+    /**
+     * List Companies (Paginated)
+     *
+     * Returns a paginated list of companies and organizations with client and project statistics.
+     */
     public function index(Request $request)
     {
         $query = Company::withCount(['clients', 'projects']);
@@ -47,6 +52,11 @@ class CompanyApiController extends Controller
         ]);
     }
 
+    /**
+     * Get Company Details
+     *
+     * Retrieves detailed profile for a company including clients, projects, and roles.
+     */
     public function show(Company $company)
     {
         $company->load(['clients', 'projects', 'roles']);
@@ -57,6 +67,11 @@ class CompanyApiController extends Controller
         ]);
     }
 
+    /**
+     * Create New Company
+     *
+     * Registers a new construction organization or corporate entity.
+     */
     public function store(Request $request)
     {
         $actor = $request->user();
@@ -91,6 +106,11 @@ class CompanyApiController extends Controller
         ], 201);
     }
 
+    /**
+     * Update Company Details
+     *
+     * Modifies organization profile, contact info, GST, or brand logo.
+     */
     public function update(Request $request, Company $company)
     {
         $validated = $request->validate([
@@ -127,6 +147,11 @@ class CompanyApiController extends Controller
         ]);
     }
 
+    /**
+     * Delete Company
+     *
+     * Removes an organization record if no projects or clients are attached.
+     */
     public function destroy(Company $company)
     {
         $projectCount = $company->projects()->count();
@@ -151,6 +176,11 @@ class CompanyApiController extends Controller
         ]);
     }
 
+    /**
+     * Get All Active Companies
+     *
+     * Fast dropdown list of all active organizations for select inputs.
+     */
     public function all()
     {
         $companies = Company::where('status', 'active')

@@ -12,6 +12,13 @@ use App\Http\Controllers\Api\Member\TaskController;
 use App\Http\Controllers\Api\ProjectApiController;
 use Illuminate\Support\Facades\Route;
 
+/**
+ * API Health & Index
+ *
+ * Verifies system availability and returns main API endpoint base paths.
+ *
+ * @tags System Health
+ */
 Route::get('/', function () {
     return response()->json([
         'success' => true,

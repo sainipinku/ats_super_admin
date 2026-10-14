@@ -886,6 +886,15 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * List Assigned Surveys
+     *
+     * Retrieves all field survey plans and duties assigned to the authenticated member, with optional status filtering.
+     *
+     * @tags Survey & Duty Tracking
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function mySurveys(Request $request)
     {
         $member = $request->user();
@@ -985,6 +994,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * List Member Assigned Tasks
+     *
+     * Retrieves all construction and execution tasks assigned to the authenticated member across accessible projects, with status, priority, and date filters.
+     *
+     * @tags Member Tasks & Checklists
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function myTasks(Request $request)
     {
         /** @var Member $member */
@@ -1196,6 +1214,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * List Today's Scheduled Tasks
+     *
+     * Retrieves tasks scheduled specifically for today or currently pending execution for the authenticated member.
+     *
+     * @tags Member Tasks & Checklists
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function todaysTasks(Request $request)
     {
         /** @var Member $member */
@@ -1458,6 +1485,15 @@ $completed = SurveyPlan::whereHas(
         ], 403);
     }
 
+    /**
+     * Get Member Attendance History
+     *
+     * Retrieves historical attendance records for the authenticated member, including check-in/out timestamps, hours worked, and project tags.
+     *
+     * @tags Member Dashboard & Attendance
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function myAttendance(Request $request)
     {
         $member = $request->user();
@@ -1531,6 +1567,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Get Project Detail Overview
+     *
+     * Returns detailed project overview for the authenticated member including site info, daily progress, attendance summary, and survey plans.
+     *
+     * @tags Member Dashboard & Attendance
+     * @param Request $request
+     * @param Project $project
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function projectDetail(Request $request, Project $project)
     {
         $member = $request->user();
@@ -1799,6 +1845,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Toggle Task Completion Status
+     *
+     * Toggles a task between completed and planned states for the member.
+     *
+     * @tags Member Tasks & Checklists
+     * @param Request $request
+     * @param int $task
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function toggleTask(Request $request, int $task)
     {
         $resolved = $this->resolveTaskAcrossTables($task);
@@ -1832,6 +1888,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Update Task Execution Status
+     *
+     * Updates the status of an assigned task (planned, in_progress, completed, blocked).
+     *
+     * @tags Member Tasks & Checklists
+     * @param Request $request
+     * @param int $task
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function updateTaskStatus(Request $request, int $task)
     {
         $resolved = $this->resolveTaskAcrossTables($task);
@@ -1859,6 +1925,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Update Task Details
+     *
+     * Updates details, dates, remarks, or metadata of an existing assigned task.
+     *
+     * @tags Member Tasks & Checklists
+     * @param Request $request
+     * @param int $task
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function updateTask(Request $request, int $task)
     {
         $resolved = $this->resolveTaskAcrossTables($task);
@@ -2010,6 +2086,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Create New Member Task
+     *
+     * Creates a new execution task assigned to a project and member with optional checklists and schedule.
+     *
+     * @tags Member Tasks & Checklists
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storeTask(Request $request)
     {
         $request->validate([
@@ -2203,6 +2288,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Member Daily Check-In
+     *
+     * Records member daily check-in with GPS coordinates, address, and selfie photo.
+     *
+     * @tags Member Dashboard & Attendance
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function checkIn(Request $request)
     {
         $member = $request->user();
@@ -2338,6 +2432,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Member Daily Check-Out
+     *
+     * Records member daily check-out, calculates worked hours, and attaches exit location.
+     *
+     * @tags Member Dashboard & Attendance
+     * @param Request $request
+     * @param int|null $attendance
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function checkOut(Request $request, $attendance = null)
     {
         $member = $request->user();
@@ -2480,6 +2584,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * List Member Notifications
+     *
+     * Retrieves latest alerts, project notifications, and approvals for the member.
+     *
+     * @tags Member Dashboard & Attendance
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function notifications(Request $request)
     {
         $member = $request->user();
@@ -2786,6 +2899,15 @@ $completed = SurveyPlan::whereHas(
         })->values()->toArray();
     }
 
+    /**
+     * Member App Profile & Navigation
+     *
+     * Retrieves member profile metrics, quick navigation options, and duty statistics for the mobile profile screen.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function profileIndex(Request $request)
     {
         $member = $request->user();
@@ -2874,6 +2996,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Create New Construction Site
+     *
+     * Creates and registers a new construction site/project directly from mobile and assigns the authenticated member.
+     *
+     * @tags Construction Projects
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storeSite(Request $request)
     {
         $request->validate([
@@ -2909,6 +3040,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Create Field Survey Plan
+     *
+     * Creates a new survey plan and assigns the creator as lead surveyor.
+     *
+     * @tags Survey & Duty Tracking
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storeSurvey(Request $request)
     {
         $request->validate([
@@ -2943,6 +3083,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Request Account Deletion
+     *
+     * Revokes active tokens and schedules the member account for permanent deletion.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function deleteAccount(Request $request)
     {
         $member = $request->user();
@@ -2955,6 +3104,14 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Get Privacy Policy
+     *
+     * Retrieves current terms and privacy policy HTML and plain text for mobile and web views.
+     *
+     * @tags System Health & Settings
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function privacyPolicy()
     {
         $setting = SystemSetting::where('name', 'privacy_policy')->first();
@@ -2971,6 +3128,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Update Privacy Policy
+     *
+     * Updates privacy policy content.
+     *
+     * @tags System Health & Settings
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storePrivacyPolicy(Request $request)
     {
         $request->validate([
@@ -2995,6 +3161,14 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Get Terms & Conditions
+     *
+     * Retrieves terms and conditions content.
+     *
+     * @tags System Health & Settings
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function termsAndConditions()
     {
         $setting = SystemSetting::where('name', 'terms_and_conditions')->first();
@@ -3011,6 +3185,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Update Terms & Conditions
+     *
+     * Updates terms and conditions content.
+     *
+     * @tags System Health & Settings
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storeTermsAndConditions(Request $request)
     {
         $request->validate([
@@ -4719,6 +4902,16 @@ $completed = SurveyPlan::whereHas(
         return $bytes . ' B';
     }
 
+    /**
+     * Get Project Survey Details & Team
+     *
+     * Retrieves full survey plan details, team members, and documents for a specific construction project.
+     *
+     * @tags Survey & Duty Tracking
+     * @param Request $request
+     * @param Project $project
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function projectSurveyDetails(Request $request, Project $project)
     {
         $member = $request->user();

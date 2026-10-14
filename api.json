@@ -18,6 +18,11 @@
     "paths": {
         "/": {
             "get": {
+                "description": "Verifies system availability and returns main API endpoint base paths.",
+                "summary": "API Health & Index",
+                "tags": [
+                    "System & Legal Policies"
+                ],
                 "responses": {
                     "200": {
                         "description": "",
@@ -97,9 +102,10 @@
         "/admin/dashboard": {
             "get": {
                 "operationId": "adminDashboardApi.index",
+                "description": "Aggregates project stages, equipment allocations, active teams, fleet status, and financial summaries for construction admins.",
+                "summary": "Admin Dashboard Overview & KPIs",
                 "tags": [
-                    "Admin Dashboard",
-                    "AdminDashboardApi"
+                    "Admin Dashboard"
                 ],
                 "responses": {
                     "200": {
@@ -620,9 +626,10 @@
         "/admin/survey-defaults": {
             "get": {
                 "operationId": "adminDashboardApi.surveyDefaults",
+                "description": "Inquires system defaults for survey shifts, site locations, total days, checklists, and supervisor templates.",
+                "summary": "Get Survey Configuration Defaults",
                 "tags": [
-                    "Admin Dashboard",
-                    "AdminDashboardApi"
+                    "Admin Dashboard"
                 ],
                 "responses": {
                     "500": {
@@ -983,9 +990,10 @@
             },
             "put": {
                 "operationId": "adminDashboardApi.updateSurveyDefaults",
+                "description": "Modifies global survey settings, shifts, step titles, and site coordinate defaults.",
+                "summary": "Update Survey Configuration Defaults",
                 "tags": [
-                    "Admin Dashboard",
-                    "AdminDashboardApi"
+                    "Admin Dashboard"
                 ],
                 "requestBody": {
                     "content": {
@@ -1201,7 +1209,7 @@
                 "description": "Registers a new construction team member or contractor into the system. The account is created in a pending state until approved by a super admin.",
                 "summary": "Register New Member",
                 "tags": [
-                    "Auth"
+                    "Authentication"
                 ],
                 "requestBody": {
                     "required": true,
@@ -1391,7 +1399,7 @@
                 "description": "Inquires whether a registered member account is pending approval, approved, or rejected based on phone number.",
                 "summary": "Check Registration & Approval Status",
                 "tags": [
-                    "Auth"
+                    "Authentication"
                 ],
                 "parameters": [
                     {
@@ -1548,7 +1556,7 @@
                 "description": "Authenticates an approved member using phone, email, or username along with their password, returning a Sanctum Bearer token and member profile.",
                 "summary": "Member Login (Password-based)",
                 "tags": [
-                    "Auth"
+                    "Authentication"
                 ],
                 "requestBody": {
                     "required": true,
@@ -1764,7 +1772,7 @@
                 "description": "Issues and sends a 6-digit One-Time Password (OTP) to the member's registered phone number.",
                 "summary": "Send OTP for Member Authentication",
                 "tags": [
-                    "Auth"
+                    "Authentication"
                 ],
                 "requestBody": {
                     "required": true,
@@ -1920,7 +1928,7 @@
                 "description": "Verifies the 6-digit OTP received by the member and generates a Sanctum Bearer access token upon success.",
                 "summary": "Verify OTP & Login",
                 "tags": [
-                    "Auth"
+                    "Authentication"
                 ],
                 "requestBody": {
                     "required": true,
@@ -2030,7 +2038,7 @@
                 "description": "Revokes the current Sanctum Bearer access token and logs the activity.",
                 "summary": "Logout Member",
                 "tags": [
-                    "Auth"
+                    "Authentication"
                 ],
                 "responses": {
                     "200": {
@@ -2068,7 +2076,7 @@
                 "description": "Returns the currently authenticated member's details, roles, employee ID, and approval status.",
                 "summary": "Get Authenticated Member Profile",
                 "tags": [
-                    "Auth"
+                    "Authentication"
                 ],
                 "responses": {
                     "200": {
@@ -2152,9 +2160,10 @@
         "/construction/clients/all": {
             "get": {
                 "operationId": "clientApi.all",
+                "description": "Fast unpaginated dropdown list of all active clients.",
+                "summary": "Get All Active Clients",
                 "tags": [
-                    "Clients",
-                    "ClientApi"
+                    "Clients"
                 ],
                 "responses": {
                     "200": {
@@ -2191,9 +2200,10 @@
         "/construction/clients": {
             "get": {
                 "operationId": "clientApi.index",
+                "description": "Returns a paginated list of clients with linked company details and project counts.",
+                "summary": "List Clients (Paginated)",
                 "tags": [
-                    "Clients",
-                    "ClientApi"
+                    "Clients"
                 ],
                 "responses": {
                     "200": {
@@ -2252,9 +2262,10 @@
             },
             "post": {
                 "operationId": "clientApi.store",
+                "description": "Registers a new construction client with contact, GST, billing, and site addresses.",
+                "summary": "Create New Client",
                 "tags": [
-                    "Clients",
-                    "ClientApi"
+                    "Clients"
                 ],
                 "requestBody": {
                     "required": true,
@@ -2388,9 +2399,10 @@
         "/construction/clients/{client}": {
             "get": {
                 "operationId": "clientApi.show",
+                "description": "Retrieves detailed profile of a specific client including company and projects.",
+                "summary": "Get Client Details",
                 "tags": [
-                    "Clients",
-                    "ClientApi"
+                    "Clients"
                 ],
                 "parameters": [
                     {
@@ -2436,9 +2448,10 @@
             },
             "put": {
                 "operationId": "clientApi.update",
+                "description": "Updates an existing client record with modified contact or address details.",
+                "summary": "Update Client Details",
                 "tags": [
-                    "Clients",
-                    "ClientApi"
+                    "Clients"
                 ],
                 "parameters": [
                     {
@@ -2584,9 +2597,10 @@
             },
             "delete": {
                 "operationId": "clientApi.destroy",
+                "description": "Removes a client record if there are no associated active projects.",
+                "summary": "Delete Client",
                 "tags": [
-                    "Clients",
-                    "ClientApi"
+                    "Clients"
                 ],
                 "parameters": [
                     {
@@ -2657,9 +2671,10 @@
         "/construction/companies/all": {
             "get": {
                 "operationId": "companyApi.all",
+                "description": "Fast dropdown list of all active organizations for select inputs.",
+                "summary": "Get All Active Companies",
                 "tags": [
-                    "Companies & Organizations",
-                    "CompanyApi"
+                    "Companies & Organizations"
                 ],
                 "responses": {
                     "200": {
@@ -2696,9 +2711,10 @@
         "/construction/companies": {
             "get": {
                 "operationId": "companyApi.index",
+                "description": "Returns a paginated list of companies and organizations with client and project statistics.",
+                "summary": "List Companies (Paginated)",
                 "tags": [
-                    "Companies & Organizations",
-                    "CompanyApi"
+                    "Companies & Organizations"
                 ],
                 "responses": {
                     "200": {
@@ -2757,9 +2773,10 @@
             },
             "post": {
                 "operationId": "companyApi.store",
+                "description": "Registers a new construction organization or corporate entity.",
+                "summary": "Create New Company",
                 "tags": [
-                    "Companies & Organizations",
-                    "CompanyApi"
+                    "Companies & Organizations"
                 ],
                 "requestBody": {
                     "required": true,
@@ -2867,9 +2884,10 @@
         "/construction/companies/{company}": {
             "get": {
                 "operationId": "companyApi.show",
+                "description": "Retrieves detailed profile for a company including clients, projects, and roles.",
+                "summary": "Get Company Details",
                 "tags": [
-                    "Companies & Organizations",
-                    "CompanyApi"
+                    "Companies & Organizations"
                 ],
                 "parameters": [
                     {
@@ -2915,9 +2933,10 @@
             },
             "put": {
                 "operationId": "companyApi.update",
+                "description": "Modifies organization profile, contact info, GST, or brand logo.",
+                "summary": "Update Company Details",
                 "tags": [
-                    "Companies & Organizations",
-                    "CompanyApi"
+                    "Companies & Organizations"
                 ],
                 "parameters": [
                     {
@@ -3038,9 +3057,10 @@
             },
             "delete": {
                 "operationId": "companyApi.destroy",
+                "description": "Removes an organization record if no projects or clients are attached.",
+                "summary": "Delete Company",
                 "tags": [
-                    "Companies & Organizations",
-                    "CompanyApi"
+                    "Companies & Organizations"
                 ],
                 "parameters": [
                     {
@@ -3111,9 +3131,10 @@
         "/construction/projects/stats": {
             "get": {
                 "operationId": "projectApi.stats",
+                "description": "Returns total counts broken down by project stage, priority, and completion status.",
+                "summary": "Get Construction Projects Statistics",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "responses": {
                     "200": {
@@ -3201,9 +3222,10 @@
         "/construction/projects": {
             "get": {
                 "operationId": "projectApi.index",
+                "description": "Returns a paginated list of construction projects with company, client, and active budget details.",
+                "summary": "List Projects (Paginated)",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "responses": {
                     "200": {
@@ -3262,9 +3284,10 @@
             },
             "post": {
                 "operationId": "projectApi.store",
+                "description": "Registers a new construction project and initializes stage to budget_pending.",
+                "summary": "Create New Project",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "requestBody": {
                     "required": true,
@@ -3388,9 +3411,10 @@
         "/construction/projects/team/assign-batch": {
             "post": {
                 "operationId": "projectApi.assignBatch",
+                "description": "Assigns multiple staff members to a project in a single transaction with designated roles and dates.",
+                "summary": "Batch Assign Team Members",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "requestBody": {
                     "required": true,
@@ -3497,9 +3521,10 @@
         "/construction/projects/{project}": {
             "get": {
                 "operationId": "projectApi.show",
+                "description": "Retrieves full project details including client, company, budgets, team, surveys, vehicles, and equipment.",
+                "summary": "Get Project Details",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "parameters": [
                     {
@@ -3545,9 +3570,10 @@
             },
             "put": {
                 "operationId": "projectApi.update",
+                "description": "Modifies existing project attributes, priority, schedule, and stage.",
+                "summary": "Update Project Details",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "parameters": [
                     {
@@ -3689,9 +3715,10 @@
             },
             "delete": {
                 "operationId": "projectApi.destroy",
+                "description": "Deletes a project and its associated cascade records safely in a transaction.",
+                "summary": "Delete Project",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "parameters": [
                     {
@@ -3762,9 +3789,10 @@
         "/construction/projects/{project}/status": {
             "post": {
                 "operationId": "projectApi.updateStatus",
+                "description": "Modifies the operational status (draft, active, on_hold, completed, cancelled) and workflow stage of a project.",
+                "summary": "Update Project Status & Stage",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "parameters": [
                     {
@@ -3863,9 +3891,10 @@
         "/construction/projects/{project}/budget": {
             "get": {
                 "operationId": "projectApi.budgets",
+                "description": "Retrieves all historical budget versions submitted for the specified project.",
+                "summary": "List Project Budget History",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "parameters": [
                     {
@@ -3914,9 +3943,10 @@
             },
             "post": {
                 "operationId": "projectApi.storeBudget",
+                "description": "Creates a new budget version with estimated and approved amounts, currency, and approval status.",
+                "summary": "Add Project Budget",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "parameters": [
                     {
@@ -4019,9 +4049,10 @@
         "/construction/projects/{project}/team": {
             "get": {
                 "operationId": "projectApi.team",
+                "description": "Retrieves all assigned staff, roles, and schedules for the specified project.",
+                "summary": "Get Project Team Members",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "parameters": [
                     {
@@ -4070,9 +4101,10 @@
             },
             "post": {
                 "operationId": "projectApi.assignTeam",
+                "description": "Assigns a specific member to a project with designated role and timeframe.",
+                "summary": "Assign Team Member to Project",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "parameters": [
                     {
@@ -4173,9 +4205,10 @@
         "/construction/projects/{project}/team/{teamMemberId}": {
             "delete": {
                 "operationId": "projectApi.removeTeamMember",
+                "description": "Unassigns and removes a team member from the project.",
+                "summary": "Remove Project Team Member",
                 "tags": [
-                    "Construction Projects",
-                    "ProjectApi"
+                    "Construction Projects"
                 ],
                 "parameters": [
                     {
@@ -4219,8 +4252,10 @@
         "/signed/documents/{document}/view": {
             "get": {
                 "operationId": "signed_documents.view",
+                "description": "Streams an authenticated inline preview of a project document or attachment.",
+                "summary": "View Construction Document",
                 "tags": [
-                    "Document"
+                    "Documents & Media"
                 ],
                 "parameters": [
                     {
@@ -4255,8 +4290,10 @@
         "/construction/mobile/construction/documents/{document}/view": {
             "get": {
                 "operationId": "construction.document.view_143",
+                "description": "Streams an authenticated inline preview of a project document or attachment.",
+                "summary": "View Construction Document",
                 "tags": [
-                    "Document"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -4293,8 +4330,10 @@
         "/construction/mobile/construction/documents/{document}/download": {
             "get": {
                 "operationId": "document.download",
+                "description": "Downloads an authenticated copy of a project document with original filename.",
+                "summary": "Download Construction Document",
                 "tags": [
-                    "Document"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -4342,9 +4381,10 @@
         "/jobs": {
             "get": {
                 "operationId": "job.index",
+                "description": "Retrieves active job openings with keyword search, location filtering, and pagination.",
+                "summary": "List Active Jobs",
                 "tags": [
-                    "Member Jobs",
-                    "Job"
+                    "Job Portal & Applications"
                 ],
                 "responses": {
                     "200": {
@@ -4505,9 +4545,10 @@
         "/jobs/{job}": {
             "get": {
                 "operationId": "job.show",
+                "description": "Retrieves job details, company info, requirement specs, and applicant submission status.",
+                "summary": "Get Job Details",
                 "tags": [
-                    "Member Jobs",
-                    "Job"
+                    "Job Portal & Applications"
                 ],
                 "parameters": [
                     {
@@ -4574,9 +4615,10 @@
         "/jobs/{job}/apply": {
             "post": {
                 "operationId": "job.apply",
+                "description": "Submits an application for a job opening with cover note, experience summary, and attached resume.",
+                "summary": "Submit Job Application",
                 "tags": [
-                    "Member Jobs",
-                    "Job"
+                    "Job Portal & Applications"
                 ],
                 "parameters": [
                     {
@@ -4714,9 +4756,10 @@
         "/jobs/{job}/save": {
             "post": {
                 "operationId": "job.save",
+                "description": "Bookmarks an active job opening to the member saved list.",
+                "summary": "Save Job to Bookmarks",
                 "tags": [
-                    "Member Jobs",
-                    "Job"
+                    "Job Portal & Applications"
                 ],
                 "parameters": [
                     {
@@ -4767,9 +4810,10 @@
             },
             "delete": {
                 "operationId": "job.unsave",
+                "description": "Removes a bookmarked job from the member saved list.",
+                "summary": "Remove Saved Job",
                 "tags": [
-                    "Member Jobs",
-                    "Job"
+                    "Job Portal & Applications"
                 ],
                 "parameters": [
                     {
@@ -4822,9 +4866,10 @@
         "/saved-jobs": {
             "get": {
                 "operationId": "job.savedIndex",
+                "description": "Retrieves all jobs bookmarked/saved by the authenticated member.",
+                "summary": "List Saved Jobs",
                 "tags": [
-                    "Member Jobs",
-                    "Job"
+                    "Job Portal & Applications"
                 ],
                 "responses": {
                     "200": {
@@ -4971,9 +5016,10 @@
         "/applications": {
             "get": {
                 "operationId": "job.myApplications",
+                "description": "Retrieves all job applications submitted by the authenticated member along with recruitment review statuses.",
+                "summary": "List My Job Applications",
                 "tags": [
-                    "Member Jobs",
-                    "Job"
+                    "Job Portal & Applications"
                 ],
                 "parameters": [
                     {
@@ -5204,9 +5250,10 @@
         "/applications/{application}": {
             "delete": {
                 "operationId": "job.withdraw",
+                "description": "Cancels and withdraws an active job application.",
+                "summary": "Withdraw Job Application",
                 "tags": [
-                    "Member Jobs",
-                    "Job"
+                    "Job Portal & Applications"
                 ],
                 "parameters": [
                     {
@@ -5278,9 +5325,10 @@
         "/profile": {
             "get": {
                 "operationId": "profile.show",
+                "description": "Retrieves the authenticated member profile details, contact information, and role assignments.",
+                "summary": "Get Member Profile",
                 "tags": [
-                    "Member Profile",
-                    "Profile"
+                    "Member Profile"
                 ],
                 "responses": {
                     "200": {
@@ -5312,9 +5360,10 @@
             },
             "put": {
                 "operationId": "profile.update",
+                "description": "Updates profile personal details, contact info, job title, skills, experience, and location coordinates.",
+                "summary": "Update Member Profile",
                 "tags": [
-                    "Member Profile",
-                    "Profile"
+                    "Member Profile"
                 ],
                 "requestBody": {
                     "content": {
@@ -5476,9 +5525,10 @@
         "/profile/change-password": {
             "post": {
                 "operationId": "profile.changePassword",
+                "description": "Validates the current password and securely updates to a new password.",
+                "summary": "Change Member Password",
                 "tags": [
-                    "Member Profile",
-                    "Profile"
+                    "Member Profile"
                 ],
                 "requestBody": {
                     "required": true,
@@ -5542,9 +5592,10 @@
         "/profile/completion": {
             "get": {
                 "operationId": "profile.completion",
+                "description": "Calculates the member profile completion percentage and lists missing recommended fields.",
+                "summary": "Get Profile Completion Score",
                 "tags": [
-                    "Member Profile",
-                    "Profile"
+                    "Member Profile"
                 ],
                 "responses": {
                     "200": {
@@ -5590,9 +5641,10 @@
         "/profile/photo": {
             "post": {
                 "operationId": "profile.updatePhoto",
+                "description": "Uploads and updates the member profile avatar image.",
+                "summary": "Upload Profile Photo",
                 "tags": [
-                    "Member Profile",
-                    "Profile"
+                    "Member Profile"
                 ],
                 "requestBody": {
                     "required": true,
@@ -5655,9 +5707,10 @@
             },
             "delete": {
                 "operationId": "profile.removePhoto",
+                "description": "Deletes the member current profile image from disk and resets avatar.",
+                "summary": "Remove Profile Photo",
                 "tags": [
-                    "Member Profile",
-                    "Profile"
+                    "Member Profile"
                 ],
                 "responses": {
                     "200": {
@@ -5698,9 +5751,10 @@
         "/profile/resume": {
             "get": {
                 "operationId": "profile.resume",
+                "description": "Checks if the member has uploaded a CV/resume and returns file metadata and view URL.",
+                "summary": "Get Member Resume Details",
                 "tags": [
-                    "Member Profile",
-                    "Profile"
+                    "Member Profile"
                 ],
                 "responses": {
                     "200": {
@@ -5771,9 +5825,10 @@
             },
             "post": {
                 "operationId": "profile.uploadResume",
+                "description": "Uploads a PDF or Word document as the member resume/CV.",
+                "summary": "Upload Member Resume",
                 "tags": [
-                    "Member Profile",
-                    "Profile"
+                    "Member Profile"
                 ],
                 "requestBody": {
                     "required": true,
@@ -5866,9 +5921,10 @@
             },
             "delete": {
                 "operationId": "profile.deleteResume",
+                "description": "Removes the uploaded resume file from storage.",
+                "summary": "Delete Member Resume",
                 "tags": [
-                    "Member Profile",
-                    "Profile"
+                    "Member Profile"
                 ],
                 "responses": {
                     "200": {
@@ -5903,9 +5959,10 @@
         "/profile/resume/view": {
             "get": {
                 "operationId": "profile.viewResume",
+                "description": "Streams the uploaded resume document for viewing or downloading.",
+                "summary": "View or Download Resume File",
                 "tags": [
-                    "Member Profile",
-                    "Profile"
+                    "Member Profile"
                 ],
                 "responses": {
                     "200": {
@@ -5951,9 +6008,10 @@
         "/tasks": {
             "get": {
                 "operationId": "task.index",
+                "description": "Returns all unified tasks assigned to the authenticated member across accessible projects.",
+                "summary": "List Member Assigned Tasks",
                 "tags": [
-                    "Member Tasks",
-                    "Task"
+                    "Member Tasks & Checklists"
                 ],
                 "responses": {
                     "200": {
@@ -6128,9 +6186,10 @@
         "/tasks/{task}": {
             "get": {
                 "operationId": "task.show",
+                "description": "Retrieves specific task info including creator, assigned dates, priority, and instance tracking.",
+                "summary": "Get Task Detail",
                 "tags": [
-                    "Member Tasks",
-                    "Task"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -6232,9 +6291,10 @@
         "/tasks/{task}/notes": {
             "get": {
                 "operationId": "task.notesIndex",
+                "description": "Retrieves comment thread and activity notes for a specific task.",
+                "summary": "List Task Notes & Comments",
                 "tags": [
-                    "Member Tasks",
-                    "Task"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -6337,9 +6397,10 @@
             },
             "post": {
                 "operationId": "task.notesStore",
+                "description": "Posts a new note or threaded reply on the specified task.",
+                "summary": "Add Task Note / Comment",
                 "tags": [
-                    "Member Tasks",
-                    "Task"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -6469,9 +6530,10 @@
         "/notes/{note}": {
             "delete": {
                 "operationId": "task.notesDestroy",
+                "description": "Deletes a note posted by the authenticated member.",
+                "summary": "Delete Task Note",
                 "tags": [
-                    "Member Tasks",
-                    "Task"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -6552,7 +6614,7 @@
                 "description": "Submits completed checklist items, site photos (up to 10), categorized survey files (CSV/RAW/KML), sketches, reference documents, and site status / obstruction reports for supervisor review.",
                 "summary": "Submit Day Task Work Data & Files",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -6883,8 +6945,10 @@
         "/attendance": {
             "get": {
                 "operationId": "memberDashboard.myAttendance_33",
+                "description": "Retrieves historical attendance records for the authenticated member, including check-in/out timestamps, hours worked, and project tags.",
+                "summary": "Get Member Attendance History",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "responses": {
                     "200": {
@@ -7008,8 +7072,10 @@
         "/attendance/check-in": {
             "post": {
                 "operationId": "memberDashboard.checkIn_34",
+                "description": "Records member daily check-in with GPS coordinates, address, and selfie photo.",
+                "summary": "Member Daily Check-In",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "requestBody": {
                     "content": {
@@ -7202,8 +7268,10 @@
         "/attendance/check-out": {
             "post": {
                 "operationId": "memberDashboard.checkOut_35",
+                "description": "Records member daily check-out, calculates worked hours, and attaches exit location.",
+                "summary": "Member Daily Check-Out",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "requestBody": {
                     "content": {
@@ -7446,8 +7514,10 @@
         "/attendance/{attendance}/check-out": {
             "post": {
                 "operationId": "memberDashboard.checkOut_36",
+                "description": "Records member daily check-out, calculates worked hours, and attaches exit location.",
+                "summary": "Member Daily Check-Out",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "parameters": [
                     {
@@ -7455,7 +7525,10 @@
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string",
+                            "type": [
+                                "integer",
+                                "null"
+                            ],
                             "default": null
                         }
                     }
@@ -7663,7 +7736,7 @@
                 "description": "Returns an overview for the authenticated member including active projects, pending/completed tasks, today's attendance status, and duty summary.",
                 "summary": "Member Dashboard Overview",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "responses": {
                     "200": {
@@ -8909,7 +8982,7 @@
                 "description": "Retrieves all construction projects where the authenticated member is assigned as a team member or surveyor.",
                 "summary": "List Assigned Projects",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "responses": {
                     "200": {
@@ -9059,8 +9132,10 @@
         "/member/dashboard/surveys": {
             "get": {
                 "operationId": "memberDashboard.mySurveys_39",
+                "description": "Retrieves all field survey plans and duties assigned to the authenticated member, with optional status filtering.",
+                "summary": "List Assigned Surveys",
                 "tags": [
-                    "MemberDashboard"
+                    "Survey & Driver Duty"
                 ],
                 "parameters": [
                     {
@@ -9158,8 +9233,10 @@
         "/member/dashboard/tasks": {
             "get": {
                 "operationId": "memberDashboard.myTasks_40",
+                "description": "Retrieves all construction and execution tasks assigned to the authenticated member across accessible projects, with status, priority, and date filters.",
+                "summary": "List Member Assigned Tasks",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "responses": {
                     "200": {
@@ -9348,8 +9425,10 @@
         "/member/dashboard/todays-tasks": {
             "get": {
                 "operationId": "memberDashboard.todaysTasks_41",
+                "description": "Retrieves tasks scheduled specifically for today or currently pending execution for the authenticated member.",
+                "summary": "List Today's Scheduled Tasks",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "responses": {
                     "200": {
@@ -9451,8 +9530,10 @@
         "/member/dashboard/attendance": {
             "get": {
                 "operationId": "memberDashboard.myAttendance_42",
+                "description": "Retrieves historical attendance records for the authenticated member, including check-in/out timestamps, hours worked, and project tags.",
+                "summary": "Get Member Attendance History",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "responses": {
                     "200": {
@@ -9576,8 +9657,10 @@
         "/member/dashboard/projects/{project}": {
             "get": {
                 "operationId": "memberDashboard.projectDetail",
+                "description": "Returns detailed project overview for the authenticated member including site info, daily progress, attendance summary, and survey plans.",
+                "summary": "Get Project Detail Overview",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "parameters": [
                     {
@@ -9945,7 +10028,7 @@
                 "description": "Retrieves all construction projects where the authenticated member is assigned as a team member or surveyor.",
                 "summary": "List Assigned Projects",
                 "tags": [
-                    "MemberDashboard"
+                    "Construction Projects"
                 ],
                 "responses": {
                     "200": {
@@ -10095,8 +10178,10 @@
         "/member/tasks": {
             "get": {
                 "operationId": "memberDashboard.myTasks_45",
+                "description": "Retrieves all construction and execution tasks assigned to the authenticated member across accessible projects, with status, priority, and date filters.",
+                "summary": "List Member Assigned Tasks",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Tasks & Checklists"
                 ],
                 "responses": {
                     "200": {
@@ -10283,8 +10368,10 @@
             },
             "post": {
                 "operationId": "memberDashboard.storeTask",
+                "description": "Creates a new execution task assigned to a project and member with optional checklists and schedule.",
+                "summary": "Create New Member Task",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Tasks & Checklists"
                 ],
                 "requestBody": {
                     "required": true,
@@ -10446,8 +10533,10 @@
         "/member/todays-tasks": {
             "get": {
                 "operationId": "memberDashboard.todaysTasks_46",
+                "description": "Retrieves tasks scheduled specifically for today or currently pending execution for the authenticated member.",
+                "summary": "List Today's Scheduled Tasks",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Tasks & Checklists"
                 ],
                 "responses": {
                     "200": {
@@ -10549,8 +10638,10 @@
         "/member/tasks/{task}": {
             "put": {
                 "operationId": "memberDashboard.updateTask_48",
+                "description": "Updates details, dates, remarks, or metadata of an existing assigned task.",
+                "summary": "Update Task Details",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -10845,8 +10936,10 @@
         "/member/tasks/{task}/update": {
             "post": {
                 "operationId": "memberDashboard.updateTask_49",
+                "description": "Updates details, dates, remarks, or metadata of an existing assigned task.",
+                "summary": "Update Task Details",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -11141,8 +11234,10 @@
         "/member/tasks/{task}/toggle": {
             "post": {
                 "operationId": "memberDashboard.toggleTask",
+                "description": "Toggles a task between completed and planned states for the member.",
+                "summary": "Toggle Task Completion Status",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -11263,8 +11358,10 @@
         "/member/tasks/{task}/status": {
             "post": {
                 "operationId": "memberDashboard.updateTaskStatus",
+                "description": "Updates the status of an assigned task (planned, in_progress, completed, blocked).",
+                "summary": "Update Task Execution Status",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -11396,8 +11493,10 @@
         "/member/attendance/check-in": {
             "post": {
                 "operationId": "memberDashboard.checkIn_52",
+                "description": "Records member daily check-in with GPS coordinates, address, and selfie photo.",
+                "summary": "Member Daily Check-In",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "responses": {
                     "200": {
@@ -11545,8 +11644,10 @@
         "/member/attendance/check-out": {
             "post": {
                 "operationId": "memberDashboard.checkOut_53",
+                "description": "Records member daily check-out, calculates worked hours, and attaches exit location.",
+                "summary": "Member Daily Check-Out",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "responses": {
                     "200": {
@@ -11748,8 +11849,10 @@
         "/member/attendance/{attendance}/check-out": {
             "post": {
                 "operationId": "memberDashboard.checkOut_54",
+                "description": "Records member daily check-out, calculates worked hours, and attaches exit location.",
+                "summary": "Member Daily Check-Out",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "parameters": [
                     {
@@ -11757,7 +11860,10 @@
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string",
+                            "type": [
+                                "integer",
+                                "null"
+                            ],
                             "default": null
                         }
                     }
@@ -11962,8 +12068,10 @@
         "/member/notifications": {
             "get": {
                 "operationId": "memberDashboard.notifications",
+                "description": "Retrieves latest alerts, project notifications, and approvals for the member.",
+                "summary": "List Member Notifications",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "responses": {
                     "200": {
@@ -12000,7 +12108,7 @@
                 "description": "Inquires the member's real-time survey duty status, active survey visit, shift timing, and current day check-in coordinates.",
                 "summary": "Get Survey Duty Status",
                 "tags": [
-                    "MemberDashboard"
+                    "Survey & Driver Duty"
                 ],
                 "responses": {
                     "200": {
@@ -12163,7 +12271,7 @@
                 "description": "Records GPS coordinates and checks the member in for the scheduled survey day duty on a project or survey plan.",
                 "summary": "Check-in for Survey Duty",
                 "tags": [
-                    "MemberDashboard"
+                    "Survey & Driver Duty"
                 ],
                 "requestBody": {
                     "content": {
@@ -12523,7 +12631,7 @@
                 "description": "Completes and checks out of the active survey visit, recording check-out time and optional GPS notes.",
                 "summary": "Check-out from Survey Duty",
                 "tags": [
-                    "MemberDashboard"
+                    "Survey & Driver Duty"
                 ],
                 "parameters": [
                     {
@@ -12789,7 +12897,7 @@
                 "description": "Submits daily survey metrics including GPS coordinates, elevation, distance covered, captured points count, photos, remarks, and raw data files.",
                 "summary": "Submit Day Survey Field Data",
                 "tags": [
-                    "MemberDashboard"
+                    "Survey & Driver Duty"
                 ],
                 "requestBody": {
                     "content": {
@@ -13029,7 +13137,7 @@
                 "description": "Inquires the member's real-time survey duty status, active survey visit, shift timing, and current day check-in coordinates.",
                 "summary": "Get Survey Duty Status",
                 "tags": [
-                    "MemberDashboard"
+                    "Survey & Driver Duty"
                 ],
                 "responses": {
                     "200": {
@@ -13192,7 +13300,7 @@
                 "description": "Records vehicle trip details, start/destination locations, start/end odometer readings, status, POD proof photos, and trip receipts for drivers.",
                 "summary": "Submit Driver Trip Log",
                 "tags": [
-                    "MemberDashboard"
+                    "Survey & Driver Duty"
                 ],
                 "requestBody": {
                     "required": true,
@@ -13392,7 +13500,7 @@
                 "description": "Records vehicle trip details, start/destination locations, start/end odometer readings, status, POD proof photos, and trip receipts for drivers.",
                 "summary": "Submit Driver Trip Log",
                 "tags": [
-                    "MemberDashboard"
+                    "Survey & Driver Duty"
                 ],
                 "parameters": [
                     {
@@ -13604,8 +13712,10 @@
         "/member/projects/{project}/survey-details": {
             "get": {
                 "operationId": "memberDashboard.projectSurveyDetails",
+                "description": "Retrieves full survey plan details, team members, and documents for a specific construction project.",
+                "summary": "Get Project Survey Details & Team",
                 "tags": [
-                    "MemberDashboard"
+                    "Survey & Driver Duty"
                 ],
                 "parameters": [
                     {
@@ -13765,7 +13875,7 @@
                 "description": "Retrieves comprehensive information for a specific task, including the current day stepper, due dates, instructions, assigned supervisor info, and interactive checklist items.",
                 "summary": "Get Task Details & Checklist Stepper",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -14106,7 +14216,7 @@
                 "description": "Submits completed checklist items, site photos (up to 10), categorized survey files (CSV/RAW/KML), sketches, reference documents, and site status / obstruction reports for supervisor review.",
                 "summary": "Submit Day Task Work Data & Files",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -14411,7 +14521,7 @@
                 "description": "Adds a new checklist requirement item to the specified execution task, with optional day number, assigned hours, notes, and proof images.",
                 "summary": "Add Task Checklist Item",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -14620,7 +14730,7 @@
                 "description": "Toggles an individual checklist item between pending and completed states for the authenticated member.",
                 "summary": "Toggle Task Checklist Item Status",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Tasks & Checklists"
                 ],
                 "parameters": [
                     {
@@ -14800,8 +14910,10 @@
         "/member/profile": {
             "get": {
                 "operationId": "memberDashboard.profileIndex",
+                "description": "Retrieves member profile metrics, quick navigation options, and duty statistics for the mobile profile screen.",
+                "summary": "Member App Profile & Navigation",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Profile"
                 ],
                 "responses": {
                     "200": {
@@ -15156,7 +15268,7 @@
                 "description": "Retrieves all construction projects where the authenticated member is assigned as a team member or surveyor.",
                 "summary": "List Assigned Projects",
                 "tags": [
-                    "MemberDashboard"
+                    "Construction Projects"
                 ],
                 "responses": {
                     "200": {
@@ -15304,8 +15416,10 @@
             },
             "post": {
                 "operationId": "memberDashboard.storeSite",
+                "description": "Creates and registers a new construction site/project directly from mobile and assigns the authenticated member.",
+                "summary": "Create New Construction Site",
                 "tags": [
-                    "MemberDashboard"
+                    "Construction Projects"
                 ],
                 "requestBody": {
                     "required": true,
@@ -15380,8 +15494,10 @@
         "/member/attendance": {
             "get": {
                 "operationId": "memberDashboard.myAttendance_71",
+                "description": "Retrieves historical attendance records for the authenticated member, including check-in/out timestamps, hours worked, and project tags.",
+                "summary": "Get Member Attendance History",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Dashboard & Attendance"
                 ],
                 "responses": {
                     "200": {
@@ -15505,8 +15621,10 @@
         "/member/surveys": {
             "get": {
                 "operationId": "memberDashboard.mySurveys_72",
+                "description": "Retrieves all field survey plans and duties assigned to the authenticated member, with optional status filtering.",
+                "summary": "List Assigned Surveys",
                 "tags": [
-                    "MemberDashboard"
+                    "Survey & Driver Duty"
                 ],
                 "parameters": [
                     {
@@ -15602,8 +15720,10 @@
             },
             "post": {
                 "operationId": "memberDashboard.storeSurvey",
+                "description": "Creates a new survey plan and assigns the creator as lead surveyor.",
+                "summary": "Create Field Survey Plan",
                 "tags": [
-                    "MemberDashboard"
+                    "Survey & Driver Duty"
                 ],
                 "requestBody": {
                     "required": true,
@@ -15677,8 +15797,10 @@
         "/member/account/delete": {
             "post": {
                 "operationId": "memberDashboard.deleteAccount",
+                "description": "Revokes active tokens and schedules the member account for permanent deletion.",
+                "summary": "Request Account Deletion",
                 "tags": [
-                    "MemberDashboard"
+                    "Member Profile"
                 ],
                 "responses": {
                     "200": {
@@ -15713,8 +15835,10 @@
         "/pages/privacy-policy": {
             "get": {
                 "operationId": "memberDashboard.privacyPolicy",
+                "description": "Retrieves current terms and privacy policy HTML and plain text for mobile and web views.",
+                "summary": "Get Privacy Policy",
                 "tags": [
-                    "MemberDashboard"
+                    "System & Legal Policies"
                 ],
                 "responses": {
                     "200": {
@@ -15778,8 +15902,10 @@
             },
             "post": {
                 "operationId": "memberDashboard.storePrivacyPolicy",
+                "description": "Updates privacy policy content.",
+                "summary": "Update Privacy Policy",
                 "tags": [
-                    "MemberDashboard"
+                    "System & Legal Policies"
                 ],
                 "requestBody": {
                     "required": true,
@@ -15860,8 +15986,10 @@
         "/pages/terms-and-conditions": {
             "get": {
                 "operationId": "memberDashboard.termsAndConditions",
+                "description": "Retrieves terms and conditions content.",
+                "summary": "Get Terms & Conditions",
                 "tags": [
-                    "MemberDashboard"
+                    "System & Legal Policies"
                 ],
                 "responses": {
                     "200": {
@@ -15925,8 +16053,10 @@
             },
             "post": {
                 "operationId": "memberDashboard.storeTermsAndConditions",
+                "description": "Updates terms and conditions content.",
+                "summary": "Update Terms & Conditions",
                 "tags": [
-                    "MemberDashboard"
+                    "System & Legal Policies"
                 ],
                 "requestBody": {
                     "required": true,
@@ -16007,9 +16137,10 @@
         "/construction/mobile/construction/projects/assigned": {
             "get": {
                 "operationId": "construction.assignedProjects",
+                "description": "Retrieves all projects assigned to the member in the mobile field operations workflow.",
+                "summary": "List Member Assigned Projects",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "responses": {
                     "200": {
@@ -16065,9 +16196,10 @@
         "/construction/mobile/construction/survey-plans/{surveyPlan}": {
             "get": {
                 "operationId": "construction.showSurveyPlan",
+                "description": "Retrieves survey plan details, team members, and checklists for the active surveyor.",
+                "summary": "Get Survey Plan Details",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -16137,9 +16269,10 @@
         "/construction/mobile/construction/survey-plans/{surveyPlan}/checklist-works": {
             "post": {
                 "operationId": "construction.storeSurveyChecklistWork",
+                "description": "Creates a new checklist work item for a survey plan.",
+                "summary": "Add Survey Work Checklist",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -16227,9 +16360,10 @@
         "/construction/mobile/construction/survey-plans/{surveyPlan}/checklist-works/{surveyWorkChecklist}": {
             "patch": {
                 "operationId": "construction.updateSurveyChecklistWork",
+                "description": "Marks an item in the survey work checklist as completed or pending.",
+                "summary": "Update Survey Work Checklist",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -16390,9 +16524,10 @@
         "/construction/mobile/construction/survey-visits/check-in": {
             "post": {
                 "operationId": "construction.checkIn",
+                "description": "Records GPS location and begins field survey day duty.",
+                "summary": "Survey Day Duty Check-In",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "requestBody": {
                     "required": true,
@@ -16465,9 +16600,10 @@
         "/construction/mobile/construction/survey-visits/{surveyVisit}/entries": {
             "post": {
                 "operationId": "construction.storeEntry",
+                "description": "Adds an observation note, photo, or media recording to an active survey visit.",
+                "summary": "Add Survey Entry & Media",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -16570,9 +16706,10 @@
         "/construction/mobile/construction/survey-visits/{surveyVisit}/measurements": {
             "post": {
                 "operationId": "construction.storeMeasurement",
+                "description": "Logs field measurements (length, width, depth, area) for a survey visit.",
+                "summary": "Record Survey Measurement",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -16684,9 +16821,10 @@
         "/construction/mobile/construction/survey-visits/{surveyVisit}/submit": {
             "post": {
                 "operationId": "construction.submitVisit",
+                "description": "Finalizes and submits the survey visit along with review notes for admin review.",
+                "summary": "Submit Completed Survey Visit",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -16755,9 +16893,10 @@
         "/construction/mobile/construction/drafting-jobs": {
             "get": {
                 "operationId": "construction.draftingJobs",
+                "description": "Retrieves assigned CAD drafting jobs and revisions for the authenticated member.",
+                "summary": "List Member Drafting Jobs",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "responses": {
                     "200": {
@@ -16794,9 +16933,10 @@
         "/construction/mobile/construction/drafting-jobs/{draftingJob}/revisions": {
             "post": {
                 "operationId": "construction.submitRevision",
+                "description": "Submits a CAD revision file, markup, or CAD drawing for a drafting assignment.",
+                "summary": "Submit Drafting Job Revision",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -16930,9 +17070,10 @@
         "/construction/mobile/construction/tasks/assigned": {
             "get": {
                 "operationId": "construction.assignedTasks",
+                "description": "Retrieves execution tasks assigned to the member under a specific project.",
+                "summary": "List Member Assigned Field Tasks",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "responses": {
                     "200": {
@@ -16969,9 +17110,10 @@
         "/construction/mobile/construction/attendance/check-in": {
             "post": {
                 "operationId": "construction.attendanceCheckIn",
+                "description": "Submits field worker daily check-in with GPS verification.",
+                "summary": "Field Attendance Check-In",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "requestBody": {
                     "content": {
@@ -17110,9 +17252,10 @@
         "/construction/mobile/construction/attendance/check-out": {
             "post": {
                 "operationId": "mobile.construction.attendanceCheckOut_132",
+                "description": "Submits field worker daily check-out and computes shift duration.",
+                "summary": "Field Attendance Check-Out",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "requestBody": {
                     "content": {
@@ -17335,9 +17478,10 @@
         "/construction/mobile/construction/attendance/{attendance}/check-out": {
             "post": {
                 "operationId": "mobile.construction.attendanceCheckOut_133",
+                "description": "Submits field worker daily check-out and computes shift duration.",
+                "summary": "Field Attendance Check-Out",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -17345,8 +17489,12 @@
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "default": null
+                            "default": null,
+                            "type": [
+                                "string",
+                                "integer",
+                                "null"
+                            ]
                         }
                     }
                 ],
@@ -17530,9 +17678,10 @@
         "/construction/mobile/construction/tasks/{task}/progress": {
             "post": {
                 "operationId": "construction.updateTaskProgress",
+                "description": "Updates field execution progress percentage, completed quantities, and status.",
+                "summary": "Update Task Progress % & Quantity",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -17642,9 +17791,10 @@
         "/construction/mobile/construction/reports": {
             "post": {
                 "operationId": "construction.submitDailyProgress",
+                "description": "Submits daily construction progress report with work accomplishments, manpower, and delays.",
+                "summary": "Submit Daily Progress Report (DPR)",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "requestBody": {
                     "required": true,
@@ -17823,9 +17973,10 @@
         "/construction/mobile/construction/projects/{project}/vehicles": {
             "get": {
                 "operationId": "construction.vehicles",
+                "description": "Retrieves fleet vehicles and recent GPS telemetry pings for a project.",
+                "summary": "List Project Vehicles & Live Pings",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -17891,9 +18042,10 @@
         "/construction/mobile/construction/projects/{project}/vehicles/pings": {
             "post": {
                 "operationId": "construction.vehiclePing",
+                "description": "Ingests real-time vehicle GPS ping including speed, odometer reading, and coordinates.",
+                "summary": "Submit Vehicle GPS Ping",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -18013,9 +18165,10 @@
         "/construction/mobile/construction/projects/{project}/equipment": {
             "get": {
                 "operationId": "construction.equipment",
+                "description": "Retrieves assigned heavy equipment, allocations, and operational usage logs.",
+                "summary": "List Project Equipment & Usage Logs",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -18088,9 +18241,10 @@
         "/construction/mobile/construction/projects/{project}/equipment/usage": {
             "post": {
                 "operationId": "construction.equipmentUsage",
+                "description": "Records equipment runtime hours and GPS location for daily machinery operations.",
+                "summary": "Log Equipment Usage Hours",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -18194,9 +18348,10 @@
         "/construction/mobile/construction/projects/{project}/equipment/return": {
             "post": {
                 "operationId": "construction.equipmentReturn",
+                "description": "Records return of equipment back to yard or site pool with GPS verification.",
+                "summary": "Return Allocated Equipment",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -18291,9 +18446,10 @@
         "/construction/mobile/construction/projects/{project}/billing": {
             "get": {
                 "operationId": "construction.billing",
+                "description": "Retrieves billing invoices and payments associated with a construction project.",
+                "summary": "Get Project Invoices & Payments",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -18359,9 +18515,10 @@
         "/construction/mobile/construction/projects/{project}/handover": {
             "get": {
                 "operationId": "construction.handover",
+                "description": "Retrieves project handover items, sign-off reports, and final client delivery documents.",
+                "summary": "Get Project Handover Documents",
                 "tags": [
-                    "Mobile Field Operations",
-                    "Construction"
+                    "Mobile Field Operations"
                 ],
                 "parameters": [
                     {
@@ -18412,9 +18569,10 @@
         "/construction/projects/{project}/tasks": {
             "get": {
                 "operationId": "projectTaskApi.index",
+                "description": "Retrieves all tasks under a specific construction project with filtering by status, priority, assignee, and search.",
+                "summary": "List Project Tasks",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -18776,9 +18934,10 @@
             },
             "post": {
                 "operationId": "projectTaskApi.store",
+                "description": "Creates a new execution task for a construction project with assignee, dates, deliverables, and attachments.",
+                "summary": "Create Project Task",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -18888,9 +19047,10 @@
         "/construction/projects/{project}/tasks/delta": {
             "get": {
                 "operationId": "projectTaskApi.delta",
+                "description": "Returns task modifications and delta changes since a specified timestamp for offline sync.",
+                "summary": "Sync Task Changes (Delta Sync)",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -19015,9 +19175,10 @@
         "/construction/projects/{project}/tasks/{task}": {
             "get": {
                 "operationId": "projectTaskApi.show",
+                "description": "Retrieves full details, checklist items, comments, and status history for a specific task.",
+                "summary": "Get Task Details",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -19083,9 +19244,10 @@
             },
             "put": {
                 "operationId": "projectTaskApi.update",
+                "description": "Modifies title, timeline, priority, description, or quantities of an existing task.",
+                "summary": "Update Project Task",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -19220,9 +19382,10 @@
             },
             "delete": {
                 "operationId": "projectTaskApi.destroy",
+                "description": "Deletes a task from the project.",
+                "summary": "Delete Project Task",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -19261,9 +19424,10 @@
         "/construction/projects/{project}/tasks/{task}/assignments": {
             "post": {
                 "operationId": "projectTaskApi.assignments",
+                "description": "Updates or sets member assignees for a construction task.",
+                "summary": "Assign Members to Task",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -19433,9 +19597,10 @@
         "/construction/projects/{project}/tasks/{task}/status": {
             "post": {
                 "operationId": "projectTaskApi.recordStatusTransition",
+                "description": "Transitions a task to a new status (e.g. in_progress, review, completed), logging GPS coordinates, progress percent, and verification files.",
+                "summary": "Record Task Status Transition",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -19681,9 +19846,10 @@
         "/construction/projects/{project}/tasks/{task}/transitions": {
             "get": {
                 "operationId": "projectTaskApi.transitionIndex",
+                "description": "Retrieves audit trail of status transitions and comments on a task.",
+                "summary": "List Task Status Transitions",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -19864,9 +20030,10 @@
         "/construction/projects/{project}/tasks/{task}/checklists": {
             "get": {
                 "operationId": "projectTaskApi.checklistIndex",
+                "description": "Retrieves all ordered checklist items belonging to a project task.",
+                "summary": "List Task Checklists",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -19925,9 +20092,10 @@
             },
             "post": {
                 "operationId": "projectTaskApi.checklistStoreBatch",
+                "description": "Replaces or bulk inserts interactive checklist items for a task.",
+                "summary": "Batch Add Task Checklists",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -20098,9 +20266,10 @@
         "/construction/projects/{project}/tasks/{checklistId}/checklists/{checklistId}": {
             "put": {
                 "operationId": "projectTaskApi.checklistUpdate",
+                "description": "Updates title, day number, sort order, or completion status of an individual checklist item.",
+                "summary": "Update Task Checklist Item",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -20214,9 +20383,10 @@
             },
             "delete": {
                 "operationId": "projectTaskApi.checklistDestroy",
+                "description": "Removes an item from the task checklist.",
+                "summary": "Delete Task Checklist Item",
                 "tags": [
-                    "Project Tasks",
-                    "ProjectTaskApi"
+                    "Project Tasks & Execution"
                 ],
                 "parameters": [
                     {
@@ -20253,9 +20423,10 @@
         "/super/members/pending": {
             "get": {
                 "operationId": "superAdminApprovalApi.pendingList",
+                "description": "Returns a paginated list of new self-registered members awaiting SuperAdmin approval.",
+                "summary": "List Pending Member Registrations",
                 "tags": [
-                    "Super Admin Approvals",
-                    "SuperAdminApprovalApi"
+                    "SuperAdmin Member Approvals"
                 ],
                 "parameters": [
                     {
@@ -20304,9 +20475,10 @@
         "/super/members/approved": {
             "get": {
                 "operationId": "superAdminApprovalApi.approvedList",
+                "description": "Returns a paginated list of approved and active construction members.",
+                "summary": "List Approved Members",
                 "tags": [
-                    "Super Admin Approvals",
-                    "SuperAdminApprovalApi"
+                    "SuperAdmin Member Approvals"
                 ],
                 "parameters": [
                     {
@@ -20419,9 +20591,10 @@
         "/super/members/rejected": {
             "get": {
                 "operationId": "superAdminApprovalApi.rejectedList",
+                "description": "Returns a paginated list of rejected member applications with rejection remarks.",
+                "summary": "List Rejected Registrations",
                 "tags": [
-                    "Super Admin Approvals",
-                    "SuperAdminApprovalApi"
+                    "SuperAdmin Member Approvals"
                 ],
                 "parameters": [
                     {
@@ -20534,9 +20707,10 @@
         "/super/members/stats": {
             "get": {
                 "operationId": "superAdminApprovalApi.approvalStats",
+                "description": "Returns total counts and approval rates for pending, approved, and rejected registrations.",
+                "summary": "Get Approval & Registration Statistics",
                 "tags": [
-                    "Super Admin Approvals",
-                    "SuperAdminApprovalApi"
+                    "SuperAdmin Member Approvals"
                 ],
                 "responses": {
                     "200": {
@@ -20603,9 +20777,10 @@
         "/super/members/{member}/show": {
             "get": {
                 "operationId": "superAdminApprovalApi.show",
+                "description": "Retrieves full applicant profile, registration source, and available role assignments.",
+                "summary": "Get Member Approval Details",
                 "tags": [
-                    "Super Admin Approvals",
-                    "SuperAdminApprovalApi"
+                    "SuperAdmin Member Approvals"
                 ],
                 "parameters": [
                     {
@@ -20924,9 +21099,10 @@
         "/super/members/{member}/approve": {
             "post": {
                 "operationId": "superAdminApprovalApi.approve",
+                "description": "Approves a pending applicant, generates their employee ID, and assigns construction roles, departments, and designations.",
+                "summary": "Approve Member Registration & Assign Roles",
                 "tags": [
-                    "Super Admin Approvals",
-                    "SuperAdminApprovalApi"
+                    "SuperAdmin Member Approvals"
                 ],
                 "parameters": [
                     {
@@ -21319,9 +21495,10 @@
         "/super/members/{member}/reject": {
             "post": {
                 "operationId": "superAdminApprovalApi.reject",
+                "description": "Rejects an application with reason recorded for the applicant to review.",
+                "summary": "Reject Member Registration",
                 "tags": [
-                    "Super Admin Approvals",
-                    "SuperAdminApprovalApi"
+                    "SuperAdmin Member Approvals"
                 ],
                 "parameters": [
                     {
@@ -21655,9 +21832,10 @@
         "/super/members/{member}/assign-admin": {
             "post": {
                 "operationId": "superAdminApprovalApi.assignAdmin",
+                "description": "Links a construction team member under a supervising Admin.",
+                "summary": "Assign Member to Admin Manager",
                 "tags": [
-                    "Super Admin Approvals",
-                    "SuperAdminApprovalApi"
+                    "SuperAdmin Member Approvals"
                 ],
                 "parameters": [
                     {
@@ -21967,9 +22145,10 @@
         "/super/roles/construction": {
             "get": {
                 "operationId": "superAdminApprovalApi.constructionRoles",
+                "description": "Returns all roles mapped to construction workflow phases (Driver, Surveyor, Draftsman, Supervisor).",
+                "summary": "List Construction Workflow Roles",
                 "tags": [
-                    "Super Admin Approvals",
-                    "SuperAdminApprovalApi"
+                    "SuperAdmin Member Approvals"
                 ],
                 "responses": {
                     "200": {
@@ -22157,9 +22336,10 @@
         "/super/departments/all": {
             "get": {
                 "operationId": "superAdminApprovalApi.allDepartments",
+                "description": "Dropdown list of all active organizational departments.",
+                "summary": "List All Active Departments",
                 "tags": [
-                    "Super Admin Approvals",
-                    "SuperAdminApprovalApi"
+                    "SuperAdmin Member Approvals"
                 ],
                 "responses": {
                     "200": {
@@ -22196,9 +22376,10 @@
         "/super/designations/by-departments": {
             "get": {
                 "operationId": "superAdminApprovalApi.designationsByDepartments",
+                "description": "Retrieves filtered designations associated with chosen department IDs.",
+                "summary": "List Designations by Department IDs",
                 "tags": [
-                    "Super Admin Approvals",
-                    "SuperAdminApprovalApi"
+                    "SuperAdmin Member Approvals"
                 ],
                 "parameters": [
                     {

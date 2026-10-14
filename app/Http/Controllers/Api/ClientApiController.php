@@ -12,6 +12,11 @@ use Illuminate\Support\Str;
  */
 class ClientApiController extends Controller
 {
+    /**
+     * List Clients (Paginated)
+     *
+     * Returns a paginated list of clients with linked company details and project counts.
+     */
     public function index(Request $request)
     {
         $query = Client::with(['company'])->withCount('projects');
@@ -55,6 +60,11 @@ class ClientApiController extends Controller
         ]);
     }
 
+    /**
+     * Get Client Details
+     *
+     * Retrieves detailed profile of a specific client including company and projects.
+     */
     public function show(Client $client)
     {
         $client->load(['company', 'projects']);
@@ -65,6 +75,11 @@ class ClientApiController extends Controller
         ]);
     }
 
+    /**
+     * Create New Client
+     *
+     * Registers a new construction client with contact, GST, billing, and site addresses.
+     */
     public function store(Request $request)
     {
         $actor = $request->user();
@@ -99,6 +114,11 @@ class ClientApiController extends Controller
         ], 201);
     }
 
+    /**
+     * Update Client Details
+     *
+     * Updates an existing client record with modified contact or address details.
+     */
     public function update(Request $request, Client $client)
     {
         $validated = $request->validate([
@@ -125,6 +145,11 @@ class ClientApiController extends Controller
         ]);
     }
 
+    /**
+     * Delete Client
+     *
+     * Removes a client record if there are no associated active projects.
+     */
     public function destroy(Client $client)
     {
         $projectCount = $client->projects()->count();
@@ -144,6 +169,11 @@ class ClientApiController extends Controller
         ]);
     }
 
+    /**
+     * Get All Active Clients
+     *
+     * Fast unpaginated dropdown list of all active clients.
+     */
     public function all(Request $request)
     {
         $query = Client::where('status', 'active');

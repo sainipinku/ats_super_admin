@@ -65,7 +65,7 @@ return [
         'enabled' => env('SCRAMBLE_DEV_TOOLS', env('APP_DEBUG', false)),
     ],
 
-    'renderer' => 'elements',
+    'renderer' => 'scalar',
 
     'renderers' => [
         /*
@@ -87,12 +87,13 @@ return [
         'scalar' => [
             'view' => 'scramble::scalar',
             'cdn' => 'https://cdn.jsdelivr.net/npm/@scalar/api-reference',
-            'theme' => 'laravel',
+            'theme' => 'purple',
             'proxyUrl' => 'https://proxy.scalar.com',
-            'darkMode' => false,
+            'darkMode' => true,
             'showDeveloperTools' => 'never',
             'agent' => ['disabled' => true],
             'credentials' => 'include',
+            'layout' => 'modern',
         ],
     ],
 

@@ -94,6 +94,15 @@ class ConstructionController extends Controller
         ]);
     }
 
+    /**
+     * List Member Assigned Projects
+     *
+     * Retrieves all projects assigned to the member in the mobile field operations workflow.
+     *
+     * @tags Mobile Field Operations
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function assignedProjects(Request $request)
     {
         $member = $request->user();
@@ -114,10 +123,20 @@ class ConstructionController extends Controller
         ]);
     }
 
-   public function showSurveyPlan(
-    Request $request,
-    SurveyPlan $surveyPlan
-) {
+    /**
+     * Get Survey Plan Details
+     *
+     * Retrieves survey plan details, team members, and checklists for the active surveyor.
+     *
+     * @tags Mobile Field Operations
+     * @param Request $request
+     * @param SurveyPlan $surveyPlan
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function showSurveyPlan(
+        Request $request,
+        SurveyPlan $surveyPlan
+    ) {
     $member = $request->user();
 
     abort_unless($member instanceof Member, 403);
@@ -170,11 +189,22 @@ class ConstructionController extends Controller
     ]);
 }
 
-public function storeSurveyChecklistWork(
-    Request $request,
-    SurveyPlan $surveyPlan,
-    ConstructionActivityService $activityService
-) {
+    /**
+     * Add Survey Work Checklist
+     *
+     * Creates a new checklist work item for a survey plan.
+     *
+     * @tags Mobile Field Operations
+     * @param Request $request
+     * @param SurveyPlan $surveyPlan
+     * @param ConstructionActivityService $activityService
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function storeSurveyChecklistWork(
+        Request $request,
+        SurveyPlan $surveyPlan,
+        ConstructionActivityService $activityService
+    ) {
     $member = $request->user();
 
     abort_unless($member instanceof Member, 403);
@@ -294,12 +324,24 @@ return response()->json([
 ], $wasCreated ? 201 : 200);
 }
 
-public function updateSurveyChecklistWork(
-    Request $request,
-    SurveyPlan $surveyPlan,
-    SurveyWorkChecklist $surveyWorkChecklist,
-    ConstructionActivityService $activityService
-) {
+    /**
+     * Update Survey Work Checklist
+     *
+     * Marks an item in the survey work checklist as completed or pending.
+     *
+     * @tags Mobile Field Operations
+     * @param Request $request
+     * @param SurveyPlan $surveyPlan
+     * @param SurveyWorkChecklist $surveyWorkChecklist
+     * @param ConstructionActivityService $activityService
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateSurveyChecklistWork(
+        Request $request,
+        SurveyPlan $surveyPlan,
+        SurveyWorkChecklist $surveyWorkChecklist,
+        ConstructionActivityService $activityService
+    ) {
     $member = $request->user();
 
     abort_unless($member instanceof Member, 403);
@@ -396,6 +438,16 @@ public function updateSurveyChecklistWork(
 ]);
 }
 
+    /**
+     * Survey Day Duty Check-In
+     *
+     * Records GPS location and begins field survey day duty.
+     *
+     * @tags Mobile Field Operations
+     * @param Request $request
+     * @param ConstructionActivityService $activityService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function checkIn(
         Request $request,
         ConstructionActivityService $activityService
@@ -456,6 +508,18 @@ public function updateSurveyChecklistWork(
         ], 201);
     }
 
+    /**
+     * Add Survey Entry & Media
+     *
+     * Adds an observation note, photo, or media recording to an active survey visit.
+     *
+     * @tags Mobile Field Operations
+     * @param SurveyVisit $surveyVisit
+     * @param Request $request
+     * @param ConstructionActivityService $activityService
+     * @param ConstructionDocumentService $documentService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storeEntry(
         SurveyVisit $surveyVisit,
         Request $request,
@@ -534,6 +598,17 @@ public function updateSurveyChecklistWork(
         ], 201);
     }
 
+    /**
+     * Record Survey Measurement
+     *
+     * Logs field measurements (length, width, depth, area) for a survey visit.
+     *
+     * @tags Mobile Field Operations
+     * @param SurveyVisit $surveyVisit
+     * @param Request $request
+     * @param ConstructionActivityService $activityService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storeMeasurement(
         SurveyVisit $surveyVisit,
         Request $request,
@@ -603,11 +678,22 @@ public function updateSurveyChecklistWork(
         ], 201);
     }
 
-  public function submitVisit(
-    SurveyVisit $surveyVisit,
-    Request $request,
-    ConstructionActivityService $activityService
-) {
+    /**
+     * Submit Completed Survey Visit
+     *
+     * Finalizes and submits the survey visit along with review notes for admin review.
+     *
+     * @tags Mobile Field Operations
+     * @param SurveyVisit $surveyVisit
+     * @param Request $request
+     * @param ConstructionActivityService $activityService
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function submitVisit(
+        SurveyVisit $surveyVisit,
+        Request $request,
+        ConstructionActivityService $activityService
+    ) {
     $member = $request->user();
 
     $this->ensureVisitOwnedBy(
@@ -730,6 +816,15 @@ public function updateSurveyChecklistWork(
     ]);
 }
 
+    /**
+     * List Member Drafting Jobs
+     *
+     * Retrieves assigned CAD drafting jobs and revisions for the authenticated member.
+     *
+     * @tags Mobile Field Operations
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function draftingJobs(Request $request)
     {
         $member = $request->user();
@@ -752,6 +847,18 @@ public function updateSurveyChecklistWork(
         ]);
     }
 
+    /**
+     * Submit Drafting Job Revision
+     *
+     * Submits a CAD revision file, markup, or CAD drawing for a drafting assignment.
+     *
+     * @tags Mobile Field Operations
+     * @param DraftingJob $draftingJob
+     * @param Request $request
+     * @param ConstructionActivityService $activityService
+     * @param ConstructionDocumentService $documentService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function submitRevision(
         DraftingJob $draftingJob,
         Request $request,
@@ -891,6 +998,15 @@ public function updateSurveyChecklistWork(
         ], 201);
     }
 
+    /**
+     * List Member Assigned Field Tasks
+     *
+     * Retrieves execution tasks assigned to the member under a specific project.
+     *
+     * @tags Mobile Field Operations
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function assignedTasks(Request $request)
     {
         $member = $request->user();
@@ -922,6 +1038,16 @@ public function updateSurveyChecklistWork(
         ]);
     }
 
+    /**
+     * Field Attendance Check-In
+     *
+     * Submits field worker daily check-in with GPS verification.
+     *
+     * @tags Mobile Field Operations
+     * @param Request $request
+     * @param ConstructionExecutionService $executionService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function attendanceCheckIn(
         Request $request,
         ConstructionExecutionService $executionService
@@ -996,6 +1122,17 @@ public function updateSurveyChecklistWork(
         ], 201);
     }
 
+    /**
+     * Field Attendance Check-Out
+     *
+     * Submits field worker daily check-out and computes shift duration.
+     *
+     * @tags Mobile Field Operations
+     * @param Request $request
+     * @param ConstructionExecutionService $executionService
+     * @param AttendanceRecord|int|null $attendance
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function attendanceCheckOut(
         Request $request,
         ConstructionExecutionService $executionService,
@@ -1101,6 +1238,17 @@ public function updateSurveyChecklistWork(
         ]);
     }
 
+    /**
+     * Update Task Progress % & Quantity
+     *
+     * Updates field execution progress percentage, completed quantities, and status.
+     *
+     * @tags Mobile Field Operations
+     * @param ExecutionTask $task
+     * @param Request $request
+     * @param ConstructionExecutionService $executionService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function updateTaskProgress(
         ExecutionTask $task,
         Request $request,
@@ -1153,6 +1301,16 @@ public function updateSurveyChecklistWork(
         ]);
     }
 
+    /**
+     * Submit Daily Progress Report (DPR)
+     *
+     * Submits daily construction progress report with work accomplishments, manpower, and delays.
+     *
+     * @tags Mobile Field Operations
+     * @param Request $request
+     * @param ConstructionExecutionService $executionService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function submitDailyProgress(
         Request $request,
         ConstructionExecutionService $executionService
@@ -1286,6 +1444,16 @@ public function updateSurveyChecklistWork(
         ], 201);
     }
 
+    /**
+     * List Project Vehicles & Live Pings
+     *
+     * Retrieves fleet vehicles and recent GPS telemetry pings for a project.
+     *
+     * @tags Mobile Field Operations
+     * @param Project $project
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function vehicles(
         Project $project,
         Request $request
@@ -1313,6 +1481,17 @@ public function updateSurveyChecklistWork(
         ]);
     }
 
+    /**
+     * Submit Vehicle GPS Ping
+     *
+     * Ingests real-time vehicle GPS ping including speed, odometer reading, and coordinates.
+     *
+     * @tags Mobile Field Operations
+     * @param Project $project
+     * @param Request $request
+     * @param ConstructionFleetService $fleetService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function vehiclePing(
         Project $project,
         Request $request,
@@ -1395,6 +1574,16 @@ public function updateSurveyChecklistWork(
         ], 201);
     }
 
+    /**
+     * List Project Equipment & Usage Logs
+     *
+     * Retrieves assigned heavy equipment, allocations, and operational usage logs.
+     *
+     * @tags Mobile Field Operations
+     * @param Project $project
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function equipment(
         Project $project,
         Request $request
@@ -1429,6 +1618,17 @@ public function updateSurveyChecklistWork(
         ]);
     }
 
+    /**
+     * Log Equipment Usage Hours
+     *
+     * Records equipment runtime hours and GPS location for daily machinery operations.
+     *
+     * @tags Mobile Field Operations
+     * @param Project $project
+     * @param Request $request
+     * @param ConstructionEquipmentService $equipmentService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function equipmentUsage(
         Project $project,
         Request $request,
@@ -1498,6 +1698,17 @@ public function updateSurveyChecklistWork(
         ], 201);
     }
 
+    /**
+     * Return Allocated Equipment
+     *
+     * Records return of equipment back to yard or site pool with GPS verification.
+     *
+     * @tags Mobile Field Operations
+     * @param Project $project
+     * @param Request $request
+     * @param ConstructionEquipmentService $equipmentService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function equipmentReturn(
         Project $project,
         Request $request,
@@ -1558,6 +1769,16 @@ public function updateSurveyChecklistWork(
         ]);
     }
 
+    /**
+     * Get Project Invoices & Payments
+     *
+     * Retrieves billing invoices and payments associated with a construction project.
+     *
+     * @tags Mobile Field Operations
+     * @param Project $project
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function billing(
         Project $project,
         Request $request
@@ -1584,6 +1805,16 @@ public function updateSurveyChecklistWork(
         ]);
     }
 
+    /**
+     * Get Project Handover Documents
+     *
+     * Retrieves project handover items, sign-off reports, and final client delivery documents.
+     *
+     * @tags Mobile Field Operations
+     * @param Project $project
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function handover(
         Project $project,
         Request $request
