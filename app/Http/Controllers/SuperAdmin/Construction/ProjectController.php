@@ -2318,7 +2318,7 @@ class ProjectController extends Controller
                     'username' => $username,
                     'password' => $sa->password ?? Hash::make('SuperAdmin@123'),
                     'status' => 1,
-                    'roles' => ['super_admin', 1],
+                    'roles' => [2],
                     'designation' => ['Super Admin'],
                     'departments' => ['Administration'],
                     'company_name' => $company?->name,

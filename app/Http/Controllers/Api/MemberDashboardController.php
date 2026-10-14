@@ -4212,6 +4212,441 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    public function submitTaskData(Request $request, $task = null)
+    {
+        $taskId = $task instanceof ExecutionTask || $task instanceof Task
+            ? $task->id
+            : ($task ?? $request->input('task_id') ?? $request->input('task'));
+
+        if (!$taskId || !is_numeric($taskId)) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'INVALID_TASK_ID',
+                'message' => 'A valid task ID is required in the URL or payload.',
+            ], 422);
+        }
+
+        $resolvedTaskData = $this->resolveTaskAcrossTables((int) $taskId);
+        if (!$resolvedTaskData) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'TASK_NOT_FOUND',
+                'message' => 'No task found with the given identifier: ' . $taskId,
+            ], 404);
+        }
+
+        $legacyTask = $resolvedTaskData['task'];
+        $unifiedTask = $resolvedTaskData['unifiedTask'];
+
+        if (!$this->authorizeTaskAccess($request, $legacyTask)) {
+            return $this->forbiddenTaskAccessResponse();
+        }
+
+        $member = $request->user();
+        $project = $legacyTask->project
+            ?? ($legacyTask->project_id ? Project::find($legacyTask->project_id) : null)
+            ?? ($unifiedTask?->project_id ? Project::find($unifiedTask->project_id) : null);
+
+        $plan = $legacyTask->surveyPlan
+            ?? ($project ? SurveyPlan::where('project_id', $project->id)->orderByDesc('id')->first() : null);
+
+        $totalDays = $this->surveyData->getTotalSurveyDays($plan, $project);
+
+        $existingVisit = SurveyVisit::where('task_id', $legacyTask->id)
+            ->where(function ($q) use ($member) {
+                $q->where('checked_in_by_member_id', $member->id)
+                    ->orWhereNull('checked_in_by_member_id');
+            })
+            ->latest()
+            ->first();
+
+        $currentDay = $this->surveyData->getCurrentDayNumber($existingVisit, $plan, $project);
+        if ($request->filled('day_number') && is_numeric($request->input('day_number'))) {
+            $currentDay = max(1, (int) $request->input('day_number'));
+        }
+
+        // 1. Checklist processing (Image 1: Work checklist 6/7 done)
+        $this->surveyData->ensureDefaultTaskChecklists($legacyTask, $currentDay);
+        $allChecklists = TaskChecklist::where('execution_task_id', $legacyTask->id)->get();
+
+        $rawChecklistIds = $request->input('checklist_ids', []);
+        if (is_string($rawChecklistIds)) {
+            $decoded = json_decode($rawChecklistIds, true);
+            $rawChecklistIds = is_array($decoded) ? $decoded : explode(',', $rawChecklistIds);
+        }
+        $completedIds = array_map('intval', array_filter((array) $rawChecklistIds, fn ($v) => is_numeric($v)));
+
+        $now = now();
+        foreach ($allChecklists as $chk) {
+            $isDone = in_array((int) $chk->id, $completedIds, true);
+            $chk->update([
+                'is_completed' => $isDone,
+                'status' => $isDone ? 'completed' : 'pending',
+                'completed_by_member_id' => $isDone ? $member->id : null,
+                'completed_at' => $isDone ? $now : null,
+            ]);
+        }
+        $allChecklists = $allChecklists->fresh();
+        $completedChecklistCount = $allChecklists->where('is_completed', true)->count();
+        $totalChecklistCount = $allChecklists->count();
+
+        // 2. Photos (Site Photos: Image 2)
+        $newPhotoUrls = [];
+        $photoFiles = $request->file('photos') ?? $request->file('site_photos') ?? [];
+        if (!is_array($photoFiles) && $photoFiles) {
+            $photoFiles = [$photoFiles];
+        }
+        foreach ($photoFiles as $photoFile) {
+            if ($photoFile && $photoFile->isValid()) {
+                try {
+                    $path = $photoFile->store('surveys/photos', 'public');
+                    $newPhotoUrls[] = Storage::url($path);
+                    $this->createTaskDocumentRecord($legacyTask->id, $member->id, Storage::url($path), $path, 'site_photo');
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+        }
+        $existingPhotos = is_array($existingVisit?->photos) ? $existingVisit->photos : [];
+        $existingFromRequest = (array) $request->input('existing_photos', []);
+        $finalPhotos = array_values(array_unique(array_merge($existingPhotos, $existingFromRequest, $newPhotoUrls)));
+
+        // 3. Multiple Categorized Files (Image 3: Files tab)
+        $categorizedFiles = [
+            'survey_data' => [],
+            'sketch_markup' => [],
+            'reference_documents' => [],
+        ];
+
+        // 3a. Survey Data Files (CSV, RAW, KML, Excel)
+        $surveyDataFiles = $request->file('survey_data_files')
+            ?? $request->file('survey_data_file')
+            ?? $request->file('survey_files')
+            ?? [];
+        if (!is_array($surveyDataFiles) && $surveyDataFiles) {
+            $surveyDataFiles = [$surveyDataFiles];
+        }
+        foreach ($surveyDataFiles as $file) {
+            if ($file && $file->isValid()) {
+                try {
+                    $origName = $file->getClientOriginalName();
+                    $ext = strtolower($file->getClientOriginalExtension());
+                    $sizeFormatted = $this->formatFileSize($file->getSize());
+                    $path = $file->store('surveys/data', 'public');
+                    $url = Storage::url($path);
+                    $categorizedFiles['survey_data'][] = [
+                        'name' => $origName,
+                        'url' => $url,
+                        'path' => $path,
+                        'size' => $sizeFormatted,
+                        'extension' => $ext,
+                    ];
+                    $this->createTaskDocumentRecord($legacyTask->id, $member->id, $url, $path, 'survey_data');
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+        }
+
+        // 3b. Sketch & Markup Files (JPG, PNG, PDF)
+        $sketchFiles = $request->file('sketch_markup_files')
+            ?? $request->file('sketch_files')
+            ?? $request->file('markup_files')
+            ?? [];
+        if (!is_array($sketchFiles) && $sketchFiles) {
+            $sketchFiles = [$sketchFiles];
+        }
+        foreach ($sketchFiles as $file) {
+            if ($file && $file->isValid()) {
+                try {
+                    $origName = $file->getClientOriginalName();
+                    $ext = strtolower($file->getClientOriginalExtension());
+                    $sizeFormatted = $this->formatFileSize($file->getSize());
+                    $path = $file->store('surveys/sketches', 'public');
+                    $url = Storage::url($path);
+                    $categorizedFiles['sketch_markup'][] = [
+                        'name' => $origName,
+                        'url' => $url,
+                        'path' => $path,
+                        'size' => $sizeFormatted,
+                        'extension' => $ext,
+                    ];
+                    $this->createTaskDocumentRecord($legacyTask->id, $member->id, $url, $path, 'sketch_markup');
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+        }
+
+        // 3c. Reference Documents (PDF, DOCX)
+        $refFiles = $request->file('reference_document_files')
+            ?? $request->file('reference_documents')
+            ?? $request->file('reference_files')
+            ?? [];
+        if (!is_array($refFiles) && $refFiles) {
+            $refFiles = [$refFiles];
+        }
+        foreach ($refFiles as $file) {
+            if ($file && $file->isValid()) {
+                try {
+                    $origName = $file->getClientOriginalName();
+                    $ext = strtolower($file->getClientOriginalExtension());
+                    $sizeFormatted = $this->formatFileSize($file->getSize());
+                    $path = $file->store('surveys/reference_docs', 'public');
+                    $url = Storage::url($path);
+                    $categorizedFiles['reference_documents'][] = [
+                        'name' => $origName,
+                        'url' => $url,
+                        'path' => $path,
+                        'size' => $sizeFormatted,
+                        'extension' => $ext,
+                    ];
+                    $this->createTaskDocumentRecord($legacyTask->id, $member->id, $url, $path, 'reference_document');
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+        }
+
+        // Legacy / Generic single file fallback
+        if ($request->hasFile('file') && empty($categorizedFiles['survey_data'])) {
+            $file = $request->file('file');
+            if ($file && $file->isValid()) {
+                $path = $file->store('surveys/documents', 'public');
+                $url = Storage::url($path);
+                $categorizedFiles['survey_data'][] = [
+                    'name' => $file->getClientOriginalName(),
+                    'url' => $url,
+                    'path' => $path,
+                    'size' => $this->formatFileSize($file->getSize()),
+                    'extension' => strtolower($file->getClientOriginalExtension()),
+                ];
+                $this->createTaskDocumentRecord($legacyTask->id, $member->id, $url, $path, 'survey_data');
+            }
+        }
+
+        // 4. Status tab data (Image 4)
+        $workStatus = strtolower((string) $request->input('work_status', 'completed'));
+        if (!in_array($workStatus, ['completed', 'partial', 'not_done'], true)) {
+            $workStatus = $completedChecklistCount === $totalChecklistCount ? 'completed' : 'partial';
+        }
+
+        $rawHasObstruction = $request->input('has_obstruction');
+        $hasObstruction = filter_var($rawHasObstruction, FILTER_VALIDATE_BOOLEAN)
+            || in_array(strtolower((string) $rawHasObstruction), ['1', 'yes', 'true'], true);
+
+        $obstructionDetails = $request->input('obstruction_details');
+        $pendingWork = $request->input('pending_work');
+        $startTime = $request->input('start_time') ?? '09:00 AM';
+        $endTime = $request->input('end_time') ?? '01:00 PM';
+        $totalHours = $request->input('total_hours') ?? '4h 0m';
+        $remarks = $request->input('remarks');
+
+        // 5. Build structured notes and persist Visit
+        $notesMetadata = [
+            'work_status' => $workStatus,
+            'has_obstruction' => $hasObstruction,
+            'obstruction_details' => $obstructionDetails,
+            'pending_work' => $pendingWork,
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'total_hours' => $totalHours,
+            'work_summary' => [
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+                'total_hours' => $totalHours,
+            ],
+            'categorized_files' => $categorizedFiles,
+            'remarks' => $remarks,
+            'checklist_summary' => [
+                'completed' => $completedChecklistCount,
+                'total' => $totalChecklistCount,
+            ],
+            'submitted_at' => now()->toIso8601String(),
+        ];
+
+        $primaryFilePath = !empty($categorizedFiles['survey_data'][0]['url'])
+            ? $categorizedFiles['survey_data'][0]['url']
+            : ($existingVisit?->file_path);
+
+        $defaultCoords = $this->surveyData->resolveSiteCoordinates($plan, $project);
+        $lat = $request->latitude !== null ? (float) $request->latitude : $defaultCoords['latitude'];
+        $long = $request->longitude !== null ? (float) $request->longitude : $defaultCoords['longitude'];
+
+        if ($existingVisit) {
+            $existingVisit->update([
+                'task_id' => $legacyTask->id,
+                'project_id' => $project?->id ?? $existingVisit->project_id,
+                'survey_plan_id' => $plan?->id ?? $existingVisit->survey_plan_id,
+                'checked_in_by_member_id' => $member->id,
+                'check_in_latitude' => $lat,
+                'check_in_longitude' => $long,
+                'photos' => $finalPhotos,
+                'file_path' => $primaryFilePath,
+                'remarks' => $remarks ?? $existingVisit->remarks,
+                'notes' => json_encode($notesMetadata, JSON_UNESCAPED_SLASHES),
+                'day_number' => $currentDay,
+                'status' => SurveyStatus::SUBMITTED, // 20
+            ]);
+            $visit = $existingVisit;
+        } else {
+            $visit = SurveyVisit::create([
+                'task_id' => $legacyTask->id,
+                'project_id' => $project?->id,
+                'survey_plan_id' => $plan?->id,
+                'checked_in_by_member_id' => $member->id,
+                'check_in_at' => now(),
+                'check_in_latitude' => $lat,
+                'check_in_longitude' => $long,
+                'photos' => $finalPhotos,
+                'file_path' => $primaryFilePath,
+                'remarks' => $remarks,
+                'notes' => json_encode($notesMetadata, JSON_UNESCAPED_SLASHES),
+                'day_number' => $currentDay,
+                'gps_verified' => true,
+                'status' => SurveyStatus::SUBMITTED, // 20
+            ]);
+        }
+
+        // 6. SurveySubmission
+        $submission = null;
+        if ($project) {
+            try {
+                $submission = SurveySubmission::updateOrCreate(
+                    [
+                        'project_id' => (int) $project->id,
+                        'survey_visit_id' => (int) $visit->id,
+                    ],
+                    [
+                        'submitted_by_member_id' => (int) $member->id,
+                        'submitted_at' => now(),
+                        'status' => SurveyStatus::SUBMITTED, // 20
+                        'review_notes' => null,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        // 7. Update Project & Task flow
+        if ($project) {
+            try {
+                $project->update([
+                    'current_stage' => 'survey_submitted',
+                ]);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        $progressPercent = $totalChecklistCount > 0
+            ? (int) round(($completedChecklistCount / $totalChecklistCount) * 100)
+            : 100;
+
+        try {
+            $legacyTask->update([
+                'status' => 'review',
+                'progress_percent' => $progressPercent,
+            ]);
+            if ($unifiedTask) {
+                $unifiedTask->update([
+                    'status' => 'review',
+                    'progress_percent' => $progressPercent,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        // 8. Build Image 5 response
+        $referenceCode = 'SRV-' . ($project ? str_pad((string) $project->id, 4, '0', STR_PAD_LEFT) : '0912') . '-D' . $currentDay;
+        $totalFilesUploaded = count($categorizedFiles['survey_data'])
+            + count($categorizedFiles['sketch_markup'])
+            + count($categorizedFiles['reference_documents']);
+
+        $nowFormatted = now()->setTimezone('Asia/Kolkata')->format('d M Y · h:i A');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Your survey task has been submitted successfully and sent to the manager for review.',
+            'data' => [
+                'title' => 'Survey task submitted',
+                'subtitle' => 'Your survey has been sent to the manager for review.',
+                'review_status' => [
+                    [
+                        'step' => 1,
+                        'title' => 'Submitted by surveyor',
+                        'subtitle' => $nowFormatted,
+                        'status' => 'completed',
+                        'is_current' => false,
+                    ],
+                    [
+                        'step' => 2,
+                        'title' => 'Waiting for manager review',
+                        'subtitle' => 'Current status',
+                        'status' => 'current',
+                        'is_current' => true,
+                    ],
+                    [
+                        'step' => 3,
+                        'title' => 'Approved or changes requested',
+                        'subtitle' => 'You will be notified',
+                        'status' => 'pending',
+                        'is_current' => false,
+                    ],
+                ],
+                'task_summary' => [
+                    'task_id' => $legacyTask->id,
+                    'reference' => $referenceCode,
+                    'project_name' => $project?->name ?? 'Survey Project',
+                    'day' => $currentDay . ' / ' . $totalDays,
+                    'day_number' => $currentDay,
+                    'total_days' => $totalDays,
+                    'total_hours' => $totalHours,
+                    'uploaded' => count($finalPhotos) . ' photos · ' . $totalFilesUploaded . ' files',
+                    'photos_count' => count($finalPhotos),
+                    'files_count' => $totalFilesUploaded,
+                    'checklist_completed_count' => $completedChecklistCount,
+                    'checklist_total_count' => $totalChecklistCount,
+                    'work_status' => $workStatus,
+                    'has_obstruction' => $hasObstruction,
+                    'obstruction_details' => $obstructionDetails,
+                    'pending_work' => $pendingWork,
+                    'submission_id' => $submission?->id,
+                    'visit_id' => $visit->id,
+                ],
+            ],
+        ]);
+    }
+
+    private function createTaskDocumentRecord(int $taskId, int $memberId, string $url, string $path, string $type): void
+    {
+        try {
+            \App\Models\TaskDocument::create([
+                'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                'task_id' => $taskId,
+                'uploaded_by' => $memberId,
+                'link' => $url,
+                'path' => $path,
+                'type' => $type,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    private function formatFileSize(int $bytes): string
+    {
+        if ($bytes >= 1048576) {
+            return number_format($bytes / 1048576, 1) . ' MB';
+        } elseif ($bytes >= 1024) {
+            return number_format($bytes / 1024, 1) . ' KB';
+        }
+
+        return $bytes . ' B';
+    }
+
     public function projectSurveyDetails(Request $request, Project $project)
     {
         $member = $request->user();

@@ -811,6 +811,7 @@ export default function SurveyWorkspace({
                                                 surveyStatusCodes={
                                                     surveyStatusCodes
                                                 }
+                                                members={members}
                                             />
                                         );
                                     },
@@ -1233,28 +1234,37 @@ function SubmissionReviewCard({
     canViewDocuments,
     routePrefix,
     surveyStatusCodes,
+    members = [],
 }) {
     const form = useForm({
         status: surveyStatusCodes.approved,
         review_notes: "",
+        assigned_to_member_id: "",
+        due_date: "",
     });
 
-    const visit =
-        submission.survey_visit;
+    const visit = submission.survey_visit;
+    const details = submission.submission_details || {};
+    const checklists = details.checklists || [];
+    const photos = details.photos || visit?.photos || [];
+    const categorizedFiles = details.categorized_files || {};
+    const workStatus = details.work_status || (Number(submission.status) === surveyStatusCodes.approved ? "completed" : "partial");
+    const hasObstruction = Boolean(details.has_obstruction);
+    const obstructionDetails = details.obstruction_details;
+    const pendingWork = details.pending_work;
+    const totalHours = details.total_hours || details.work_summary?.total_hours;
+    const checklistDone = details.checklist_completed_count ?? checklists.filter((c) => c.is_completed).length;
+    const checklistTotal = details.checklist_total_count ?? checklists.length;
 
-    const planDocuments =
-        visit?.survey_plan?.documents || [];
+    const planDocuments = visit?.survey_plan?.documents || [];
 
     const isReviewable =
-        Number(submission.status)
-        === surveyStatusCodes.submitted;
+        Number(submission.status) === surveyStatusCodes.submitted;
 
     const noteRequired = [
         surveyStatusCodes.revision_requested,
         surveyStatusCodes.rejected,
-    ].includes(
-        Number(form.data.status),
-    );
+    ].includes(Number(form.data.status));
 
     const submitReview = (event) => {
         event.preventDefault();
@@ -1270,270 +1280,479 @@ function SubmissionReviewCard({
         );
     };
 
+    const statusBadgeColors = {
+        completed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+        partial: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+        not_done: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300",
+    };
+
     return (
-        <article className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+        <article className="rounded-2xl border border-slate-200/80 bg-slate-50 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            {/* Header */}
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/70 pb-4 dark:border-slate-800">
                 <div>
-                    <p className="font-semibold text-slate-900 dark:text-white">
-                        {submission.project?.name
-                            || "Unknown project"}
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-base font-semibold text-slate-900 dark:text-white">
+                            {submission.project?.name || "Survey Task Submission"}
+                        </p>
+                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                            Day {visit?.day_number || 1}
+                        </span>
+                    </div>
 
-                    <p className="text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-slate-500">
                         Submitted by{" "}
-                        {submission.submitted_by?.name
-                            || "Unknown"}
+                        <span className="font-medium text-slate-700 dark:text-slate-300">
+                            {submission.submitted_by?.name || "Field Surveyor"}
+                        </span>
                         {" • "}
-                        Visit #
-                        {submission.survey_visit_id}
+                        Visit #{submission.survey_visit_id}
+                        {details.task_id ? ` • Task #${details.task_id}` : ""}
                     </p>
 
-                    <p className="mt-1 text-xs text-slate-400">
-                        {formatDateTime(
-                            submission.submitted_at,
-                        )}
+                    <p className="mt-0.5 text-xs text-slate-400">
+                        {formatDateTime(submission.submitted_at)}
                     </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                    <StatusBadge
-                        value={
-                            submission.status_key
-                        }
-                    />
+                <div className="flex flex-wrap items-center gap-2">
+                    <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
+                            statusBadgeColors[workStatus] || statusBadgeColors.completed
+                        }`}
+                    >
+                        Work: {workStatus.replace("_", " ")}
+                    </span>
+
+                    <StatusBadge value={submission.status_key} />
 
                     <StatusBadge
-                        value={
-                            visit?.gps_verified
-                                ? "gps_verified"
-                                : "unverified"
-                        }
+                        value={visit?.gps_verified ? "gps_verified" : "unverified"}
                     />
                 </div>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {/* Meta statistics */}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
                 <MetaPill
                     label="Checked In By"
-                    value={
-                        visit?.checked_in_by?.name
-                        || "Unknown"
-                    }
+                    value={visit?.checked_in_by?.name || "Unknown"}
                 />
 
                 <MetaPill
-                    label="Entries"
-                    value={String(
-                        visit?.entries?.length || 0,
-                    )}
+                    label="Checklist Progress"
+                    value={`${checklistDone} / ${checklistTotal} done`}
                 />
 
                 <MetaPill
-                    label="Measurements"
-                    value={String(
-                        visit?.measurements?.length
-                        || 0,
-                    )}
+                    label="Total Hours"
+                    value={totalHours ? String(totalHours) : (visit?.duration_minutes ? `${Math.round(visit.duration_minutes / 60 * 10) / 10}h` : "—")}
+                />
+
+                <MetaPill
+                    label="Uploaded Media"
+                    value={`${photos.length} photos · ${(categorizedFiles.survey_data?.length || 0) + (categorizedFiles.sketch_markup?.length || 0) + (categorizedFiles.reference_documents?.length || 0)} files`}
                 />
             </div>
 
+            {/* Obstruction Alert Box */}
+            {hasObstruction && (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/30">
+                    <div className="flex items-start gap-2.5">
+                        <span className="text-base leading-none">⚠️</span>
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                                Site Obstruction Reported
+                            </p>
+                            <p className="mt-1 text-xs text-amber-900 dark:text-amber-200">
+                                {obstructionDetails || "Obstruction was flagged at the survey site."}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Pending Work Box */}
+            {pendingWork && (
+                <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 dark:border-blue-900/60 dark:bg-blue-950/30">
+                    <div className="flex items-start gap-2.5">
+                        <span className="text-base leading-none">📌</span>
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300">
+                                Pending Work Remaining
+                            </p>
+                            <p className="mt-1 text-xs text-blue-900 dark:text-blue-200">
+                                {pendingWork}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Work Checklist Section */}
+            {checklists.length > 0 && (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="mb-2.5 flex items-center justify-between">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            Work Checklist
+                        </p>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            {checklistDone} / {checklistTotal} done
+                        </span>
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-2">
+                        {checklists.map((item) => (
+                            <div
+                                key={item.id}
+                                className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300"
+                            >
+                                <span
+                                    className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px] font-bold ${
+                                        item.is_completed
+                                            ? "bg-emerald-500 text-white"
+                                            : "border border-slate-300 bg-slate-100 text-transparent dark:border-slate-700 dark:bg-slate-900"
+                                    }`}
+                                >
+                                    ✓
+                                </span>
+                                <span
+                                    className={
+                                        item.is_completed
+                                            ? "font-medium text-slate-900 dark:text-slate-100"
+                                            : "text-slate-400 dark:text-slate-500"
+                                    }
+                                >
+                                    {item.item_title}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Site Photos Gallery */}
+            {photos.length > 0 && (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+                    <p className="mb-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Site Photos ({photos.length})
+                    </p>
+
+                    <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
+                        {photos.map((photoUrl, idx) => (
+                            <a
+                                key={idx}
+                                href={photoUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                                title="Click to view full photo"
+                            >
+                                <img
+                                    src={photoUrl}
+                                    alt={`Site photo #${idx + 1}`}
+                                    className="h-full w-full object-cover transition duration-200 group-hover:scale-105"
+                                />
+                                <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5 text-[9px] font-medium text-white">
+                                    #{idx + 1}
+                                </span>
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Categorized Files */}
+            {((categorizedFiles.survey_data?.length || 0) > 0 ||
+                (categorizedFiles.sketch_markup?.length || 0) > 0 ||
+                (categorizedFiles.reference_documents?.length || 0) > 0) && (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+                    <p className="mb-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Submitted Files & Documents
+                    </p>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        {/* Survey Data */}
+                        <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+                            <p className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                📊 Survey Data Files
+                            </p>
+                            <div className="space-y-1.5">
+                                {categorizedFiles.survey_data?.map((file, i) => (
+                                    <a
+                                        key={i}
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center justify-between rounded-lg bg-white p-2 text-xs font-medium text-indigo-600 shadow-xs hover:underline dark:bg-slate-950 dark:text-indigo-400"
+                                    >
+                                        <span className="truncate max-w-[130px]">{file.name}</span>
+                                        <span className="text-[10px] text-slate-400">{file.size}</span>
+                                    </a>
+                                ))}
+                                {(!categorizedFiles.survey_data || categorizedFiles.survey_data.length === 0) && (
+                                    <span className="text-xs text-slate-400">None uploaded</span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Sketch & Markup */}
+                        <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+                            <p className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                📐 Sketch & Markup
+                            </p>
+                            <div className="space-y-1.5">
+                                {categorizedFiles.sketch_markup?.map((file, i) => (
+                                    <a
+                                        key={i}
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center justify-between rounded-lg bg-white p-2 text-xs font-medium text-indigo-600 shadow-xs hover:underline dark:bg-slate-950 dark:text-indigo-400"
+                                    >
+                                        <span className="truncate max-w-[130px]">{file.name}</span>
+                                        <span className="text-[10px] text-slate-400">{file.size}</span>
+                                    </a>
+                                ))}
+                                {(!categorizedFiles.sketch_markup || categorizedFiles.sketch_markup.length === 0) && (
+                                    <span className="text-xs text-slate-400">None uploaded</span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Reference Documents */}
+                        <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+                            <p className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                📑 Reference Documents
+                            </p>
+                            <div className="space-y-1.5">
+                                {categorizedFiles.reference_documents?.map((file, i) => (
+                                    <a
+                                        key={i}
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center justify-between rounded-lg bg-white p-2 text-xs font-medium text-indigo-600 shadow-xs hover:underline dark:bg-slate-950 dark:text-indigo-400"
+                                    >
+                                        <span className="truncate max-w-[130px]">{file.name}</span>
+                                        <span className="text-[10px] text-slate-400">{file.size}</span>
+                                    </a>
+                                ))}
+                                {(!categorizedFiles.reference_documents || categorizedFiles.reference_documents.length === 0) && (
+                                    <span className="text-xs text-slate-400">None uploaded</span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Plan Documents (existing) */}
             {planDocuments.length ? (
-                <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 dark:border-indigo-900 dark:bg-indigo-950/20">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
-                        Plan Documents
+                <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 dark:border-indigo-900 dark:bg-indigo-950/20">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+                        Survey Plan Attached Documents
                     </p>
 
                     <div className="flex flex-wrap gap-2">
-                        {planDocuments.map(
-                            (document) => (
-                                <DocumentLinks
-                                    key={
-                                        document.id
-                                    }
-                                    document={
-                                        document
-                                    }
-                                    documentRouteBase={
-                                        documentRouteBase
-                                    }
-                                    canView={
-                                        canViewDocuments
-                                    }
-                                />
-                            ),
-                        )}
+                        {planDocuments.map((document) => (
+                            <DocumentLinks
+                                key={document.id}
+                                document={document}
+                                documentRouteBase={documentRouteBase}
+                                canView={canViewDocuments}
+                            />
+                        ))}
                     </div>
                 </div>
             ) : null}
 
+            {/* Entries (existing) */}
             {visit?.entries?.length ? (
-                <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
-                    {visit.entries.map(
-                        (entry) => (
-                            <div
-                                key={entry.id}
-                                className="flex flex-wrap items-start justify-between gap-3 text-sm text-slate-600 dark:text-slate-300"
-                            >
-                                <div>
-                                    <p className="font-medium text-slate-800 dark:text-slate-100">
-                                        {entry.entry_type}
-                                        {" • "}
-                                        {entry.title}
+                <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
+                    {visit.entries.map((entry) => (
+                        <div
+                            key={entry.id}
+                            className="flex flex-wrap items-start justify-between gap-3 text-sm text-slate-600 dark:text-slate-300"
+                        >
+                            <div>
+                                <p className="font-medium text-slate-800 dark:text-slate-100">
+                                    {entry.entry_type} • {entry.title}
+                                </p>
+                                {entry.description ? (
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        {entry.description}
                                     </p>
-
-                                    {entry.description ? (
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            {
-                                                entry.description
-                                            }
-                                        </p>
-                                    ) : null}
-                                </div>
-
-                                {entry.supporting_document ? (
-                                    <DocumentLinks
-                                        document={
-                                            entry.supporting_document
-                                        }
-                                        documentRouteBase={
-                                            documentRouteBase
-                                        }
-                                        canView={
-                                            canViewDocuments
-                                        }
-                                    />
-                                ) : (
-                                    <span className="text-xs text-slate-400">
-                                        No attachment
-                                    </span>
-                                )}
+                                ) : null}
                             </div>
-                        ),
-                    )}
+
+                            {entry.supporting_document ? (
+                                <DocumentLinks
+                                    document={entry.supporting_document}
+                                    documentRouteBase={documentRouteBase}
+                                    canView={canViewDocuments}
+                                />
+                            ) : (
+                                <span className="text-xs text-slate-400">
+                                    No attachment
+                                </span>
+                            )}
+                        </div>
+                    ))}
                 </div>
             ) : null}
 
+            {/* Review Decision Form */}
             {isReviewable && canReview ? (
                 <form
                     onSubmit={submitReview}
-                    className="mt-4 space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800"
+                    className="mt-5 space-y-4 border-t border-slate-200 pt-4 dark:border-slate-800"
                 >
-                    <div className="grid gap-3 md:grid-cols-[190px,1fr]">
+                    <div className="grid gap-3 md:grid-cols-[220px,1fr]">
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                Decision
+                            <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                Review Action
                             </label>
 
                             <select
-                                value={
-                                    form.data.status
-                                }
+                                value={form.data.status}
                                 onChange={(event) =>
                                     form.setData(
                                         "status",
-                                        Number(
-                                            event.target
-                                                .value,
-                                        ),
+                                        Number(event.target.value),
                                     )
                                 }
-                                className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 font-medium text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                             >
-                                <option
-                                    value={
-                                        surveyStatusCodes
-                                            .approved
-                                    }
-                                >
-                                    Approve
+                                <option value={surveyStatusCodes.approved}>
+                                    ✓ Approve
                                 </option>
-
-                                <option
-                                    value={
-                                        surveyStatusCodes
-                                            .revision_requested
-                                    }
-                                >
-                                    Request Revision
+                                <option value={surveyStatusCodes.revision_requested}>
+                                    🔄 Request Changes / Revision
                                 </option>
-
-                                <option
-                                    value={
-                                        surveyStatusCodes
-                                            .rejected
-                                    }
-                                >
-                                    Reject
+                                <option value={surveyStatusCodes.rejected}>
+                                    ✕ Reject
                                 </option>
                             </select>
 
                             {form.errors.status ? (
                                 <p className="mt-1 text-xs text-rose-600">
-                                    {
-                                        form.errors
-                                            .status
-                                    }
+                                    {form.errors.status}
                                 </p>
                             ) : null}
                         </div>
 
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                Review Notes{" "}
-
+                            <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                {Number(form.data.status) === surveyStatusCodes.revision_requested
+                                    ? "Action Description / Required Changes"
+                                    : "Review Notes"}
                                 {noteRequired ? (
-                                    <span className="text-rose-500">
-                                        *
-                                    </span>
+                                    <span className="text-rose-500"> *</span>
                                 ) : null}
                             </label>
 
                             <textarea
                                 rows={3}
-                                required={
-                                    noteRequired
-                                }
-                                value={
-                                    form.data
-                                        .review_notes
-                                }
+                                required={noteRequired}
+                                value={form.data.review_notes}
                                 onChange={(event) =>
-                                    form.setData(
-                                        "review_notes",
-                                        event.target.value,
-                                    )
+                                    form.setData("review_notes", event.target.value)
                                 }
                                 placeholder={
-                                    noteRequired
-                                        ? "Explain the required changes or rejection reason"
-                                        : "Optional approval notes"
+                                    Number(form.data.status) === surveyStatusCodes.revision_requested
+                                        ? "Give detailed action description explaining what modifications or re-survey work is needed..."
+                                        : Number(form.data.status) === surveyStatusCodes.rejected
+                                        ? "State the reason for rejecting this survey submission..."
+                                        : "Optional notes for the approval..."
                                 }
-                                className="w-full rounded-xl border border-slate-300 px-4 py-3 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                                className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                             />
 
-                            {form.errors
-                                .review_notes ? (
+                            {form.errors.review_notes ? (
                                 <p className="mt-1 text-xs text-rose-600">
-                                    {
-                                        form.errors
-                                            .review_notes
-                                    }
+                                    {form.errors.review_notes}
                                 </p>
                             ) : null}
                         </div>
                     </div>
 
-                    <div className="flex justify-end">
+                    {/* When Approved: Assign Next Teammate (Draftsperson) */}
+                    {Number(form.data.status) === surveyStatusCodes.approved && (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+                            <div className="mb-2">
+                                <p className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                                    Next Workflow Step: Assign to Draft Person / Teammate
+                                </p>
+                                <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80">
+                                    Approving will transition project to <strong>Drafting in Progress</strong>. Assign the teammate responsible for the drafting job.
+                                </p>
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                        Assign Teammate
+                                    </label>
+                                    <select
+                                        value={form.data.assigned_to_member_id}
+                                        onChange={(e) =>
+                                            form.setData("assigned_to_member_id", e.target.value)
+                                        }
+                                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                    >
+                                        <option value="">Select draft person / teammate...</option>
+                                        {members.map((m) => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.name} {m.designation_text ? `(${m.designation_text})` : ""}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                        Target Due Date (Optional)
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={form.data.due_date}
+                                        onChange={(e) =>
+                                            form.setData("due_date", e.target.value)
+                                        }
+                                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* When Request Revision: Alert */}
+                    {Number(form.data.status) === surveyStatusCodes.revision_requested && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+                            <strong>Note:</strong> Requesting changes will move the project stage back to <strong>Survey In Progress</strong> and set the task status to <strong>In Progress</strong> with your action description so the surveyor can make corrections and resubmit.
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-2">
                         <button
                             type="submit"
-                            disabled={
-                                form.processing
-                            }
-                            className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-indigo-600 dark:hover:bg-indigo-500"
+                            disabled={form.processing}
+                            className={`rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-60 ${
+                                Number(form.data.status) === surveyStatusCodes.approved
+                                    ? "bg-emerald-600 hover:bg-emerald-700"
+                                    : Number(form.data.status) === surveyStatusCodes.revision_requested
+                                    ? "bg-amber-600 hover:bg-amber-700"
+                                    : "bg-rose-600 hover:bg-rose-700"
+                            }`}
                         >
                             {form.processing
-                                ? "Saving Review..."
-                                : "Submit Review"}
+                                ? "Processing..."
+                                : Number(form.data.status) === surveyStatusCodes.approved
+                                ? "Approve & Advance to Drafting"
+                                : Number(form.data.status) === surveyStatusCodes.revision_requested
+                                ? "Send Revision Request"
+                                : "Reject Submission"}
                         </button>
                     </div>
                 </form>
@@ -1548,15 +1767,13 @@ function SubmissionReviewCard({
                     {!isReviewable ? (
                         <>
                             <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
-                                {submission.review_notes
-                                    || "No review notes were provided."}
+                                {submission.review_notes || "No review notes were provided."}
                             </p>
 
                             <p className="mt-1 text-xs text-slate-500">
-                                {submission.reviewed_by
-                                    ?.name
+                                {submission.reviewed_by?.name
                                     ? `Reviewed by ${submission.reviewed_by.name}`
-                                    : "Reviewed by an authorized reviewer (identity is in the activity log)"}
+                                    : "Reviewed by an authorized reviewer"}
 
                                 {submission.reviewed_at
                                     ? ` • ${formatDateTime(submission.reviewed_at)}`

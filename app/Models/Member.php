@@ -79,6 +79,36 @@ class Member extends Authenticatable
         'rejected_at' => 'datetime',
     ];
 
+    public function setRolesAttribute($value): void
+    {
+        $raw = is_array($value) ? $value : (is_string($value) ? (json_decode($value, true) ?: [$value]) : []);
+        $cleanRoles = collect($raw)->map(function ($r) {
+            if (is_numeric($r)) {
+                return (int) $r;
+            }
+            if (is_string($r) && !empty(trim($r))) {
+                $slug = strtolower(trim($r));
+                $mappedId = match ($slug) {
+                    'super_admin', 'superadmin' => 2,
+                    'member' => 1,
+                    'admin' => 9,
+                    'project_admin', 'project-admin' => 3,
+                    default => null,
+                };
+                if ($mappedId) {
+                    return $mappedId;
+                }
+                $dbRole = Role::where('slug', $slug)->first();
+                if ($dbRole) {
+                    return (int) $dbRole->id;
+                }
+            }
+            return null;
+        })->filter()->unique()->values()->all();
+
+        $this->attributes['roles'] = json_encode($cleanRoles);
+    }
+
     public function getIsDriverAttribute(): int
     {
         return $this->isDriver() ? 1 : 0;
@@ -234,7 +264,8 @@ class Member extends Authenticatable
     public function scopeHasRole($query, $roleId)
     {
         return $query->where(function($q) use ($roleId) {
-            $q->whereJsonContains('roles', (string) $roleId);
+            $q->whereJsonContains('roles', (int) $roleId)
+              ->orWhereJsonContains('roles', (string) $roleId);
         });
     }
 
