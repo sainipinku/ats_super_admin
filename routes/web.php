@@ -974,6 +974,7 @@ Route::post('/emulate/switch-role', [EmulationController::class, 'switchRole'])-
 
 // Password Reset Routes
 Route::get('/forget-password', [HomeController::class, 'forgetPassword'])->name('password.request');
+Route::redirect('/forgot-password', '/forget-password');
 Route::get('/super-forget-password', [HomeController::class, 'superForgetPassword'])->name('super.password.request');
 Route::post('/check-email', [HomeController::class, 'checkEmail'])->name('auth.checkEmail');
 Route::post('/super-check-email', [HomeController::class, 'superCheckEmail'])->name('super.auth.checkEmail');

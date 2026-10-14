@@ -52,7 +52,7 @@ Route::get('/signed/documents/{document}/view', [
     App\Http\Controllers\Construction\DocumentController::class, 'view',
 ])
     ->middleware('signed')
-    ->name('signed_documents.view');
+    ->name('api.signed_documents.view');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);

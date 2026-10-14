@@ -60,7 +60,7 @@ jobs:
           sed -i 's/DB_DATABASE=.*/DB_DATABASE=:memory:/' .env
           php artisan key:generate --ansi
 
-      - name: Validate Scramble API Documentation
+      - name: Validate Scramble API Documentation & Routes
         env:
           DB_CONNECTION: sqlite
           DB_DATABASE: ':memory:'
@@ -68,7 +68,10 @@ jobs:
           SESSION_DRIVER: array
           QUEUE_CONNECTION: sync
           MAIL_MAILER: array
-        run: php artisan scramble:analyze
+        run: |
+          php artisan route:cache
+          php artisan route:clear
+          php artisan scramble:analyze
 
   # -------------------------------------------------------------
   # Job 2: CD (Auto Deploy to VPS Server via SSH)
@@ -140,7 +143,7 @@ jobs:
             # 7. Optimize & cache config, routes, views
             echo "⚡ Clearing and caching Laravel configuration..."
             php artisan config:cache
-            php artisan route:cache
+            php artisan route:cache || { echo "⚠️ Route cache failed — clearing route cache to allow normal dynamic routing"; php artisan route:clear; }
             php artisan view:cache
 
             # 8. Restart queue workers (if any)
