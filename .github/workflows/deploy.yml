@@ -95,8 +95,24 @@ jobs:
             set -e
             echo "🚀 Starting Deployment on $(hostname)..."
             
-            # 1. Navigate to target web directory
-            DEPLOY_DIR="${{ secrets.SSH_DEPLOY_PATH || '/var/www/cadmax_consult_admin' }}"
+            # 1. Resolve and navigate to target web directory
+            RAW_DIR="${{ secrets.SSH_DEPLOY_PATH }}"
+            CLEAN_DIR=$(echo "$RAW_DIR" | sed -e 's/^cd //g' -e "s/['\"]//g" | xargs)
+
+            if [ -n "$CLEAN_DIR" ] && [ -d "$CLEAN_DIR" ]; then
+              DEPLOY_DIR="$CLEAN_DIR"
+            elif [ -d "/var/www/cadmax_consult_admin" ]; then
+              DEPLOY_DIR="/var/www/cadmax_consult_admin"
+            elif [ -d "/var/www/html/cadmax_consult_admin" ]; then
+              DEPLOY_DIR="/var/www/html/cadmax_consult_admin"
+            else
+              echo "❌ Error: Target deployment directory not found!"
+              echo "Specified: '$CLEAN_DIR'"
+              echo "Listing /var/www:"
+              ls -la /var/www || true
+              exit 1
+            fi
+
             cd "$DEPLOY_DIR"
             echo "📂 Working directory: $(pwd)"
 
