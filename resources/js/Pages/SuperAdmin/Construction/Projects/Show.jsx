@@ -398,32 +398,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                     {project.survey_plans?.length ? (
                         <div className="space-y-4">
                             {project.survey_plans.map((plan) => (
-                                <div key={plan.id} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <p className="font-semibold text-slate-900 dark:text-white">{plan.title}</p>
-                                            <p className="text-sm text-slate-500">{plan.survey_code} • {formatDate(plan.planned_date) || "No planned date"}</p>
-                                            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 break-words">{plan.site_address || "No site address recorded."}</p>
-                                        </div>
-                                        <StatusBadge value={plan.status_key} />
-                                    </div>
-                                    <div className="mt-4 flex flex-wrap gap-2">
-                                        {(plan.plan_members || []).map((member) => (
-                                            <span key={member.id} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 dark:bg-slate-950 dark:text-slate-200">
-                                                {member.member?.name || "Unknown"} • {member.role_in_survey}
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <div className="mt-4 space-y-3">
-                                        {(plan.visits || []).length ? (
-                                            plan.visits.map((visit) => <SurveyVisitCard key={visit.id} visit={visit} />)
-                                        ) : (
-                                            <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-3 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-950">
-                                                No field check-in visits captured yet.
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
+                                <SurveyPlanCard key={plan.id} plan={plan} />
                             ))}
                         </div>
                     ) : (
@@ -2435,6 +2410,206 @@ function SurveyVisitCard({ visit }) {
             ) : null}
 
             <PhotoGrid photos={visit.photos} className="mt-4" />
+        </div>
+    );
+}
+
+function SurveyPlanCard({ plan }) {
+    const [showModal, setShowModal] = useState(false);
+    const visits = plan.visits || [];
+
+    return (
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-2xs transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                            {plan.survey_code}
+                        </span>
+                        <h4 className="font-bold text-slate-900 dark:text-white">
+                            {plan.title}
+                        </h4>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                        Planned Date: {formatDate(plan.planned_date) || "No planned date"}
+                        {plan.site_address ? ` • 📍 ${plan.site_address}` : " • No site address recorded."}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <StatusBadge value={plan.status_key || plan.status} />
+                </div>
+            </div>
+
+            {/* Assigned Survey Team Members */}
+            {(plan.plan_members || []).length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                    {plan.plan_members.map((member) => (
+                        <span
+                            key={member.id}
+                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                        >
+                            <span>👤</span>
+                            <span>{member.member?.name || "Unknown"}</span>
+                            <span className="text-slate-400">•</span>
+                            <span className="text-slate-500 dark:text-slate-400">{member.role_in_survey}</span>
+                        </span>
+                    ))}
+                </div>
+            )}
+
+            {/* Bottom bar with Visits Summary & View More button */}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold">
+                        {visits.length}
+                    </span>
+                    <span>
+                        {visits.length === 0
+                            ? "No field check-in visits yet"
+                            : `${visits.length} field visit${visits.length > 1 ? "s" : ""} recorded`}
+                    </span>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={() => setShowModal(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 shadow-2xs transition hover:bg-indigo-100 hover:border-indigo-300 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
+                >
+                    <span>👁️</span>
+                    <span>View More Details</span>
+                    {visits.length > 0 && (
+                        <span className="rounded-full bg-indigo-200/90 px-1.5 py-0.2 text-[10px] font-bold text-indigo-800 dark:bg-indigo-800 dark:text-indigo-200">
+                            {visits.length}
+                        </span>
+                    )}
+                    <span>↗</span>
+                </button>
+            </div>
+
+            {/* Survey Plan Details Modal */}
+            {showModal && (
+                <Modal show={true} onClose={() => setShowModal(false)} maxWidth="5xl">
+                    <div className="flex max-h-[88vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between border-b border-slate-200/80 px-6 py-4 dark:border-slate-800">
+                            <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                        {plan.survey_code}
+                                    </span>
+                                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                        {plan.title}
+                                    </h3>
+                                    <StatusBadge value={plan.status_key || plan.status} />
+                                </div>
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    Planned Date: {formatDate(plan.planned_date) || "No planned date"}
+                                    {plan.site_address ? ` • 📍 ${plan.site_address}` : ""}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Modal Body - Scrollable */}
+                        <div className="flex-1 space-y-6 overflow-y-auto p-6">
+                            {/* Plan Overview Card */}
+                            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-indigo-50/20 p-4.5 shadow-2xs dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
+                                <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                    Survey Plan Overview
+                                </h4>
+                                <div className="mt-3 grid grid-cols-2 gap-4 text-xs sm:grid-cols-4">
+                                    <div>
+                                        <p className="text-slate-400">Survey Code</p>
+                                        <p className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{plan.survey_code}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-400">Planned Date</p>
+                                        <p className="font-semibold text-slate-800 dark:text-slate-200">{formatDate(plan.planned_date) || "N/A"}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-400">Status</p>
+                                        <p className="font-semibold text-slate-800 dark:text-slate-200">{plan.status_key || plan.status || "In Progress"}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-400">Field Visits</p>
+                                        <p className="font-semibold text-slate-800 dark:text-slate-200">{visits.length} recorded</p>
+                                    </div>
+                                </div>
+                                {plan.site_address && (
+                                    <div className="mt-3 rounded-xl bg-slate-100/70 p-3 text-xs text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                                        <span className="font-semibold text-slate-900 dark:text-white">📍 Site Location: </span>
+                                        {plan.site_address}
+                                    </div>
+                                )}
+                                {(plan.plan_members || []).length > 0 && (
+                                    <div className="mt-3 border-t border-slate-200/60 pt-3 dark:border-slate-800">
+                                        <p className="text-[11px] font-medium text-slate-400 mb-1.5">Assigned Survey Team:</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {plan.plan_members.map((m) => (
+                                                <span key={m.id} className="rounded-lg bg-white px-2.5 py-1 text-xs border border-slate-200 font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                                    👤 {m.member?.name || "Unknown"} ({m.role_in_survey})
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Captured Field Visits */}
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                        <span>📍</span>
+                                        <span>Field Check-in Visits & Survey Reports ({visits.length})</span>
+                                    </h4>
+                                    {visits.length > 0 && (
+                                        <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">
+                                            Latest: Day {visits[0]?.day_number || 1}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {visits.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {visits.map((visit) => (
+                                            <SurveyVisitCard key={visit.id} visit={visit} />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center dark:border-slate-800">
+                                        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-2xl dark:bg-amber-950/40">
+                                            📋
+                                        </span>
+                                        <h4 className="mt-3 text-sm font-bold text-slate-900 dark:text-white">
+                                            No Field Visits Captured Yet
+                                        </h4>
+                                        <p className="mt-1 max-w-md mx-auto text-xs text-slate-500">
+                                            Field surveyors have not submitted check-in visits for this survey plan yet.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex items-center justify-end border-t border-slate-200/80 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-950">
+                            <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
         </div>
     );
 }
