@@ -942,6 +942,116 @@ function TaskRow({ task, project, members, onEdit }) {
     const [showChecklists, setShowChecklists] = useState(false);
     const [showAddChecklistModal, setShowAddChecklistModal] = useState(false);
     const [previewImage, setPreviewImage] = useState(null);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [showTransferModal, setShowTransferModal] = useState(false);
+    const [showRevisionInput, setShowRevisionInput] = useState(false);
+    const [revisionRemarks, setRevisionRemarks] = useState("");
+    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+    const taskVisits = useMemo(() => {
+        const list = [...(task.survey_visits || task.surveyVisits || [])];
+        if (list.length === 0 && Array.isArray(project.survey_visits)) {
+            project.survey_visits.forEach((v) => {
+                if (Number(v.task_id) === Number(task.id)) {
+                    list.push(v);
+                }
+            });
+        }
+        return list;
+    }, [task, project]);
+
+    const projectTeamMembers = useMemo(() => {
+        const list = project.team_members || project.teamMembers || [];
+        return list.map((tm) => {
+            const m = tm.member || {};
+            const r = tm.role || {};
+            const roleName = r.name || tm.assignment_scope || tm.project_role || "Team Member";
+            const isDraftPerson = /draft|cad|drafter|draftsman/i.test(roleName) || /draft|cad|drafter|draftsman/i.test(m.designation || "");
+            return {
+                id: tm.id,
+                member_id: tm.member_id || m.id,
+                name: m.name || `Member #${tm.member_id}`,
+                email: m.email || "",
+                phone: m.phone || "",
+                role_name: roleName,
+                is_draft_person: isDraftPerson,
+                designation: m.designation || "",
+                is_primary: tm.is_primary,
+            };
+        }).filter((tm) => tm.member_id);
+    }, [project]);
+
+    const defaultDraftMember = projectTeamMembers.find((tm) => tm.is_draft_person) || projectTeamMembers[0];
+    const transferForm = useForm({
+        member_id: defaultDraftMember?.member_id || "",
+        assignment_role: defaultDraftMember?.is_draft_person ? "draft_person" : "executor",
+        due_date: task.planned_end_date ? String(task.planned_end_date).split("T")[0] : "",
+        notes: "",
+        create_drafting_job: defaultDraftMember?.is_draft_person ? true : false,
+    });
+
+    useEffect(() => {
+        if (showTransferModal) {
+            const draftMem = projectTeamMembers.find((tm) => tm.is_draft_person) || projectTeamMembers[0];
+            transferForm.setData({
+                member_id: draftMem?.member_id || "",
+                assignment_role: draftMem?.is_draft_person ? "draft_person" : "executor",
+                due_date: task.planned_end_date ? String(task.planned_end_date).split("T")[0] : "",
+                notes: "",
+                create_drafting_job: draftMem?.is_draft_person ? true : false,
+            });
+        }
+    }, [showTransferModal]);
+
+    const handleTransferSubmit = (e) => {
+        e.preventDefault();
+        if (!transferForm.data.member_id) {
+            toast.error("Please select a project team member.");
+            return;
+        }
+        transferForm.post(route("super.construction.projects.tasks-v2.transfer", [project.id, task.id]), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowTransferModal(false);
+                toast.success("Task assigned / transferred successfully.");
+            },
+            onError: (errors) => {
+                const firstError = Object.values(errors)[0];
+                if (firstError) toast.error(firstError);
+                else toast.error("Failed to transfer task.");
+            },
+        });
+    };
+
+    const handleReviewSurvey = (decision) => {
+        if (decision === "revision_requested" && !revisionRemarks.trim()) {
+            toast.error("Please provide revision remarks describing what needs to be updated.");
+            return;
+        }
+        setIsSubmittingReview(true);
+        router.post(
+            route("super.construction.projects.tasks-v2.review-survey", [project.id, task.id]),
+            {
+                decision,
+                remarks: revisionRemarks.trim() || undefined,
+            },
+            {
+                preserveScroll: true,
+                onFinish: () => setIsSubmittingReview(false),
+                onSuccess: () => {
+                    setShowDetailsModal(false);
+                    setShowRevisionInput(false);
+                    setRevisionRemarks("");
+                    toast.success(decision === "approved" ? "Survey task approved!" : "Revision requested from surveyor.");
+                },
+                onError: (errors) => {
+                    const firstError = Object.values(errors)[0];
+                    if (firstError) toast.error(firstError);
+                    else toast.error("Failed to update survey review.");
+                },
+            }
+        );
+    };
 
     // Quick inline add state
     const [quickTitle, setQuickTitle] = useState("");
@@ -1181,6 +1291,29 @@ function TaskRow({ task, project, members, onEdit }) {
 
                     {/* Task Actions */}
                     <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowDetailsModal(true)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 shadow-xs transition hover:bg-sky-100 hover:border-sky-300 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-300 dark:hover:bg-sky-900/50"
+                            title="View all submitted survey data, coordinates, photos, and attached files"
+                        >
+                            <span>👁️</span>
+                            <span>View Details</span>
+                            {taskVisits.length > 0 && (
+                                <span className="rounded-full bg-sky-200/90 px-1.5 py-0.2 text-[10px] font-bold text-sky-800 dark:bg-sky-800 dark:text-sky-200">
+                                    {taskVisits.length}
+                                </span>
+                            )}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowTransferModal(true)}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:from-violet-500 hover:to-indigo-500"
+                            title="Assign or transfer this task to a project team member (e.g. Draft Person)"
+                        >
+                            <span>⇄</span>
+                            <span>Assign / Transfer</span>
+                        </button>
                         <button
                             type="button"
                             onClick={() => setShowAddChecklistModal(true)}
@@ -1579,6 +1712,525 @@ function TaskRow({ task, project, members, onEdit }) {
                             className="max-h-[75vh] w-full rounded-xl object-contain"
                         />
                     </div>
+                </Modal>
+            )}
+
+            {/* Task Submission Details Modal */}
+            {showDetailsModal && (
+                <Modal show={true} onClose={() => setShowDetailsModal(false)} maxWidth="4xl">
+                    <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-900">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between border-b border-slate-200/80 px-6 py-4 dark:border-slate-800">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                        {task.task_code}
+                                    </span>
+                                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                        Survey Task Submission Details
+                                    </h3>
+                                    <StatusBadge value={task.status} />
+                                    <StatusBadge value={task.priority} />
+                                </div>
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    {task.title} • Planned: {formatDate(task.planned_start_date) || "TBD"} → {formatDate(task.planned_end_date) || "TBD"}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowDetailsModal(false)}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Modal Body - Scrollable */}
+                        <div className="flex-1 space-y-6 overflow-y-auto p-6">
+                            {/* Survey Visits Submissions */}
+                            {taskVisits.length > 0 ? (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                            Submitted Field Reports ({taskVisits.length})
+                                        </h4>
+                                        <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                                            Latest Submission
+                                        </span>
+                                    </div>
+
+                                    {taskVisits.map((v, vIdx) => (
+                                        <div
+                                            key={v.id || vIdx}
+                                            className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4.5 shadow-xs dark:border-slate-800 dark:bg-slate-950"
+                                        >
+                                            {/* Submitter Info Card */}
+                                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-slate-800">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 font-bold text-sm">
+                                                        {(v.checked_in_by?.name || "S").charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-semibold text-slate-900 dark:text-white">
+                                                            {v.checked_in_by?.name || "Field Surveyor"}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500">
+                                                            Day {v.day_number || 1} • Submitted: {formatDateTime(v.updated_at || v.created_at) || "N/A"}
+                                                            {v.checked_in_by?.phone ? ` • Tel: ${v.checked_in_by.phone}` : ""}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                                        Number(v.status) === 2 || v.status_key === 'approved'
+                                                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                                            : Number(v.status) === 3 || v.status_key === 'rejected'
+                                                            ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+                                                            : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                                                    }`}>
+                                                        {v.status_label || (Number(v.status) === 2 ? 'Approved' : 'Submitted for Review')}
+                                                    </span>
+                                                    {v.gps_verified ? (
+                                                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                                            📍 GPS Verified
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+
+                                            {/* Metrics Grid */}
+                                            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                                <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                                    <p className="text-[11px] font-medium text-slate-400">Elevation</p>
+                                                    <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                                                        {v.elevation_m != null ? `${v.elevation_m} m` : "—"}
+                                                    </p>
+                                                </div>
+                                                <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                                    <p className="text-[11px] font-medium text-slate-400">Distance Covered</p>
+                                                    <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                                                        {v.distance_covered_m != null ? `${v.distance_covered_m} m` : "—"}
+                                                    </p>
+                                                </div>
+                                                <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                                    <p className="text-[11px] font-medium text-slate-400">Points Captured</p>
+                                                    <p className="mt-1 text-base font-bold text-indigo-600 dark:text-indigo-400">
+                                                        {v.total_points_captured != null ? v.total_points_captured : "—"}
+                                                    </p>
+                                                </div>
+                                                <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                                    <p className="text-[11px] font-medium text-slate-400">Day Scheduled</p>
+                                                    <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                                                        Day {v.day_number || 1}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* GPS Coordinates */}
+                                            {(v.check_in_latitude || v.check_in_longitude) && (
+                                                <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                                                    <span>📍 Coords:</span>
+                                                    <span className="font-mono text-slate-700 dark:text-slate-300">
+                                                        {Number(v.check_in_latitude).toFixed(6)}, {Number(v.check_in_longitude).toFixed(6)}
+                                                    </span>
+                                                    <a
+                                                        href={`https://www.google.com/maps?q=${v.check_in_latitude},${v.check_in_longitude}`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="text-indigo-600 hover:underline dark:text-indigo-400"
+                                                    >
+                                                        (Open in Google Maps ↗)
+                                                    </a>
+                                                </div>
+                                            )}
+
+                                            {/* Remarks & Field Notes */}
+                                            {(v.remarks || v.notes) && (
+                                                <div className="mt-4 space-y-2.5">
+                                                    {v.remarks && (
+                                                        <div className="rounded-xl bg-amber-50/70 p-3 text-xs dark:bg-amber-950/20">
+                                                            <p className="font-semibold text-amber-900 dark:text-amber-200">Survey Remarks</p>
+                                                            <p className="mt-1 text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{v.remarks}</p>
+                                                        </div>
+                                                    )}
+                                                    {v.notes && (
+                                                        <div className="rounded-xl bg-slate-100/80 p-3 text-xs dark:bg-slate-900/80">
+                                                            <p className="font-semibold text-slate-800 dark:text-slate-200">Field Notes / Metadata</p>
+                                                            <p className="mt-1 text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+                                                                {typeof v.notes === 'string' ? v.notes : JSON.stringify(v.notes, null, 2)}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Attached Files */}
+                                            {v.file_path && (
+                                                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Attached Survey Files & Reports</p>
+                                                    <div className="mt-2 flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-lg">📄</span>
+                                                            <span className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate max-w-sm">
+                                                                {v.file_path.split("/").pop() || "Survey Data Report"}
+                                                            </span>
+                                                        </div>
+                                                        <a
+                                                            href={v.file_path}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300"
+                                                        >
+                                                            <span>Download / View File</span>
+                                                            <span>↓</span>
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Site Proof Photos */}
+                                            {Array.isArray(v.photos) && v.photos.length > 0 && (
+                                                <div className="mt-4">
+                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                                        Site Proof Photos ({v.photos.length})
+                                                    </p>
+                                                    <div className="mt-2 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                                                        {v.photos.map((photoUrl, pIdx) => (
+                                                            <button
+                                                                key={pIdx}
+                                                                type="button"
+                                                                onClick={() => setPreviewImage(photoUrl)}
+                                                                className="group relative aspect-video w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-2xs transition hover:scale-[1.02] hover:border-indigo-400 dark:border-slate-700 dark:bg-slate-900"
+                                                            >
+                                                                <img
+                                                                    src={photoUrl}
+                                                                    alt={`Proof ${pIdx + 1}`}
+                                                                    className="h-full w-full object-cover"
+                                                                />
+                                                                <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100 text-white text-xs font-semibold">
+                                                                    🔍 Zoom
+                                                                </span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center dark:border-slate-800">
+                                    <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-2xl dark:bg-amber-950/40">
+                                        📋
+                                    </span>
+                                    <h4 className="mt-3 text-sm font-bold text-slate-900 dark:text-white">
+                                        No Survey Submissions Yet
+                                    </h4>
+                                    <p className="mt-1 max-w-md mx-auto text-xs text-slate-500">
+                                        The survey team has not submitted field data for this task yet. When they complete day work and submit from the mobile app, full metrics, points, RAW/PDF files, and photos will appear here.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Task Checklist Items */}
+                            {taskChecklists.length > 0 && (
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-950">
+                                    <div className="flex items-center justify-between border-b border-slate-200 pb-2.5 dark:border-slate-800">
+                                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                            Task Checklists ({completedChecklists} of {taskChecklists.length} done)
+                                        </h4>
+                                        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                            {progress}% Complete
+                                        </span>
+                                    </div>
+                                    <div className="mt-3 space-y-2">
+                                        {taskChecklists.map((c) => (
+                                            <div
+                                                key={c.id}
+                                                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className={c.is_completed ? "text-emerald-500 font-bold" : "text-slate-300"}>
+                                                        {c.is_completed ? "✓" : "○"}
+                                                    </span>
+                                                    <span className={`font-medium ${c.is_completed ? "line-through text-slate-400" : "text-slate-800 dark:text-slate-200"}`}>
+                                                        {c.item_title}
+                                                    </span>
+                                                    {c.assign_hours && (
+                                                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                                            {c.assign_hours} hrs
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {c.image_url_1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setPreviewImage(c.image_url_1)}
+                                                            className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                                                        >
+                                                            📷 Proof 1
+                                                        </button>
+                                                    )}
+                                                    {c.image_url_2 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setPreviewImage(c.image_url_2)}
+                                                            className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                                                        >
+                                                            📷 Proof 2
+                                                        </button>
+                                                    )}
+                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                                        c.is_completed
+                                                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                                            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                                                    }`}>
+                                                        {c.is_completed ? "Done" : "Pending"}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Inline Revision Input Form */}
+                            {showRevisionInput && (
+                                <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-4 dark:border-amber-700 dark:bg-amber-950/40">
+                                    <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                                        Request Survey Revision from Field Team
+                                    </h4>
+                                    <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
+                                        Describe what is missing or needs correction (e.g. "Missing elevation points on boundary corner B-4; please resubmit"):
+                                    </p>
+                                    <textarea
+                                        value={revisionRemarks}
+                                        onChange={(e) => setRevisionRemarks(e.target.value)}
+                                        rows={3}
+                                        placeholder="Enter revision notes and instructions..."
+                                        className="mt-2.5 w-full rounded-xl border border-amber-300 bg-white p-3 text-xs text-slate-900 focus:border-amber-500 focus:outline-none dark:border-amber-700 dark:bg-slate-900 dark:text-white"
+                                    />
+                                    <div className="mt-3 flex justify-end gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowRevisionInput(false)}
+                                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={isSubmittingReview}
+                                            onClick={() => handleReviewSurvey("revision_requested")}
+                                            className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-amber-500 disabled:opacity-60"
+                                        >
+                                            {isSubmittingReview ? "Sending..." : "Submit Revision Request"}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer Actions */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/80 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-950">
+                            <button
+                                type="button"
+                                onClick={() => setShowDetailsModal(false)}
+                                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Close
+                            </button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {!showRevisionInput && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowRevisionInput(true)}
+                                        className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                                    >
+                                        Request Revision
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    disabled={isSubmittingReview}
+                                    onClick={() => handleReviewSurvey("approved")}
+                                    className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-emerald-500 disabled:opacity-60"
+                                >
+                                    Approve Survey
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowDetailsModal(false);
+                                        setShowTransferModal(true);
+                                    }}
+                                    className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:from-violet-500 hover:to-indigo-500"
+                                >
+                                    Approve & Transfer to Draft Person ➔
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Task Assign / Transfer Modal */}
+            {showTransferModal && (
+                <Modal show={true} onClose={() => setShowTransferModal(false)} maxWidth="2xl">
+                    <form onSubmit={handleTransferSubmit} className="p-6">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-3 dark:border-slate-800">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                    Assign / Transfer Task
+                                </h3>
+                                <p className="text-xs text-slate-500">
+                                    Transfer <strong>{task.task_code}</strong>: "{task.title}" to a project team member.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowTransferModal(false)}
+                                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Current Assignee Banner */}
+                        <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
+                            <div>
+                                <span className="text-slate-400">Current Supervisor / Assignee:</span>{" "}
+                                <strong className="text-slate-800 dark:text-slate-200">
+                                    {task.supervisor?.name || "Unassigned"}
+                                </strong>
+                            </div>
+                            <StatusBadge value={task.status} />
+                        </div>
+
+                        <div className="mt-4 space-y-4">
+                            {/* Member Dropdown from projectTeamMembers */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                    Assign To Project Team Member <span className="text-rose-500">*</span>
+                                </label>
+                                <p className="text-[11px] text-slate-400 mb-1.5">
+                                    Select from members assigned to this project's team:
+                                </p>
+                                {projectTeamMembers.length > 0 ? (
+                                    <select
+                                        value={transferForm.data.member_id}
+                                        onChange={(e) => {
+                                            const mid = e.target.value;
+                                            const selected = projectTeamMembers.find((tm) => Number(tm.member_id) === Number(mid));
+                                            transferForm.setData((prev) => ({
+                                                ...prev,
+                                                member_id: mid,
+                                                assignment_role: selected?.is_draft_person ? "draft_person" : prev.assignment_role,
+                                                create_drafting_job: selected?.is_draft_person ? true : prev.create_drafting_job,
+                                            }));
+                                        }}
+                                        required
+                                        className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                    >
+                                        <option value="">-- Choose Project Team Member --</option>
+                                        {projectTeamMembers.map((tm) => (
+                                            <option key={tm.id} value={tm.member_id}>
+                                                {tm.name} — {tm.role_name} {tm.is_draft_person ? "⭐ (Draft Person)" : ""}
+                                            </option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+                                        ⚠️ No team members currently assigned to this project. Please assign team members in the <strong>Assigned Team</strong> section first.
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Assignment Role */}
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        Assignment Role
+                                    </label>
+                                    <select
+                                        value={transferForm.data.assignment_role}
+                                        onChange={(e) => transferForm.setData("assignment_role", e.target.value)}
+                                        className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                    >
+                                        <option value="draft_person">Draft Person (Prepares CAD DWG / Revisions)</option>
+                                        <option value="executor">Field Executor (Site Work / Operations)</option>
+                                        <option value="supervisor">Supervisor (Site In-charge)</option>
+                                        <option value="reviewer">Reviewer / Quality Checker</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                        Target Due Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={transferForm.data.due_date}
+                                        onChange={(e) => transferForm.setData("due_date", e.target.value)}
+                                        className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Drafting Job Toggle */}
+                            <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+                                <label className="flex items-start gap-2.5 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={transferForm.data.create_drafting_job}
+                                        onChange={(e) => transferForm.setData("create_drafting_job", e.target.checked)}
+                                        className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    <div>
+                                        <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                            Create Drafting Job for CAD Drawing & Revision Submissions
+                                        </span>
+                                        <p className="text-[11px] text-slate-500">
+                                            Unlocks CAD drawing uploads (DWG/PDF), revision tracking, and drafting dashboard for the assigned Draft Person.
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+
+                            {/* Instructions & Scope */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    Instructions & Drafting Scope / Remarks
+                                </label>
+                                <textarea
+                                    value={transferForm.data.notes}
+                                    onChange={(e) => transferForm.setData("notes", e.target.value)}
+                                    rows={3}
+                                    placeholder="e.g. Generate 2D topographic DWG with contour lines from points captured. Follow municipality standard layers..."
+                                    className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setShowTransferModal(false)}
+                                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={transferForm.processing || projectTeamMembers.length === 0}
+                                className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:from-violet-500 hover:to-indigo-500 disabled:opacity-60"
+                            >
+                                {transferForm.processing ? "Assigning Task..." : "Confirm & Transfer Task"}
+                            </button>
+                        </div>
+                    </form>
                 </Modal>
             )}
 

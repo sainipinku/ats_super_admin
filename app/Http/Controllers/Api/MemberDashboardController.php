@@ -3767,10 +3767,8 @@ $completed = SurveyPlan::whereHas(
         $priorityStr = $this->formatPriorityValue($task->priority, 'high');
 
         $submittedVisits = SurveyVisit::where('task_id', $task->id)
-            ->orWhere(function ($q) use ($project, $member) {
-                if ($project) {
-                    $q->where('project_id', $project->id)->where('checked_in_by_member_id', $member->id);
-                }
+            ->when($project, function ($q) use ($project) {
+                $q->orWhere('project_id', $project->id);
             })
             ->latest()
             ->get()

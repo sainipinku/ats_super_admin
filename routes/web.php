@@ -440,6 +440,15 @@ Route::prefix('super/construction')
             ->middleware('construction.permission:execution_task.manage')
             ->scopeBindings()
             ->name('projects.tasks-v2.checklists.batch');
+        Route::post('/projects/{project}/tasks-v2/{taskId}/transfer', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'transferTask'])
+            ->middleware('construction.permission:execution_task.manage')
+            ->name('projects.tasks-v2.transfer');
+        Route::post('/projects/{project}/tasks-v2/{taskId}/review-survey', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'reviewSurvey'])
+            ->middleware('construction.permission:execution_task.manage,survey_submission.review')
+            ->name('projects.tasks-v2.review-survey');
+        Route::post('/projects/{project}/drafting-jobs/{draftingJob}/review', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'reviewDraftingJob'])
+            ->middleware('construction.permission:drafting.manage,drawing_approval.manage,execution_task.manage')
+            ->name('projects.drafting-jobs.review');
 
         Route::get('/survey', [App\Http\Controllers\SuperAdmin\Construction\SurveyController::class, 'index'])
             ->middleware('construction.permission:survey_plan.manage,survey_submission.review')
