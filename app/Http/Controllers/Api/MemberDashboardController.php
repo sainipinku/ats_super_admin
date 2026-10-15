@@ -3402,9 +3402,13 @@ $completed = SurveyPlan::whereHas(
             }
 
             if (!$surveyPlanId && $projectId) {
-                $surveyPlanId = SurveyPlan::where('project_id', $projectId)
-                    ->orderByDesc('id')
-                    ->value('id') ?? SurveyPlan::value('id');
+                $resolvedPlan = $this->resolveOrCreateSurveyPlan(
+                    $project,
+                    $member,
+                    null,
+                    $project?->name
+                );
+                $surveyPlanId = $resolvedPlan?->id ?? SurveyPlan::value('id');
             }
         } catch (\Throwable $e) {
             report($e);
@@ -4220,10 +4224,10 @@ $completed = SurveyPlan::whereHas(
                     ->orderByDesc('id')
                     ->first()?->project;
 
+            $preferredPlanId = (int) ($request->survey_plan_id ?? $request->input('survey_plan') ?? 0);
             $plan = $task?->surveyPlan
                 ?? $visit?->surveyPlan
-                ?? ($request->survey_plan_id ? SurveyPlan::find($request->survey_plan_id) : null)
-                ?? ($project ? SurveyPlan::where('project_id', $project->id)->orderByDesc('id')->first() : null);
+                ?? $this->resolveOrCreateSurveyPlan($project, $member, $preferredPlanId ?: null, $task?->title);
         } catch (\Throwable $e) {
             report($e);
         }
@@ -4500,8 +4504,19 @@ $completed = SurveyPlan::whereHas(
             ?? ($legacyTask->project_id ? Project::find($legacyTask->project_id) : null)
             ?? ($unifiedTask?->project_id ? Project::find($unifiedTask->project_id) : null);
 
+        $preferredPlanId = (int) ($request->input('survey_plan_id')
+            ?? $request->input('survey_plan')
+            ?? $legacyTask->survey_plan_id
+            ?? $unifiedTask?->survey_plan_id
+            ?? 0);
+
         $plan = $legacyTask->surveyPlan
-            ?? ($project ? SurveyPlan::where('project_id', $project->id)->orderByDesc('id')->first() : null);
+            ?? $this->resolveOrCreateSurveyPlan(
+                $project,
+                $member,
+                $preferredPlanId ?: null,
+                $legacyTask->title ?? $unifiedTask?->title
+            );
 
         $totalDays = $this->surveyData->getTotalSurveyDays($plan, $project);
 
@@ -4726,14 +4741,23 @@ $completed = SurveyPlan::whereHas(
         $lat = $request->latitude !== null ? (float) $request->latitude : $defaultCoords['latitude'];
         $long = $request->longitude !== null ? (float) $request->longitude : $defaultCoords['longitude'];
 
+        $surveyPlanId = $plan?->id ?? $existingVisit?->survey_plan_id ?? ($preferredPlanId ?: null);
+        $elevation = $request->input('elevation_m') ?? $request->input('elevation');
+        $distance = $request->input('distance_covered_m') ?? $request->input('distance');
+        $points = $request->input('total_points_captured') ?? $request->input('points');
+
         if ($existingVisit) {
             $existingVisit->update([
                 'task_id' => $legacyTask->id,
+                'execution_task_id' => $legacyTask->id,
                 'project_id' => $project?->id ?? $existingVisit->project_id,
-                'survey_plan_id' => $plan?->id ?? $existingVisit->survey_plan_id,
+                'survey_plan_id' => $surveyPlanId ?? $existingVisit->survey_plan_id,
                 'checked_in_by_member_id' => $member->id,
                 'check_in_latitude' => $lat,
                 'check_in_longitude' => $long,
+                'elevation_m' => $elevation ?? $existingVisit->elevation_m,
+                'distance_covered_m' => $distance ?? $existingVisit->distance_covered_m,
+                'total_points_captured' => $points ?? $existingVisit->total_points_captured,
                 'photos' => $finalPhotos,
                 'file_path' => $primaryFilePath,
                 'remarks' => $remarks ?? $existingVisit->remarks,
@@ -4745,12 +4769,16 @@ $completed = SurveyPlan::whereHas(
         } else {
             $visit = SurveyVisit::create([
                 'task_id' => $legacyTask->id,
+                'execution_task_id' => $legacyTask->id,
                 'project_id' => $project?->id,
-                'survey_plan_id' => $plan?->id,
+                'survey_plan_id' => $surveyPlanId,
                 'checked_in_by_member_id' => $member->id,
                 'check_in_at' => now(),
                 'check_in_latitude' => $lat,
                 'check_in_longitude' => $long,
+                'elevation_m' => $elevation,
+                'distance_covered_m' => $distance,
+                'total_points_captured' => $points,
                 'photos' => $finalPhotos,
                 'file_path' => $primaryFilePath,
                 'remarks' => $remarks,
@@ -4898,6 +4926,85 @@ $completed = SurveyPlan::whereHas(
         }
 
         return $bytes . ' B';
+    }
+
+    /**
+     * Resolve an existing SurveyPlan or auto-create one for the project.
+     */
+    protected function resolveOrCreateSurveyPlan(
+        ?Project $project,
+        ?Member $member = null,
+        ?int $preferredPlanId = null,
+        ?string $titleContext = null
+    ): ?SurveyPlan {
+        if ($preferredPlanId) {
+            $found = SurveyPlan::find($preferredPlanId);
+            if ($found) {
+                return $found;
+            }
+        }
+
+        if ($project) {
+            $projectPlan = SurveyPlan::where('project_id', $project->id)
+                ->orderByDesc('id')
+                ->first();
+            if ($projectPlan) {
+                return $projectPlan;
+            }
+        }
+
+        if ($member) {
+            $assignedPlan = SurveyPlan::whereHas('planMembers', function ($q) use ($member) {
+                $q->where('member_id', $member->id);
+            })
+            ->when($project, fn ($q) => $q->where('project_id', $project->id))
+            ->orderByDesc('id')
+            ->first();
+
+            if ($assignedPlan) {
+                return $assignedPlan;
+            }
+        }
+
+        if ($project) {
+            try {
+                $code = 'SUR-' . strtoupper(\Illuminate\Support\Str::random(8));
+                $title = 'Field Survey - ' . ($titleContext ?: ($project->name ?? 'Project #' . $project->id));
+
+                $newPlan = SurveyPlan::create([
+                    'project_id' => $project->id,
+                    'survey_code' => $code,
+                    'title' => $title,
+                    'description' => 'Auto-generated survey plan for task submissions and field surveys.',
+                    'site_address' => $project->site_address ?? $project->location ?? null,
+                    'site_latitude' => $project->latitude ?? null,
+                    'site_longitude' => $project->longitude ?? null,
+                    'planned_date' => now()->toDateString(),
+                    'assigned_by_type' => $member ? get_class($member) : null,
+                    'assigned_by_id' => $member?->id,
+                    'status' => SurveyPlan::STATUS_IN_PROGRESS,
+                ]);
+
+                if ($member) {
+                    SurveyPlanMember::firstOrCreate(
+                        [
+                            'survey_plan_id' => $newPlan->id,
+                            'member_id' => $member->id,
+                        ],
+                        [
+                            'role_in_survey' => 'Lead Surveyor',
+                            'status' => 'assigned',
+                        ]
+                    );
+                }
+
+                return $newPlan;
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return SurveyPlan::orderByDesc('id')->first();
     }
 
     /**
