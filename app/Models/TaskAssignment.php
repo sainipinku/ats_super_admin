@@ -55,6 +55,15 @@ class TaskAssignment extends Model
         return ['uuid'];
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (TaskAssignment $assignment) {
+            if (empty($assignment->assigned_by) && !empty($assignment->assigned_by_uid)) {
+                $assignment->assigned_by = (int) $assignment->assigned_by_uid;
+            }
+        });
+    }
+
     public function task(): BelongsTo
     {
         return $this->belongsTo(Task::class);

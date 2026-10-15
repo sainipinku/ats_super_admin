@@ -380,6 +380,7 @@ class ProjectTaskController extends Controller implements HasMiddleware
                             'is_primary' => true,
                             'assigned_from' => now(),
                             'assigned_until' => $dueDate,
+                            'assigned_by' => (int) ($actor?->getKey() ?? 0),
                             'assigned_by_type' => $actor ? $actor::class : null,
                             'assigned_by_uid' => $actor?->getKey(),
                             'status' => 'active',
@@ -393,6 +394,18 @@ class ProjectTaskController extends Controller implements HasMiddleware
                     $surveyVisit = SurveyVisit::where('task_id', $taskId)->latest()->first()
                         ?? SurveyVisit::where('project_id', $project->id)->latest()->first();
 
+                    if (!$surveyVisit) {
+                        $surveyVisit = SurveyVisit::create([
+                            'project_id' => $project->id,
+                            'task_id' => $unifiedTask?->id ?? $taskId,
+                            'execution_task_id' => $legacyTask?->id,
+                            'checked_in_by_member_id' => $legacyTask?->supervisor_member_id ?? $unifiedTask?->member_id ?? $memberId,
+                            'check_in_at' => now(),
+                            'check_out_at' => now(),
+                            'status' => 2,
+                        ]);
+                    }
+
                     $surveySubmission = null;
                     if ($surveyVisit) {
                         $surveySubmission = SurveySubmission::where('survey_visit_id', $surveyVisit->id)->first();
@@ -403,8 +416,10 @@ class ProjectTaskController extends Controller implements HasMiddleware
                     if (!$surveySubmission) {
                         $surveySubmission = SurveySubmission::create([
                             'project_id' => $project->id,
-                            'survey_visit_id' => $surveyVisit?->id,
-                            'submitted_by_member_id' => $surveyVisit?->checked_in_by_member_id ?? $memberId,
+                            'survey_visit_id' => $surveyVisit->id,
+                            'task_id' => $unifiedTask?->id ?? $taskId,
+                            'execution_task_id' => $legacyTask?->id,
+                            'submitted_by_member_id' => $surveyVisit->checked_in_by_member_id ?? $memberId,
                             'submitted_at' => now(),
                             'status' => SurveySubmission::STATUS_APPROVED,
                             'review_notes' => 'Survey auto-approved on transfer to Draft Person.',

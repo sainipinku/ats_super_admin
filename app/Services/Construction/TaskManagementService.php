@@ -851,6 +851,7 @@ class TaskManagementService
             'is_primary' => !empty($row['is_primary']),
             'assigned_from' => $start ? $this->toCarbon($start, '09:00:00')?->format('Y-m-d H:i:s') : null,
             'assigned_until' => $end ? $this->toCarbon($end, '18:00:00')?->format('Y-m-d H:i:s') : null,
+            'assigned_by' => (int) ($actor->getKey() ?? 0),
             'assigned_by_type' => morph_type($actor),
             'assigned_by_uid' => $actor->getKey(),
             'uuid' => (string) Str::uuid(),

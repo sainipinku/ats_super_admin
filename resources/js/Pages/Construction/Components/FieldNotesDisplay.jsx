@@ -26,7 +26,7 @@ function safeParse(val) {
     return null;
 }
 
-export default function FieldNotesDisplay({ notes, compact = false, className = "" }) {
+export default function FieldNotesDisplay({ notes, compact = false, hideRemarks = false, className = "" }) {
     const [showRaw, setShowRaw] = useState(false);
 
     if (!notes) return null;
@@ -242,7 +242,7 @@ export default function FieldNotesDisplay({ notes, compact = false, className = 
             )}
 
             {/* Remarks if provided */}
-            {remarks && (
+            {remarks && !hideRemarks && (
                 <div className="rounded-xl bg-slate-100/70 p-2.5 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
                     <p className="font-semibold text-slate-800 dark:text-slate-200">Notes / Remarks</p>
                     <p className="mt-1 leading-relaxed whitespace-pre-wrap">{remarks}</p>

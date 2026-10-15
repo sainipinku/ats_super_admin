@@ -1228,61 +1228,30 @@ function TaskRow({ task, project, members, onEdit }) {
                             />
                         </div>
 
-                        {/* Submitted Field Reports */}
-                        {(task.survey_visits || task.surveyVisits || []).length > 0 && (
-                            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
-                                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                                    Submitted Day Data & Field Reports ({(task.survey_visits || task.surveyVisits).length})
-                                </p>
-                                <div className="mt-2 space-y-2.5">
-                                    {(task.survey_visits || task.surveyVisits).map((v) => (
-                                        <div key={v.id} className="rounded-lg border border-slate-200 bg-white p-2.5 text-xs dark:border-slate-700 dark:bg-slate-950">
-                                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-1.5 dark:border-slate-800">
-                                                <span className="font-semibold text-indigo-600 dark:text-indigo-400">
-                                                    Day {v.day_number || 1} Survey Update
-                                                </span>
-                                                <span className="text-slate-400">
-                                                    {v.checked_in_by?.name ? `Submitted by ${v.checked_in_by.name}` : ""}
-                                                </span>
-                                            </div>
-                                            <div className="mt-2 grid grid-cols-2 gap-2 text-slate-600 dark:text-slate-300 sm:grid-cols-4">
-                                                {v.distance_covered_m != null && (
-                                                    <div>
-                                                        <span className="text-slate-400">Distance:</span> {v.distance_covered_m} m
-                                                    </div>
-                                                )}
-                                                {v.elevation_m != null && (
-                                                    <div>
-                                                        <span className="text-slate-400">Elevation:</span> {v.elevation_m} m
-                                                    </div>
-                                                )}
-                                                {v.total_points_captured != null && (
-                                                    <div>
-                                                        <span className="text-slate-400">Points:</span> {v.total_points_captured}
-                                                    </div>
-                                                )}
-                                                {v.file_path && (
-                                                    <div>
-                                                        <a href={v.file_path} target="_blank" rel="noreferrer" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                                                            📄 View PDF/Report
-                                                        </a>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {v.remarks && <p className="mt-1.5 text-slate-600 dark:text-slate-300"><strong>Remarks:</strong> {v.remarks}</p>}
-                                            {v.notes && <FieldNotesDisplay notes={v.notes} />}
-                                            {Array.isArray(v.photos) && v.photos.length > 0 && (
-                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                    {v.photos.map((imgUrl, idx) => (
-                                                        <a key={idx} href={imgUrl} target="_blank" rel="noreferrer">
-                                                            <img src={imgUrl} alt={`Proof ${idx + 1}`} className="h-12 w-12 rounded-lg border border-slate-200 object-cover shadow-xs hover:opacity-80 dark:border-slate-700" />
-                                                        </a>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
+                        {/* Compact Field Survey Reports Summary */}
+                        {taskVisits.length > 0 && (
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-sky-200/80 bg-gradient-to-r from-sky-50/70 via-indigo-50/40 to-slate-50/60 p-2.5 sm:px-3.5 sm:py-2 text-xs dark:border-sky-900/40 dark:from-sky-950/30 dark:via-indigo-950/20 dark:to-slate-900/40">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-600 text-white text-xs font-bold shadow-2xs">
+                                        📄
+                                    </span>
+                                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                        {taskVisits.length} Field Survey Report{taskVisits.length > 1 ? "s" : ""} Submitted
+                                    </span>
+                                    <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">•</span>
+                                    <span className="text-slate-500 dark:text-slate-400">
+                                        Latest: Day {taskVisits[0]?.day_number || 1}
+                                        {taskVisits[0]?.checked_in_by?.name ? ` by ${taskVisits[0].checked_in_by.name}` : ""}
+                                    </span>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDetailsModal(true)}
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 font-semibold text-sky-700 shadow-2xs border border-sky-200 hover:bg-sky-50 dark:bg-slate-900 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/60 transition"
+                                >
+                                    <span>View Details</span>
+                                    <span>↗</span>
+                                </button>
                             </div>
                         )}
                     </div>
@@ -1715,8 +1684,8 @@ function TaskRow({ task, project, members, onEdit }) {
 
             {/* Task Submission Details Modal */}
             {showDetailsModal && (
-                <Modal show={true} onClose={() => setShowDetailsModal(false)} maxWidth="4xl">
-                    <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-900">
+                <Modal show={true} onClose={() => setShowDetailsModal(false)} maxWidth="5xl">
+                    <div className="flex max-h-[88vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between border-b border-slate-200/80 px-6 py-4 dark:border-slate-800">
                             <div>
@@ -1852,7 +1821,7 @@ function TaskRow({ task, project, members, onEdit }) {
                                                         </div>
                                                     )}
                                                     {v.notes && (
-                                                        <FieldNotesDisplay notes={v.notes} />
+                                                        <FieldNotesDisplay notes={v.notes} hideRemarks={Boolean(v.remarks)} />
                                                     )}
                                                 </div>
                                             )}
