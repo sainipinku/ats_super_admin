@@ -1227,33 +1227,6 @@ function TaskRow({ task, project, members, onEdit }) {
                                 style={{ width: `${progress}%` }}
                             />
                         </div>
-
-                        {/* Compact Field Survey Reports Summary */}
-                        {taskVisits.length > 0 && (
-                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-sky-200/80 bg-gradient-to-r from-sky-50/70 via-indigo-50/40 to-slate-50/60 p-2.5 sm:px-3.5 sm:py-2 text-xs dark:border-sky-900/40 dark:from-sky-950/30 dark:via-indigo-950/20 dark:to-slate-900/40">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-600 text-white text-xs font-bold shadow-2xs">
-                                        📄
-                                    </span>
-                                    <span className="font-semibold text-slate-800 dark:text-slate-200">
-                                        {taskVisits.length} Field Survey Report{taskVisits.length > 1 ? "s" : ""} Submitted
-                                    </span>
-                                    <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">•</span>
-                                    <span className="text-slate-500 dark:text-slate-400">
-                                        Latest: Day {taskVisits[0]?.day_number || 1}
-                                        {taskVisits[0]?.checked_in_by?.name ? ` by ${taskVisits[0].checked_in_by.name}` : ""}
-                                    </span>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowDetailsModal(true)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 font-semibold text-sky-700 shadow-2xs border border-sky-200 hover:bg-sky-50 dark:bg-slate-900 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/60 transition"
-                                >
-                                    <span>View Details</span>
-                                    <span>↗</span>
-                                </button>
-                            </div>
-                        )}
                     </div>
 
                     {/* Task Actions */}
@@ -1714,15 +1687,56 @@ function TaskRow({ task, project, members, onEdit }) {
 
                         {/* Modal Body - Scrollable */}
                         <div className="flex-1 space-y-6 overflow-y-auto p-6">
+                            {/* Task Details Overview Card */}
+                            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-indigo-50/20 p-4.5 shadow-2xs dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
+                                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 pb-3 dark:border-slate-800">
+                                    <div>
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Task Overview</span>
+                                        <h4 className="text-base font-bold text-slate-900 dark:text-white">{task.title}</h4>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <StatusBadge value={task.status} />
+                                        <StatusBadge value={task.priority} />
+                                    </div>
+                                </div>
+                                <div className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+                                    <div>
+                                        <p className="text-slate-400">Supervisor</p>
+                                        <p className="font-semibold text-slate-800 dark:text-slate-200">{task.supervisor?.name || "Unassigned"}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-400">Planned Schedule</p>
+                                        <p className="font-semibold text-slate-800 dark:text-slate-200">
+                                            {formatDate(task.planned_start_date) || "TBD"} → {formatDate(task.planned_end_date) || "TBD"}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-400">Progress</p>
+                                        <p className="font-semibold text-slate-800 dark:text-slate-200">{progress}%</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-400">Checklists</p>
+                                        <p className="font-semibold text-slate-800 dark:text-slate-200">{completedChecklists} of {taskChecklists.length} done</p>
+                                    </div>
+                                </div>
+                                {task.description && (
+                                    <div className="mt-3 rounded-xl bg-slate-100/70 p-3 text-xs text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                                        <span className="font-semibold text-slate-900 dark:text-white">Description: </span>
+                                        {task.description}
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Survey Visits Submissions */}
                             {taskVisits.length > 0 ? (
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
-                                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                            Submitted Field Reports ({taskVisits.length})
+                                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                            <span>📋</span>
+                                            <span>Submitted Day Data & Field Reports ({taskVisits.length})</span>
                                         </h4>
-                                        <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
-                                            Latest Submission
+                                        <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                                            Latest: Day {taskVisits[0]?.day_number || 1}
                                         </span>
                                     </div>
 
@@ -1738,11 +1752,13 @@ function TaskRow({ task, project, members, onEdit }) {
                                                         {(v.checked_in_by?.name || "S").charAt(0).toUpperCase()}
                                                     </div>
                                                     <div>
-                                                        <p className="font-semibold text-slate-900 dark:text-white">
-                                                            {v.checked_in_by?.name || "Field Surveyor"}
-                                                        </p>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                                                Day {v.day_number || 1} Survey Update
+                                                            </span>
+                                                        </div>
                                                         <p className="text-xs text-slate-500">
-                                                            Day {v.day_number || 1} • Submitted: {formatDateTime(v.updated_at || v.created_at) || "N/A"}
+                                                            Submitted by <span className="font-semibold text-slate-700 dark:text-slate-300">{v.checked_in_by?.name || "Field Surveyor"}</span> • {formatDateTime(v.updated_at || v.created_at) || "N/A"}
                                                             {v.checked_in_by?.phone ? ` • Tel: ${v.checked_in_by.phone}` : ""}
                                                         </p>
                                                     </div>
