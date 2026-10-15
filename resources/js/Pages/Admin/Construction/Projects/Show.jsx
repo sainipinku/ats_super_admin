@@ -11,6 +11,7 @@ import DraftingWorkflowPanel from "@/Pages/Construction/Components/DraftingWorkf
 import AccountsVerificationPanel from "@/Pages/Construction/Components/AccountsVerificationPanel";
 import SurveySubmissionPanel from "@/Pages/Construction/Components/SurveySubmissionPanel";
 import WorkflowAuditTrail from "@/Pages/Construction/Components/WorkflowAuditTrail";
+import FieldNotesDisplay from "@/Pages/Construction/Components/FieldNotesDisplay";
 
 export default function ProjectShow({ project, activityLog, workflowSummary }) {
     const [activeWorkflowTab, setActiveWorkflowTab] = useState("supervisor");
@@ -634,18 +635,15 @@ function SurveyVisitCard({ visit }) {
             </div>
 
             {visit.remarks || visit.notes ? (
-                <div className="mt-3 rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
+                <div className="mt-3 space-y-2">
                     {visit.remarks ? (
-                        <div>
+                        <div className="rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
                             <p className="font-semibold">Remarks</p>
                             <p className="mt-1 whitespace-pre-wrap break-words">{visit.remarks}</p>
                         </div>
                     ) : null}
                     {visit.notes ? (
-                        <div className="mt-2">
-                            <p className="font-semibold">Field Notes</p>
-                            <p className="mt-1 whitespace-pre-wrap break-words">{visit.notes}</p>
-                        </div>
+                        <FieldNotesDisplay notes={visit.notes} />
                     ) : null}
                 </div>
             ) : null}

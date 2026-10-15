@@ -24,8 +24,8 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('auth:sanctum'),
-            new Middleware('ability:task.manage,construction.view'),
+            new Middleware('auth:sanctum', except: ['delta']),
+            new Middleware('ability:task.manage,construction.view', except: ['delta']),
         ];
     }
 

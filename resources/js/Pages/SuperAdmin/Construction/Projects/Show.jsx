@@ -15,6 +15,7 @@ import DraftingWorkflowPanel from "@/Pages/Construction/Components/DraftingWorkf
 import AccountsVerificationPanel from "@/Pages/Construction/Components/AccountsVerificationPanel";
 import SurveySubmissionPanel from "@/Pages/Construction/Components/SurveySubmissionPanel";
 import WorkflowAuditTrail from "@/Pages/Construction/Components/WorkflowAuditTrail";
+import FieldNotesDisplay from "@/Pages/Construction/Components/FieldNotesDisplay";
 
 export default function ProjectShow({ project, members, roles, activityLog, workflowSummary }) {
     const [activeWorkflowTab, setActiveWorkflowTab] = useState("supervisor");
@@ -473,18 +474,15 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                                         <PhotoGrid photos={submission.survey_visit.photos} className="mt-3" />
                                     ) : null}
                                     {submission.survey_visit?.remarks || submission.survey_visit?.notes ? (
-                                        <div className="mt-3 rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
+                                        <div className="mt-3 space-y-2">
                                             {submission.survey_visit.remarks ? (
-                                                <div>
+                                                <div className="rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
                                                     <p className="font-semibold">Remarks</p>
                                                     <p className="mt-1 whitespace-pre-wrap break-words">{submission.survey_visit.remarks}</p>
                                                 </div>
                                             ) : null}
                                             {submission.survey_visit.notes ? (
-                                                <div className="mt-2">
-                                                    <p className="font-semibold">Field Notes</p>
-                                                    <p className="mt-1 whitespace-pre-wrap break-words">{submission.survey_visit.notes}</p>
-                                                </div>
+                                                <FieldNotesDisplay notes={submission.survey_visit.notes} />
                                             ) : null}
                                         </div>
                                     ) : null}
@@ -1272,7 +1270,7 @@ function TaskRow({ task, project, members, onEdit }) {
                                                 )}
                                             </div>
                                             {v.remarks && <p className="mt-1.5 text-slate-600 dark:text-slate-300"><strong>Remarks:</strong> {v.remarks}</p>}
-                                            {v.notes && <p className="mt-1 text-slate-500 dark:text-slate-400"><strong>Notes:</strong> {v.notes}</p>}
+                                            {v.notes && <FieldNotesDisplay notes={v.notes} />}
                                             {Array.isArray(v.photos) && v.photos.length > 0 && (
                                                 <div className="mt-2 flex flex-wrap gap-2">
                                                     {v.photos.map((imgUrl, idx) => (
@@ -1854,12 +1852,7 @@ function TaskRow({ task, project, members, onEdit }) {
                                                         </div>
                                                     )}
                                                     {v.notes && (
-                                                        <div className="rounded-xl bg-slate-100/80 p-3 text-xs dark:bg-slate-900/80">
-                                                            <p className="font-semibold text-slate-800 dark:text-slate-200">Field Notes / Metadata</p>
-                                                            <p className="mt-1 text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
-                                                                {typeof v.notes === 'string' ? v.notes : JSON.stringify(v.notes, null, 2)}
-                                                            </p>
-                                                        </div>
+                                                        <FieldNotesDisplay notes={v.notes} />
                                                     )}
                                                 </div>
                                             )}
@@ -2443,18 +2436,15 @@ function SurveyVisitCard({ visit }) {
             </div>
 
             {visit.remarks || visit.notes ? (
-                <div className="mt-3 rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
+                <div className="mt-3 space-y-2">
                     {visit.remarks ? (
-                        <div>
+                        <div className="rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
                             <p className="font-semibold">Remarks</p>
                             <p className="mt-1 whitespace-pre-wrap break-words">{visit.remarks}</p>
                         </div>
                     ) : null}
                     {visit.notes ? (
-                        <div className="mt-2">
-                            <p className="font-semibold">Field Notes</p>
-                            <p className="mt-1 whitespace-pre-wrap break-words">{visit.notes}</p>
-                        </div>
+                        <FieldNotesDisplay notes={visit.notes} />
                     ) : null}
                 </div>
             ) : null}
