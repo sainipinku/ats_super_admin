@@ -381,7 +381,7 @@ class MemberDashboardController extends Controller
             $companies = collect([]);
         }
 
-        $projects = Project::with(['company', 'client', 'latestBudget', 'teamMembers.role'])
+        $projects = Project::with(['company', 'client', 'latestBudget', 'teamMembers.member', 'teamMembers.role'])
             ->whereIn('id', $projectIds)
             ->latest()
             ->get();
@@ -391,7 +391,7 @@ class MemberDashboardController extends Controller
             ->where('status', 'active')
             ->pluck('project_id');
 
-        $primaryProjects = Project::with(['company', 'client', 'latestBudget'])
+        $primaryProjects = Project::with(['company', 'client', 'latestBudget', 'teamMembers.member', 'teamMembers.role'])
             ->whereIn('id', $primaryProjectIds)
             ->get();
 
@@ -695,6 +695,29 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             $projAllTasksModels = $tasksByProject->get($projId, collect());
             $projLast20Tasks = $projAllTasksModels->take(20)->map(fn ($t) => $this->formatTaskItem($t))->values()->all();
 
+            $teamMembers = $project->teamMembers
+                ? $project->teamMembers
+                    ->filter(fn ($tm) => $tm->status === null || $tm->status === 'active')
+                    ->map(function ($tm) {
+                        return [
+                            'id' => $tm->id,
+                            'member_id' => $tm->member_id,
+                            'name' => $tm->member?->name ?? 'Team Member',
+                            'email' => $tm->member?->email,
+                            'mobile' => $tm->member?->mobile ?? $tm->member?->phone,
+                            'phone' => $tm->member?->phone ?? $tm->member?->mobile,
+                            'designation' => $tm->member?->designation,
+                            'role' => $tm->role?->name ?? $tm->assignment_scope ?? 'Member',
+                            'role_slug' => $tm->role?->slug,
+                            'profile_photo_url' => $tm->member?->profile_photo_url ?? null,
+                            'is_primary' => (bool) $tm->is_primary,
+                            'status' => $tm->status ?? 'active',
+                        ];
+                    })->values()->all()
+                : [];
+
+            $project->setAttribute('team_members_count', count($teamMembers));
+            $project->setAttribute('team_members', $teamMembers);
             $project->setAttribute('today_tasks', $projTodayTasks);
             $project->setAttribute('today_task', $projTodayTasks);
             $project->setAttribute('tasks', $projLast20Tasks);
@@ -767,9 +790,6 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             'projects_by_stage' => $projectStageCounts,
             'survey_plans' => $surveyPlans,
             'today_survey_visits' => $todayVisits,
-            'tasks' => $last20TasksFormatted,
-            'task' => $last20TasksFormatted,
-            'all_tasks' => $last20TasksFormatted,
             'task_summary' => $taskCounts,
             'drafting_jobs' => $draftingJobs,
             'recent_dprs' => $recentDPRs,
@@ -2674,12 +2694,37 @@ $completed = SurveyPlan::whereHas(
             return null;
         }
 
+        if (!$primary->relationLoaded('teamMembers')) {
+            $primary->loadMissing(['teamMembers.member', 'teamMembers.role']);
+        }
+
         $tasksCount = $primary->tasks_count ?? ($primary->executionTasks ? $primary->executionTasks->count() : 0);
         $todayTasks = $primary->today_tasks ?? [];
         $todayTasksCount = $primary->today_tasks_count ?? count($todayTasks);
         $tasks = $primary->tasks ?? [];
         $startDate = $primary->start_date ? $primary->start_date->format('d M') : null;
         $endDate = $primary->expected_end_date ? $primary->expected_end_date->format('d M') : null;
+
+        $teamMembers = $primary->teamMembers
+            ? $primary->teamMembers
+                ->filter(fn ($tm) => $tm->status === null || $tm->status === 'active')
+                ->map(function ($tm) {
+                    return [
+                        'id' => $tm->id,
+                        'member_id' => $tm->member_id,
+                        'name' => $tm->member?->name ?? 'Team Member',
+                        'email' => $tm->member?->email,
+                        'mobile' => $tm->member?->mobile ?? $tm->member?->phone,
+                        'phone' => $tm->member?->phone ?? $tm->member?->mobile,
+                        'designation' => $tm->member?->designation,
+                        'role' => $tm->role?->name ?? $tm->assignment_scope ?? 'Member',
+                        'role_slug' => $tm->role?->slug,
+                        'profile_photo_url' => $tm->member?->profile_photo_url ?? null,
+                        'is_primary' => (bool) $tm->is_primary,
+                        'status' => $tm->status ?? 'active',
+                    ];
+                })->values()->all()
+            : [];
 
         return [
             'id' => $primary->id,
@@ -2690,6 +2735,8 @@ $completed = SurveyPlan::whereHas(
             'progress_percent' => (int) ($primary->progress_percent ?? round($primary->executionTasks?->avg('progress_percent') ?? 0)),
             'start_date' => $startDate,
             'deadline' => $endDate,
+            'team_members_count' => count($teamMembers),
+            'team_members' => $teamMembers,
             'tasks_count' => $tasksCount,
             'today_tasks_count' => $todayTasksCount,
             'today_tasks' => $todayTasks,
