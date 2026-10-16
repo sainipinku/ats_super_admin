@@ -176,7 +176,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
             <WorkflowTracker currentStage={project.current_stage} isLocked={project.is_locked} />
 
             {/* Workflow Stage Control Tabs */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
+            <div className="hidden md:block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                         5-Stage Complete Workflow Management
@@ -185,55 +185,50 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                         <button
                             type="button"
                             onClick={() => setActiveWorkflowTab("supervisor")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${
-                                activeWorkflowTab === "supervisor"
-                                    ? "bg-indigo-600 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "supervisor"
+                                ? "bg-indigo-600 text-white shadow-sm"
+                                : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                                }`}
                         >
                             Supervisor Single-Screen Review
                         </button>
                         <button
                             type="button"
                             onClick={() => setActiveWorkflowTab("survey")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${
-                                activeWorkflowTab === "survey"
-                                    ? "bg-sky-600 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "survey"
+                                ? "bg-sky-600 text-white shadow-sm"
+                                : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                                }`}
                         >
                             Stage 1: Survey
                         </button>
                         <button
                             type="button"
                             onClick={() => setActiveWorkflowTab("drafting")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${
-                                activeWorkflowTab === "drafting"
-                                    ? "bg-indigo-600 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "drafting"
+                                ? "bg-indigo-600 text-white shadow-sm"
+                                : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                                }`}
                         >
                             Stage 2: Drafting
                         </button>
                         <button
                             type="button"
                             onClick={() => setActiveWorkflowTab("accounts")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${
-                                activeWorkflowTab === "accounts"
-                                    ? "bg-amber-600 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "accounts"
+                                ? "bg-amber-600 text-white shadow-sm"
+                                : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                                }`}
                         >
                             Stage 3: Accounts
                         </button>
                         <button
                             type="button"
                             onClick={() => setActiveWorkflowTab("audit")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${
-                                activeWorkflowTab === "audit"
-                                    ? "bg-slate-700 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "audit"
+                                ? "bg-slate-700 text-white shadow-sm"
+                                : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                                }`}
                         >
                             Audit Trail Logs
                         </button>
@@ -428,8 +423,8 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                                         {submission.reviewed_by?.name
                                             ? submission.reviewed_by.name
                                             : submission.reviewed_at
-                                            ? "authorized reviewer"
-                                            : "Pending review"}
+                                                ? "authorized reviewer"
+                                                : "Pending review"}
                                     </p>
                                     <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-600 dark:text-slate-300">
                                         {submission.review_notes || "No review notes yet."}
@@ -538,11 +533,10 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                     <button
                         type="button"
                         onClick={() => setShowCreateTask((prev) => !prev)}
-                        className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold shadow-xs transition ${
-                            showCreateTask
-                                ? "bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200"
-                                : "bg-indigo-600 text-white hover:bg-indigo-500"
-                        }`}
+                        className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold shadow-xs transition ${showCreateTask
+                            ? "bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200"
+                            : "bg-indigo-600 text-white hover:bg-indigo-500"
+                            }`}
                     >
                         <span className="text-base font-bold leading-none">{showCreateTask ? "✕" : "+"}</span>
                         <span>{showCreateTask ? "Close Task Form" : "New Task"}</span>
@@ -1256,11 +1250,10 @@ function TaskRow({ task, project, members, onEdit }) {
                         </div>
                         <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
                             <div
-                                className={`h-full rounded-full transition-all duration-500 ${
-                                    progress === 100
-                                        ? "bg-emerald-500"
-                                        : "bg-gradient-to-r from-indigo-500 to-sky-500"
-                                }`}
+                                className={`h-full rounded-full transition-all duration-500 ${progress === 100
+                                    ? "bg-emerald-500"
+                                    : "bg-gradient-to-r from-indigo-500 to-sky-500"
+                                    }`}
                                 style={{ width: `${progress}%` }}
                             />
                         </div>
@@ -1273,11 +1266,10 @@ function TaskRow({ task, project, members, onEdit }) {
                         <button
                             type="button"
                             onClick={() => setShowChecklists((prev) => !prev)}
-                            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-2xs transition ${
-                                showChecklists
-                                    ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300"
-                                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                            }`}
+                            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-2xs transition ${showChecklists
+                                ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                                }`}
                         >
                             <svg className="h-3.5 w-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -1360,22 +1352,20 @@ function TaskRow({ task, project, members, onEdit }) {
                                 {taskChecklists.map((item) => (
                                     <div
                                         key={item.id}
-                                        className={`flex items-start justify-between gap-3 rounded-lg border p-2.5 text-xs transition ${
-                                            item.is_completed
-                                                ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-950 dark:bg-emerald-950/20"
-                                                : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700/80 dark:bg-slate-950"
-                                        }`}
+                                        className={`flex items-start justify-between gap-3 rounded-lg border p-2.5 text-xs transition ${item.is_completed
+                                            ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-950 dark:bg-emerald-950/20"
+                                            : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700/80 dark:bg-slate-950"
+                                            }`}
                                     >
                                         <div className="flex items-start gap-2.5 min-w-0 flex-1">
                                             <button
                                                 type="button"
                                                 disabled={togglingId === item.id}
                                                 onClick={() => handleToggleChecklist(item)}
-                                                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
-                                                    item.is_completed
-                                                        ? "border-emerald-600 bg-emerald-600 text-white"
-                                                        : "border-slate-300 bg-white hover:border-indigo-500 dark:border-slate-600 dark:bg-slate-800"
-                                                }`}
+                                                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${item.is_completed
+                                                    ? "border-emerald-600 bg-emerald-600 text-white"
+                                                    : "border-slate-300 bg-white hover:border-indigo-500 dark:border-slate-600 dark:bg-slate-800"
+                                                    }`}
                                                 title={item.is_completed ? "Click to reopen" : "Click to mark completed"}
                                             >
                                                 {item.is_completed ? (
@@ -1386,11 +1376,10 @@ function TaskRow({ task, project, members, onEdit }) {
                                             </button>
                                             <div className="min-w-0 flex-1">
                                                 <p
-                                                    className={`font-medium ${
-                                                        item.is_completed
-                                                            ? "text-slate-500 line-through dark:text-slate-400"
-                                                            : "text-slate-800 dark:text-slate-100"
-                                                    }`}
+                                                    className={`font-medium ${item.is_completed
+                                                        ? "text-slate-500 line-through dark:text-slate-400"
+                                                        : "text-slate-800 dark:text-slate-100"
+                                                        }`}
                                                 >
                                                     {item.item_title}
                                                 </p>
@@ -1809,13 +1798,12 @@ function TaskRow({ task, project, members, onEdit }) {
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                                                        Number(v.status) === 2 || v.status_key === 'approved'
-                                                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                                            : Number(v.status) === 3 || v.status_key === 'rejected'
+                                                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${Number(v.status) === 2 || v.status_key === 'approved'
+                                                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                                        : Number(v.status) === 3 || v.status_key === 'rejected'
                                                             ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
                                                             : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
-                                                    }`}>
+                                                        }`}>
                                                         {v.status_label || (Number(v.status) === 2 ? 'Approved' : 'Submitted for Review')}
                                                     </span>
                                                     {v.gps_verified ? (
@@ -2004,11 +1992,10 @@ function TaskRow({ task, project, members, onEdit }) {
                                                             📷 Proof 2
                                                         </button>
                                                     )}
-                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                                        c.is_completed
-                                                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                                            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                                                    }`}>
+                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${c.is_completed
+                                                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                                        : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                                                        }`}>
                                                         {c.is_completed ? "Done" : "Pending"}
                                                     </span>
                                                 </div>
@@ -3079,11 +3066,10 @@ function TeamMemberRow({ teamMember, project, roles }) {
                         </button>
                         <button
                             onClick={handleStatusToggle}
-                            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
-                                teamMember.status === 'active'
-                                    ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/30'
-                                    : 'bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-300 dark:hover:bg-green-900/30'
-                            }`}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${teamMember.status === 'active'
+                                ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/30'
+                                : 'bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-300 dark:hover:bg-green-900/30'
+                                }`}
                         >
                             {teamMember.status === 'active' ? 'Deactivate' : 'Activate'}
                         </button>

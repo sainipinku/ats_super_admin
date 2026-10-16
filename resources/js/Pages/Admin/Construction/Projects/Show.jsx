@@ -27,7 +27,7 @@ export default function ProjectShow({ project, activityLog, workflowSummary }) {
             <WorkflowTracker currentStage={project.current_stage} isLocked={project.is_locked} />
 
             {/* Workflow Stage Control Tabs */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
+            <div className="hidden md:block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                         5-Stage Complete Workflow Management
@@ -36,55 +36,50 @@ export default function ProjectShow({ project, activityLog, workflowSummary }) {
                         <button
                             type="button"
                             onClick={() => setActiveWorkflowTab("supervisor")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${
-                                activeWorkflowTab === "supervisor"
+                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "supervisor"
                                     ? "bg-indigo-600 text-white shadow-sm"
                                     : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                            }`}
+                                }`}
                         >
                             Supervisor Single-Screen Review
                         </button>
                         <button
                             type="button"
                             onClick={() => setActiveWorkflowTab("survey")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${
-                                activeWorkflowTab === "survey"
+                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "survey"
                                     ? "bg-sky-600 text-white shadow-sm"
                                     : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                            }`}
+                                }`}
                         >
                             Stage 1: Survey
                         </button>
                         <button
                             type="button"
                             onClick={() => setActiveWorkflowTab("drafting")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${
-                                activeWorkflowTab === "drafting"
+                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "drafting"
                                     ? "bg-indigo-600 text-white shadow-sm"
                                     : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                            }`}
+                                }`}
                         >
                             Stage 2: Drafting
                         </button>
                         <button
                             type="button"
                             onClick={() => setActiveWorkflowTab("accounts")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${
-                                activeWorkflowTab === "accounts"
+                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "accounts"
                                     ? "bg-amber-600 text-white shadow-sm"
                                     : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                            }`}
+                                }`}
                         >
                             Stage 3: Accounts
                         </button>
                         <button
                             type="button"
                             onClick={() => setActiveWorkflowTab("audit")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${
-                                activeWorkflowTab === "audit"
+                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "audit"
                                     ? "bg-slate-700 text-white shadow-sm"
                                     : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                            }`}
+                                }`}
                         >
                             Audit Trail Logs
                         </button>
@@ -328,8 +323,8 @@ export default function ProjectShow({ project, activityLog, workflowSummary }) {
                                         {submission.reviewed_by?.name
                                             ? submission.reviewed_by.name
                                             : submission.reviewed_at
-                                            ? "authorized reviewer"
-                                            : "Pending review"}
+                                                ? "authorized reviewer"
+                                                : "Pending review"}
                                     </p>
                                     <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
                                         {submission.review_notes || "No review notes yet."}
