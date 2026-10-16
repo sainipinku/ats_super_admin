@@ -26,6 +26,8 @@ export default function ProjectShow({ project, activityLog, workflowSummary }) {
         <ConstructionShell title={project.name} description={`${project.project_code} • ${project.company?.name || ""}`} variant="admin">
             <WorkflowTracker currentStage={project.current_stage} isLocked={project.is_locked} />
 
+
+
             {/* Workflow Stage Control Tabs */}
             {/* <div className="hidden md:block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
