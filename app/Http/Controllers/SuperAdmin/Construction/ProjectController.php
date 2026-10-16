@@ -244,7 +244,7 @@ class ProjectController extends Controller
             'tasks.surveyVisits.submission.reviewedBy',
             'tasks.assignments.assignee',
             'tasks.supervisor',
-            'tasks.assignedMembers.member',
+            'tasks.assignedMembers',
             'dailyProgressReports.submittedBy',
             'dailyProgressReports.reviewedBy',
             'dailyProgressReports.items',

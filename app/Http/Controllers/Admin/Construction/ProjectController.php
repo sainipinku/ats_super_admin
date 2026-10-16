@@ -91,7 +91,7 @@ class ProjectController extends Controller
             'executionTasks.progressReports.reviewedBy',
             'tasks.checklistItems.completedBy',
             'tasks.supervisor',
-            'tasks.assignedMembers.member',
+            'tasks.assignedMembers',
             'dailyProgressReports.submittedBy',
             'dailyProgressReports.reviewedBy',
             'dailyProgressReports.items',
