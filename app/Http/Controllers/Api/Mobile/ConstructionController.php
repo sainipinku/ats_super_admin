@@ -831,19 +831,21 @@ return response()->json([
 
         $projectId = (int) $request->integer('project');
 
+        $query = DraftingJob::with([
+            'project',
+            'surveySubmission',
+            'drawingRevisions.dwgDocument',
+            'drawingRevisions.pdfDocument',
+            'drawingRevisions.approvals',
+        ])->where('assigned_to_member_id', $member->getKey());
+
+        if ($projectId > 0) {
+            $query->where('project_id', $projectId);
+        }
+
         return response()->json([
             'success' => true,
-            'data' => DraftingJob::with([
-                'project',
-                'surveySubmission',
-            ])
-                ->where('project_id', $projectId)
-                ->where(
-                    'assigned_to_member_id',
-                    $member->getKey()
-                )
-                ->latest()
-                ->get(),
+            'data' => $query->latest()->get(),
         ]);
     }
 

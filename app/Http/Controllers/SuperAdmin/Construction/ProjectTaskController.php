@@ -326,7 +326,7 @@ class ProjectTaskController extends Controller implements HasMiddleware
                             ? $legacyTask->description . "\n\n[Transfer Note: " . $notes . "]"
                             : $notes;
                     }
-                    $legacyTask->status = 'in_progress';
+                    $legacyTask->status = $shouldCreateDraftingJob ? 'drafting_in_progress' : 'in_progress';
                     $legacyTask->save();
 
                     ExecutionTaskAssignee::where('execution_task_id', $legacyTask->id)
@@ -362,7 +362,7 @@ class ProjectTaskController extends Controller implements HasMiddleware
                             ? $unifiedTask->description . "\n\n[Transfer Note: " . $notes . "]"
                             : $notes;
                     }
-                    $unifiedTask->status = 'in_progress';
+                    $unifiedTask->status = $shouldCreateDraftingJob ? 'drafting_in_progress' : 'in_progress';
                     $unifiedTask->save();
 
                     TaskAssignment::where('task_id', $unifiedTask->id)
@@ -546,15 +546,47 @@ class ProjectTaskController extends Controller implements HasMiddleware
             }
         }
 
-        if ($decision === 'approved' && $transferMemberId) {
-            $fakeRequest = new Request([
-                'member_id' => $transferMemberId,
-                'assignment_role' => 'draft_person',
-                'due_date' => $validated['due_date'] ?? null,
-                'notes' => $validated['drafting_notes'] ?? $remarks,
-                'create_drafting_job' => true,
-            ]);
-            return $this->transferTask($fakeRequest, $project, $taskId);
+        $legacyTask = ExecutionTask::find($taskId);
+        $unifiedTask = Task::find($taskId);
+
+        if ($decision === 'approved') {
+            if ($legacyTask) {
+                $legacyTask->status = $transferMemberId ? 'drafting_in_progress' : 'survey_approved';
+                $legacyTask->save();
+            }
+            if ($unifiedTask) {
+                $unifiedTask->status = 'review';
+                $unifiedTask->save();
+            }
+
+            if ($transferMemberId) {
+                $fakeRequest = new Request([
+                    'member_id' => $transferMemberId,
+                    'assignment_role' => 'draft_person',
+                    'due_date' => $validated['due_date'] ?? null,
+                    'notes' => $validated['drafting_notes'] ?? $remarks,
+                    'create_drafting_job' => true,
+                ]);
+                return $this->transferTask($fakeRequest, $project, $taskId);
+            }
+        } elseif ($decision === 'revision_requested') {
+            if ($legacyTask) {
+                $legacyTask->status = 'in_progress';
+                $legacyTask->save();
+            }
+            if ($unifiedTask) {
+                $unifiedTask->status = 'in_progress';
+                $unifiedTask->save();
+            }
+        } elseif ($decision === 'rejected') {
+            if ($legacyTask) {
+                $legacyTask->status = 'blocked';
+                $legacyTask->save();
+            }
+            if ($unifiedTask) {
+                $unifiedTask->status = 'blocked';
+                $unifiedTask->save();
+            }
         }
 
         $msg = match ($decision) {
@@ -564,6 +596,105 @@ class ProjectTaskController extends Controller implements HasMiddleware
         };
 
         return Redirect::back()->with('success', $msg);
+    }
+
+    public function submitDraftDrawing(Request $request, Project $project): RedirectResponse
+    {
+        $actor = $this->constructionActor() ?? $request->user();
+
+        $validated = $request->validate([
+            'drafting_job_id' => ['nullable', 'integer'],
+            'drawing_type' => ['required', 'string', 'max:255'],
+            'drawing_no' => ['required', 'string', 'max:100'],
+            'revision_no' => ['nullable', 'integer'],
+            'changes_made' => ['nullable', 'string', 'max:2000'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'dwg_file' => ['nullable', 'file', 'max:51200'],
+            'pdf_file' => ['nullable', 'file', 'max:51200'],
+        ]);
+
+        $draftingJob = null;
+        if (!empty($validated['drafting_job_id'])) {
+            $draftingJob = DraftingJob::where('project_id', $project->id)->find($validated['drafting_job_id']);
+        }
+        if (!$draftingJob) {
+            $draftingJob = DraftingJob::where('project_id', $project->id)
+                ->when($actor instanceof Member, fn ($q) => $q->where('assigned_to_member_id', $actor->id))
+                ->latest()
+                ->first();
+        }
+        if (!$draftingJob) {
+            $draftingJob = DraftingJob::firstOrCreate(
+                ['project_id' => $project->id],
+                [
+                    'assigned_to_member_id' => $actor instanceof Member ? $actor->id : null,
+                    'assigned_at' => now(),
+                    'status' => 'queued',
+                ]
+            );
+        }
+
+        $dwgDoc = null;
+        if ($request->hasFile('dwg_file')) {
+            $dwgDoc = app(\App\Services\Construction\ConstructionDocumentService::class)->storeDocument(
+                documentable: $draftingJob,
+                actor: $actor,
+                folder: 'construction/drawings/dwg',
+                file: $request->file('dwg_file'),
+                companyId: $project->company_id,
+                projectId: $project->id
+            );
+        }
+
+        $pdfDoc = null;
+        if ($request->hasFile('pdf_file')) {
+            $pdfDoc = app(\App\Services\Construction\ConstructionDocumentService::class)->storeDocument(
+                documentable: $draftingJob,
+                actor: $actor,
+                folder: 'construction/drawings/pdf',
+                file: $request->file('pdf_file'),
+                companyId: $project->company_id,
+                projectId: $project->id
+            );
+        }
+
+        $revNo = !empty($validated['revision_no'])
+            ? (int) $validated['revision_no']
+            : (int) $draftingJob->drawingRevisions()->max('revision_no') + 1;
+
+        $revision = DrawingRevision::create([
+            'project_id' => $project->id,
+            'drafting_job_id' => $draftingJob->id,
+            'revision_no' => $revNo,
+            'drawing_type' => $validated['drawing_type'],
+            'drawing_no' => $validated['drawing_no'],
+            'dwg_document_id' => $dwgDoc?->id,
+            'pdf_document_id' => $pdfDoc?->id,
+            'changes_made' => $validated['changes_made'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'uploaded_by_member_id' => $actor instanceof Member ? $actor->id : null,
+            'uploaded_at' => now(),
+            'status' => 'submitted',
+        ]);
+
+        DrawingApproval::create([
+            'project_id' => $project->id,
+            'drawing_revision_id' => $revision->id,
+            'requested_by_type' => $actor ? $actor::class : null,
+            'requested_by_id' => $actor?->getKey(),
+            'requested_at' => now(),
+            'decision' => 'pending',
+        ]);
+
+        $draftingJob->update([
+            'status' => 'submitted',
+        ]);
+
+        $project->update([
+            'current_stage' => 'drawing_approval_pending',
+        ]);
+
+        return Redirect::back()->with('success', 'CAD Drawing submitted successfully for Approval.');
     }
 
     public function reviewDraftingJob(Request $request, Project $project, DraftingJob $draftingJob): RedirectResponse
@@ -585,7 +716,7 @@ class ProjectTaskController extends Controller implements HasMiddleware
             ]);
             $latestRev = $draftingJob->drawingRevisions()->latest()->first();
             if ($latestRev) {
-                $latestRev->update(['status' => 'approved']);
+                $latestRev->update(['status' => 'approved', 'is_locked' => true]);
                 DrawingApproval::where('drawing_revision_id', $latestRev->id)
                     ->where('decision', 'pending')
                     ->update([
@@ -596,6 +727,17 @@ class ProjectTaskController extends Controller implements HasMiddleware
                         'remarks' => $remarks,
                     ]);
             }
+
+            // Advance associated tasks to completed / ready
+            ExecutionTask::where('project_id', $project->id)
+                ->where('status', 'drafting_in_progress')
+                ->update(['status' => 'completed']);
+
+            Task::where('project_id', $project->id)
+                ->where('status', 'drafting_in_progress')
+                ->update(['status' => 'completed']);
+
+            // Advance project stage to Construction Execution
             $project->update(['current_stage' => 'ready_for_construction']);
         } else {
             $draftingJob->update([

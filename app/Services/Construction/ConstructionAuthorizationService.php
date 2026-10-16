@@ -98,6 +98,24 @@ class ConstructionAuthorizationService
                 ->toArray();
             $roleIds = array_merge($roleIds, $assignmentRoleIds);
 
+            // Also check project team assignments
+            $teamRoleIds = DB::table('construction_project_team_members')
+                ->where('member_id', $actor->getKey())
+                ->where('status', 'active')
+                ->when($projectId !== null, fn ($q) => $q->where('project_id', $projectId))
+                ->pluck('role_id')
+                ->toArray();
+            $roleIds = array_merge($roleIds, $teamRoleIds);
+
+            // Also check if assigned to drafting jobs
+            $hasDraftingJob = DB::table('construction_drafting_jobs')
+                ->where('assigned_to_member_id', $actor->getKey())
+                ->when($projectId !== null, fn ($q) => $q->where('project_id', $projectId))
+                ->exists();
+            if ($hasDraftingJob) {
+                $roleSlugs[] = 'draft_person';
+            }
+
             if (!empty($actor->assigned_roles)) {
                 $roleSlugs = array_merge($roleSlugs, (array) $actor->assigned_roles);
             }

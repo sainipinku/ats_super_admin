@@ -225,6 +225,7 @@ class ProjectController extends Controller
             'surveySubmissions.reviewedBy',
             'surveySubmissions.surveyVisit.checkedInBy',
             'draftingJobs.assignedTo',
+            'draftingJobs.surveySubmission',
             'draftingJobs.drawingRevisions.uploadedBy',
             'draftingJobs.drawingRevisions.dwgDocument',
             'draftingJobs.drawingRevisions.pdfDocument',

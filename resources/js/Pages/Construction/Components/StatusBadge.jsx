@@ -1,6 +1,7 @@
 const colors = {
     active: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300",
     approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300",
+    survey_approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300",
     ready_for_construction: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300",
     pending: "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300",
     submitted: "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300",

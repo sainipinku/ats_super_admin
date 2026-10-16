@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMemo } from "react";
-import { useForm, router } from "@inertiajs/react";
+import { useForm, router, usePage } from "@inertiajs/react";
 import { toast } from "react-hot-toast";
 import ConstructionShell from "@/Pages/Construction/Components/ConstructionShell";
 import EmptyState from "@/Pages/Construction/Components/EmptyState";
@@ -18,7 +18,27 @@ import WorkflowAuditTrail from "@/Pages/Construction/Components/WorkflowAuditTra
 import FieldNotesDisplay from "@/Pages/Construction/Components/FieldNotesDisplay";
 
 export default function ProjectShow({ project, members, roles, activityLog, workflowSummary }) {
-    const [activeWorkflowTab, setActiveWorkflowTab] = useState("supervisor");
+    const { auth } = usePage().props;
+    const currentUser = auth?.user;
+    const activeRoleSlug = String(auth?.active_role?.slug || auth?.active_role || "").toLowerCase();
+
+    const isDraftPersonUser = useMemo(() => {
+        if (activeRoleSlug === "draft_person" || activeRoleSlug === "drafter" || activeRoleSlug === "draftsman") return true;
+        if (Array.isArray(currentUser?.assigned_roles) && currentUser.assigned_roles.includes("draft_person")) return true;
+        const team = project?.team_members || project?.teamMembers || [];
+        if (currentUser?.id && team.some((tm) => Number(tm.member_id) === Number(currentUser.id) && (/draft|cad|drafter/i.test(tm.role?.name || tm.assignment_scope || tm.project_role || "")))) return true;
+        if (currentUser?.id && (project?.drafting_jobs || []).some((dj) => Number(dj.assigned_to_member_id) === Number(currentUser.id))) return true;
+        return false;
+    }, [activeRoleSlug, currentUser, project]);
+
+    const [activeWorkflowTab, setActiveWorkflowTab] = useState(() => isDraftPersonUser ? "drafting" : "supervisor");
+
+    useEffect(() => {
+        if (isDraftPersonUser) {
+            setActiveWorkflowTab("drafting");
+        }
+    }, [isDraftPersonUser]);
+
     const latestSubmission = project.survey_submissions?.[0] ?? null;
     const latestDraftingJob = project.drafting_jobs?.[0] ?? null;
 
@@ -905,6 +925,10 @@ export default function ProjectShow({ project, members, roles, activityLog, work
 }
 
 function TaskRow({ task, project, members, onEdit }) {
+    const { auth } = usePage().props;
+    const currentUser = auth?.user;
+    const activeRoleSlug = String(auth?.active_role?.slug || auth?.active_role || "").toLowerCase();
+
     const [confirmingDelete, setConfirmingDelete] = useState(false);
     const [showChecklists, setShowChecklists] = useState(false);
     const [showAddChecklistModal, setShowAddChecklistModal] = useState(false);
@@ -914,6 +938,8 @@ function TaskRow({ task, project, members, onEdit }) {
     const [showRevisionInput, setShowRevisionInput] = useState(false);
     const [revisionRemarks, setRevisionRemarks] = useState("");
     const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+    const [showDraftUploadSection, setShowDraftUploadSection] = useState(false);
+    const [isSubmittingDraftReview, setIsSubmittingDraftReview] = useState(false);
 
     const taskVisits = useMemo(() => {
         const list = [...(task.survey_visits || task.surveyVisits || [])];
@@ -947,6 +973,170 @@ function TaskRow({ task, project, members, onEdit }) {
             };
         }).filter((tm) => tm.member_id);
     }, [project]);
+
+    // Role and Drafting Job Resolution
+    const isDraftPersonUser = useMemo(() => {
+        if (activeRoleSlug === "draft_person" || activeRoleSlug === "drafter" || activeRoleSlug === "draftsman") return true;
+        if (Array.isArray(currentUser?.assigned_roles) && currentUser.assigned_roles.includes("draft_person")) return true;
+        const team = project?.team_members || project?.teamMembers || [];
+        if (currentUser?.id && team.some((tm) => Number(tm.member_id) === Number(currentUser.id) && (/draft|cad|drafter/i.test(tm.role?.name || tm.assignment_scope || tm.project_role || tm.member?.designation || "")))) return true;
+        if (currentUser?.id && (project?.drafting_jobs || []).some((dj) => Number(dj.assigned_to_member_id) === Number(currentUser.id))) return true;
+        return false;
+    }, [activeRoleSlug, currentUser, project]);
+
+    const taskDraftingJob = useMemo(() => {
+        const jobs = project.drafting_jobs || project.draftingJobs || [];
+        const bySub = jobs.find((job) => {
+            const sub = job.survey_submission || job.surveySubmission;
+            if (!sub) return false;
+            if (Number(sub.task_id) === Number(task.id) || Number(sub.execution_task_id) === Number(task.id)) {
+                return true;
+            }
+            if (taskVisits.some((v) => Number(v.id) === Number(sub.survey_visit_id))) {
+                return true;
+            }
+            return false;
+        });
+        if (bySub) return bySub;
+
+        const isDraftStatus = task.status === "drafting_in_progress" || (task.assignees || []).some((a) => a.assignment_role === "draft_person");
+        if (isDraftStatus && jobs.length > 0) {
+            const taskSupervisorId = task.supervisor_member_id || task.supervisor?.id || task.member_id;
+            const matchingJob = jobs.find((j) => Number(j.assigned_to_member_id) === Number(taskSupervisorId));
+            return matchingJob || jobs[0];
+        }
+        return null;
+    }, [project.drafting_jobs, project.draftingJobs, task, taskVisits]);
+
+    const isSurveyApproved = useMemo(() => {
+        if (task.status === "survey_approved" || task.status === "drafting_in_progress" || task.status === "completed") {
+            return true;
+        }
+        if (taskDraftingJob) return true;
+        const hasApprovedVisit = taskVisits.some((v) => {
+            const sub = v.submission;
+            return v.status === 2 || v.status === "approved" || (sub && (sub.status === 2 || sub.status_key === "approved"));
+        });
+        if (hasApprovedVisit) return true;
+        const submissions = project.survey_submissions || project.surveySubmissions || [];
+        return submissions.some((s) => {
+            const matches = Number(s.task_id) === Number(task.id) || Number(s.execution_task_id) === Number(task.id) || taskVisits.some((v) => Number(v.id) === Number(s.survey_visit_id));
+            return matches && (s.status === 2 || s.status_key === "approved");
+        });
+    }, [task.status, taskDraftingJob, taskVisits, project.survey_submissions, project.surveySubmissions, task.id]);
+
+    const isDraftingAssigned = useMemo(() => {
+        if (Boolean(taskDraftingJob)) return true;
+        if (task.status === "drafting_in_progress") return true;
+        return (task.assignees || []).some((a) => a.assignment_role === "draft_person")
+            || (task.assignments || []).some((a) => a.assignment_role === "draft_person");
+    }, [taskDraftingJob, task.status, task.assignees, task.assignments]);
+
+    const assignedDraftPerson = useMemo(() => {
+        if (taskDraftingJob?.assignedTo || taskDraftingJob?.assigned_to) {
+            return taskDraftingJob.assignedTo || taskDraftingJob.assigned_to;
+        }
+        const draftAssignee = (task.assignees || []).find((a) => a.assignment_role === "draft_person");
+        if (draftAssignee?.member) return draftAssignee.member;
+        const draftAss = (task.assignments || []).find((a) => a.assignment_role === "draft_person");
+        if (draftAss?.assignee) return draftAss.assignee;
+        const supId = task.supervisor_member_id || task.supervisor?.id;
+        if (supId) {
+            const tm = projectTeamMembers.find((m) => Number(m.member_id) === Number(supId) && m.is_draft_person);
+            if (tm) return tm;
+        }
+        return null;
+    }, [taskDraftingJob, task, projectTeamMembers]);
+
+    const isCurrentUserDraftPerson = useMemo(() => {
+        if (!currentUser?.id) return false;
+        if (taskDraftingJob && Number(taskDraftingJob.assigned_to_member_id) === Number(currentUser.id)) return true;
+        if (assignedDraftPerson && Number(assignedDraftPerson.id || assignedDraftPerson.member_id) === Number(currentUser.id)) return true;
+        if (isDraftPersonUser) return true;
+        return false;
+    }, [currentUser, taskDraftingJob, assignedDraftPerson, isDraftPersonUser]);
+
+    const drawingRevisions = useMemo(() => {
+        return taskDraftingJob?.drawing_revisions || taskDraftingJob?.drawingRevisions || [];
+    }, [taskDraftingJob]);
+
+    const latestRevision = drawingRevisions.length ? drawingRevisions[drawingRevisions.length - 1] : null;
+    const isDrawingApproved = latestRevision?.status === "approved" || taskDraftingJob?.status === "approved";
+    const isDrawingSubmitted = latestRevision?.status === "submitted" || taskDraftingJob?.status === "submitted";
+    const isDrawingRevisionRequested = latestRevision?.status === "revision_requested" || taskDraftingJob?.status === "revision_requested";
+
+    // Form for CAD Drawing Submissions
+    const draftUploadForm = useForm({
+        drafting_job_id: taskDraftingJob?.id || "",
+        drawing_title: `${task.task_code || "TSK"} - CAD Plan`,
+        drawing_no: `DWG-${task.task_code || task.id}`,
+        drawing_type: "topographic",
+        revision_no: drawingRevisions.length + 1,
+        changes_made: "",
+        notes: "",
+        dwg_file: null,
+        pdf_file: null,
+    });
+
+    useEffect(() => {
+        if (taskDraftingJob?.id) {
+            draftUploadForm.setData({
+                ...draftUploadForm.data,
+                drafting_job_id: taskDraftingJob.id,
+                revision_no: drawingRevisions.length + 1,
+            });
+        }
+    }, [taskDraftingJob?.id, drawingRevisions.length]);
+
+    const handleDraftSubmit = (e) => {
+        e.preventDefault();
+        if (!draftUploadForm.data.dwg_file && !draftUploadForm.data.pdf_file) {
+            toast.error("Please upload at least a CAD (.DWG/.DXF) or PDF Drawing file.");
+            return;
+        }
+        draftUploadForm.post(route("super.construction.projects.tasks-v2.submit-draft", project.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowDraftUploadSection(false);
+                toast.success("CAD Drawing revision submitted successfully! Awaiting review.");
+            },
+            onError: (errors) => {
+                const firstError = Object.values(errors)[0];
+                if (firstError) toast.error(firstError);
+                else toast.error("Failed to submit CAD drawing.");
+            },
+        });
+    };
+
+    const handleReviewDraftingJob = (decision) => {
+        if (!taskDraftingJob) return;
+        setIsSubmittingDraftReview(true);
+        router.post(
+            route("super.construction.projects.drafting-jobs.review", [project.id, taskDraftingJob.id]),
+            {
+                decision,
+                remarks: revisionRemarks.trim() || undefined,
+            },
+            {
+                preserveScroll: true,
+                onFinish: () => setIsSubmittingDraftReview(false),
+                onSuccess: () => {
+                    setShowDetailsModal(false);
+                    setRevisionRemarks("");
+                    toast.success(
+                        decision === "approved"
+                            ? "CAD Drawing approved! Project stage moved to Ready for Construction Execution."
+                            : "Revision requested from Draft Person."
+                    );
+                },
+                onError: (errors) => {
+                    const firstError = Object.values(errors)[0];
+                    if (firstError) toast.error(firstError);
+                    else toast.error("Failed to update drafting review.");
+                },
+            }
+        );
+    };
 
     const defaultDraftMember = projectTeamMembers.find((tm) => tm.is_draft_person) || projectTeamMembers[0];
     const transferForm = useForm({
@@ -1221,13 +1411,18 @@ function TaskRow({ task, project, members, onEdit }) {
 
                     <div className="flex flex-col min-w-0">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                            Supervisor
+                            {isDraftingAssigned ? "Draft Person" : "Supervisor"}
                         </span>
                         <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
                             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
-                                {(task.supervisor?.name || "U")[0].toUpperCase()}
+                                {((assignedDraftPerson?.name || task.supervisor?.name || "U")[0] || "U").toUpperCase()}
                             </span>
-                            <span className="truncate">{task.supervisor?.name || "Unassigned"}</span>
+                            <span className="truncate">{assignedDraftPerson?.name || task.supervisor?.name || "Unassigned"}</span>
+                            {isDraftingAssigned && (
+                                <span className="ml-1 rounded bg-violet-100 px-1 py-0.2 text-[9px] font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                                    CAD
+                                </span>
+                            )}
                         </span>
                     </div>
 
@@ -1315,17 +1510,39 @@ function TaskRow({ task, project, members, onEdit }) {
                                 </span>
                             )}
                         </button>
-                        <button
-                            type="button"
-                            onClick={() => setShowTransferModal(true)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:from-violet-500 hover:to-indigo-500"
-                            title="Assign or transfer this task to a project team member (e.g. Draft Person)"
-                        >
-                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                            </svg>
-                            <span>Assign / Transfer</span>
-                        </button>
+
+                        {isCurrentUserDraftPerson ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowDetailsModal(true);
+                                    setShowDraftUploadSection(true);
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:from-emerald-500 hover:to-teal-500"
+                                title="Upload and submit CAD drawing for this task"
+                            >
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span>Submit CAD Drawing</span>
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setShowTransferModal(true)}
+                                className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-xs transition ${
+                                    isDraftingAssigned
+                                        ? "border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-300"
+                                        : "bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500"
+                                }`}
+                                title={isDraftingAssigned ? "Re-assign or transfer this task to another team member" : "Assign or transfer this task to a project team member"}
+                            >
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                                <span>{isDraftingAssigned ? "Re-assign / Transfer" : "Assign / Transfer"}</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -2005,20 +2222,307 @@ function TaskRow({ task, project, members, onEdit }) {
                                 </div>
                             )}
 
+                            {/* Drafting & CAD Drawing Phase Section */}
+                            {(isSurveyApproved || isDraftingAssigned || isCurrentUserDraftPerson || drawingRevisions.length > 0) && (
+                                <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-4.5 dark:border-indigo-900/60 dark:bg-indigo-950/20">
+                                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 pb-3 dark:border-indigo-900/60">
+                                        <div className="flex items-center gap-2">
+                                            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600 text-base text-white shadow-xs">
+                                                📐
+                                            </span>
+                                            <div>
+                                                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                                                    Drafting & CAD Drawing Workspace
+                                                </h4>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                    {assignedDraftPerson ? (
+                                                        <span>Assigned Draft Person: <strong className="text-indigo-700 dark:text-indigo-300">{assignedDraftPerson.name}</strong></span>
+                                                    ) : (
+                                                        <span>Drafting job queued for project assignment</span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {isDrawingApproved ? (
+                                                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                                                    ✓ CAD Drawing Approved
+                                                </span>
+                                            ) : isDrawingSubmitted ? (
+                                                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                                                    ⏳ Awaiting Drawing Review
+                                                </span>
+                                            ) : (
+                                                <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-bold text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">
+                                                    Drafting In Progress
+                                                </span>
+                                            )}
+
+                                            {isCurrentUserDraftPerson && !isDrawingApproved && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowDraftUploadSection((prev) => !prev)}
+                                                    className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500"
+                                                >
+                                                    {showDraftUploadSection ? "Close Form" : "+ Upload CAD Drawing"}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Existing Revisions List */}
+                                    {drawingRevisions.length > 0 ? (
+                                        <div className="mt-3.5 space-y-2.5">
+                                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                                Submitted Drawing Revisions ({drawingRevisions.length})
+                                            </p>
+                                            {drawingRevisions.map((rev) => {
+                                                const dwgPath = rev.dwg_document?.file_path || rev.dwg_file_path || rev.dwg_url;
+                                                const pdfPath = rev.pdf_document?.file_path || rev.pdf_file_path || rev.pdf_url;
+                                                const dwgHref = dwgPath ? (String(dwgPath).startsWith("http") || String(dwgPath).startsWith("/") ? dwgPath : "/" + dwgPath) : null;
+                                                const pdfHref = pdfPath ? (String(pdfPath).startsWith("http") || String(pdfPath).startsWith("/") ? pdfPath : "/" + pdfPath) : null;
+
+                                                return (
+                                                    <div
+                                                        key={rev.id}
+                                                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-white p-3 shadow-2xs dark:border-indigo-900/50 dark:bg-slate-900"
+                                                    >
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-[11px] font-bold text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">
+                                                                    Rev #{rev.revision_no || 1}
+                                                                </span>
+                                                                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                                                    {rev.drawing_no || rev.drawing_type || "CAD Layout"}
+                                                                </span>
+                                                                <StatusBadge value={rev.status || "submitted"} />
+                                                            </div>
+                                                            {rev.changes_made && (
+                                                                <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                                                                    Notes: {rev.changes_made}
+                                                                </p>
+                                                            )}
+                                                            <p className="mt-0.5 text-[10px] text-slate-400">
+                                                                Uploaded {rev.uploaded_at ? formatDate(rev.uploaded_at) : "recently"}
+                                                                {rev.uploaded_by?.name ? ` by ${rev.uploaded_by.name}` : ""}
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            {dwgHref && (
+                                                                <a
+                                                                    href={dwgHref}
+                                                                    target="_blank"
+                                                                    rel="noreferrer noopener"
+                                                                    download
+                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
+                                                                >
+                                                                    📥 Download DWG
+                                                                </a>
+                                                            )}
+                                                            {pdfHref && (
+                                                                <a
+                                                                    href={pdfHref}
+                                                                    target="_blank"
+                                                                    rel="noreferrer noopener"
+                                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300"
+                                                                >
+                                                                    📄 View PDF Sheet
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+
+                                            {/* Admin Drawing Approval Action Banner */}
+                                            {!isCurrentUserDraftPerson && taskDraftingJob && (isDrawingSubmitted || isDrawingRevisionRequested) && (
+                                                <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50/90 p-3.5 dark:border-amber-700 dark:bg-amber-950/40">
+                                                    <h5 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                                                        Admin Review for CAD Drawing
+                                                    </h5>
+                                                    <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
+                                                        Approving this drawing will mark drafting as completed and advance the project stage to <strong>Construction Execution</strong>.
+                                                    </p>
+                                                    <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
+                                                        <button
+                                                            type="button"
+                                                            disabled={isSubmittingDraftReview}
+                                                            onClick={() => handleReviewDraftingJob("revision_requested")}
+                                                            className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-200"
+                                                        >
+                                                            Request Drawing Revision
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={isSubmittingDraftReview}
+                                                            onClick={() => handleReviewDraftingJob("approved")}
+                                                            className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-500 disabled:opacity-60"
+                                                        >
+                                                            {isSubmittingDraftReview ? "Approving..." : "✓ Approve CAD Drawing & Advance Stage"}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="mt-3 rounded-xl border border-dashed border-indigo-200 p-4 text-center dark:border-indigo-900/50">
+                                            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                                                No CAD drawing files submitted yet for this task.
+                                            </p>
+                                            <p className="mt-0.5 text-[11px] text-slate-400">
+                                                The assigned Draft Person can use the survey data above to generate CAD drawings and submit them below.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Inline CAD Submission Form (for Draft Person or Admin upload) */}
+                                    {(showDraftUploadSection || (isCurrentUserDraftPerson && drawingRevisions.length === 0)) && (
+                                        <form onSubmit={handleDraftSubmit} className="mt-4 rounded-xl border border-indigo-200 bg-white p-4 shadow-sm dark:border-indigo-900/60 dark:bg-slate-900">
+                                            <h5 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                                <span>📤</span>
+                                                <span>Submit CAD Drawing Files (DWG / PDF)</span>
+                                            </h5>
+                                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                                Upload your finished drawing files for admin approval. Once approved, the project will move to Construction Execution.
+                                            </p>
+
+                                            <div className="mt-3.5 grid gap-3 sm:grid-cols-2">
+                                                <div>
+                                                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                                        Drawing Title / Sheet Name *
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={draftUploadForm.data.drawing_title}
+                                                        onChange={(e) => draftUploadForm.setData("drawing_title", e.target.value)}
+                                                        required
+                                                        placeholder="e.g. Site Boundary & Topographic CAD Plan"
+                                                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                                        Drawing Number / Code *
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={draftUploadForm.data.drawing_no}
+                                                        onChange={(e) => draftUploadForm.setData("drawing_no", e.target.value)}
+                                                        required
+                                                        placeholder="e.g. DWG-TSK-00012-01"
+                                                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                                        Drawing Type
+                                                    </label>
+                                                    <select
+                                                        value={draftUploadForm.data.drawing_type}
+                                                        onChange={(e) => draftUploadForm.setData("drawing_type", e.target.value)}
+                                                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                                                    >
+                                                        <option value="topographic">Topographic Survey Plan</option>
+                                                        <option value="architectural">Architectural Layout</option>
+                                                        <option value="structural">Structural Drawing</option>
+                                                        <option value="civil">Civil Engineering Plan</option>
+                                                        <option value="as_built">As-Built Drawing</option>
+                                                        <option value="site_boundary">Site Boundary & Coordinates</option>
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                                        Revision No
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={draftUploadForm.data.revision_no}
+                                                        onChange={(e) => draftUploadForm.setData("revision_no", e.target.value)}
+                                                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                                        CAD DWG / DXF File
+                                                    </label>
+                                                    <input
+                                                        type="file"
+                                                        accept=".dwg,.dxf,.zip"
+                                                        onChange={(e) => draftUploadForm.setData("dwg_file", e.target.files[0])}
+                                                        className="mt-1 w-full text-xs text-slate-500 file:mr-2 file:rounded-md file:border-0 file:bg-indigo-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                                        PDF Drawing Sheet / Print Preview
+                                                    </label>
+                                                    <input
+                                                        type="file"
+                                                        accept=".pdf,image/*"
+                                                        onChange={(e) => draftUploadForm.setData("pdf_file", e.target.files[0])}
+                                                        className="mt-1 w-full text-xs text-slate-500 file:mr-2 file:rounded-md file:border-0 file:bg-sky-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-sky-700 hover:file:bg-sky-100"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-3">
+                                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                                    Scope / Changes Made / Drawing Notes
+                                                </label>
+                                                <textarea
+                                                    rows={2}
+                                                    value={draftUploadForm.data.changes_made}
+                                                    onChange={(e) => draftUploadForm.setData("changes_made", e.target.value)}
+                                                    placeholder="Specify layer standards, contours, adjustments made from field coordinates..."
+                                                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                                                />
+                                            </div>
+
+                                            <div className="mt-3 flex items-center justify-end gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowDraftUploadSection(false)}
+                                                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    type="submit"
+                                                    disabled={draftUploadForm.processing}
+                                                    className="rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:from-emerald-500 hover:to-teal-500 disabled:opacity-60"
+                                                >
+                                                    {draftUploadForm.processing ? "Uploading Drawing..." : "Submit CAD Drawing for Approval ➔"}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Inline Revision Input Form */}
                             {showRevisionInput && (
                                 <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-4 dark:border-amber-700 dark:bg-amber-950/40">
                                     <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                                        Request Survey Revision from Field Team
+                                        {isCurrentUserDraftPerson ? "Request Clarification / Changes from Surveyor" : "Request Survey Revision from Field Team"}
                                     </h4>
                                     <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
-                                        Describe what is missing or needs correction (e.g. "Missing elevation points on boundary corner B-4; please resubmit"):
+                                        {isCurrentUserDraftPerson
+                                            ? "Specify missing survey points, elevation details, or boundary issues needed to complete CAD drawings:"
+                                            : "Describe what is missing or needs correction (e.g. \"Missing elevation points on boundary corner B-4; please resubmit\"):"}
                                     </p>
                                     <textarea
                                         value={revisionRemarks}
                                         onChange={(e) => setRevisionRemarks(e.target.value)}
                                         rows={3}
-                                        placeholder="Enter revision notes and instructions..."
+                                        placeholder={isCurrentUserDraftPerson ? "Enter clarification request for field surveyor..." : "Enter revision notes and instructions..."}
                                         className="mt-2.5 w-full rounded-xl border border-amber-300 bg-white p-3 text-xs text-slate-900 focus:border-amber-500 focus:outline-none dark:border-amber-700 dark:bg-slate-900 dark:text-white"
                                     />
                                     <div className="mt-3 flex justify-end gap-2">
@@ -2046,39 +2550,100 @@ function TaskRow({ task, project, members, onEdit }) {
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/80 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-950">
                             <button
                                 type="button"
-                                onClick={() => setShowDetailsModal(false)}
+                                onClick={() => {
+                                    setShowDetailsModal(false);
+                                    setShowDraftUploadSection(false);
+                                }}
                                 className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                             >
                                 Close
                             </button>
+
                             <div className="flex flex-wrap items-center gap-2">
-                                {!showRevisionInput && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowRevisionInput(true)}
-                                        className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-                                    >
-                                        Request Revision
-                                    </button>
+                                {isCurrentUserDraftPerson ? (
+                                    <>
+                                        {/* Draft Person Actions */}
+                                        {!showRevisionInput && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowRevisionInput(true)}
+                                                className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                                            >
+                                                Request Clarification from Surveyor
+                                            </button>
+                                        )}
+                                        {!isDrawingApproved && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowDraftUploadSection((prev) => !prev)}
+                                                className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:from-emerald-500 hover:to-teal-500"
+                                            >
+                                                {showDraftUploadSection ? "Hide CAD Form" : "Upload & Submit CAD Drawing ➔"}
+                                            </button>
+                                        )}
+                                        {isDrawingApproved && (
+                                            <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
+                                                ✓ CAD Drawing Approved — Ready for Construction
+                                            </span>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* Admin / Owner / Supervisor Actions */}
+                                        {isSurveyApproved || isDraftingAssigned ? (
+                                            <>
+                                                <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                                    ✓ Survey Approved
+                                                </span>
+                                                {assignedDraftPerson && (
+                                                    <span className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/40 dark:text-violet-300">
+                                                        ⭐ Drafter: {assignedDraftPerson.name}
+                                                    </span>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowDetailsModal(false);
+                                                        setShowTransferModal(true);
+                                                    }}
+                                                    className="rounded-xl border border-violet-300 bg-violet-50 px-3.5 py-2 text-xs font-semibold text-violet-800 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200"
+                                                >
+                                                    Re-assign / Transfer Task
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                {!showRevisionInput && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowRevisionInput(true)}
+                                                        className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                                                    >
+                                                        Request Revision
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    disabled={isSubmittingReview}
+                                                    onClick={() => handleReviewSurvey("approved")}
+                                                    className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-emerald-500 disabled:opacity-60"
+                                                >
+                                                    Approve Survey
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowDetailsModal(false);
+                                                        setShowTransferModal(true);
+                                                    }}
+                                                    className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:from-violet-500 hover:to-indigo-500"
+                                                >
+                                                    Approve & Transfer to Draft Person ➔
+                                                </button>
+                                            </>
+                                        )}
+                                    </>
                                 )}
-                                <button
-                                    type="button"
-                                    disabled={isSubmittingReview}
-                                    onClick={() => handleReviewSurvey("approved")}
-                                    className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-emerald-500 disabled:opacity-60"
-                                >
-                                    Approve Survey
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowDetailsModal(false);
-                                        setShowTransferModal(true);
-                                    }}
-                                    className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:from-violet-500 hover:to-indigo-500"
-                                >
-                                    Approve & Transfer to Draft Person ➔
-                                </button>
                             </div>
                         </div>
                     </div>

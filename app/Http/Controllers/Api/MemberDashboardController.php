@@ -98,13 +98,29 @@ class MemberDashboardController extends Controller
             ->unique()
             ->all();
 
+        $viaDraftingJob = \App\Models\DraftingJob::query()
+            ->where('assigned_to_member_id', $member->getKey())
+            ->whereNotNull('project_id')
+            ->pluck('project_id')
+            ->unique()
+            ->all();
+
+        $viaSurveyPlan = \App\Models\SurveyPlan::query()
+            ->whereHas('planMembers', fn ($q) => $q->where('member_id', $member->getKey()))
+            ->whereNotNull('project_id')
+            ->pluck('project_id')
+            ->unique()
+            ->all();
+
         $merged = array_merge(
             $team,
             $viaLegacyAssignee,
             $viaLegacySupervisor,
             $viaUnifiedSupervisor,
             $viaAssigneeUnified,
-            $viaDirectMember
+            $viaDirectMember,
+            $viaDraftingJob,
+            $viaSurveyPlan
         );
         return array_values(array_unique(array_map('intval', $merged)));
     }
@@ -822,16 +838,32 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
         $surveyProjectIds = SurveyPlan::whereHas('planMembers', function ($q) use ($memberId) {
             $q->where('member_id', $memberId);
         })->pluck('project_id');
-        $taskProjectIds = ExecutionTaskAssignee::where('member_id', $memberId)->where('status', 'active')->pluck('project_id');
 
-        $projectIds = $teamProjectIds->merge($surveyProjectIds)->merge($taskProjectIds)->unique()->values();
+        $taskProjectIds = ExecutionTaskAssignee::where('member_id', $memberId)->where('status', 'active')->pluck('project_id');
+        $draftingProjectIds = \App\Models\DraftingJob::where('assigned_to_member_id', $memberId)->pluck('project_id');
+        $legacySupProjectIds = \App\Models\ExecutionTask::where('supervisor_member_id', $memberId)->pluck('project_id');
+        $unifiedSupProjectIds = \App\Models\Task::where('assigned_supervisor_member_id', $memberId)->orWhere('member_id', $memberId)->pluck('project_id');
+        $unifiedAssignProjectIds = \App\Models\TaskAssignment::where('assigned_to', $memberId)->where(fn ($q) => $q->whereNull('is_transferred')->orWhere('is_transferred', 0))->pluck('project_id');
+
+        $projectIds = $teamProjectIds
+            ->merge($surveyProjectIds)
+            ->merge($taskProjectIds)
+            ->merge($draftingProjectIds)
+            ->merge($legacySupProjectIds)
+            ->merge($unifiedSupProjectIds)
+            ->merge($unifiedAssignProjectIds)
+            ->unique()
+            ->values();
 
         $query = Project::with([
             'company',
             'client',
             'latestBudget',
-            'teamMembers',
+            'teamMembers.role',
+            'teamMembers.member',
             'executionTasks',
+            'draftingJobs.assignedTo',
+            'draftingJobs.drawingRevisions',
         ])->whereIn('id', $projectIds);
 
         if ($request->filled('status') && $request->status !== 'all') {
@@ -865,7 +897,7 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
         $perPage = $request->per_page ?? 15;
         $projects = $query->latest()->paginate($perPage);
 
-        $formattedProjects = collect($projects->items())->map(function ($p) {
+        $formattedProjects = collect($projects->items())->map(function ($p) use ($memberId) {
             $statusLabel = match (strtolower($p->status ?? 'active')) {
                 'active', 'running' => 'Running',
                 'draft', 'planning' => 'Planning',
@@ -873,17 +905,23 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
                 default => ucfirst($p->status ?? 'Running'),
             };
 
+            $isDraftAssigned = $p->draftingJobs && $p->draftingJobs->where('assigned_to_member_id', $memberId)->isNotEmpty();
+
             return [
                 'id' => $p->id,
                 'project_code' => $p->project_code ?? 'PRJ-001',
                 'name' => $p->name,
                 'status' => strtolower($statusLabel),
                 'status_label' => $statusLabel,
+                'current_stage' => $p->current_stage ?? 'survey_in_progress',
+                'stage_label' => ucfirst(str_replace('_', ' ', $p->current_stage ?? 'survey in progress')),
                 'manager_name' => $p->client->name ?? $p->company->name ?? 'Amit Sharma',
                 'location' => $p->project_address ?? 'Jaipur',
                 'progress_percent' => (int) ($p->progress_percent ?? 80),
                 'employees_count' => $p->teamMembers ? $p->teamMembers->count() : 8,
                 'tasks_count' => $p->executionTasks ? $p->executionTasks->count() : 15,
+                'is_drafting_assigned' => $isDraftAssigned,
+                'drafting_jobs' => $isDraftAssigned ? $p->draftingJobs->where('assigned_to_member_id', $memberId)->values() : [],
                 'end_date_formatted' => $p->expected_end_date ? $p->expected_end_date->format('d M Y') : null,
             ];
         });
@@ -1068,7 +1106,11 @@ $completed = SurveyPlan::whereHas(
                 $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
                     $assignmentOrSupervisor->whereHas('assignees', function (Builder $sub) use ($memberId) {
                         $sub->where('member_id', $memberId)->where('status', 'active');
-                    })->orWhere('supervisor_member_id', $memberId);
+                    })
+                    ->orWhere('supervisor_member_id', $memberId)
+                    ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
+                        $sub->where('assigned_to_member_id', $memberId);
+                    });
                 });
                 if ($accessibleProjectIds !== []) {
                     $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
@@ -1103,7 +1145,10 @@ $completed = SurveyPlan::whereHas(
                         $sub->where('members.id', $memberId);
                     })
                     ->orWhere('assigned_supervisor_member_id', $memberId)
-                    ->orWhere('member_id', $memberId);
+                    ->orWhere('member_id', $memberId)
+                    ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
+                        $sub->where('assigned_to_member_id', $memberId);
+                    });
                 });
                 if ($accessibleProjectIds !== []) {
                     $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
@@ -1211,6 +1256,8 @@ $completed = SurveyPlan::whereHas(
             'data' => $pageTasks->map(function (array $row) {
                 return [
                     'id' => $row['id'],
+                    'task_code' => $row['task_code'] ?? null,
+                    'project_id' => $row['project_id'] ?? null,
                     'title' => $row['title'],
                     'project_name' => $row['project_name'],
                     'location' => $row['location'],
@@ -1219,6 +1266,7 @@ $completed = SurveyPlan::whereHas(
                     'priority_label' => $row['priority_label'],
                     'is_completed' => $row['is_completed'],
                     'status' => $row['status'],
+                    'is_drafting_assigned' => $row['is_drafting_assigned'] ?? false,
                 ];
             }),
             'pagination' => [
@@ -1271,7 +1319,17 @@ $completed = SurveyPlan::whereHas(
                 $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
                     $assignmentOrSupervisor->whereHas('assignees', function (Builder $sub) use ($memberId) {
                         $sub->where('member_id', $memberId)->where('status', 'active');
-                    })->orWhere('supervisor_member_id', $memberId);
+                    })->orWhere('supervisor_member_id', $memberId)
+                    ->orWhereIn('id', function ($sub) use ($memberId) {
+                        $sub->select('execution_task_id')
+                            ->from('construction_survey_submissions')
+                            ->whereNotNull('execution_task_id')
+                            ->whereIn('id', function ($dSub) use ($memberId) {
+                                $dSub->select('survey_submission_id')
+                                    ->from('construction_drafting_jobs')
+                                    ->where('assigned_to_member_id', $memberId);
+                            });
+                    });
                 });
                 if ($accessibleProjectIds !== []) {
                     $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
@@ -1306,7 +1364,17 @@ $completed = SurveyPlan::whereHas(
                         $sub->where('members.id', $memberId);
                     })
                     ->orWhere('assigned_supervisor_member_id', $memberId)
-                    ->orWhere('member_id', $memberId);
+                    ->orWhere('member_id', $memberId)
+                    ->orWhereIn('id', function ($sub) use ($memberId) {
+                        $sub->select('task_id')
+                            ->from('construction_survey_submissions')
+                            ->whereNotNull('task_id')
+                            ->whereIn('id', function ($dSub) use ($memberId) {
+                                $dSub->select('survey_submission_id')
+                                    ->from('construction_drafting_jobs')
+                                    ->where('assigned_to_member_id', $memberId);
+                            });
+                    });
                 });
                 if ($accessibleProjectIds !== []) {
                     $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
@@ -1433,6 +1501,8 @@ $completed = SurveyPlan::whereHas(
         return [
             'source' => $sourceLegacy ? 'legacy' : 'unified',
             'id' => (int) $t->id,
+            'task_code' => (string) ($t->task_code ?? ('TSK-' . str_pad((string) $t->id, 5, '0', STR_PAD_LEFT))),
+            'project_id' => $t->project_id ? (int) $t->project_id : null,
             'title' => (string) $t->title,
             'project_name' => $t->project->name ?? null,
             'location' => $t->project->project_address ?? null,
@@ -1442,6 +1512,7 @@ $completed = SurveyPlan::whereHas(
             'is_completed' => strtolower($status) === 'completed',
             'status' => $status,
             'normalized_status' => $normalized,
+            'is_drafting_assigned' => strtolower($status) === 'drafting_in_progress',
             'sort_key' => $sortKey,
         ];
     }
@@ -1462,6 +1533,8 @@ $completed = SurveyPlan::whereHas(
         return [
             'source' => $sourceLegacy ? 'legacy' : 'unified',
             'id' => (int) $t->id,
+            'task_code' => (string) ($t->task_code ?? ('TSK-' . str_pad((string) $t->id, 5, '0', STR_PAD_LEFT))),
+            'project_id' => $t->project_id ? (int) $t->project_id : null,
             'title' => (string) $t->title,
             'project_name' => $t->project->name ?? null,
             'location' => $t->project->project_address ?? null,
@@ -1471,6 +1544,7 @@ $completed = SurveyPlan::whereHas(
             'is_completed' => strtolower($status) === 'completed',
             'status' => $status,
             'normalized_status' => $normalized,
+            'is_drafting_assigned' => strtolower($status) === 'drafting_in_progress',
             'sort_key' => $sortKey,
         ];
     }

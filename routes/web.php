@@ -449,6 +449,9 @@ Route::prefix('super/construction')
         Route::post('/projects/{project}/drafting-jobs/{draftingJob}/review', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'reviewDraftingJob'])
             ->middleware('construction.permission:drafting.manage,drawing_approval.manage,execution_task.manage')
             ->name('projects.drafting-jobs.review');
+        Route::post('/projects/{project}/tasks-v2/submit-draft', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'submitDraftDrawing'])
+            ->middleware('construction.permission:drafting.manage,document.manage,execution_task.manage')
+            ->name('projects.tasks-v2.submit-draft');
 
         Route::get('/survey', [App\Http\Controllers\SuperAdmin\Construction\SurveyController::class, 'index'])
             ->middleware('construction.permission:survey_plan.manage,survey_submission.review')
@@ -870,13 +873,13 @@ Route::prefix('member')->middleware(['member'])->group(function () {
         ->name('member.construction.')
         ->group(function () {
             Route::get('/dashboard', [App\Http\Controllers\Member\ConstructionController::class, 'dashboard'])
-                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage')
+                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage,drafting.manage,project.view')
                 ->name('dashboard');
             Route::get('/projects', [App\Http\Controllers\Member\ConstructionController::class, 'projects'])
-                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage')
+                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage,drafting.manage,project.view')
                 ->name('projects.index');
             Route::get('/projects/{project}', [App\Http\Controllers\Member\ConstructionController::class, 'showProject'])
-                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage')
+                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage,drafting.manage,project.view')
                 ->name('projects.show');
 
             Route::post('/projects/{project}/workflow/submit-survey', [App\Http\Controllers\Construction\ProjectWorkflowController::class, 'submitSurvey'])->name('projects.workflow.submit-survey');
