@@ -142,6 +142,7 @@ jobs:
 
             # 7. Optimize & cache config, routes, views
             echo "⚡ Clearing and caching Laravel configuration..."
+            php artisan optimize:clear
             php artisan config:cache
             php artisan route:cache || { echo "⚠️ Route cache failed — clearing route cache to allow normal dynamic routing"; php artisan route:clear; }
             php artisan view:cache
