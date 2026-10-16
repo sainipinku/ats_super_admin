@@ -71,13 +71,13 @@ export default function AuthenticatedLayout({ header, children }) {
             label: "Projects",
             permissions: ["project.manage", "project.view"],
         },
-        ...(!isEmployeeView ? [{
+        {
             href: route("super.construction.clients.index"),
             active: route().current("super.construction.clients.*"),
             icon: <FaCity size={14} />,
             label: "Clients",
             permissions: ["client.manage", "client.view"],
-        }] : []),
+        },
         {
             href: route("super.construction.execution.index"),
             active: route().current("super.construction.execution.*"),
@@ -85,13 +85,13 @@ export default function AuthenticatedLayout({ header, children }) {
             label: "Execution",
             permissions: ["execution.manage", "execution.view", "execution_task.manage", "execution.task.view", "dpr.review", "attendance.review"],
         },
-        ...(!isEmployeeView ? [{
+        {
             href: route("super.construction.billing.index"),
             active: route().current("super.construction.billing.*"),
             icon: <FaFileInvoiceDollar size={14} />,
             label: "Billing",
             permissions: ["billing.manage", "billing.view", "billing_invoice.manage", "billing_payment.manage"],
-        }] : []),
+        },
     ].filter((item) => hasPerm(item.permissions));
 
     const { successAlert, errorAlert, warningAlert, infoAlert } = useAlerts();

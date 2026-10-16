@@ -8,45 +8,58 @@ const variantConfig = {
         layout: SuperAdminLayout,
         items: [
             { label: "Control Tower", href: route("super.construction.dashboard"), active: "super.construction.dashboard", permissions: ["dashboard.view"] },
-            { label: "Client Registration", href: route("super.construction.clients.index"), active: "super.construction.clients.*", permissions: ["client.manage"] },
-            { label: "Projects & Budget", href: route("super.construction.projects.index"), active: "super.construction.projects.*", permissions: ["project.manage"] },
-            { label: "Survey Planning", href: route("super.construction.survey.index"), active: "super.construction.survey.*", permissions: ["survey_plan.manage", "survey_submission.review"] },
-            { label: "Drawing Approval", href: route("super.construction.drafting.index"), active: "super.construction.drafting.*", permissions: ["drafting.manage", "drawing_approval.manage"] },
-            { label: "Site Execution", href: route("super.construction.execution.index"), active: "super.construction.execution.*", permissions: ["execution.manage", "execution_task.manage", "dpr.review", "attendance.review"] },
-            // { label: "Material Management", href: route("super.construction.materials.index"), active: "super.construction.materials.*", permissions: ["material.manage", "purchase_request.manage", "purchase_order.manage", "material_receipt.manage", "material_issue.manage", "material_stock.manage"] },
-            { label: "Vehicle Tracking", href: route("super.construction.vehicles.index"), active: "super.construction.vehicles.*", permissions: ["vehicle.manage", "vehicle_assignment.manage", "vehicle_tracking.manage"] },
-            { label: "Equipment Allocation", href: route("super.construction.equipment.index"), active: "super.construction.equipment.*", permissions: ["equipment.manage", "equipment_allocation.manage", "equipment_usage.manage"] },
-            { label: "Accounts & Billing", href: route("super.construction.billing.index"), active: "super.construction.billing.*", permissions: ["billing_invoice.manage", "billing_payment.manage"] },
-            { label: "Handover & Closure", href: route("super.construction.handover.index"), active: "super.construction.handover.*", permissions: ["handover.manage", "project_closure.manage"] },
+            { label: "Client Registration", href: route("super.construction.clients.index"), active: "super.construction.clients.*", permissions: ["client.manage", "client.view"] },
+            { label: "Projects & Budget", href: route("super.construction.projects.index"), active: "super.construction.projects.*", permissions: ["project.manage", "project.view"] },
+            { label: "Survey Planning", href: route("super.construction.survey.index"), active: "super.construction.survey.*", permissions: ["survey_plan.manage", "survey.manage", "survey_submission.review", "survey_plan.view", "survey.view"] },
+            { label: "Drawing Approval", href: route("super.construction.drafting.index"), active: "super.construction.drafting.*", permissions: ["drafting.manage", "drawing_approval.manage", "drafting.view", "drawing_approval.view"] },
+            { label: "Site Execution", href: route("super.construction.execution.index"), active: "super.construction.execution.*", permissions: ["execution.manage", "execution_task.manage", "execution.view", "dpr.review", "attendance.review"] },
+            { label: "Vehicle Tracking", href: route("super.construction.vehicles.index"), active: "super.construction.vehicles.*", permissions: ["vehicle.manage", "vehicle_assignment.manage", "vehicle_tracking.manage", "vehicle.view", "vehicle_tracking.view"] },
+            { label: "Equipment Allocation", href: route("super.construction.equipment.index"), active: "super.construction.equipment.*", permissions: ["equipment.manage", "equipment_allocation.manage", "equipment_usage.manage", "equipment.view"] },
+            { label: "Accounts & Billing", href: route("super.construction.billing.index"), active: "super.construction.billing.*", permissions: ["billing.manage", "billing.view", "billing_invoice.manage", "billing_payment.manage"] },
+            { label: "Handover & Closure", href: route("super.construction.handover.index"), active: "super.construction.handover.*", permissions: ["handover.manage", "project_closure.manage", "handover.view"] },
         ],
     },
     admin: {
         layout: AdminLayout,
         items: [
             { label: "Project Dashboard", href: route("admin.construction.dashboard"), active: "admin.construction.dashboard", permissions: ["dashboard.view"] },
-            { label: "Assigned Projects", href: route("admin.construction.projects.index"), active: "admin.construction.projects.*", permissions: ["project.manage"] },
-            { label: "Survey Workflow", href: route("admin.construction.survey.index"), active: "admin.construction.survey.*", permissions: ["survey_plan.manage", "survey_submission.review"] },
-            { label: "Drawing Approval", href: route("admin.construction.drafting.index"), active: "admin.construction.drafting.*", permissions: ["drafting.manage", "drawing_approval.manage"] },
-            { label: "Site Execution", href: route("admin.construction.execution.index"), active: "admin.construction.execution.*", permissions: ["execution.manage", "execution_task.manage", "dpr.review", "attendance.review"] },
-            // { label: "Material Management", href: route("admin.construction.materials.index"), active: "admin.construction.materials.*", permissions: ["material.manage", "purchase_request.manage", "purchase_order.manage", "material_receipt.manage", "material_issue.manage", "material_stock.manage"] },
-            { label: "Vehicle Tracking", href: route("admin.construction.vehicles.index"), active: "admin.construction.vehicles.*", permissions: ["vehicle.manage", "vehicle_assignment.manage", "vehicle_tracking.manage"] },
-            { label: "Equipment Allocation", href: route("admin.construction.equipment.index"), active: "admin.construction.equipment.*", permissions: ["equipment.manage", "equipment_allocation.manage", "equipment_usage.manage"] },
-            { label: "Accounts & Billing", href: route("admin.construction.billing.index"), active: "admin.construction.billing.*", permissions: ["billing_invoice.manage", "billing_payment.manage"] },
-            { label: "Handover & Closure", href: route("admin.construction.handover.index"), active: "admin.construction.handover.*", permissions: ["handover.manage", "project_closure.manage"] },
+            { label: "Assigned Projects", href: route("admin.construction.projects.index"), active: "admin.construction.projects.*", permissions: ["project.manage", "project.view"] },
+            { label: "Survey Workflow", href: route("admin.construction.survey.index"), active: "admin.construction.survey.*", permissions: ["survey_plan.manage", "survey.manage", "survey_submission.review", "survey_plan.view", "survey.view"] },
+            { label: "Drawing Approval", href: route("admin.construction.drafting.index"), active: "admin.construction.drafting.*", permissions: ["drafting.manage", "drawing_approval.manage", "drafting.view", "drawing_approval.view"] },
+            { label: "Site Execution", href: route("admin.construction.execution.index"), active: "admin.construction.execution.*", permissions: ["execution.manage", "execution_task.manage", "execution.view", "dpr.review", "attendance.review"] },
+            { label: "Vehicle Tracking", href: route("admin.construction.vehicles.index"), active: "admin.construction.vehicles.*", permissions: ["vehicle.manage", "vehicle_assignment.manage", "vehicle_tracking.manage", "vehicle.view", "vehicle_tracking.view"] },
+            { label: "Equipment Allocation", href: route("admin.construction.equipment.index"), active: "admin.construction.equipment.*", permissions: ["equipment.manage", "equipment_allocation.manage", "equipment_usage.manage", "equipment.view"] },
+            { label: "Accounts & Billing", href: route("admin.construction.billing.index"), active: "admin.construction.billing.*", permissions: ["billing.manage", "billing.view", "billing_invoice.manage", "billing_payment.manage"] },
+            { label: "Handover & Closure", href: route("admin.construction.handover.index"), active: "admin.construction.handover.*", permissions: ["handover.manage", "project_closure.manage", "handover.view"] },
         ],
     },
     member: {
         layout: MemberLayout,
         items: [
             { label: "Project Dashboard", href: route("member.dashboard"), active: "member.construction.dashboard", permissions: ["dashboard.view"] },
-            { label: "Assigned Projects", href: route("member.construction.projects.index"), active: "member.construction.projects.*", permissions: ["dashboard.view", "project.manage"] },
-            { label: "Site Execution", href: route("member.construction.execution.index"), active: "member.construction.execution.*", permissions: ["execution_task.manage", "execution.task.view", "dpr.manage", "attendance.manage"] },
+            { label: "Assigned Projects", href: route("member.construction.projects.index"), active: "member.construction.projects.*", permissions: ["dashboard.view", "project.manage", "project.view"] },
+            { label: "Site Execution", href: route("member.construction.execution.index"), active: "member.construction.execution.*", permissions: ["execution_task.manage", "execution.task.view", "execution.manage", "execution.view", "dpr.manage", "attendance.manage"] },
             { label: "Material Management", href: route("member.construction.materials.index"), active: "member.construction.materials.*", permissions: ["material_issue.manage", "material_stock.manage", "material.manage"] },
-            { label: "Vehicle Tracking", href: route("member.construction.vehicles.index"), active: "member.construction.vehicles.*", permissions: ["vehicle_tracking.manage"] },
-            { label: "Equipment Allocation", href: route("member.construction.equipment.index"), active: "member.construction.equipment.*", permissions: ["equipment_allocation.manage", "equipment_usage.manage"] },
-            { label: "Handover & Closure", href: route("member.construction.handover.index"), active: "member.construction.handover.*", permissions: ["handover.manage"] },
+            { label: "Vehicle Tracking", href: route("member.construction.vehicles.index"), active: "member.construction.vehicles.*", permissions: ["vehicle_tracking.manage", "vehicle.manage"] },
+            { label: "Equipment Allocation", href: route("member.construction.equipment.index"), active: "member.construction.equipment.*", permissions: ["equipment_allocation.manage", "equipment_usage.manage", "equipment.manage"] },
+            { label: "Handover & Closure", href: route("member.construction.handover.index"), active: "member.construction.handover.*", permissions: ["handover.manage", "project_closure.manage"] },
         ],
     },
+};
+
+const permissionAliases = {
+    "drawing_approval.manage": ["drafting.manage", "drafting.view", "document.manage", "drawing_approval.view"],
+    "drafting.manage": ["drawing_approval.manage", "drawing_approval.view", "document.manage", "drafting.view"],
+    "survey_plan.manage": ["survey.manage", "survey_submission.review", "survey_plan.view", "survey.view"],
+    "survey.manage": ["survey_plan.manage", "survey.view", "survey_plan.view"],
+    "vehicle_tracking.manage": ["vehicle.manage", "vehicle_assignment.manage", "vehicle_tracking.view"],
+    "vehicle.manage": ["vehicle_tracking.manage", "vehicle.view"],
+    "equipment_category.manage": ["equipment.manage", "equipment_category.view"],
+    "equipment.manage": ["equipment_category.manage", "equipment_usage.manage", "equipment_allocation.manage", "equipment.view"],
+    "billing.manage": ["billing_invoice.manage", "billing_payment.manage", "billing.view"],
+    "handover.manage": ["project_closure.manage", "handover.view"],
+    "execution.manage": ["execution_task.manage", "execution.view", "execution.task.view"],
+    "execution_task.manage": ["execution.manage", "execution.task.view", "execution.view"],
 };
 
 export default function ConstructionShell({
@@ -61,14 +74,16 @@ export default function ConstructionShell({
 
     const user = page.props.auth?.user;
     const guard = page.props.auth?.guard;
-    const isSuperAdmin =
+    const isImpersonating = Boolean(page.props?.is_impersonating || page.props.auth?.is_impersonating);
+    const isSuperAdmin = !isImpersonating && (
         guard === "superadmin" ||
         user?.email === "superadmin@gmail.com" ||
         Boolean(user?.is_super_admin) ||
         user?.slug === "super-admin" ||
         user?.slug === "super_admin" ||
         (Array.isArray(user?.assigned_roles) && (user.assigned_roles.includes("super_admin") || user.assigned_roles.includes("superadmin"))) ||
-        (Array.isArray(user?.roles) && (user.roles.includes("super_admin") || user.roles.includes("superadmin")));
+        (Array.isArray(user?.roles) && (user.roles.includes("super_admin") || user.roles.includes("superadmin")))
+    );
 
     const permissions =
         variant === "member"
@@ -79,18 +94,26 @@ export default function ConstructionShell({
         if (isSuperAdmin) return true;
         if (!itemPerms || itemPerms.length === 0) return true;
         if (!Array.isArray(permissions) || permissions.length === 0) return false;
+
         return itemPerms.some((permSlug) => {
-            if (permissions.includes(permSlug)) return true;
-            const viewSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".view") : permSlug;
-            const createSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".create") : permSlug;
-            const editSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".edit") : permSlug;
-            const deleteSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".delete") : permSlug;
-            return (
-                permissions.includes(viewSlug) ||
-                permissions.includes(createSlug) ||
-                permissions.includes(editSlug) ||
-                permissions.includes(deleteSlug)
-            );
+            const permsToCheck = [permSlug, ...(permissionAliases[permSlug] || [])];
+
+            return permsToCheck.some((slug) => {
+                if (permissions.includes(slug)) return true;
+                const viewSlug = slug.endsWith(".manage") ? slug.replace(".manage", ".view") : slug;
+                const createSlug = slug.endsWith(".manage") ? slug.replace(".manage", ".create") : slug;
+                const editSlug = slug.endsWith(".manage") ? slug.replace(".manage", ".edit") : slug;
+                const deleteSlug = slug.endsWith(".manage") ? slug.replace(".manage", ".delete") : slug;
+                const manageSlug = slug.endsWith(".view") ? slug.replace(".view", ".manage") : slug;
+
+                return (
+                    permissions.includes(viewSlug) ||
+                    permissions.includes(createSlug) ||
+                    permissions.includes(editSlug) ||
+                    permissions.includes(deleteSlug) ||
+                    permissions.includes(manageSlug)
+                );
+            });
         });
     };
 

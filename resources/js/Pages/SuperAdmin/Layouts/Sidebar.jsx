@@ -27,22 +27,21 @@ const navigation = [
         items: [
             {
                 label: "ERP Dashboard",
-                permission: "dashboard.view",
+                permissions: ["dashboard.view"],
                 href: route("super.dashboard"),
                 active: ["super.dashboard", "super.construction.dashboard"],
                 icon: FaTachometerAlt,
             },
             {
                 label: "Permission Requests",
-                permission: "approval_request.manage",
-                adminOnly: true,
+                permissions: ["approval_request.manage", "approval_request.view"],
                 href: route("super.approval_requests.index"),
                 active: ["super.approval_requests.*"],
                 icon: FaClipboardList,
             },
             {
                 label: "Admin & Super Admins",
-                permission: "super_admin.manage",
+                permissions: ["super_admin.manage", "super_admin.view"],
                 adminOnly: true,
                 href: route("super.super_admins.index"),
                 active: ["super.super_admins.*"],
@@ -50,8 +49,7 @@ const navigation = [
             },
             {
                 label: "Role Management",
-                permission: "role.manage",
-                adminOnly: true,
+                permissions: ["role.manage", "role.view"],
                 href: route("super.role.list"),
                 active: ["super.role.*"],
                 icon: FaShieldAlt,
@@ -63,16 +61,14 @@ const navigation = [
         items: [
             {
                 label: "Employee Management",
-                permission: "employee.manage",
-                adminOnly: true,
+                permissions: ["employee.manage", "employee.view"],
                 href: route("super.employees.list"),
                 active: ["super.employees.*"],
                 icon: FaUsers,
             },
             {
                 label: "Client Registration",
-                permission: "client.manage",
-                adminOnly: true,
+                permissions: ["client.manage", "client.view"],
                 href: route("super.construction.clients.index"),
                 active: ["super.construction.clients.*"],
                 icon: FaCity,
@@ -84,25 +80,31 @@ const navigation = [
         items: [
             {
                 label: "Projects & Budget",
-                permission: "project.manage",
+                permissions: ["project.manage", "project.view"],
                 href: route("super.construction.projects.index"),
                 active: ["super.construction.projects.*"],
                 icon: FaProjectDiagram,
             },
             {
                 label: "Survey Planning",
-                permission: "survey_plan.manage",
+                permissions: ["survey_plan.manage", "survey.manage", "survey_plan.view", "survey.view"],
                 href: route("super.construction.survey.index"),
                 active: ["super.construction.survey.*"],
                 icon: FaClipboardList,
             },
             {
                 label: "Drawing Approval",
-                permission: "drawing_approval.manage",
-                permissions: ["drawing_approval.manage", "drafting.manage"],
+                permissions: ["drawing_approval.manage", "drafting.manage", "drawing_approval.view", "drafting.view"],
                 href: route("super.construction.drafting.index"),
                 active: ["super.construction.drafting.*"],
                 icon: FaDraftingCompass,
+            },
+            {
+                label: "Site Execution",
+                permissions: ["execution.manage", "execution.view", "execution_task.manage", "dpr.review", "attendance.review"],
+                href: route("super.construction.execution.index"),
+                active: ["super.construction.execution.*"],
+                icon: FaHardHat,
             },
         ],
     },
@@ -111,28 +113,28 @@ const navigation = [
         items: [
             {
                 label: "Vehicle Management",
-                permission: "vehicle.manage",
+                permissions: ["vehicle.manage", "vehicle.view"],
                 href: route("super.vehicles.list"),
                 active: ["super.vehicles.*"],
                 icon: FaTruck,
             },
             {
                 label: "Vehicle Tracking",
-                permission: "vehicle_tracking.manage",
+                permissions: ["vehicle_tracking.manage", "vehicle.manage", "vehicle_assignment.manage", "vehicle_tracking.view"],
                 href: route("super.construction.vehicles.index"),
                 active: ["super.construction.vehicles.*"],
                 icon: FaRoute,
             },
             {
                 label: "Equipment Categories",
-                permission: "equipment_category.manage",
+                permissions: ["equipment_category.manage", "equipment.manage", "equipment_category.view"],
                 href: route("super.equipment.categories.list"),
                 active: ["super.equipment.categories.*"],
                 icon: FaLayerGroup,
             },
             {
                 label: "Equipment Management",
-                permission: "equipment.manage",
+                permissions: ["equipment.manage", "equipment_usage.manage", "equipment_allocation.manage", "equipment.view"],
                 href: route("super.equipment.list"),
                 active: ["super.equipment.*"],
                 exclude: ["super.equipment.categories.*"],
@@ -145,15 +147,14 @@ const navigation = [
         items: [
             {
                 label: "Accounts & Billing",
-                permission: "billing.manage",
-                adminOnly: true,
+                permissions: ["billing.manage", "billing.view", "billing_invoice.manage", "billing_payment.manage"],
                 href: route("super.construction.billing.index"),
                 active: ["super.construction.billing.*"],
                 icon: FaMoneyBillWave,
             },
             {
                 label: "Handover & Closure",
-                permission: "handover.manage",
+                permissions: ["handover.manage", "project_closure.manage", "handover.view"],
                 href: route("super.construction.handover.index"),
                 active: ["super.construction.handover.*"],
                 icon: FaHandshake,
@@ -217,11 +218,18 @@ export default function Sidebar({ isOpen, onClose }) {
     const isEmployeeView = isImpersonating && !isAdminUser;
 
     const permissionAliases = {
-        "drawing_approval.manage": ["drafting.manage", "drafting.view", "document.manage"],
-        "drafting.manage": ["drawing_approval.manage", "drawing_approval.view"],
-        "survey_plan.manage": ["survey.manage", "survey_submission.review", "survey_plan.view"],
-        "vehicle_tracking.manage": ["vehicle.manage", "vehicle_assignment.manage"],
-        "equipment_category.manage": ["equipment.manage"],
+        "drawing_approval.manage": ["drafting.manage", "drafting.view", "document.manage", "drawing_approval.view"],
+        "drafting.manage": ["drawing_approval.manage", "drawing_approval.view", "document.manage", "drafting.view"],
+        "survey_plan.manage": ["survey.manage", "survey_submission.review", "survey_plan.view", "survey.view"],
+        "survey.manage": ["survey_plan.manage", "survey.view", "survey_plan.view"],
+        "vehicle_tracking.manage": ["vehicle.manage", "vehicle_assignment.manage", "vehicle_tracking.view"],
+        "vehicle.manage": ["vehicle_tracking.manage", "vehicle.view"],
+        "equipment_category.manage": ["equipment.manage", "equipment_category.view"],
+        "equipment.manage": ["equipment_category.manage", "equipment_usage.manage", "equipment_allocation.manage", "equipment.view"],
+        "billing.manage": ["billing_invoice.manage", "billing_payment.manage", "billing.view"],
+        "handover.manage": ["project_closure.manage", "handover.view"],
+        "execution.manage": ["execution_task.manage", "execution.view", "execution.task.view"],
+        "execution_task.manage": ["execution.manage", "execution.task.view", "execution.view"],
     };
 
     const hasPerm = (target) => {

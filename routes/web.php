@@ -345,18 +345,18 @@ Route::prefix('super/construction')
             ->name('clients.destroy');
 
         Route::get('/projects', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'index'])
-            ->middleware('construction.permission:project.manage')
+            ->middleware('construction.permission:project.manage,project.view')
             ->name('projects.index');
         Route::get('/projects/next-code', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'nextProjectCode'])
             ->name('projects.next-code');
         Route::post('/projects', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'store'])
-            ->middleware('construction.permission:project.manage')
+            ->middleware('construction.permission:project.manage,project.create')
             ->name('projects.store');
         Route::put('/projects/{project}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'update'])
-            ->middleware('construction.permission:project.manage')
+            ->middleware('construction.permission:project.manage,project.edit')
             ->name('projects.update');
         Route::get('/projects/{project}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'show'])
-            ->middleware('construction.permission:project.manage')
+            ->middleware('construction.permission:project.manage,project.view')
             ->name('projects.show');
 
         Route::post('/projects/{project}/workflow/submit-survey', [App\Http\Controllers\Construction\ProjectWorkflowController::class, 'submitSurvey'])->name('projects.workflow.submit-survey');
@@ -629,10 +629,10 @@ Route::prefix('admin/construction')
             ->middleware('construction.permission:dashboard.view')
             ->name('dashboard');
         Route::get('/projects', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'index'])
-            ->middleware('construction.permission:project.manage')
+            ->middleware('construction.permission:project.manage,project.view')
             ->name('projects.index');
         Route::get('/projects/{project}', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'show'])
-            ->middleware('construction.permission:project.manage')
+            ->middleware('construction.permission:project.manage,project.view')
             ->name('projects.show');
 
         Route::post('/projects/{project}/workflow/submit-survey', [App\Http\Controllers\Construction\ProjectWorkflowController::class, 'submitSurvey'])->name('projects.workflow.submit-survey');

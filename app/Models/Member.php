@@ -370,7 +370,12 @@ class Member extends Authenticatable
     }
     public function isAdmin(): bool
     {
-        if ($this->slug === 'admin' || $this->slug === 'super-admin') {
+        if (session()->has('impersonator')) {
+            $assignedSlugs = $this->assigned_role_details['slugs'] ?? [];
+            return in_array('admin', $assignedSlugs, true) || in_array('project_admin', $assignedSlugs, true) || in_array('super_admin', $assignedSlugs, true);
+        }
+
+        if ($this->slug === 'admin' || $this->slug === 'super-admin' || $this->slug === 'super_admin') {
             return true;
         }
 
@@ -394,23 +399,47 @@ class Member extends Authenticatable
 
         return false;
     }
- public function isSuperAdmin(): bool
+
+    public function isSuperAdmin(): bool
     {
-        return $this->id === 2 || $this->slug === 'super-admin';
+        if (session()->has('impersonator')) {
+            return false;
+        }
+
+        if ($this->slug === 'super-admin' || $this->slug === 'super_admin') {
+            return true;
+        }
+
+        $assignedSlugs = $this->assigned_role_details['slugs'] ?? [];
+        if (is_array($assignedSlugs) && (in_array('super_admin', $assignedSlugs, true) || in_array('superadmin', $assignedSlugs, true))) {
+            return true;
+        }
+
+        if (is_array($this->roles) && !empty($this->roles)) {
+            $superAdminRoleIds = Role::whereIn('slug', ['super-admin', 'super_admin', 'superadmin'])->pluck('id')->toArray();
+            if (!empty(array_intersect($this->roles, $superAdminRoleIds))) {
+                return true;
+            }
+            if (in_array('super_admin', $this->roles, true) || in_array('superadmin', $this->roles, true) || in_array('super-admin', $this->roles, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
+
     /**
      * Check if the role is a member role
      */
     public function isMember(): bool
     {
-        return $this->id === 3 || $this->slug === 'member';
+        return !$this->isAdmin() && !$this->isSuperAdmin();
     }
 
     public function isCallingTeam(): bool
     {
         return (bool) $this->is_calling_team;
     }
-
 
     public function getRoleName($roleId)
     {
@@ -424,11 +453,7 @@ class Member extends Authenticatable
             return 'callingteam';
         }
 
-        return match ($this->id) {
-            1 => 'admin',
-            3 => 'member',
-            default => 'web',
-        };
+        return 'member';
     }
 
     /**
