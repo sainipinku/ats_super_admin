@@ -135,25 +135,6 @@ class ConstructionAuthorizationService
                 ->pluck('construction_permissions.slug')
                 ->all();
         }
-
-        if (empty($permissions)) {
-            $permissions = [
-                'dashboard.view',
-                'project.manage',
-                'project.view',
-                'survey_plan.manage',
-                'survey_plan.view',
-                'drawing_approval.manage',
-                'drafting.manage',
-                'vehicle.manage',
-                'vehicle_tracking.manage',
-                'equipment.manage',
-                'equipment_category.manage',
-                'handover.manage',
-                'execution.manage',
-            ];
-        }
-
         return $permissions;
     }
 

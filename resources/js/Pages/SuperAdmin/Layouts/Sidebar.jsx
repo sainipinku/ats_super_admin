@@ -99,6 +99,7 @@ const navigation = [
             {
                 label: "Drawing Approval",
                 permission: "drawing_approval.manage",
+                permissions: ["drawing_approval.manage", "drafting.manage"],
                 href: route("super.construction.drafting.index"),
                 active: ["super.construction.drafting.*"],
                 icon: FaDraftingCompass,
@@ -192,6 +193,11 @@ export default function Sidebar({ isOpen, onClose }) {
     const currentProject = props?.current_project;
     const userPermissions = auth?.permissions || auth?.construction_permissions || [];
 
+    const activeRole = props?.active_role;
+    const roleDisplayName = 
+        activeRole?.name ||
+        (Array.isArray(user?.assigned_roles) && user.assigned_roles[0] ? user.assigned_roles[0].replace(/_/g, ' ') : null);
+
     const isSuperAdmin = 
         guard === "superadmin" ||
         user?.email === "superadmin@gmail.com" ||
@@ -206,30 +212,45 @@ export default function Sidebar({ isOpen, onClose }) {
         Boolean(user?.is_admin) || 
         user?.slug === "admin" || 
         (Array.isArray(user?.assigned_roles) && (user.assigned_roles.includes("admin") || user.assigned_roles.includes("project_admin"))) ||
-        (Array.isArray(user?.roles) && (user.roles.includes("admin") || user.roles.includes("project_admin") || user.roles.includes(1) || user.roles.includes("1")));
+        (Array.isArray(user?.roles) && (user.roles.includes("admin") || user.roles.includes("project_admin") || user.roles.includes(9) || user.roles.includes("9") || user.roles.includes(3) || user.roles.includes("3")));
 
     const isEmployeeView = isImpersonating && !isAdminUser;
 
-    const hasPerm = (permSlug) => {
-        if (!permSlug) return true;
-        if (isSuperAdmin || isAdminUser) return true;
-        if (permSlug === "dashboard.view") return true;
-        if (userPermissions.length === 0) return true;
+    const permissionAliases = {
+        "drawing_approval.manage": ["drafting.manage", "drafting.view", "document.manage"],
+        "drafting.manage": ["drawing_approval.manage", "drawing_approval.view"],
+        "survey_plan.manage": ["survey.manage", "survey_submission.review", "survey_plan.view"],
+        "vehicle_tracking.manage": ["vehicle.manage", "vehicle_assignment.manage"],
+        "equipment_category.manage": ["equipment.manage"],
+    };
 
-        const viewSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".view") : permSlug;
-        const createSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".create") : permSlug;
-        const editSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".edit") : permSlug;
-        const deleteSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".delete") : permSlug;
-        const manageSlug = permSlug.endsWith(".view") ? permSlug.replace(".view", ".manage") : permSlug;
+    const hasPerm = (target) => {
+        if (!target) return true;
+        if (isSuperAdmin) return true;
+        if (!Array.isArray(userPermissions) || userPermissions.length === 0) return false;
 
-        return (
-            userPermissions.includes(permSlug) ||
-            userPermissions.includes(viewSlug) ||
-            userPermissions.includes(createSlug) ||
-            userPermissions.includes(editSlug) ||
-            userPermissions.includes(deleteSlug) ||
-            userPermissions.includes(manageSlug)
-        );
+        const targets = Array.isArray(target) ? target : [target];
+
+        return targets.some((permSlug) => {
+            const permsToCheck = [permSlug, ...(permissionAliases[permSlug] || [])];
+
+            return permsToCheck.some((slug) => {
+                if (userPermissions.includes(slug)) return true;
+                const viewSlug = slug.endsWith(".manage") ? slug.replace(".manage", ".view") : slug;
+                const createSlug = slug.endsWith(".manage") ? slug.replace(".manage", ".create") : slug;
+                const editSlug = slug.endsWith(".manage") ? slug.replace(".manage", ".edit") : slug;
+                const deleteSlug = slug.endsWith(".manage") ? slug.replace(".manage", ".delete") : slug;
+                const manageSlug = slug.endsWith(".view") ? slug.replace(".view", ".manage") : slug;
+
+                return (
+                    userPermissions.includes(viewSlug) ||
+                    userPermissions.includes(createSlug) ||
+                    userPermissions.includes(editSlug) ||
+                    userPermissions.includes(deleteSlug) ||
+                    userPermissions.includes(manageSlug)
+                );
+            });
+        });
     };
 
     const isProjectOwner = user?.is_project_owner == 1 || (user && (user.id == 1 || user.id === '1'));
@@ -238,9 +259,9 @@ export default function Sidebar({ isOpen, onClose }) {
         .map((group) => {
             const items = group.items
                 .filter((item) => {
-                    if (isSuperAdmin || isAdminUser) return true;
+                    if (isSuperAdmin) return true;
                     if (item.adminOnly && !isAdminUser) return false;
-                    return hasPerm(item.permission);
+                    return hasPerm(item.permissions || item.permission);
                 })
                 .map((item) => {
                     if (item.label === "Admin & Super Admins" && !isProjectOwner) {
@@ -283,7 +304,9 @@ export default function Sidebar({ isOpen, onClose }) {
                             betaxtech
                         </p>
                         <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-300">
-                            {isEmployeeView ? "Employee Workspace" : "Super Admin"}
+                            {isSuperAdmin
+                                ? "Super Admin"
+                                : (roleDisplayName || (isAdminUser ? "Admin ERP" : "Employee Workspace"))}
                         </p>
                         {companyName && !isEmployeeView && (
                             <p

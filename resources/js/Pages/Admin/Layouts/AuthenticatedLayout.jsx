@@ -46,13 +46,14 @@ export default function AuthenticatedLayout({ header, children }) {
         Boolean(authUser?.is_admin) || 
         authUser?.slug === "admin" || 
         (Array.isArray(authUser?.assigned_roles) && (authUser.assigned_roles.includes("admin") || authUser.assigned_roles.includes("project_admin"))) ||
-        (Array.isArray(authUser?.roles) && (authUser.roles.includes("admin") || authUser.roles.includes("project_admin")));
-    const isEmployeeView = (isImpersonating && !isAdminUser) || guard === "member";
+        (Array.isArray(authUser?.roles) && (authUser.roles.includes("admin") || authUser.roles.includes("project_admin") || authUser.roles.includes(9) || authUser.roles.includes("9") || authUser.roles.includes(3) || authUser.roles.includes("3")));
+    const isEmployeeView = (isImpersonating && !isAdminUser) || guard === "member" || (!isSuperAdmin && !isAdminUser);
     const userPermissions = user.auth?.permissions || user.auth?.construction_permissions || user.permissions || [];
 
     const hasPerm = (itemPerms) => {
         if (isSuperAdmin) return true;
         if (!itemPerms || itemPerms.length === 0) return true;
+        if (!Array.isArray(userPermissions) || userPermissions.length === 0) return false;
         return itemPerms.some((permSlug) => {
             if (userPermissions.includes(permSlug)) return true;
             const prefix = permSlug.split('.')[0];

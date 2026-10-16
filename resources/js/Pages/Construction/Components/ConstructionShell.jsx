@@ -78,6 +78,7 @@ export default function ConstructionShell({
     const hasPerm = (itemPerms) => {
         if (isSuperAdmin) return true;
         if (!itemPerms || itemPerms.length === 0) return true;
+        if (!Array.isArray(permissions) || permissions.length === 0) return false;
         return itemPerms.some((permSlug) => {
             if (permissions.includes(permSlug)) return true;
             const viewSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".view") : permSlug;
