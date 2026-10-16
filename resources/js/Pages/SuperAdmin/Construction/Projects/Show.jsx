@@ -1163,56 +1163,159 @@ function TaskRow({ task, project, members, onEdit }) {
 
     return (
         <>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4.5 shadow-xs transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex-1 min-w-[280px]">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-                                {task.task_code}
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 sm:p-5 shadow-xs transition hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700">
+                {/* 1. Header: Task Code, Title, Badges & Administrative Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                        <span className="inline-flex items-center rounded-md bg-indigo-50 px-2.5 py-1 font-mono text-[11px] font-bold text-indigo-700 border border-indigo-100 dark:bg-indigo-950/60 dark:border-indigo-900/60 dark:text-indigo-300">
+                            {task.task_code}
+                        </span>
+                        <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                            {task.title}
+                        </h4>
+                        <StatusBadge value={task.status} />
+                        <StatusBadge value={task.priority} />
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                            type="button"
+                            onClick={onEdit}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                            title="Edit Task Details"
+                        >
+                            <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                            <span>Edit</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setConfirmingDelete(true)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200/80 bg-rose-50/60 px-2.5 py-1 text-xs font-medium text-rose-600 shadow-2xs transition hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-400"
+                            title="Delete Task"
+                        >
+                            <svg className="h-3.5 w-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span>Delete</span>
+                        </button>
+                    </div>
+                </div>
+
+                {task.description ? (
+                    <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                        {task.description}
+                    </p>
+                ) : null}
+
+                {/* 2. Middle Grid: Key Metadata & Status Spanning Full Width */}
+                <div className="mt-3.5 grid grid-cols-2 gap-3 sm:grid-cols-4 rounded-xl border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-800/80 dark:bg-slate-900/40">
+                    <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                            Planned Schedule
+                        </span>
+                        <span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200">
+                            <svg className="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className="truncate">
+                                {formatDate(task.planned_start_date) || "TBD"} → {formatDate(task.planned_end_date) || "TBD"}
                             </span>
-                            <p className="font-bold text-slate-900 dark:text-white">{task.title}</p>
-                            <StatusBadge value={task.status} />
-                            <StatusBadge value={task.priority} />
+                        </span>
+                    </div>
+
+                    <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                            Supervisor
+                        </span>
+                        <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
+                                {(task.supervisor?.name || "U")[0].toUpperCase()}
+                            </span>
+                            <span className="truncate">{task.supervisor?.name || "Unassigned"}</span>
+                        </span>
+                    </div>
+
+                    <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                            Checklists
+                        </span>
+                        <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                            <svg className="h-3.5 w-3.5 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>{completedChecklists} of {taskChecklists.length} done</span>
+                        </span>
+                    </div>
+
+                    <div className="flex flex-col justify-center min-w-0">
+                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                            <span>Progress</span>
+                            <span className="font-mono text-xs font-bold text-slate-700 dark:text-slate-200">{progress}%</span>
                         </div>
-                        <p className="mt-1 text-xs text-slate-500">
-                            Planned: {formatDate(task.planned_start_date) || "TBD"} → {formatDate(task.planned_end_date) || "TBD"}
-                        </p>
-                        {task.description ? (
-                            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{task.description}</p>
-                        ) : null}
-                        <div className="mt-3 grid gap-3 text-xs grid-cols-2 sm:grid-cols-3">
-                            <div>
-                                <p className="text-slate-400">Supervisor</p>
-                                <p className="font-semibold text-slate-800 dark:text-slate-200">{task.supervisor?.name || "Unassigned"}</p>
-                            </div>
-                            <div>
-                                <p className="text-slate-400">Progress</p>
-                                <p className="font-semibold text-slate-800 dark:text-slate-200">{progress}%</p>
-                            </div>
-                            <div className="col-span-2 sm:col-span-1">
-                                <p className="text-slate-400">Checklists</p>
-                                <p className="font-semibold text-slate-800 dark:text-slate-200">
-                                    {completedChecklists} of {taskChecklists.length} done
-                                </p>
-                            </div>
-                        </div>
-                        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
                             <div
-                                className="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 transition-all duration-300"
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                    progress === 100
+                                        ? "bg-emerald-500"
+                                        : "bg-gradient-to-r from-indigo-500 to-sky-500"
+                                }`}
                                 style={{ width: `${progress}%` }}
                             />
                         </div>
                     </div>
+                </div>
 
-                    {/* Task Actions */}
+                {/* 3. Bottom Action Bar: Checklist actions & Primary workflow actions */}
+                <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-100 pt-3 dark:border-slate-800/80">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowChecklists((prev) => !prev)}
+                            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-2xs transition ${
+                                showChecklists
+                                    ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300"
+                                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                            }`}
+                        >
+                            <svg className="h-3.5 w-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            <span>Checklists ({completedChecklists}/{taskChecklists.length})</span>
+                            <svg
+                                className={`h-3 w-3 text-slate-400 transition-transform duration-200 ${showChecklists ? "rotate-180" : ""}`}
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowAddChecklistModal(true)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-2xs transition hover:bg-emerald-100 hover:border-emerald-300 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            title="Add a checklist item directly to this task"
+                        >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span>Add Checklist</span>
+                        </button>
+                    </div>
+
                     <div className="flex flex-wrap items-center gap-2">
                         <button
                             type="button"
                             onClick={() => setShowDetailsModal(true)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 shadow-xs transition hover:bg-sky-100 hover:border-sky-300 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-300 dark:hover:bg-sky-900/50"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 shadow-2xs transition hover:bg-sky-100 hover:border-sky-300 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-300 dark:hover:bg-sky-900/50"
                             title="View all submitted survey data, coordinates, photos, and attached files"
                         >
-                            <span>👁️</span>
+                            <svg className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
                             <span>View Details</span>
                             {taskVisits.length > 0 && (
                                 <span className="rounded-full bg-sky-200/90 px-1.5 py-0.2 text-[10px] font-bold text-sky-800 dark:bg-sky-800 dark:text-sky-200">
@@ -1223,46 +1326,13 @@ function TaskRow({ task, project, members, onEdit }) {
                         <button
                             type="button"
                             onClick={() => setShowTransferModal(true)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:from-violet-500 hover:to-indigo-500"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:from-violet-500 hover:to-indigo-500"
                             title="Assign or transfer this task to a project team member (e.g. Draft Person)"
                         >
-                            <span>⇄</span>
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
                             <span>Assign / Transfer</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setShowAddChecklistModal(true)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-500"
-                            title="Add a checklist item directly to this task"
-                        >
-                            <span className="text-sm font-bold leading-none">+</span>
-                            <span>Add Checklist</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setShowChecklists((prev) => !prev)}
-                            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                                showChecklists
-                                    ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300"
-                                    : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                            }`}
-                        >
-                            <span>Checklists ({completedChecklists}/{taskChecklists.length})</span>
-                            <span className={`transform text-[9px] transition-transform ${showChecklists ? "rotate-180" : ""}`}>▼</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onEdit}
-                            className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
-                        >
-                            Edit Task
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setConfirmingDelete(true)}
-                            className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30"
-                        >
-                            Delete
                         </button>
                     </div>
                 </div>
