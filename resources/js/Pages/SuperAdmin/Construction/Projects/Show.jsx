@@ -176,7 +176,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
             <WorkflowTracker currentStage={project.current_stage} isLocked={project.is_locked} />
 
             {/* Workflow Stage Control Tabs */}
-            <div className="hidden md:block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
+            {/* <div className="hidden md:block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                         5-Stage Complete Workflow Management
@@ -271,7 +271,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                 {activeWorkflowTab === "audit" && (
                     <WorkflowAuditTrail logs={project.workflow_logs} />
                 )}
-            </div>
+            </div> */}
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
                 <StatCard label="Budget Versions" value={metrics.budgets} />
