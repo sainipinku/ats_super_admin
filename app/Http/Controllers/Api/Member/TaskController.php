@@ -65,6 +65,7 @@ class TaskController extends Controller
         $query = Task::query()
             ->with([
                 'creator',
+                'checklistItems.completedBy',
                 'assignedMembers' => function ($q) use ($member) {
                     $q->select('members.id', 'members.name', 'members.email', 'members.phone')
                         ->where('assigned_to', $member->id)
@@ -159,9 +160,13 @@ class TaskController extends Controller
             ], 403);
         }
 
-        $task->load(['creator', 'instances' => function ($q) use ($member) {
-            $q->where('assigned_to', $member->id)->latest();
-        }]);
+        $task->load([
+            'creator',
+            'checklistItems.completedBy',
+            'instances' => function ($q) use ($member) {
+                $q->where('assigned_to', $member->id)->latest();
+            }
+        ]);
 
         return response()->json([
             'success' => true,

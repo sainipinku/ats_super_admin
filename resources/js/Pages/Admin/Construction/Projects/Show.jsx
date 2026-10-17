@@ -13,6 +13,7 @@ import SurveySubmissionPanel from "@/Pages/Construction/Components/SurveySubmiss
 import WorkflowAuditTrail from "@/Pages/Construction/Components/WorkflowAuditTrail";
 import FieldNotesDisplay from "@/Pages/Construction/Components/FieldNotesDisplay";
 import Modal from "@/Components/Modal";
+import ProjectActivityLog from "@/Pages/Construction/Components/ProjectActivityLog";
 
 export default function ProjectShow({ project, activityLog, workflowSummary }) {
     const [activeWorkflowTab, setActiveWorkflowTab] = useState("supervisor");
@@ -395,24 +396,7 @@ export default function ProjectShow({ project, activityLog, workflowSummary }) {
                 initialCounts={{ total: checklistCounts.total, completed: checklistCounts.completed, completion: checklistCompletion }}
             />
 
-            <SectionCard title="Project Activity" description="Recent workflow actions for this assigned project.">
-                {activityLog?.length ? (
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        {activityLog.map((item) => (
-                            <div key={item.id} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                                <div className="flex items-center justify-between gap-3">
-                                    <p className="font-medium text-slate-900 dark:text-white">{item.module}</p>
-                                    <StatusBadge value={item.action} />
-                                </div>
-                                <p className="mt-2 text-sm text-slate-500">{item.actor?.name || item.actor?.email || "System"}</p>
-                                <p className="mt-1 text-xs text-slate-500">{formatDate(item.created_at)}</p>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <EmptyState title="No activity yet." description="Activity logs will appear here as the project advances through the workflow." />
-                )}
-            </SectionCard>
+            <ProjectActivityLog activityLog={activityLog} />
         </ConstructionShell>
     );
 }

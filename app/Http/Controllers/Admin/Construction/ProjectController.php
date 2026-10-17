@@ -446,6 +446,21 @@ class ProjectController extends Controller
         try {
             $taskId = $validated['scope'] === 'execution_task' ? $validated['execution_task_id'] : null;
             $planId = $validated['scope'] === 'survey_plan' ? $validated['survey_plan_id'] : null;
+            $unifiedTaskId = $validated['scope'] === 'unified_task' ? $validated['unified_task_id'] : null;
+
+            if ($validated['scope'] === 'unified_task' && $unifiedTaskId) {
+                $execTask = \App\Models\ExecutionTask::where('project_id', $project->id)->find($unifiedTaskId)
+                    ?? \App\Models\ExecutionTask::where('project_id', $project->id)
+                        ->where('task_code', \App\Models\Task::where('id', $unifiedTaskId)->value('task_code'))
+                        ->first();
+                $taskId = $execTask?->id ?? $unifiedTaskId;
+            } elseif ($validated['scope'] === 'execution_task' && $taskId) {
+                $unifiedTask = \App\Models\Task::where('project_id', $project->id)->find($taskId)
+                    ?? \App\Models\Task::where('project_id', $project->id)
+                        ->where('task_code', \App\Models\ExecutionTask::where('id', $taskId)->value('task_code'))
+                        ->first();
+                $unifiedTaskId = $unifiedTask?->id ?? $taskId;
+            }
 
             if ($validated['scope'] === 'project') {
                 $firstPlan = $project->surveyPlans->first();
@@ -482,27 +497,33 @@ class ProjectController extends Controller
                 'completed_at' => $isDone ? now() : null,
             ]);
 
-            if ($validated['scope'] === 'unified_task' && !empty($validated['unified_task_id'])) {
+            if (!empty($unifiedTaskId)) {
                 try {
-                    \App\Models\TaskChecklistItem::create([
-                        'task_id' => $validated['unified_task_id'],
-                        'project_id' => $project->id,
-                        'day_number' => $validated['day_number'],
-                        'item_title' => $validated['item_title'],
-                        'assign_hours' => $validated['assign_hours'] ?? null,
-                        'notes' => $validated['notes'] ?? null,
-                        'status' => $statusVal,
-                        'image_url_1' => $imageUrl1,
-                        'image_url_2' => $imageUrl2,
-                        'is_completed' => $isDone,
-                        'source' => 'admin_custom',
-                    ]);
+                    \App\Models\TaskChecklistItem::updateOrCreate(
+                        [
+                            'task_id' => $unifiedTaskId,
+                            'project_id' => $project->id,
+                            'item_title' => $validated['item_title'],
+                            'day_number' => $validated['day_number'],
+                        ],
+                        [
+                            'assign_hours' => $validated['assign_hours'] ?? null,
+                            'notes' => $validated['notes'] ?? null,
+                            'status' => $statusVal,
+                            'image_url_1' => $imageUrl1,
+                            'image_url_2' => $imageUrl2,
+                            'is_completed' => $isDone,
+                            'completed_by_member_id' => $isDone ? $actor?->getKey() : null,
+                            'completed_at' => $isDone ? now() : null,
+                            'source' => 'admin_custom',
+                        ]
+                    );
                 } catch (\Throwable $e) {
                     report($e);
                 }
             }
 
-            if (!$taskId && !$planId) {
+            if ($validated['scope'] === 'project' && !$taskId && !$planId) {
                 try {
                     $surveyData->ensureDefaultTaskChecklists(
                         $project->executionTasks->first() ?? new \App\Models\ExecutionTask([

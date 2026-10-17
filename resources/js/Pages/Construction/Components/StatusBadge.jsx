@@ -38,12 +38,22 @@ const colors = {
     structure: "bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300",
     finishing: "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300",
     handover: "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300",
+    created: "bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300",
+    updated: "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300",
+    assigned: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300",
+    reopened: "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300",
+    task_transferred: "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300",
+    transferred: "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300",
+    status_changed: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300",
+    deleted: "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300",
+    revoked: "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300",
 };
 
 export default function StatusBadge({ value, status, label }) {
     const rawVal = value ?? status ?? "unknown";
     const displayLabel = label || String(rawVal).replaceAll("_", " ");
-    const color = colors[rawVal] || "bg-slate-100 text-slate-700";
+    const normalizedKey = String(rawVal).toLowerCase().trim().replace(/[\s-]+/g, "_");
+    const color = colors[rawVal] || colors[normalizedKey] || "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700/60";
 
     return (
         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize ${color}`}>

@@ -1101,6 +1101,7 @@ $completed = SurveyPlan::whereHas(
             'project.client',
             'executionPlan',
             'supervisor',
+            'checklists',
         ])->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
             $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
                 $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
@@ -1135,6 +1136,7 @@ $completed = SurveyPlan::whereHas(
             'executionPlan',
             'assignedSupervisor',
             'supervisor',
+            'checklistItems',
         ])->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
             $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
                 $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
@@ -1513,6 +1515,8 @@ $completed = SurveyPlan::whereHas(
             'status' => $status,
             'normalized_status' => $normalized,
             'is_drafting_assigned' => strtolower($status) === 'drafting_in_progress',
+            'checklist_total' => $t->relationLoaded('checklists') ? $t->checklists->count() : 0,
+            'checklist_completed' => $t->relationLoaded('checklists') ? $t->checklists->where('is_completed', true)->count() : 0,
             'sort_key' => $sortKey,
         ];
     }
@@ -1545,6 +1549,8 @@ $completed = SurveyPlan::whereHas(
             'status' => $status,
             'normalized_status' => $normalized,
             'is_drafting_assigned' => strtolower($status) === 'drafting_in_progress',
+            'checklist_total' => $t->relationLoaded('checklistItems') ? $t->checklistItems->count() : 0,
+            'checklist_completed' => $t->relationLoaded('checklistItems') ? $t->checklistItems->where('is_completed', true)->count() : 0,
             'sort_key' => $sortKey,
         ];
     }
@@ -3815,14 +3821,16 @@ $completed = SurveyPlan::whereHas(
      */
     public function taskDetails(Request $request, $taskId)
     {
-        $task = ExecutionTask::query()->find($taskId);
-        if (!$task) {
+        $resolved = $this->resolveTaskAcrossTables((int) $taskId);
+        if ($resolved === null) {
             return response()->json([
                 'success' => false,
                 'error_code' => 'TASK_NOT_FOUND',
                 'message' => 'No task found with the given identifier.',
             ], 404);
         }
+
+        [$task, $unifiedTask] = [$resolved['task'], $resolved['unifiedTask']];
 
         if (!$this->authorizeTaskAccess($request, $task)) {
             return $this->forbiddenTaskAccessResponse();
@@ -3850,10 +3858,19 @@ $completed = SurveyPlan::whereHas(
         }
 
         $this->surveyData->ensureDefaultTaskChecklists($task, $currentDay);
-        $checklists = TaskChecklist::where('execution_task_id', $task->id)->get();
 
-        $formattedChecklist = $checklists->map(function ($c) {
-            return [
+        $legacyChecklists = TaskChecklist::where('execution_task_id', $task->id)->get();
+        $unifiedChecklistItems = $unifiedTask !== null
+            ? \App\Models\TaskChecklistItem::where('task_id', $unifiedTask->id)->get()
+            : \App\Models\TaskChecklistItem::where('task_id', $task->id)->get();
+
+        $mergedList = collect();
+        $seenTitles = [];
+
+        foreach ($legacyChecklists as $c) {
+            $key = strtolower(trim((string) $c->item_title)) . '-' . ($c->day_number ?? 1);
+            $seenTitles[$key] = true;
+            $mergedList->push([
                 'id' => $c->id,
                 'item_title' => $c->item_title,
                 'assign_hours' => $c->assign_hours ? (float) $c->assign_hours : null,
@@ -3862,8 +3879,29 @@ $completed = SurveyPlan::whereHas(
                 'image_url_1' => $c->image_url_1,
                 'image_url_2' => $c->image_url_2,
                 'is_completed' => (bool) $c->is_completed,
-            ];
-        });
+                'day_number' => $c->day_number ?? 1,
+            ]);
+        }
+
+        foreach ($unifiedChecklistItems as $c) {
+            $key = strtolower(trim((string) $c->item_title)) . '-' . ($c->day_number ?? 1);
+            if (!isset($seenTitles[$key])) {
+                $seenTitles[$key] = true;
+                $mergedList->push([
+                    'id' => $c->id,
+                    'item_title' => $c->item_title,
+                    'assign_hours' => $c->assign_hours ? (float) $c->assign_hours : null,
+                    'notes' => $c->notes,
+                    'status' => $c->status ?? ($c->is_completed ? 'completed' : 'pending'),
+                    'image_url_1' => $c->image_url_1,
+                    'image_url_2' => $c->image_url_2,
+                    'is_completed' => (bool) $c->is_completed,
+                    'day_number' => $c->day_number ?? 1,
+                ]);
+            }
+        }
+
+        $formattedChecklist = $mergedList->values();
 
         $dayStepper = $this->surveyData->buildTaskDayStepper($currentDay, $totalDays);
 
@@ -3945,32 +3983,84 @@ $completed = SurveyPlan::whereHas(
      * @param TaskChecklist $checklist
      * @return \Illuminate\Http\JsonResponse
      */
-    public function toggleChecklist(Request $request, TaskChecklist $checklist)
+    public function toggleChecklist(Request $request, $checklist)
     {
         $member = $request->user();
-        $task = ExecutionTask::with('project')
-            ->where('id', $checklist->execution_task_id)
-            ->first();
-        if (!$task) {
+
+        $checklistModel = $checklist instanceof TaskChecklist
+            ? $checklist
+            : TaskChecklist::find($checklist);
+
+        $unifiedItem = null;
+        if (!$checklistModel) {
+            $unifiedItem = \App\Models\TaskChecklistItem::find($checklist);
+        }
+
+        if (!$checklistModel && !$unifiedItem) {
             return response()->json([
                 'success' => false,
-                'error_code' => 'CHECKLIST_ORPHAN',
-                'message' => 'Checklist is not linked to a valid task.',
-            ], 422);
+                'error_code' => 'CHECKLIST_NOT_FOUND',
+                'message' => 'Checklist item not found.',
+            ], 404);
         }
-        if (!$this->authorizeTaskAccess($request, $task)) {
+
+        $task = null;
+        if ($checklistModel && $checklistModel->execution_task_id) {
+            $task = ExecutionTask::with('project')->find($checklistModel->execution_task_id);
+        }
+        if (!$task && $checklistModel) {
+            $unifiedMatch = \App\Models\TaskChecklistItem::where('item_title', $checklistModel->item_title)->first();
+            if ($unifiedMatch) {
+                $task = ExecutionTask::with('project')->find($unifiedMatch->task_id);
+            }
+        }
+        if (!$task && $unifiedItem) {
+            $task = ExecutionTask::with('project')->find($unifiedItem->task_id);
+        }
+
+        if ($task && !$this->authorizeTaskAccess($request, $task)) {
             return $this->forbiddenTaskAccessResponse();
         }
 
-        $newStatus = !$checklist->is_completed;
+        $isCurrentlyCompleted = $checklistModel ? (bool) $checklistModel->is_completed : (bool) $unifiedItem->is_completed;
+        $nextCompleted = !$isCurrentlyCompleted;
 
         try {
-            $checklist->update([
-                'is_completed' => $newStatus,
-                'status' => $newStatus ? 'completed' : 'pending',
-                'completed_by_member_id' => $newStatus ? $member->id : null,
-                'completed_at' => $newStatus ? now() : null,
-            ]);
+            if ($checklistModel) {
+                $checklistModel->update([
+                    'is_completed' => $nextCompleted,
+                    'status' => $nextCompleted ? 'completed' : 'pending',
+                    'completed_by_member_id' => $nextCompleted ? $member->id : null,
+                    'completed_at' => $nextCompleted ? now() : null,
+                ]);
+
+                try {
+                    \App\Models\TaskChecklistItem::where('item_title', $checklistModel->item_title)->update([
+                        'is_completed' => $nextCompleted,
+                        'status' => $nextCompleted ? 'completed' : 'pending',
+                        'completed_by_member_id' => $nextCompleted ? $member->id : null,
+                        'completed_at' => $nextCompleted ? now() : null,
+                    ]);
+                } catch (\Throwable $e) {}
+            }
+
+            if ($unifiedItem) {
+                $unifiedItem->update([
+                    'is_completed' => $nextCompleted,
+                    'status' => $nextCompleted ? 'completed' : 'pending',
+                    'completed_by_member_id' => $nextCompleted ? $member->id : null,
+                    'completed_at' => $nextCompleted ? now() : null,
+                ]);
+
+                try {
+                    TaskChecklist::where('item_title', $unifiedItem->item_title)->update([
+                        'is_completed' => $nextCompleted,
+                        'status' => $nextCompleted ? 'completed' : 'pending',
+                        'completed_by_member_id' => $nextCompleted ? $member->id : null,
+                        'completed_at' => $nextCompleted ? now() : null,
+                    ]);
+                } catch (\Throwable $e) {}
+            }
         } catch (\Throwable $e) {
             report($e);
 
@@ -3980,18 +4070,20 @@ $completed = SurveyPlan::whereHas(
             ], 500);
         }
 
+        $active = $checklistModel ?: $unifiedItem;
+
         return response()->json([
             'success' => true,
             'message' => 'Checklist item updated.',
             'item' => [
-                'id' => $checklist->id,
-                'item_title' => $checklist->item_title,
-                'assign_hours' => $checklist->assign_hours ? (float) $checklist->assign_hours : null,
-                'notes' => $checklist->notes,
-                'status' => $checklist->status,
-                'image_url_1' => $checklist->image_url_1,
-                'image_url_2' => $checklist->image_url_2,
-                'is_completed' => (bool) $checklist->is_completed,
+                'id' => $active->id,
+                'item_title' => $active->item_title,
+                'assign_hours' => $active->assign_hours ? (float) $active->assign_hours : null,
+                'notes' => $active->notes,
+                'status' => $active->status,
+                'image_url_1' => $active->image_url_1,
+                'image_url_2' => $active->image_url_2,
+                'is_completed' => (bool) $active->is_completed,
             ],
         ]);
     }
@@ -4082,6 +4174,7 @@ $completed = SurveyPlan::whereHas(
                 \App\Models\TaskChecklistItem::query()->create([
                     'task_id' => $unifiedTask->id,
                     'project_id' => $project?->id,
+                    'day_number' => $request->day_number ?? $defaultDay,
                     'item_title' => $request->item_title,
                     'assign_hours' => $request->assign_hours ?? null,
                     'notes' => $request->notes ?? null,
@@ -4090,6 +4183,7 @@ $completed = SurveyPlan::whereHas(
                     'image_url_2' => $imageUrl2,
                     'is_completed' => false,
                     'sort_order' => $request->day_number ?? $defaultDay,
+                    'source' => 'member_added',
                 ]);
             } catch (\Throwable $e) {
                 report($e);
