@@ -46,13 +46,14 @@ export default function AuthenticatedLayout({ header, children }) {
         Boolean(authUser?.is_admin) || 
         authUser?.slug === "admin" || 
         (Array.isArray(authUser?.assigned_roles) && (authUser.assigned_roles.includes("admin") || authUser.assigned_roles.includes("project_admin"))) ||
-        (Array.isArray(authUser?.roles) && (authUser.roles.includes("admin") || authUser.roles.includes("project_admin")));
-    const isEmployeeView = (isImpersonating && !isAdminUser) || guard === "member";
+        (Array.isArray(authUser?.roles) && (authUser.roles.includes("admin") || authUser.roles.includes("project_admin") || authUser.roles.includes(9) || authUser.roles.includes("9") || authUser.roles.includes(3) || authUser.roles.includes("3")));
+    const isEmployeeView = (isImpersonating && !isAdminUser) || guard === "member" || (!isSuperAdmin && !isAdminUser);
     const userPermissions = user.auth?.permissions || user.auth?.construction_permissions || user.permissions || [];
 
     const hasPerm = (itemPerms) => {
         if (isSuperAdmin) return true;
         if (!itemPerms || itemPerms.length === 0) return true;
+        if (!Array.isArray(userPermissions) || userPermissions.length === 0) return false;
         return itemPerms.some((permSlug) => {
             if (userPermissions.includes(permSlug)) return true;
             const prefix = permSlug.split('.')[0];
@@ -68,13 +69,13 @@ export default function AuthenticatedLayout({ header, children }) {
             label: "Projects",
             permissions: ["project.manage", "project.view"],
         },
-        ...(!isEmployeeView ? [{
+        {
             href: route("admin.construction.clients.index"),
             active: route().current("admin.construction.clients.*"),
             icon: <FaCity size={14} />,
             label: "Clients",
             permissions: ["client.manage", "client.view"],
-        }] : []),
+        },
         {
             href: route("admin.construction.execution.index"),
             active: route().current("admin.construction.execution.*"),
@@ -82,13 +83,13 @@ export default function AuthenticatedLayout({ header, children }) {
             label: "Execution",
             permissions: ["execution.manage", "execution.view", "execution_task.manage", "execution.task.view", "dpr.review", "attendance.review"],
         },
-        ...(!isEmployeeView ? [{
+        {
             href: route("admin.construction.billing.index"),
             active: route().current("admin.construction.billing.*"),
             icon: <FaFileInvoiceDollar size={14} />,
             label: "Billing",
             permissions: ["billing.manage", "billing.view", "billing_invoice.manage", "billing_payment.manage"],
-        }] : []),
+        },
     ].filter((item) => hasPerm(item.permissions));
 
     const { successAlert, errorAlert, warningAlert, infoAlert } = useAlerts();

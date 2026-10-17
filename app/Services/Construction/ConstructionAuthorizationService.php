@@ -51,29 +51,39 @@ class ConstructionAuthorizationService
             return [];
         }
 
+        $isImpersonating = session()->has('impersonator');
+
         $isUnrestrictedSuperAdmin = false;
-        if ($actor instanceof SuperAdmin) {
-            $isUnrestrictedSuperAdmin = true;
-        } elseif ($actor instanceof Member) {
-            $isUnrestrictedSuperAdmin = ((int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1));
-        }
+        if (!$isImpersonating) {
+            if ($actor instanceof SuperAdmin) {
+                $isUnrestrictedSuperAdmin = true;
+            } elseif ($actor instanceof Member) {
+                $isUnrestrictedSuperAdmin = ((int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1));
+            }
 
-        if ($isUnrestrictedSuperAdmin) {
-            return Permission::query()
-                ->orderBy('slug')
-                ->pluck('slug')
-                ->all();
-        }
+            if ($isUnrestrictedSuperAdmin) {
+                return Permission::query()
+                    ->orderBy('slug')
+                    ->pluck('slug')
+                    ->all();
+            }
 
-        if ($actor instanceof Member && $actor->isAdmin()) {
-            return Permission::query()
-                ->orderBy('slug')
-                ->pluck('slug')
-                ->all();
+            if ($actor instanceof Member && $actor->isAdmin()) {
+                return Permission::query()
+                    ->orderBy('slug')
+                    ->pluck('slug')
+                    ->all();
+            }
         }
 
         $roleIds = [];
         $roleSlugs = [];
+
+        // If an active role is set in session or request query, ensure it is considered
+        $activeRoleSlug = session('active_role') ?? request()?->query('role');
+        if ($activeRoleSlug) {
+            $roleSlugs[] = strtolower(trim($activeRoleSlug));
+        }
 
         if ($actor instanceof Member) {
             $assignmentRoleIds = DB::table('construction_member_role_assignments')
@@ -87,6 +97,24 @@ class ConstructionAuthorizationService
                 ->pluck('role_id')
                 ->toArray();
             $roleIds = array_merge($roleIds, $assignmentRoleIds);
+
+            // Also check project team assignments
+            $teamRoleIds = DB::table('construction_project_team_members')
+                ->where('member_id', $actor->getKey())
+                ->where('status', 'active')
+                ->when($projectId !== null, fn ($q) => $q->where('project_id', $projectId))
+                ->pluck('role_id')
+                ->toArray();
+            $roleIds = array_merge($roleIds, $teamRoleIds);
+
+            // Also check if assigned to drafting jobs
+            $hasDraftingJob = DB::table('construction_drafting_jobs')
+                ->where('assigned_to_member_id', $actor->getKey())
+                ->when($projectId !== null, fn ($q) => $q->where('project_id', $projectId))
+                ->exists();
+            if ($hasDraftingJob) {
+                $roleSlugs[] = 'draft_person';
+            }
 
             if (!empty($actor->assigned_roles)) {
                 $roleSlugs = array_merge($roleSlugs, (array) $actor->assigned_roles);
@@ -135,34 +163,11 @@ class ConstructionAuthorizationService
                 ->pluck('construction_permissions.slug')
                 ->all();
         }
-
-        if (empty($permissions)) {
-            $permissions = [
-                'dashboard.view',
-                'project.manage',
-                'project.view',
-                'survey_plan.manage',
-                'survey_plan.view',
-                'drawing_approval.manage',
-                'drafting.manage',
-                'vehicle.manage',
-                'vehicle_tracking.manage',
-                'equipment.manage',
-                'equipment_category.manage',
-                'handover.manage',
-                'execution.manage',
-            ];
-        }
-
         return $permissions;
     }
 
     /**
      * Check whether the actor has at least one requested permission.
-     *
-     * MemberRoleAssignment.status:
-     * 1 = active
-     * 0 = inactive
      *
      * @param array<int, string> $permissions
      */
@@ -171,73 +176,67 @@ class ConstructionAuthorizationService
         array $permissions,
         ?int $projectId = null
     ): bool {
-        if (!$actor || $permissions === []) {
+        if (!$actor || empty($permissions)) {
             return false;
         }
 
-        $isUnrestrictedSuperAdmin = false;
+        $userPerms = $this->permissionsFor($actor, $projectId);
 
-        if ($actor instanceof SuperAdmin) {
-            $isUnrestrictedSuperAdmin = true;
-        } elseif ($actor instanceof Member) {
-            $isUnrestrictedSuperAdmin = (
-                $actor->isSuperAdmin()
-                || $actor->slug === 'super-admin'
-                || (int) $actor->id === 1
-                || (string) $actor->id === '1'
-                || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1)
-                || $actor->isAdmin()
-            );
+        if (empty($userPerms)) {
+            return false;
         }
 
-        if ($isUnrestrictedSuperAdmin) {
+        if (in_array('*', $userPerms, true)) {
             return true;
         }
 
-        if (!$actor instanceof Member) {
-            return false;
+        $permissionAliases = [
+            'drawing_approval.manage' => ['drafting.manage', 'drafting.view', 'document.manage', 'drawing_approval.view'],
+            'drafting.manage' => ['drawing_approval.manage', 'drawing_approval.view', 'document.manage', 'drafting.view'],
+            'survey_plan.manage' => ['survey.manage', 'survey_submission.review', 'survey_plan.view', 'survey.view'],
+            'survey.manage' => ['survey_plan.manage', 'survey.view', 'survey_plan.view'],
+            'vehicle_tracking.manage' => ['vehicle.manage', 'vehicle_assignment.manage', 'vehicle_tracking.view'],
+            'vehicle.manage' => ['vehicle_tracking.manage', 'vehicle.view'],
+            'equipment_category.manage' => ['equipment.manage', 'equipment_category.view'],
+            'equipment.manage' => ['equipment_category.manage', 'equipment_usage.manage', 'equipment_allocation.manage', 'equipment.view'],
+            'billing.manage' => ['billing_invoice.manage', 'billing_payment.manage', 'billing.view'],
+            'billing_invoice.manage' => ['billing.manage', 'billing.view'],
+            'billing_payment.manage' => ['billing.manage', 'billing.view'],
+            'handover.manage' => ['project_closure.manage', 'handover.view'],
+            'project_closure.manage' => ['handover.manage', 'handover.view'],
+            'execution.manage' => ['execution_task.manage', 'execution.view', 'execution.task.view'],
+            'execution_task.manage' => ['execution.manage', 'execution.task.view', 'execution.view'],
+        ];
+
+        foreach ($permissions as $reqPerm) {
+            if (in_array($reqPerm, $userPerms, true)) {
+                return true;
+            }
+
+            // Manage grants view/create/edit/delete
+            if (str_ends_with($reqPerm, '.view')) {
+                $base = substr($reqPerm, 0, -5);
+                if (in_array("{$base}.manage", $userPerms, true)) {
+                    return true;
+                }
+            }
+
+            // Check aliases
+            $aliases = $permissionAliases[$reqPerm] ?? [];
+            foreach ($aliases as $alias) {
+                if (in_array($alias, $userPerms, true)) {
+                    return true;
+                }
+                if (str_ends_with($alias, '.view')) {
+                    $base = substr($alias, 0, -5);
+                    if (in_array("{$base}.manage", $userPerms, true)) {
+                        return true;
+                    }
+                }
+            }
         }
 
-        $query = Permission::query()
-            ->join(
-                'construction_role_permissions',
-                'construction_role_permissions.permission_id',
-                '=',
-                'construction_permissions.id'
-            )
-            ->join(
-                'construction_roles',
-                'construction_roles.id',
-                '=',
-                'construction_role_permissions.role_id'
-            )
-            ->join(
-                'construction_member_role_assignments',
-                'construction_member_role_assignments.role_id',
-                '=',
-                'construction_roles.id'
-            )
-            ->where(
-                'construction_member_role_assignments.member_id',
-                $actor->getKey()
-            )
-            ->where(
-                'construction_member_role_assignments.status',
-                1
-            )
-            ->where(
-                'construction_roles.status',
-                'active'
-            )
-            ->whereNull('construction_roles.deleted_at')
-            ->whereIn(
-                'construction_permissions.slug',
-                $permissions
-            );
-
-        $this->applyProjectScope($query, $projectId);
-
-        return $query->exists();
+        return false;
     }
 
     public function can(
@@ -463,10 +462,8 @@ class ConstructionAuthorizationService
     }
 
     /**
-     * Project-scoped checks require an exact project role assignment.
-     *
-     * Global assignments (project_id IS NULL) only apply
-     * when there is no project context.
+     * Project-scoped checks include both project-specific role assignments
+     * and global company role assignments (project_id IS NULL).
      */
     private function applyProjectScope(
         Builder $query,
@@ -476,7 +473,10 @@ class ConstructionAuthorizationService
             return;
         }
 
-        $query->where('construction_member_role_assignments.project_id', $projectId);
+        $query->where(function (Builder $subQuery) use ($projectId) {
+            $subQuery->where('construction_member_role_assignments.project_id', $projectId)
+                     ->orWhereNull('construction_member_role_assignments.project_id');
+        });
     }
 
     public function inferProjectId(Request $request): ?int

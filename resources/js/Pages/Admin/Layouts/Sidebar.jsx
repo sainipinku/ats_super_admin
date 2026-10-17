@@ -35,22 +35,21 @@ const navigation = [
         items: [
             {
                 label: "ERP Dashboard",
-                permission: "dashboard.view",
+                permissions: ["dashboard.view"],
                 getHref: () => safeRoute("admin.dashboard", safeRoute("admin.construction.dashboard")),
                 active: ["admin.dashboard", "admin.construction.dashboard", "super.dashboard"],
                 icon: FaTachometerAlt,
             },
             {
                 label: "Permission Requests",
-                permission: "approval_request.manage",
-                adminOnly: true,
+                permissions: ["approval_request.manage", "approval_request.view"],
                 getHref: () => safeRoute("super.approval_requests.index"),
                 active: ["super.approval_requests.*", "admin.approval_requests.*"],
                 icon: FaClipboardList,
             },
             {
                 label: "Admin & Super Admins",
-                permission: "super_admin.manage",
+                permissions: ["super_admin.manage", "super_admin.view"],
                 adminOnly: true,
                 getHref: () => safeRoute("super.super_admins.index"),
                 active: ["super.super_admins.*"],
@@ -58,8 +57,7 @@ const navigation = [
             },
             {
                 label: "Role Management",
-                permission: "role.manage",
-                adminOnly: true,
+                permissions: ["role.manage", "role.view"],
                 getHref: () => safeRoute("super.role.list"),
                 active: ["super.role.*"],
                 icon: FaShieldAlt,
@@ -71,16 +69,14 @@ const navigation = [
         items: [
             {
                 label: "Employee Management",
-                permission: "employee.manage",
-                adminOnly: true,
+                permissions: ["employee.manage", "employee.view"],
                 getHref: () => safeRoute("super.employees.list"),
                 active: ["super.employees.*"],
                 icon: FaUsers,
             },
             {
                 label: "Client Registration",
-                permission: "client.manage",
-                adminOnly: true,
+                permissions: ["client.manage", "client.view"],
                 getHref: () => safeRoute("super.construction.clients.index"),
                 active: ["super.construction.clients.*"],
                 icon: FaCity,
@@ -92,24 +88,31 @@ const navigation = [
         items: [
             {
                 label: "Projects & Budget",
-                permission: "project.manage",
+                permissions: ["project.manage", "project.view"],
                 getHref: () => safeRoute("admin.construction.projects.index", safeRoute("super.construction.projects.index")),
                 active: ["admin.construction.projects.*", "super.construction.projects.*"],
                 icon: FaProjectDiagram,
             },
             {
                 label: "Survey Planning",
-                permission: "survey_plan.manage",
+                permissions: ["survey_plan.manage", "survey.manage", "survey_plan.view", "survey.view"],
                 getHref: () => safeRoute("admin.construction.survey.index", safeRoute("super.construction.survey.index")),
                 active: ["admin.construction.survey.*", "super.construction.survey.*"],
                 icon: FaClipboardList,
             },
             {
                 label: "Drawing Approval",
-                permission: "drawing_approval.manage",
+                permissions: ["drawing_approval.manage", "drafting.manage", "drawing_approval.view", "drafting.view"],
                 getHref: () => safeRoute("admin.construction.drafting.index", safeRoute("super.construction.drafting.index")),
                 active: ["admin.construction.drafting.*", "super.construction.drafting.*"],
                 icon: FaDraftingCompass,
+            },
+            {
+                label: "Site Execution",
+                permissions: ["execution.manage", "execution.view", "execution_task.manage", "dpr.review", "attendance.review"],
+                getHref: () => safeRoute("admin.construction.execution.index", safeRoute("super.construction.execution.index")),
+                active: ["admin.construction.execution.*", "super.construction.execution.*"],
+                icon: FaHardHat,
             },
         ],
     },
@@ -118,28 +121,28 @@ const navigation = [
         items: [
             {
                 label: "Vehicle Management",
-                permission: "vehicle.manage",
+                permissions: ["vehicle.manage", "vehicle.view"],
                 getHref: () => safeRoute("super.vehicles.list"),
                 active: ["super.vehicles.*"],
                 icon: FaTruck,
             },
             {
                 label: "Vehicle Tracking",
-                permission: "vehicle_tracking.manage",
+                permissions: ["vehicle_tracking.manage", "vehicle.manage", "vehicle_assignment.manage", "vehicle_tracking.view"],
                 getHref: () => safeRoute("admin.construction.vehicles.index", safeRoute("super.construction.vehicles.index")),
                 active: ["admin.construction.vehicles.*", "super.construction.vehicles.*"],
                 icon: FaRoute,
             },
             {
                 label: "Equipment Categories",
-                permission: "equipment_category.manage",
+                permissions: ["equipment_category.manage", "equipment.manage", "equipment_category.view"],
                 getHref: () => safeRoute("super.equipment.categories.list"),
                 active: ["super.equipment.categories.*"],
                 icon: FaLayerGroup,
             },
             {
                 label: "Equipment Management",
-                permission: "equipment.manage",
+                permissions: ["equipment.manage", "equipment_usage.manage", "equipment_allocation.manage", "equipment.view"],
                 getHref: () => safeRoute("super.equipment.list"),
                 active: ["super.equipment.*"],
                 exclude: ["super.equipment.categories.*"],
@@ -152,15 +155,14 @@ const navigation = [
         items: [
             {
                 label: "Accounts & Billing",
-                permission: "billing.manage",
-                adminOnly: true,
+                permissions: ["billing.manage", "billing.view", "billing_invoice.manage", "billing_payment.manage"],
                 getHref: () => safeRoute("admin.construction.billing.index", safeRoute("super.construction.billing.index")),
                 active: ["admin.construction.billing.*", "super.construction.billing.*"],
                 icon: FaMoneyBillWave,
             },
             {
                 label: "Handover & Closure",
-                permission: "handover.manage",
+                permissions: ["handover.manage", "project_closure.manage", "handover.view"],
                 getHref: () => safeRoute("admin.construction.handover.index", safeRoute("super.construction.handover.index")),
                 active: ["admin.construction.handover.*", "super.construction.handover.*"],
                 icon: FaHandshake,
@@ -199,6 +201,11 @@ export default function Sidebar({ isOpen, onClose }) {
     const currentProject = props?.current_project;
     const userPermissions = auth?.permissions || auth?.construction_permissions || [];
 
+    const activeRole = props?.active_role;
+    const roleDisplayName = 
+        activeRole?.name ||
+        (Array.isArray(user?.assigned_roles) && user.assigned_roles[0] ? user.assigned_roles[0].replace(/_/g, ' ') : null);
+
     const isSuperAdminUnimpersonated = !isImpersonating && (
         guard === "superadmin" ||
         user?.email === "superadmin@gmail.com" ||
@@ -213,30 +220,53 @@ export default function Sidebar({ isOpen, onClose }) {
         Boolean(user?.is_admin) || 
         user?.slug === "admin" || 
         (Array.isArray(user?.assigned_roles) && (user.assigned_roles.includes("admin") || user.assigned_roles.includes("project_admin"))) ||
-        (Array.isArray(user?.roles) && (user.roles.includes("admin") || user.roles.includes("project_admin")));
+        (Array.isArray(user?.roles) && (user.roles.includes("admin") || user.roles.includes("project_admin") || user.roles.includes(9) || user.roles.includes("9") || user.roles.includes(3) || user.roles.includes("3")));
     const isSuperAdmin = isSuperAdminUnimpersonated;
 
     const isEmployeeView = isImpersonating && !isAdminUser;
 
-    const hasPerm = (permSlug) => {
-        if (!permSlug) return true;
+    const permissionAliases = {
+        "drawing_approval.manage": ["drafting.manage", "drafting.view", "document.manage", "drawing_approval.view"],
+        "drafting.manage": ["drawing_approval.manage", "drawing_approval.view", "document.manage", "drafting.view"],
+        "survey_plan.manage": ["survey.manage", "survey_submission.review", "survey_plan.view", "survey.view"],
+        "survey.manage": ["survey_plan.manage", "survey.view", "survey_plan.view"],
+        "vehicle_tracking.manage": ["vehicle.manage", "vehicle_assignment.manage", "vehicle_tracking.view"],
+        "vehicle.manage": ["vehicle_tracking.manage", "vehicle.view"],
+        "equipment_category.manage": ["equipment.manage", "equipment_category.view"],
+        "equipment.manage": ["equipment_category.manage", "equipment_usage.manage", "equipment_allocation.manage", "equipment.view"],
+        "billing.manage": ["billing_invoice.manage", "billing_payment.manage", "billing.view"],
+        "handover.manage": ["project_closure.manage", "handover.view"],
+        "execution.manage": ["execution_task.manage", "execution.view", "execution.task.view"],
+        "execution_task.manage": ["execution.manage", "execution.task.view", "execution.view"],
+    };
+
+    const hasPerm = (target) => {
+        if (!target) return true;
         if (isSuperAdmin) return true;
-        if (permSlug === "dashboard.view") return true;
+        if (!Array.isArray(userPermissions) || userPermissions.length === 0) return false;
 
-        const viewSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".view") : permSlug;
-        const createSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".create") : permSlug;
-        const editSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".edit") : permSlug;
-        const deleteSlug = permSlug.endsWith(".manage") ? permSlug.replace(".manage", ".delete") : permSlug;
-        const manageSlug = permSlug.endsWith(".view") ? permSlug.replace(".view", ".manage") : permSlug;
+        const targets = Array.isArray(target) ? target : [target];
 
-        return (
-            userPermissions.includes(permSlug) ||
-            userPermissions.includes(viewSlug) ||
-            userPermissions.includes(createSlug) ||
-            userPermissions.includes(editSlug) ||
-            userPermissions.includes(deleteSlug) ||
-            userPermissions.includes(manageSlug)
-        );
+        return targets.some((permSlug) => {
+            const permsToCheck = [permSlug, ...(permissionAliases[permSlug] || [])];
+
+            return permsToCheck.some((slug) => {
+                if (userPermissions.includes(slug)) return true;
+                const viewSlug = slug.endsWith(".manage") ? slug.replace(".manage", ".view") : slug;
+                const createSlug = slug.endsWith(".manage") ? slug.replace(".manage", ".create") : slug;
+                const editSlug = slug.endsWith(".manage") ? slug.replace(".manage", ".edit") : slug;
+                const deleteSlug = slug.endsWith(".manage") ? slug.replace(".manage", ".delete") : slug;
+                const manageSlug = slug.endsWith(".view") ? slug.replace(".view", ".manage") : slug;
+
+                return (
+                    userPermissions.includes(viewSlug) ||
+                    userPermissions.includes(createSlug) ||
+                    userPermissions.includes(editSlug) ||
+                    userPermissions.includes(deleteSlug) ||
+                    userPermissions.includes(manageSlug)
+                );
+            });
+        });
     };
 
     const isProjectOwner = user?.is_project_owner == 1 || (user && (user.id == 1 || user.id === '1'));
@@ -247,7 +277,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 .filter((item) => {
                     if (isSuperAdmin) return true;
                     if (item.adminOnly && !isAdminUser) return false;
-                    return hasPerm(item.permission);
+                    return hasPerm(item.permissions || item.permission);
                 })
                 .map((item) => {
                     if (item.label === "Admin & Super Admins" && !isProjectOwner) {
@@ -290,7 +320,9 @@ export default function Sidebar({ isOpen, onClose }) {
                             betaxtech
                         </p>
                         <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-300">
-                            {isEmployeeView ? "Employee Workspace" : "Admin ERP"}
+                            {isSuperAdmin
+                                ? "Super Admin"
+                                : (roleDisplayName || (isAdminUser ? "Admin ERP" : "Employee Workspace"))}
                         </p>
                     </div>
                 </div>
