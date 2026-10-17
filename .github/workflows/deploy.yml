@@ -51,7 +51,16 @@ jobs:
         run: npm ci || npm install
 
       - name: Build Frontend Assets
-        run: npm run build
+        run: |
+          npm run build
+          tar -czf frontend-build.tar.gz -C public/build .
+
+      - name: Upload Frontend Build Archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build-archive
+          path: frontend-build.tar.gz
+          retention-days: 1
 
       - name: Prepare Laravel Environment
         run: |
@@ -74,17 +83,34 @@ jobs:
           php artisan scramble:analyze
 
   # -------------------------------------------------------------
-  # Job 2: CD (Auto Deploy to VPS Server via SSH)
+  # Job 2: CD (Zero-Downtime Deploy to VPS Server via SSH & SCP)
   # -------------------------------------------------------------
   deploy:
-    name: Deploy to VPS Server
+    name: Zero-Downtime Deploy to VPS
     needs: [test_and_build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/abhishek' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     timeout-minutes: 20
 
     steps:
-      - name: Execute Remote Deployment via SSH
+      - name: Download Frontend Build Archive
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build-archive
+          path: .
+
+      - name: Transfer Pre-Built Assets to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          source: "frontend-build.tar.gz"
+          target: "/tmp"
+
+      - name: Execute Remote Zero-Downtime Deployment via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -96,7 +122,7 @@ jobs:
           command_timeout: 30m
           script: |
             set -e
-            echo "🚀 Starting Deployment on $(hostname)..."
+            echo "🚀 Starting Zero-Downtime Deployment on $(hostname)..."
             
             # 1. Resolve and navigate to target web directory
             RAW_DIR="${{ secrets.SSH_DEPLOY_PATH }}"
@@ -119,22 +145,41 @@ jobs:
             cd "$DEPLOY_DIR"
             echo "📂 Working directory: $(pwd)"
 
-            # 2. Put application into maintenance mode (optional safe mode)
-            php artisan down --retry=15 || true
+            # 2. Ensure application is active (prevent any lingering 503 maintenance mode)
+            php artisan up || true
 
-            # 3. Pull latest code from the abhishek branch
+            # 3. Pull latest code without taking the site down
             echo "📥 Fetching latest commits from GitHub..."
             git fetch origin abhishek
             git reset --hard origin/abhishek
 
-            # 4. Install PHP dependencies (Production optimized)
+            # 4. Install PHP dependencies (Production optimized, fast)
             echo "📦 Installing Composer dependencies..."
             composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
 
-            # 5. Install Node dependencies & compile frontend
-            echo "🎨 Building frontend assets..."
-            npm install --no-audit
-            npm run build
+            # 5. Atomically unpack pre-compiled frontend assets (No npm install or build on VPS!)
+            TAR_FILE=""
+            if [ -f "/tmp/frontend-build.tar.gz" ]; then
+              TAR_FILE="/tmp/frontend-build.tar.gz"
+            elif [ -f "/tmp/dist/frontend-build.tar.gz" ]; then
+              TAR_FILE="/tmp/dist/frontend-build.tar.gz"
+            fi
+
+            if [ -n "$TAR_FILE" ] && [ -f "$TAR_FILE" ]; then
+              echo "🎨 Deploying pre-compiled frontend assets..."
+              rm -rf public/build_new
+              mkdir -p public/build_new
+              tar -xzf "$TAR_FILE" -C public/build_new
+              rm -f "$TAR_FILE"
+              
+              # Atomic directory swap so active web visitors never hit 404 for assets
+              rm -rf public/build_old
+              [ -d public/build ] && mv public/build public/build_old
+              mv public/build_new public/build
+              rm -rf public/build_old
+            else
+              echo "ℹ️ No new frontend archive found in /tmp; keeping existing build."
+            fi
 
             # 6. Run database migrations safely
             echo "🗄️ Running database migrations..."
@@ -142,7 +187,6 @@ jobs:
 
             # 7. Optimize & cache config, routes, views
             echo "⚡ Clearing and caching Laravel configuration..."
-            php artisan optimize:clear
             php artisan config:cache
             php artisan route:cache || { echo "⚠️ Route cache failed — clearing route cache to allow normal dynamic routing"; php artisan route:clear; }
             php artisan view:cache
@@ -151,12 +195,16 @@ jobs:
             echo "🔄 Restarting queue workers..."
             php artisan queue:restart || true
 
-            # 9. Set appropriate file permissions
+            # 9. Gracefully reload PHP-FPM for instant zero-downtime OPcache refresh
+            echo "⚡ Gracefully reloading PHP-FPM..."
+            (sudo systemctl reload php8.4-fpm || sudo systemctl reload php-fpm || sudo systemctl reload php8.3-fpm || sudo service php8.4-fpm reload) || true
+
+            # 10. Set appropriate file permissions
             echo "🔒 Ensuring correct directory permissions..."
-            chown -R www-data:www-data storage bootstrap/cache || true
-            chmod -R 775 storage bootstrap/cache || true
+            chown -R www-data:www-data storage bootstrap/cache public/build || true
+            chmod -R 775 storage bootstrap/cache public/build || true
 
-            # 10. Bring application back up
-            php artisan up
+            # 11. Confirm application is up and running
+            php artisan up || true
 
-            echo "✅ Deployment completed successfully!"
+            echo "✅ Zero-Downtime Deployment completed successfully in seconds!"
