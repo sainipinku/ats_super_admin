@@ -1185,6 +1185,8 @@ $completed = SurveyPlan::whereHas(
             $normalizedStatusFilter = $statusMap[strtolower((string) $request->status)] ?? strtolower((string) $request->status);
         }
 
+
+        
         $legacyQuery = ExecutionTask::with([
             'project.company',
             'project.client',
