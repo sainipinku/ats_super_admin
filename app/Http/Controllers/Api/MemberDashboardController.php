@@ -724,9 +724,6 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             $projId = (int) $project->id;
             $projAllTasksModels = $tasksByProject->get($projId, collect());
 
-<<<<<<< HEAD
-            $project->setAttribute('today_tasks_count', $todayTasksByProject->get($projId, collect())->count());
-=======
             $teamMembers = $project->teamMembers
                 ? $project->teamMembers
                     ->filter(fn ($tm) => $tm->status === null || $tm->status === 'active')
@@ -755,7 +752,6 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             $project->setAttribute('tasks', $projLast20Tasks);
             $project->setAttribute('task', $projLast20Tasks);
             $project->setAttribute('today_tasks_count', count($projTodayTasks));
->>>>>>> 335cd38722737df3f373704af55a034671960641
             $project->setAttribute('tasks_count', $projAllTasksModels->count());
         };
 
@@ -781,11 +777,7 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             'check_in_card' => $checkInCard,
             'todays_summary' => $todaysSummaryCard,
             'current_project' => $currentProjectCard,
-<<<<<<< HEAD
-            'tasks' => $dashboardTasks,
-=======
             'todays_tasks' => $todaysTasksList,
->>>>>>> 335cd38722737df3f373704af55a034671960641
             'quick_actions' => $quickActionsList,
             'field_activity' => $fieldActivityCard,
             'performance' => $performanceCard,
