@@ -72,7 +72,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/tasks', [TaskController::class, 'index']);
     Route::get('/tasks/{task}', [TaskController::class, 'show']);
-    Route::post('/tasks/{task}/submit', [MemberDashboardController::class, 'submitTaskData']);
+    Route::post('/tasks/{taskId}/submit', [MemberDashboardController::class, 'submitSurveyTask']);
     Route::get('/tasks/{task}/notes', [TaskController::class, 'notesIndex']);
     Route::post('/tasks/{task}/notes', [TaskController::class, 'notesStore']);
     Route::delete('/notes/{note}', [TaskController::class, 'notesDestroy']);
