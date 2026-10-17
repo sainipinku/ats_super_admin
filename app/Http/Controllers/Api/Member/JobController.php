@@ -11,6 +11,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+/**
+ * @tags Member Jobs
+ */
 class JobController extends Controller
 {
     private function getProfileCompletionData($member): array
@@ -207,7 +210,16 @@ class JobController extends Controller
             . '</div></div></div></body></html>';
     }
 
-   public function index(Request $request)
+    /**
+     * List Active Jobs
+     *
+     * Retrieves active job openings with keyword search, location filtering, and pagination.
+     *
+     * @tags Job Portal & Applications
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function index(Request $request)
 {
     $query = Job::query()
         ->with(['creator'])
@@ -267,6 +279,16 @@ class JobController extends Controller
     ]);
 }
 
+    /**
+     * Get Job Details
+     *
+     * Retrieves job details, company info, requirement specs, and applicant submission status.
+     *
+     * @tags Job Portal & Applications
+     * @param Request $request
+     * @param Job $job
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function show(Request $request, Job $job)
     {
         if ($job->status !== 'active') {
@@ -300,6 +322,16 @@ class JobController extends Controller
         ]);
     }
 
+    /**
+     * Save Job to Bookmarks
+     *
+     * Bookmarks an active job opening to the member saved list.
+     *
+     * @tags Job Portal & Applications
+     * @param Request $request
+     * @param Job $job
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function save(Request $request, Job $job)
     {
         if ($job->status !== 'active') {
@@ -323,6 +355,16 @@ class JobController extends Controller
         ]);
     }
 
+    /**
+     * Remove Saved Job
+     *
+     * Removes a bookmarked job from the member saved list.
+     *
+     * @tags Job Portal & Applications
+     * @param Request $request
+     * @param Job $job
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function unsave(Request $request, Job $job)
     {
         $member = $request->user();
@@ -339,6 +381,15 @@ class JobController extends Controller
         ]);
     }
 
+    /**
+     * List Saved Jobs
+     *
+     * Retrieves all jobs bookmarked/saved by the authenticated member.
+     *
+     * @tags Job Portal & Applications
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function savedIndex(Request $request)
     {
         $member = $request->user();
@@ -358,6 +409,16 @@ class JobController extends Controller
         ]);
     }
 
+    /**
+     * Submit Job Application
+     *
+     * Submits an application for a job opening with cover note, experience summary, and attached resume.
+     *
+     * @tags Job Portal & Applications
+     * @param Request $request
+     * @param Job $job
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function apply(Request $request, Job $job)
     {
         if ($job->status !== 'active') {
@@ -511,7 +572,16 @@ class JobController extends Controller
         ]);
     }
 
-   public function myApplications(Request $request)
+    /**
+     * List My Job Applications
+     *
+     * Retrieves all job applications submitted by the authenticated member along with recruitment review statuses.
+     *
+     * @tags Job Portal & Applications
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function myApplications(Request $request)
 {
     $member = $request->user();
     
@@ -557,6 +627,16 @@ class JobController extends Controller
     ]);
 }
 
+    /**
+     * Withdraw Job Application
+     *
+     * Cancels and withdraws an active job application.
+     *
+     * @tags Job Portal & Applications
+     * @param Request $request
+     * @param JobApplication $application
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function withdraw(Request $request, JobApplication $application)
     {
         $member = $request->user();

@@ -16,13 +16,16 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
+/**
+ * @tags Project Tasks
+ */
 class ProjectTaskApiController extends Controller implements HasMiddleware
 {
     public static function middleware(): array
     {
         return [
-            new Middleware('auth:sanctum'),
-            new Middleware('ability:task.manage,construction.view'),
+            new Middleware('auth:sanctum', except: ['delta']),
+            new Middleware('ability:task.manage,construction.view', except: ['delta']),
         ];
     }
 
@@ -31,6 +34,16 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
     ) {
     }
 
+    /**
+     * List Project Tasks
+     *
+     * Retrieves all tasks under a specific construction project with filtering by status, priority, assignee, and search.
+     *
+     * @tags Project Tasks & Execution
+     * @param Request $request
+     * @param Project $project
+     * @return JsonResponse
+     */
     public function index(Request $request, Project $project): JsonResponse
     {
         $filters = $request->validate([
@@ -64,6 +77,16 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
         ]);
     }
 
+    /**
+     * Create Project Task
+     *
+     * Creates a new execution task for a construction project with assignee, dates, deliverables, and attachments.
+     *
+     * @tags Project Tasks & Execution
+     * @param Request $request
+     * @param Project $project
+     * @return JsonResponse
+     */
     public function store(Request $request, Project $project): JsonResponse
     {
         $actor = $request->user();
@@ -103,6 +126,17 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
         }
     }
 
+    /**
+     * Get Task Details
+     *
+     * Retrieves full details, checklist items, comments, and status history for a specific task.
+     *
+     * @tags Project Tasks & Execution
+     * @param Request $request
+     * @param Project $project
+     * @param Task $task
+     * @return JsonResponse
+     */
     public function show(Request $request, Project $project, Task $task): JsonResponse
     {
         $this->assertBelongsToProject($task, $project);
@@ -122,6 +156,17 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
         ]);
     }
 
+    /**
+     * Update Project Task
+     *
+     * Modifies title, timeline, priority, description, or quantities of an existing task.
+     *
+     * @tags Project Tasks & Execution
+     * @param Request $request
+     * @param Project $project
+     * @param Task $task
+     * @return JsonResponse
+     */
     public function update(Request $request, Project $project, Task $task): JsonResponse
     {
         $this->assertBelongsToProject($task, $project);
@@ -154,6 +199,17 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
         }
     }
 
+    /**
+     * Delete Project Task
+     *
+     * Deletes a task from the project.
+     *
+     * @tags Project Tasks & Execution
+     * @param Request $request
+     * @param Project $project
+     * @param Task $task
+     * @return JsonResponse
+     */
     public function destroy(Request $request, Project $project, Task $task): JsonResponse
     {
         $this->assertBelongsToProject($task, $project);
@@ -165,6 +221,17 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
         return response()->json(null, 204);
     }
 
+    /**
+     * Assign Members to Task
+     *
+     * Updates or sets member assignees for a construction task.
+     *
+     * @tags Project Tasks & Execution
+     * @param Request $request
+     * @param Project $project
+     * @param Task $task
+     * @return JsonResponse
+     */
     public function assignments(Request $request, Project $project, Task $task): JsonResponse
     {
         $this->assertBelongsToProject($task, $project);
@@ -199,6 +266,16 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
         }
     }
 
+    /**
+     * List Task Checklists
+     *
+     * Retrieves all ordered checklist items belonging to a project task.
+     *
+     * @tags Project Tasks & Execution
+     * @param Project $project
+     * @param Task $task
+     * @return JsonResponse
+     */
     public function checklistIndex(Project $project, Task $task): JsonResponse
     {
         $this->assertBelongsToProject($task, $project);
@@ -208,6 +285,17 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
         ]);
     }
 
+    /**
+     * Batch Add Task Checklists
+     *
+     * Replaces or bulk inserts interactive checklist items for a task.
+     *
+     * @tags Project Tasks & Execution
+     * @param Request $request
+     * @param Project $project
+     * @param Task $task
+     * @return JsonResponse
+     */
     public function checklistStoreBatch(Request $request, Project $project, Task $task): JsonResponse
     {
         $this->assertBelongsToProject($task, $project);
@@ -241,6 +329,17 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
         }
     }
 
+    /**
+     * Update Task Checklist Item
+     *
+     * Updates title, day number, sort order, or completion status of an individual checklist item.
+     *
+     * @tags Project Tasks & Execution
+     * @param Request $request
+     * @param Project $project
+     * @param int $checklistId
+     * @return JsonResponse
+     */
     public function checklistUpdate(Request $request, Project $project, int $checklistId): JsonResponse
     {
         $actor = $request->user();
@@ -278,6 +377,17 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
         ]);
     }
 
+    /**
+     * Delete Task Checklist Item
+     *
+     * Removes an item from the task checklist.
+     *
+     * @tags Project Tasks & Execution
+     * @param Request $request
+     * @param Project $project
+     * @param int $checklistId
+     * @return JsonResponse
+     */
     public function checklistDestroy(Request $request, Project $project, int $checklistId): JsonResponse
     {
         $actor = $request->user();
@@ -299,6 +409,17 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
         return response()->json(null, 204);
     }
 
+    /**
+     * Record Task Status Transition
+     *
+     * Transitions a task to a new status (e.g. in_progress, review, completed), logging GPS coordinates, progress percent, and verification files.
+     *
+     * @tags Project Tasks & Execution
+     * @param Request $request
+     * @param Project $project
+     * @param Task $task
+     * @return JsonResponse
+     */
     public function recordStatusTransition(Request $request, Project $project, Task $task): JsonResponse
     {
         $this->assertBelongsToProject($task, $project);
@@ -364,6 +485,16 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
         }
     }
 
+    /**
+     * List Task Status Transitions
+     *
+     * Retrieves audit trail of status transitions and comments on a task.
+     *
+     * @tags Project Tasks & Execution
+     * @param Project $project
+     * @param Task $task
+     * @return JsonResponse
+     */
     public function transitionIndex(Project $project, Task $task): JsonResponse
     {
         $this->assertBelongsToProject($task, $project);
@@ -375,6 +506,16 @@ class ProjectTaskApiController extends Controller implements HasMiddleware
         ]);
     }
 
+    /**
+     * Sync Task Changes (Delta Sync)
+     *
+     * Returns task modifications and delta changes since a specified timestamp for offline sync.
+     *
+     * @tags Project Tasks & Execution
+     * @param Request $request
+     * @param Project $project
+     * @return JsonResponse
+     */
     public function delta(Request $request, Project $project): JsonResponse
     {
         $request->validate(['since' => 'required|date']);

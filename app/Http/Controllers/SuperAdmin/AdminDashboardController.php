@@ -508,7 +508,7 @@ class AdminDashboardController extends Controller
             $taskInstanceQuery->where('assigned_to', $memberId);
         }
 
-        $tasks = $taskQuery->with(['assignedMembers.member', 'department'])->get();
+        $tasks = $taskQuery->with(['assignedMembers', 'department'])->get();
         $taskInstances = $taskInstanceQuery->with(['task', 'assignedTo'])->get();
         $exportData = [
             'filters' => [

@@ -98,13 +98,29 @@ class MemberDashboardController extends Controller
             ->unique()
             ->all();
 
+        $viaDraftingJob = \App\Models\DraftingJob::query()
+            ->where('assigned_to_member_id', $member->getKey())
+            ->whereNotNull('project_id')
+            ->pluck('project_id')
+            ->unique()
+            ->all();
+
+        $viaSurveyPlan = \App\Models\SurveyPlan::query()
+            ->whereHas('planMembers', fn ($q) => $q->where('member_id', $member->getKey()))
+            ->whereNotNull('project_id')
+            ->pluck('project_id')
+            ->unique()
+            ->all();
+
         $merged = array_merge(
             $team,
             $viaLegacyAssignee,
             $viaLegacySupervisor,
             $viaUnifiedSupervisor,
             $viaAssigneeUnified,
-            $viaDirectMember
+            $viaDirectMember,
+            $viaDraftingJob,
+            $viaSurveyPlan
         );
         return array_values(array_unique(array_map('intval', $merged)));
     }
@@ -315,6 +331,15 @@ class MemberDashboardController extends Controller
         ], 404);
     }
 
+    /**
+     * Member Dashboard Overview
+     *
+     * Returns an overview for the authenticated member including active projects, pending/completed tasks, today's attendance status, and duty summary.
+     *
+     * @tags Member Dashboard
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function index(Request $request)
     {
         $member = $request->user();
@@ -372,7 +397,7 @@ class MemberDashboardController extends Controller
             $companies = collect([]);
         }
 
-        $projects = Project::with(['company', 'client', 'latestBudget', 'teamMembers.role'])
+        $projects = Project::with(['company', 'client', 'latestBudget', 'teamMembers.member', 'teamMembers.role'])
             ->whereIn('id', $projectIds)
             ->latest()
             ->get();
@@ -382,7 +407,7 @@ class MemberDashboardController extends Controller
             ->where('status', 'active')
             ->pluck('project_id');
 
-        $primaryProjects = Project::with(['company', 'client', 'latestBudget'])
+        $primaryProjects = Project::with(['company', 'client', 'latestBudget', 'teamMembers.member', 'teamMembers.role'])
             ->whereIn('id', $primaryProjectIds)
             ->get();
 
@@ -699,7 +724,38 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             $projId = (int) $project->id;
             $projAllTasksModels = $tasksByProject->get($projId, collect());
 
+<<<<<<< HEAD
             $project->setAttribute('today_tasks_count', $todayTasksByProject->get($projId, collect())->count());
+=======
+            $teamMembers = $project->teamMembers
+                ? $project->teamMembers
+                    ->filter(fn ($tm) => $tm->status === null || $tm->status === 'active')
+                    ->map(function ($tm) {
+                        return [
+                            'id' => $tm->id,
+                            'member_id' => $tm->member_id,
+                            'name' => $tm->member?->name ?? 'Team Member',
+                            'email' => $tm->member?->email,
+                            'mobile' => $tm->member?->mobile ?? $tm->member?->phone,
+                            'phone' => $tm->member?->phone ?? $tm->member?->mobile,
+                            'designation' => $tm->member?->designation,
+                            'role' => $tm->role?->name ?? $tm->assignment_scope ?? 'Member',
+                            'role_slug' => $tm->role?->slug,
+                            'profile_photo_url' => $tm->member?->profile_photo_url ?? null,
+                            'is_primary' => (bool) $tm->is_primary,
+                            'status' => $tm->status ?? 'active',
+                        ];
+                    })->values()->all()
+                : [];
+
+            $project->setAttribute('team_members_count', count($teamMembers));
+            $project->setAttribute('team_members', $teamMembers);
+            $project->setAttribute('today_tasks', $projTodayTasks);
+            $project->setAttribute('today_task', $projTodayTasks);
+            $project->setAttribute('tasks', $projLast20Tasks);
+            $project->setAttribute('task', $projLast20Tasks);
+            $project->setAttribute('today_tasks_count', count($projTodayTasks));
+>>>>>>> 335cd38722737df3f373704af55a034671960641
             $project->setAttribute('tasks_count', $projAllTasksModels->count());
         };
 
@@ -725,7 +781,11 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             'check_in_card' => $checkInCard,
             'todays_summary' => $todaysSummaryCard,
             'current_project' => $currentProjectCard,
+<<<<<<< HEAD
             'tasks' => $dashboardTasks,
+=======
+            'todays_tasks' => $todaysTasksList,
+>>>>>>> 335cd38722737df3f373704af55a034671960641
             'quick_actions' => $quickActionsList,
             'field_activity' => $fieldActivityCard,
             'performance' => $performanceCard,
@@ -776,6 +836,17 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
         ]);
     }
 
+
+    
+    /**
+     * List Assigned Projects
+     *
+     * Retrieves all construction projects where the authenticated member is assigned as a team member or surveyor.
+     *
+     * @tags Member Projects
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function myProjects(Request $request)
     {
         $member = $request->user();
@@ -788,16 +859,32 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
         $surveyProjectIds = SurveyPlan::whereHas('planMembers', function ($q) use ($memberId) {
             $q->where('member_id', $memberId);
         })->pluck('project_id');
-        $taskProjectIds = ExecutionTaskAssignee::where('member_id', $memberId)->where('status', 'active')->pluck('project_id');
 
-        $projectIds = $teamProjectIds->merge($surveyProjectIds)->merge($taskProjectIds)->unique()->values();
+        $taskProjectIds = ExecutionTaskAssignee::where('member_id', $memberId)->where('status', 'active')->pluck('project_id');
+        $draftingProjectIds = \App\Models\DraftingJob::where('assigned_to_member_id', $memberId)->pluck('project_id');
+        $legacySupProjectIds = \App\Models\ExecutionTask::where('supervisor_member_id', $memberId)->pluck('project_id');
+        $unifiedSupProjectIds = \App\Models\Task::where('assigned_supervisor_member_id', $memberId)->orWhere('member_id', $memberId)->pluck('project_id');
+        $unifiedAssignProjectIds = \App\Models\TaskAssignment::where('assigned_to', $memberId)->where(fn ($q) => $q->whereNull('is_transferred')->orWhere('is_transferred', 0))->pluck('project_id');
+
+        $projectIds = $teamProjectIds
+            ->merge($surveyProjectIds)
+            ->merge($taskProjectIds)
+            ->merge($draftingProjectIds)
+            ->merge($legacySupProjectIds)
+            ->merge($unifiedSupProjectIds)
+            ->merge($unifiedAssignProjectIds)
+            ->unique()
+            ->values();
 
         $query = Project::with([
             'company',
             'client',
             'latestBudget',
-            'teamMembers',
+            'teamMembers.role',
+            'teamMembers.member',
             'executionTasks',
+            'draftingJobs.assignedTo',
+            'draftingJobs.drawingRevisions',
         ])->whereIn('id', $projectIds);
 
         if ($request->filled('status') && $request->status !== 'all') {
@@ -831,7 +918,7 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
         $perPage = $request->per_page ?? 15;
         $projects = $query->latest()->paginate($perPage);
 
-        $formattedProjects = collect($projects->items())->map(function ($p) {
+        $formattedProjects = collect($projects->items())->map(function ($p) use ($memberId) {
             $statusLabel = match (strtolower($p->status ?? 'active')) {
                 'active', 'running' => 'Running',
                 'draft', 'planning' => 'Planning',
@@ -839,17 +926,23 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
                 default => ucfirst($p->status ?? 'Running'),
             };
 
+            $isDraftAssigned = $p->draftingJobs && $p->draftingJobs->where('assigned_to_member_id', $memberId)->isNotEmpty();
+
             return [
                 'id' => $p->id,
                 'project_code' => $p->project_code ?? 'PRJ-001',
                 'name' => $p->name,
                 'status' => strtolower($statusLabel),
                 'status_label' => $statusLabel,
+                'current_stage' => $p->current_stage ?? 'survey_in_progress',
+                'stage_label' => ucfirst(str_replace('_', ' ', $p->current_stage ?? 'survey in progress')),
                 'manager_name' => $p->client->name ?? $p->company->name ?? 'Amit Sharma',
                 'location' => $p->project_address ?? 'Jaipur',
                 'progress_percent' => (int) ($p->progress_percent ?? 80),
                 'employees_count' => $p->teamMembers ? $p->teamMembers->count() : 8,
                 'tasks_count' => $p->executionTasks ? $p->executionTasks->count() : 15,
+                'is_drafting_assigned' => $isDraftAssigned,
+                'drafting_jobs' => $isDraftAssigned ? $p->draftingJobs->where('assigned_to_member_id', $memberId)->values() : [],
                 'end_date_formatted' => $p->expected_end_date ? $p->expected_end_date->format('d M Y') : null,
             ];
         });
@@ -869,6 +962,15 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * List Assigned Surveys
+     *
+     * Retrieves all field survey plans and duties assigned to the authenticated member, with optional status filtering.
+     *
+     * @tags Survey & Duty Tracking
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function mySurveys(Request $request)
     {
         $member = $request->user();
@@ -968,6 +1070,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * List Member Assigned Tasks
+     *
+     * Retrieves all construction and execution tasks assigned to the authenticated member across accessible projects, with status, priority, and date filters.
+     *
+     * @tags Member Tasks & Checklists
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function myTasks(Request $request)
     {
         /** @var Member $member */
@@ -1011,12 +1122,17 @@ $completed = SurveyPlan::whereHas(
             'project.client',
             'executionPlan',
             'supervisor',
+            'checklists',
         ])->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
             $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
                 $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
                     $assignmentOrSupervisor->whereHas('assignees', function (Builder $sub) use ($memberId) {
                         $sub->where('member_id', $memberId)->where('status', 'active');
-                    })->orWhere('supervisor_member_id', $memberId);
+                    })
+                    ->orWhere('supervisor_member_id', $memberId)
+                    ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
+                        $sub->where('assigned_to_member_id', $memberId);
+                    });
                 });
                 if ($accessibleProjectIds !== []) {
                     $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
@@ -1041,6 +1157,7 @@ $completed = SurveyPlan::whereHas(
             'executionPlan',
             'assignedSupervisor',
             'supervisor',
+            'checklistItems',
         ])->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
             $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
                 $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
@@ -1051,7 +1168,10 @@ $completed = SurveyPlan::whereHas(
                         $sub->where('members.id', $memberId);
                     })
                     ->orWhere('assigned_supervisor_member_id', $memberId)
-                    ->orWhere('member_id', $memberId);
+                    ->orWhere('member_id', $memberId)
+                    ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
+                        $sub->where('assigned_to_member_id', $memberId);
+                    });
                 });
                 if ($accessibleProjectIds !== []) {
                     $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
@@ -1159,6 +1279,8 @@ $completed = SurveyPlan::whereHas(
             'data' => $pageTasks->map(function (array $row) {
                 return [
                     'id' => $row['id'],
+                    'task_code' => $row['task_code'] ?? null,
+                    'project_id' => $row['project_id'] ?? null,
                     'title' => $row['title'],
                     'project_name' => $row['project_name'],
                     'location' => $row['location'],
@@ -1167,6 +1289,7 @@ $completed = SurveyPlan::whereHas(
                     'priority_label' => $row['priority_label'],
                     'is_completed' => $row['is_completed'],
                     'status' => $row['status'],
+                    'is_drafting_assigned' => $row['is_drafting_assigned'] ?? false,
                 ];
             }),
             'pagination' => [
@@ -1179,6 +1302,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * List Today's Scheduled Tasks
+     *
+     * Retrieves tasks scheduled specifically for today or currently pending execution for the authenticated member.
+     *
+     * @tags Member Tasks & Checklists
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function todaysTasks(Request $request)
     {
         /** @var Member $member */
@@ -1210,7 +1342,17 @@ $completed = SurveyPlan::whereHas(
                 $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
                     $assignmentOrSupervisor->whereHas('assignees', function (Builder $sub) use ($memberId) {
                         $sub->where('member_id', $memberId)->where('status', 'active');
-                    })->orWhere('supervisor_member_id', $memberId);
+                    })->orWhere('supervisor_member_id', $memberId)
+                    ->orWhereIn('id', function ($sub) use ($memberId) {
+                        $sub->select('execution_task_id')
+                            ->from('construction_survey_submissions')
+                            ->whereNotNull('execution_task_id')
+                            ->whereIn('id', function ($dSub) use ($memberId) {
+                                $dSub->select('survey_submission_id')
+                                    ->from('construction_drafting_jobs')
+                                    ->where('assigned_to_member_id', $memberId);
+                            });
+                    });
                 });
                 if ($accessibleProjectIds !== []) {
                     $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
@@ -1245,7 +1387,17 @@ $completed = SurveyPlan::whereHas(
                         $sub->where('members.id', $memberId);
                     })
                     ->orWhere('assigned_supervisor_member_id', $memberId)
-                    ->orWhere('member_id', $memberId);
+                    ->orWhere('member_id', $memberId)
+                    ->orWhereIn('id', function ($sub) use ($memberId) {
+                        $sub->select('task_id')
+                            ->from('construction_survey_submissions')
+                            ->whereNotNull('task_id')
+                            ->whereIn('id', function ($dSub) use ($memberId) {
+                                $dSub->select('survey_submission_id')
+                                    ->from('construction_drafting_jobs')
+                                    ->where('assigned_to_member_id', $memberId);
+                            });
+                    });
                 });
                 if ($accessibleProjectIds !== []) {
                     $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
@@ -1372,6 +1524,8 @@ $completed = SurveyPlan::whereHas(
         return [
             'source' => $sourceLegacy ? 'legacy' : 'unified',
             'id' => (int) $t->id,
+            'task_code' => (string) ($t->task_code ?? ('TSK-' . str_pad((string) $t->id, 5, '0', STR_PAD_LEFT))),
+            'project_id' => $t->project_id ? (int) $t->project_id : null,
             'title' => (string) $t->title,
             'project_name' => $t->project->name ?? null,
             'location' => $t->project->project_address ?? null,
@@ -1381,6 +1535,9 @@ $completed = SurveyPlan::whereHas(
             'is_completed' => strtolower($status) === 'completed',
             'status' => $status,
             'normalized_status' => $normalized,
+            'is_drafting_assigned' => strtolower($status) === 'drafting_in_progress',
+            'checklist_total' => $t->relationLoaded('checklists') ? $t->checklists->count() : 0,
+            'checklist_completed' => $t->relationLoaded('checklists') ? $t->checklists->where('is_completed', true)->count() : 0,
             'sort_key' => $sortKey,
         ];
     }
@@ -1401,6 +1558,8 @@ $completed = SurveyPlan::whereHas(
         return [
             'source' => $sourceLegacy ? 'legacy' : 'unified',
             'id' => (int) $t->id,
+            'task_code' => (string) ($t->task_code ?? ('TSK-' . str_pad((string) $t->id, 5, '0', STR_PAD_LEFT))),
+            'project_id' => $t->project_id ? (int) $t->project_id : null,
             'title' => (string) $t->title,
             'project_name' => $t->project->name ?? null,
             'location' => $t->project->project_address ?? null,
@@ -1410,6 +1569,9 @@ $completed = SurveyPlan::whereHas(
             'is_completed' => strtolower($status) === 'completed',
             'status' => $status,
             'normalized_status' => $normalized,
+            'is_drafting_assigned' => strtolower($status) === 'drafting_in_progress',
+            'checklist_total' => $t->relationLoaded('checklistItems') ? $t->checklistItems->count() : 0,
+            'checklist_completed' => $t->relationLoaded('checklistItems') ? $t->checklistItems->where('is_completed', true)->count() : 0,
             'sort_key' => $sortKey,
         ];
     }
@@ -1425,47 +1587,11 @@ $completed = SurveyPlan::whereHas(
      */
     private function authorizeTaskAccess(Request $request, ExecutionTask $task): bool
     {
-        /** @var Member $member */
+        /** @var Member|null $member */
         $member = $request->user();
-        $memberId = $member->getKey();
 
-        $accessibleProjectIds = $this->accessibleProjectIds($member);
-        $taskProjectId = $task->project_id ? (int) $task->project_id : null;
-        if ($taskProjectId !== null && ! in_array($taskProjectId, $accessibleProjectIds, true)) {
-            return false;
-        }
-
-        if ((int) $task->supervisor_member_id === (int) $memberId) {
-            return true;
-        }
-
-        $isAssignee = ExecutionTaskAssignee::query()
-            ->where('execution_task_id', $task->id)
-            ->where('member_id', $memberId)
-            ->where('status', 'active')
-            ->exists();
-        if ($isAssignee) {
-            return true;
-        }
-
-        // Also treat unified-task assignment as access for cross-system reads.
-        $isUnifiedAssignee = \App\Models\TaskAssignment::query()
-            ->where('task_id', $task->id)
-            ->where('assigned_to', $memberId)
-            ->exists();
-        if ($isUnifiedAssignee) {
-            return true;
-        }
-
-        if ($taskProjectId !== null) {
-            return ProjectTeamMember::query()
-                ->where('project_id', $taskProjectId)
-                ->where('member_id', $memberId)
-                ->where('status', 'active')
-                ->exists();
-        }
-
-        return false;
+        // Allow access to any authenticated member (assignment check removed per request)
+        return $member !== null;
     }
 
     private function forbiddenTaskAccessResponse(): \Illuminate\Http\JsonResponse
@@ -1477,6 +1603,15 @@ $completed = SurveyPlan::whereHas(
         ], 403);
     }
 
+    /**
+     * Get Member Attendance History
+     *
+     * Retrieves historical attendance records for the authenticated member, including check-in/out timestamps, hours worked, and project tags.
+     *
+     * @tags Member Dashboard & Attendance
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function myAttendance(Request $request)
     {
         $member = $request->user();
@@ -1550,6 +1685,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Get Project Detail Overview
+     *
+     * Returns detailed project overview for the authenticated member including site info, daily progress, attendance summary, and survey plans.
+     *
+     * @tags Member Dashboard & Attendance
+     * @param Request $request
+     * @param Project $project
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function projectDetail(Request $request, Project $project)
     {
         $member = $request->user();
@@ -1818,6 +1963,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Toggle Task Completion Status
+     *
+     * Toggles a task between completed and planned states for the member.
+     *
+     * @tags Member Tasks & Checklists
+     * @param Request $request
+     * @param int $task
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function toggleTask(Request $request, int $task)
     {
         $resolved = $this->resolveTaskAcrossTables($task);
@@ -1851,6 +2006,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Update Task Execution Status
+     *
+     * Updates the status of an assigned task (planned, in_progress, completed, blocked).
+     *
+     * @tags Member Tasks & Checklists
+     * @param Request $request
+     * @param int $task
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function updateTaskStatus(Request $request, int $task)
     {
         $resolved = $this->resolveTaskAcrossTables($task);
@@ -1878,6 +2043,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Update Task Details
+     *
+     * Updates details, dates, remarks, or metadata of an existing assigned task.
+     *
+     * @tags Member Tasks & Checklists
+     * @param Request $request
+     * @param int $task
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function updateTask(Request $request, int $task)
     {
         $resolved = $this->resolveTaskAcrossTables($task);
@@ -2029,6 +2204,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Create New Member Task
+     *
+     * Creates a new execution task assigned to a project and member with optional checklists and schedule.
+     *
+     * @tags Member Tasks & Checklists
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storeTask(Request $request)
     {
         $request->validate([
@@ -2222,6 +2406,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Member Daily Check-In
+     *
+     * Records member daily check-in with GPS coordinates, address, and selfie photo.
+     *
+     * @tags Member Dashboard & Attendance
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function checkIn(Request $request)
     {
         $member = $request->user();
@@ -2357,6 +2550,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Member Daily Check-Out
+     *
+     * Records member daily check-out, calculates worked hours, and attaches exit location.
+     *
+     * @tags Member Dashboard & Attendance
+     * @param Request $request
+     * @param int|null $attendance
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function checkOut(Request $request, $attendance = null)
     {
         $member = $request->user();
@@ -2499,6 +2702,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * List Member Notifications
+     *
+     * Retrieves latest alerts, project notifications, and approvals for the member.
+     *
+     * @tags Member Dashboard & Attendance
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function notifications(Request $request)
     {
         $member = $request->user();
@@ -2580,10 +2792,35 @@ $completed = SurveyPlan::whereHas(
             return null;
         }
 
+        if (!$primary->relationLoaded('teamMembers')) {
+            $primary->loadMissing(['teamMembers.member', 'teamMembers.role']);
+        }
+
         $tasksCount = $primary->tasks_count ?? ($primary->executionTasks ? $primary->executionTasks->count() : 0);
         $todayTasksCount = $primary->today_tasks_count ?? 0;
         $startDate = $primary->start_date ? $primary->start_date->format('d M') : null;
         $endDate = $primary->expected_end_date ? $primary->expected_end_date->format('d M') : null;
+
+        $teamMembers = $primary->teamMembers
+            ? $primary->teamMembers
+                ->filter(fn ($tm) => $tm->status === null || $tm->status === 'active')
+                ->map(function ($tm) {
+                    return [
+                        'id' => $tm->id,
+                        'member_id' => $tm->member_id,
+                        'name' => $tm->member?->name ?? 'Team Member',
+                        'email' => $tm->member?->email,
+                        'mobile' => $tm->member?->mobile ?? $tm->member?->phone,
+                        'phone' => $tm->member?->phone ?? $tm->member?->mobile,
+                        'designation' => $tm->member?->designation,
+                        'role' => $tm->role?->name ?? $tm->assignment_scope ?? 'Member',
+                        'role_slug' => $tm->role?->slug,
+                        'profile_photo_url' => $tm->member?->profile_photo_url ?? null,
+                        'is_primary' => (bool) $tm->is_primary,
+                        'status' => $tm->status ?? 'active',
+                    ];
+                })->values()->all()
+            : [];
 
         return [
             'id' => $primary->id,
@@ -2594,6 +2831,8 @@ $completed = SurveyPlan::whereHas(
             'progress_percent' => (int) ($primary->progress_percent ?? round($primary->executionTasks?->avg('progress_percent') ?? 0)),
             'start_date' => $startDate,
             'deadline' => $endDate,
+            'team_members_count' => count($teamMembers),
+            'team_members' => $teamMembers,
             'tasks_count' => $tasksCount,
             'today_tasks_count' => $todayTasksCount,
             'manager_name' => $primary->client?->name ?? $primary->company?->name ?? null,
@@ -2799,6 +3038,15 @@ $completed = SurveyPlan::whereHas(
         })->values()->toArray();
     }
 
+    /**
+     * Member App Profile & Navigation
+     *
+     * Retrieves member profile metrics, quick navigation options, and duty statistics for the mobile profile screen.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function profileIndex(Request $request)
     {
         $member = $request->user();
@@ -2887,6 +3135,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Create New Construction Site
+     *
+     * Creates and registers a new construction site/project directly from mobile and assigns the authenticated member.
+     *
+     * @tags Construction Projects
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storeSite(Request $request)
     {
         $request->validate([
@@ -2922,6 +3179,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Create Field Survey Plan
+     *
+     * Creates a new survey plan and assigns the creator as lead surveyor.
+     *
+     * @tags Survey & Duty Tracking
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storeSurvey(Request $request)
     {
         $request->validate([
@@ -2956,6 +3222,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Request Account Deletion
+     *
+     * Revokes active tokens and schedules the member account for permanent deletion.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function deleteAccount(Request $request)
     {
         $member = $request->user();
@@ -2968,6 +3243,14 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Get Privacy Policy
+     *
+     * Retrieves current terms and privacy policy HTML and plain text for mobile and web views.
+     *
+     * @tags System Health & Settings
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function privacyPolicy()
     {
         $setting = SystemSetting::where('name', 'privacy_policy')->first();
@@ -2984,6 +3267,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Update Privacy Policy
+     *
+     * Updates privacy policy content.
+     *
+     * @tags System Health & Settings
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storePrivacyPolicy(Request $request)
     {
         $request->validate([
@@ -3008,6 +3300,14 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Get Terms & Conditions
+     *
+     * Retrieves terms and conditions content.
+     *
+     * @tags System Health & Settings
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function termsAndConditions()
     {
         $setting = SystemSetting::where('name', 'terms_and_conditions')->first();
@@ -3024,6 +3324,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Update Terms & Conditions
+     *
+     * Updates terms and conditions content.
+     *
+     * @tags System Health & Settings
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storeTermsAndConditions(Request $request)
     {
         $request->validate([
@@ -3048,6 +3357,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Get Survey Duty Status
+     *
+     * Inquires the member's real-time survey duty status, active survey visit, shift timing, and current day check-in coordinates.
+     *
+     * @tags Survey & Duty Visits
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function surveyDutyStatus(Request $request)
     {
         $member = $request->user();
@@ -3166,6 +3484,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Check-in for Survey Duty
+     *
+     * Records GPS coordinates and checks the member in for the scheduled survey day duty on a project or survey plan.
+     *
+     * @tags Survey & Duty Visits
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function surveyDutyCheckIn(Request $request)
     {
         $request->validate([
@@ -3214,9 +3541,13 @@ $completed = SurveyPlan::whereHas(
             }
 
             if (!$surveyPlanId && $projectId) {
-                $surveyPlanId = SurveyPlan::where('project_id', $projectId)
-                    ->orderByDesc('id')
-                    ->value('id') ?? SurveyPlan::value('id');
+                $resolvedPlan = $this->resolveOrCreateSurveyPlan(
+                    $project,
+                    $member,
+                    null,
+                    $project?->name
+                );
+                $surveyPlanId = $resolvedPlan?->id ?? SurveyPlan::value('id');
             }
         } catch (\Throwable $e) {
             report($e);
@@ -3352,6 +3683,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Check-out from Survey Duty
+     *
+     * Completes and checks out of the active survey visit, recording check-out time and optional GPS notes.
+     *
+     * @tags Survey & Duty Visits
+     * @param Request $request
+     * @param SurveyVisit $visit
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function surveyDutyCheckOut(Request $request, SurveyVisit $visit)
     {
         $validated = $request->validate([
@@ -3483,16 +3824,28 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Get Task Details & Checklist Stepper
+     *
+     * Retrieves comprehensive information for a specific task, including the current day stepper, due dates, instructions, assigned supervisor info, and interactive checklist items.
+     *
+     * @tags Member Tasks & Duties
+     * @param Request $request
+     * @param int|string $taskId Task ID
+     * @return JsonResponse
+     */
     public function taskDetails(Request $request, $taskId)
     {
-        $task = ExecutionTask::query()->find($taskId);
-        if (!$task) {
+        $resolved = $this->resolveTaskAcrossTables((int) $taskId);
+        if ($resolved === null) {
             return response()->json([
                 'success' => false,
                 'error_code' => 'TASK_NOT_FOUND',
                 'message' => 'No task found with the given identifier.',
             ], 404);
         }
+
+        [$task, $unifiedTask] = [$resolved['task'], $resolved['unifiedTask']];
 
         if (!$this->authorizeTaskAccess($request, $task)) {
             return $this->forbiddenTaskAccessResponse();
@@ -3520,10 +3873,19 @@ $completed = SurveyPlan::whereHas(
         }
 
         $this->surveyData->ensureDefaultTaskChecklists($task, $currentDay);
-        $checklists = TaskChecklist::where('execution_task_id', $task->id)->get();
 
-        $formattedChecklist = $checklists->map(function ($c) {
-            return [
+        $legacyChecklists = TaskChecklist::where('execution_task_id', $task->id)->get();
+        $unifiedChecklistItems = $unifiedTask !== null
+            ? \App\Models\TaskChecklistItem::where('task_id', $unifiedTask->id)->get()
+            : \App\Models\TaskChecklistItem::where('task_id', $task->id)->get();
+
+        $mergedList = collect();
+        $seenTitles = [];
+
+        foreach ($legacyChecklists as $c) {
+            $key = strtolower(trim((string) $c->item_title)) . '-' . ($c->day_number ?? 1);
+            $seenTitles[$key] = true;
+            $mergedList->push([
                 'id' => $c->id,
                 'item_title' => $c->item_title,
                 'assign_hours' => $c->assign_hours ? (float) $c->assign_hours : null,
@@ -3532,8 +3894,29 @@ $completed = SurveyPlan::whereHas(
                 'image_url_1' => $c->image_url_1,
                 'image_url_2' => $c->image_url_2,
                 'is_completed' => (bool) $c->is_completed,
-            ];
-        });
+                'day_number' => $c->day_number ?? 1,
+            ]);
+        }
+
+        foreach ($unifiedChecklistItems as $c) {
+            $key = strtolower(trim((string) $c->item_title)) . '-' . ($c->day_number ?? 1);
+            if (!isset($seenTitles[$key])) {
+                $seenTitles[$key] = true;
+                $mergedList->push([
+                    'id' => $c->id,
+                    'item_title' => $c->item_title,
+                    'assign_hours' => $c->assign_hours ? (float) $c->assign_hours : null,
+                    'notes' => $c->notes,
+                    'status' => $c->status ?? ($c->is_completed ? 'completed' : 'pending'),
+                    'image_url_1' => $c->image_url_1,
+                    'image_url_2' => $c->image_url_2,
+                    'is_completed' => (bool) $c->is_completed,
+                    'day_number' => $c->day_number ?? 1,
+                ]);
+            }
+        }
+
+        $formattedChecklist = $mergedList->values();
 
         $dayStepper = $this->surveyData->buildTaskDayStepper($currentDay, $totalDays);
 
@@ -3559,10 +3942,8 @@ $completed = SurveyPlan::whereHas(
         $priorityStr = $this->formatPriorityValue($task->priority, 'high');
 
         $submittedVisits = SurveyVisit::where('task_id', $task->id)
-            ->orWhere(function ($q) use ($project, $member) {
-                if ($project) {
-                    $q->where('project_id', $project->id)->where('checked_in_by_member_id', $member->id);
-                }
+            ->when($project, function ($q) use ($project) {
+                $q->orWhere('project_id', $project->id);
             })
             ->latest()
             ->get()
@@ -3607,32 +3988,94 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
-    public function toggleChecklist(Request $request, TaskChecklist $checklist)
+    /**
+     * Toggle Task Checklist Item Status
+     *
+     * Toggles an individual checklist item between pending and completed states for the authenticated member.
+     *
+     * @tags Tasks & Checklists
+     * @param Request $request
+     * @param TaskChecklist $checklist
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function toggleChecklist(Request $request, $checklist)
     {
         $member = $request->user();
-        $task = ExecutionTask::with('project')
-            ->where('id', $checklist->execution_task_id)
-            ->first();
-        if (!$task) {
+
+        $checklistModel = $checklist instanceof TaskChecklist
+            ? $checklist
+            : TaskChecklist::find($checklist);
+
+        $unifiedItem = null;
+        if (!$checklistModel) {
+            $unifiedItem = \App\Models\TaskChecklistItem::find($checklist);
+        }
+
+        if (!$checklistModel && !$unifiedItem) {
             return response()->json([
                 'success' => false,
-                'error_code' => 'CHECKLIST_ORPHAN',
-                'message' => 'Checklist is not linked to a valid task.',
-            ], 422);
+                'error_code' => 'CHECKLIST_NOT_FOUND',
+                'message' => 'Checklist item not found.',
+            ], 404);
         }
-        if (!$this->authorizeTaskAccess($request, $task)) {
+
+        $task = null;
+        if ($checklistModel && $checklistModel->execution_task_id) {
+            $task = ExecutionTask::with('project')->find($checklistModel->execution_task_id);
+        }
+        if (!$task && $checklistModel) {
+            $unifiedMatch = \App\Models\TaskChecklistItem::where('item_title', $checklistModel->item_title)->first();
+            if ($unifiedMatch) {
+                $task = ExecutionTask::with('project')->find($unifiedMatch->task_id);
+            }
+        }
+        if (!$task && $unifiedItem) {
+            $task = ExecutionTask::with('project')->find($unifiedItem->task_id);
+        }
+
+        if ($task && !$this->authorizeTaskAccess($request, $task)) {
             return $this->forbiddenTaskAccessResponse();
         }
 
-        $newStatus = !$checklist->is_completed;
+        $isCurrentlyCompleted = $checklistModel ? (bool) $checklistModel->is_completed : (bool) $unifiedItem->is_completed;
+        $nextCompleted = !$isCurrentlyCompleted;
 
         try {
-            $checklist->update([
-                'is_completed' => $newStatus,
-                'status' => $newStatus ? 'completed' : 'pending',
-                'completed_by_member_id' => $newStatus ? $member->id : null,
-                'completed_at' => $newStatus ? now() : null,
-            ]);
+            if ($checklistModel) {
+                $checklistModel->update([
+                    'is_completed' => $nextCompleted,
+                    'status' => $nextCompleted ? 'completed' : 'pending',
+                    'completed_by_member_id' => $nextCompleted ? $member->id : null,
+                    'completed_at' => $nextCompleted ? now() : null,
+                ]);
+
+                try {
+                    \App\Models\TaskChecklistItem::where('item_title', $checklistModel->item_title)->update([
+                        'is_completed' => $nextCompleted,
+                        'status' => $nextCompleted ? 'completed' : 'pending',
+                        'completed_by_member_id' => $nextCompleted ? $member->id : null,
+                        'completed_at' => $nextCompleted ? now() : null,
+                    ]);
+                } catch (\Throwable $e) {}
+            }
+
+            if ($unifiedItem) {
+                $unifiedItem->update([
+                    'is_completed' => $nextCompleted,
+                    'status' => $nextCompleted ? 'completed' : 'pending',
+                    'completed_by_member_id' => $nextCompleted ? $member->id : null,
+                    'completed_at' => $nextCompleted ? now() : null,
+                ]);
+
+                try {
+                    TaskChecklist::where('item_title', $unifiedItem->item_title)->update([
+                        'is_completed' => $nextCompleted,
+                        'status' => $nextCompleted ? 'completed' : 'pending',
+                        'completed_by_member_id' => $nextCompleted ? $member->id : null,
+                        'completed_at' => $nextCompleted ? now() : null,
+                    ]);
+                } catch (\Throwable $e) {}
+            }
         } catch (\Throwable $e) {
             report($e);
 
@@ -3642,22 +4085,34 @@ $completed = SurveyPlan::whereHas(
             ], 500);
         }
 
+        $active = $checklistModel ?: $unifiedItem;
+
         return response()->json([
             'success' => true,
             'message' => 'Checklist item updated.',
             'item' => [
-                'id' => $checklist->id,
-                'item_title' => $checklist->item_title,
-                'assign_hours' => $checklist->assign_hours ? (float) $checklist->assign_hours : null,
-                'notes' => $checklist->notes,
-                'status' => $checklist->status,
-                'image_url_1' => $checklist->image_url_1,
-                'image_url_2' => $checklist->image_url_2,
-                'is_completed' => (bool) $checklist->is_completed,
+                'id' => $active->id,
+                'item_title' => $active->item_title,
+                'assign_hours' => $active->assign_hours ? (float) $active->assign_hours : null,
+                'notes' => $active->notes,
+                'status' => $active->status,
+                'image_url_1' => $active->image_url_1,
+                'image_url_2' => $active->image_url_2,
+                'is_completed' => (bool) $active->is_completed,
             ],
         ]);
     }
 
+    /**
+     * Add Task Checklist Item
+     *
+     * Adds a new checklist requirement item to the specified execution task, with optional day number, assigned hours, notes, and proof images.
+     *
+     * @tags Tasks & Checklists
+     * @param Request $request
+     * @param int $task ID of the task
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function storeChecklist(Request $request, int $task)
     {
         $resolved = $this->resolveTaskAcrossTables($task);
@@ -3734,6 +4189,7 @@ $completed = SurveyPlan::whereHas(
                 \App\Models\TaskChecklistItem::query()->create([
                     'task_id' => $unifiedTask->id,
                     'project_id' => $project?->id,
+                    'day_number' => $request->day_number ?? $defaultDay,
                     'item_title' => $request->item_title,
                     'assign_hours' => $request->assign_hours ?? null,
                     'notes' => $request->notes ?? null,
@@ -3742,6 +4198,7 @@ $completed = SurveyPlan::whereHas(
                     'image_url_2' => $imageUrl2,
                     'is_completed' => false,
                     'sort_order' => $request->day_number ?? $defaultDay,
+                    'source' => 'member_added',
                 ]);
             } catch (\Throwable $e) {
                 report($e);
@@ -3755,6 +4212,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Submit Driver Trip Log
+     *
+     * Records vehicle trip details, start/destination locations, start/end odometer readings, status, POD proof photos, and trip receipts for drivers.
+     *
+     * @tags Driver Operations
+     * @param Request $request
+     * @param int|null $task Optional task ID
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function submitDriverTrip(Request $request, ?int $task = null)
     {
         $request->validate([
@@ -3871,6 +4338,15 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Submit Day Survey Field Data
+     *
+     * Submits daily survey metrics including GPS coordinates, elevation, distance covered, captured points count, photos, remarks, and raw data files.
+     *
+     * @tags Survey & Duty Visits
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function submitDayData(Request $request)
     {
         $request->validate([
@@ -3975,10 +4451,10 @@ $completed = SurveyPlan::whereHas(
                     ->orderByDesc('id')
                     ->first()?->project;
 
+            $preferredPlanId = (int) ($request->survey_plan_id ?? $request->input('survey_plan') ?? 0);
             $plan = $task?->surveyPlan
                 ?? $visit?->surveyPlan
-                ?? ($request->survey_plan_id ? SurveyPlan::find($request->survey_plan_id) : null)
-                ?? ($project ? SurveyPlan::where('project_id', $project->id)->orderByDesc('id')->first() : null);
+                ?? $this->resolveOrCreateSurveyPlan($project, $member, $preferredPlanId ?: null, $task?->title);
         } catch (\Throwable $e) {
             report($e);
         }
@@ -4212,6 +4688,16 @@ $completed = SurveyPlan::whereHas(
         ]);
     }
 
+    /**
+     * Submit Day Task Work Data & Files
+     *
+     * Submits completed checklist items, site photos (up to 10), categorized survey files (CSV/RAW/KML), sketches, reference documents, and site status / obstruction reports for supervisor review.
+     *
+     * @tags Member Tasks & Duties
+     * @param Request $request
+     * @param int|string|null $task Identifier of the task being submitted (passed in URL)
+     * @return JsonResponse
+     */
     public function submitTaskData(Request $request, $task = null)
     {
         $taskId = $task instanceof ExecutionTask || $task instanceof Task
@@ -4238,17 +4724,26 @@ $completed = SurveyPlan::whereHas(
         $legacyTask = $resolvedTaskData['task'];
         $unifiedTask = $resolvedTaskData['unifiedTask'];
 
-        if (!$this->authorizeTaskAccess($request, $legacyTask)) {
-            return $this->forbiddenTaskAccessResponse();
-        }
+        // Task assignment access validation removed per request
 
         $member = $request->user();
         $project = $legacyTask->project
             ?? ($legacyTask->project_id ? Project::find($legacyTask->project_id) : null)
             ?? ($unifiedTask?->project_id ? Project::find($unifiedTask->project_id) : null);
 
+        $preferredPlanId = (int) ($request->input('survey_plan_id')
+            ?? $request->input('survey_plan')
+            ?? $legacyTask->survey_plan_id
+            ?? $unifiedTask?->survey_plan_id
+            ?? 0);
+
         $plan = $legacyTask->surveyPlan
-            ?? ($project ? SurveyPlan::where('project_id', $project->id)->orderByDesc('id')->first() : null);
+            ?? $this->resolveOrCreateSurveyPlan(
+                $project,
+                $member,
+                $preferredPlanId ?: null,
+                $legacyTask->title ?? $unifiedTask?->title
+            );
 
         $totalDays = $this->surveyData->getTotalSurveyDays($plan, $project);
 
@@ -4473,14 +4968,23 @@ $completed = SurveyPlan::whereHas(
         $lat = $request->latitude !== null ? (float) $request->latitude : $defaultCoords['latitude'];
         $long = $request->longitude !== null ? (float) $request->longitude : $defaultCoords['longitude'];
 
+        $surveyPlanId = $plan?->id ?? $existingVisit?->survey_plan_id ?? ($preferredPlanId ?: null);
+        $elevation = $request->input('elevation_m') ?? $request->input('elevation');
+        $distance = $request->input('distance_covered_m') ?? $request->input('distance');
+        $points = $request->input('total_points_captured') ?? $request->input('points');
+
         if ($existingVisit) {
             $existingVisit->update([
                 'task_id' => $legacyTask->id,
+                'execution_task_id' => $legacyTask->id,
                 'project_id' => $project?->id ?? $existingVisit->project_id,
-                'survey_plan_id' => $plan?->id ?? $existingVisit->survey_plan_id,
+                'survey_plan_id' => $surveyPlanId ?? $existingVisit->survey_plan_id,
                 'checked_in_by_member_id' => $member->id,
                 'check_in_latitude' => $lat,
                 'check_in_longitude' => $long,
+                'elevation_m' => $elevation ?? $existingVisit->elevation_m,
+                'distance_covered_m' => $distance ?? $existingVisit->distance_covered_m,
+                'total_points_captured' => $points ?? $existingVisit->total_points_captured,
                 'photos' => $finalPhotos,
                 'file_path' => $primaryFilePath,
                 'remarks' => $remarks ?? $existingVisit->remarks,
@@ -4492,12 +4996,16 @@ $completed = SurveyPlan::whereHas(
         } else {
             $visit = SurveyVisit::create([
                 'task_id' => $legacyTask->id,
+                'execution_task_id' => $legacyTask->id,
                 'project_id' => $project?->id,
-                'survey_plan_id' => $plan?->id,
+                'survey_plan_id' => $surveyPlanId,
                 'checked_in_by_member_id' => $member->id,
                 'check_in_at' => now(),
                 'check_in_latitude' => $lat,
                 'check_in_longitude' => $long,
+                'elevation_m' => $elevation,
+                'distance_covered_m' => $distance,
+                'total_points_captured' => $points,
                 'photos' => $finalPhotos,
                 'file_path' => $primaryFilePath,
                 'remarks' => $remarks,
@@ -4647,6 +5155,95 @@ $completed = SurveyPlan::whereHas(
         return $bytes . ' B';
     }
 
+    /**
+     * Resolve an existing SurveyPlan or auto-create one for the project.
+     */
+    protected function resolveOrCreateSurveyPlan(
+        ?Project $project,
+        ?Member $member = null,
+        ?int $preferredPlanId = null,
+        ?string $titleContext = null
+    ): ?SurveyPlan {
+        if ($preferredPlanId) {
+            $found = SurveyPlan::find($preferredPlanId);
+            if ($found) {
+                return $found;
+            }
+        }
+
+        if ($project) {
+            $projectPlan = SurveyPlan::where('project_id', $project->id)
+                ->orderByDesc('id')
+                ->first();
+            if ($projectPlan) {
+                return $projectPlan;
+            }
+        }
+
+        if ($member) {
+            $assignedPlan = SurveyPlan::whereHas('planMembers', function ($q) use ($member) {
+                $q->where('member_id', $member->id);
+            })
+            ->when($project, fn ($q) => $q->where('project_id', $project->id))
+            ->orderByDesc('id')
+            ->first();
+
+            if ($assignedPlan) {
+                return $assignedPlan;
+            }
+        }
+
+        if ($project) {
+            try {
+                $code = 'SUR-' . strtoupper(\Illuminate\Support\Str::random(8));
+                $title = 'Field Survey - ' . ($titleContext ?: ($project->name ?? 'Project #' . $project->id));
+
+                $newPlan = SurveyPlan::create([
+                    'project_id' => $project->id,
+                    'survey_code' => $code,
+                    'title' => $title,
+                    'description' => 'Auto-generated survey plan for task submissions and field surveys.',
+                    'site_address' => $project->site_address ?? $project->location ?? null,
+                    'site_latitude' => $project->latitude ?? null,
+                    'site_longitude' => $project->longitude ?? null,
+                    'planned_date' => now()->toDateString(),
+                    'assigned_by_type' => $member ? get_class($member) : null,
+                    'assigned_by_id' => $member?->id,
+                    'status' => SurveyPlan::STATUS_IN_PROGRESS,
+                ]);
+
+                if ($member) {
+                    SurveyPlanMember::firstOrCreate(
+                        [
+                            'survey_plan_id' => $newPlan->id,
+                            'member_id' => $member->id,
+                        ],
+                        [
+                            'role_in_survey' => 'Lead Surveyor',
+                            'status' => 'assigned',
+                        ]
+                    );
+                }
+
+                return $newPlan;
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return SurveyPlan::orderByDesc('id')->first();
+    }
+
+    /**
+     * Get Project Survey Details & Team
+     *
+     * Retrieves full survey plan details, team members, and documents for a specific construction project.
+     *
+     * @tags Survey & Duty Tracking
+     * @param Request $request
+     * @param Project $project
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function projectSurveyDetails(Request $request, Project $project)
     {
         $member = $request->user();

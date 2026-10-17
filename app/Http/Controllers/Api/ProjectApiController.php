@@ -21,6 +21,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * @tags Construction Projects
+ */
 class ProjectApiController extends Controller
 {
     public function __construct(
@@ -53,6 +56,11 @@ class ProjectApiController extends Controller
         return null;
     }
 
+    /**
+     * List Projects (Paginated)
+     *
+     * Returns a paginated list of construction projects with company, client, and active budget details.
+     */
     public function index(Request $request)
     {
         $query = Project::with(['company', 'client', 'latestBudget']);
@@ -101,6 +109,11 @@ class ProjectApiController extends Controller
         ]);
     }
 
+    /**
+     * Get Project Details
+     *
+     * Retrieves full project details including client, company, budgets, team, surveys, vehicles, and equipment.
+     */
     public function show(Project $project)
     {
         $project->load([
@@ -127,6 +140,11 @@ class ProjectApiController extends Controller
         ]);
     }
 
+    /**
+     * Create New Project
+     *
+     * Registers a new construction project and initializes stage to budget_pending.
+     */
     public function store(Request $request)
     {
         $actor = $request->user();
@@ -162,6 +180,11 @@ class ProjectApiController extends Controller
         ], 201);
     }
 
+    /**
+     * Update Project Details
+     *
+     * Modifies existing project attributes, priority, schedule, and stage.
+     */
     public function update(Request $request, Project $project)
     {
         $validated = $request->validate([
@@ -189,6 +212,11 @@ class ProjectApiController extends Controller
         ]);
     }
 
+    /**
+     * Delete Project
+     *
+     * Deletes a project and its associated cascade records safely in a transaction.
+     */
     public function destroy(Project $project)
     {
         try {
@@ -256,6 +284,11 @@ class ProjectApiController extends Controller
         }
     }
 
+    /**
+     * Update Project Status & Stage
+     *
+     * Modifies the operational status (draft, active, on_hold, completed, cancelled) and workflow stage of a project.
+     */
     public function updateStatus(Request $request, Project $project)
     {
         $validated = $request->validate([
@@ -275,6 +308,11 @@ class ProjectApiController extends Controller
         ]);
     }
 
+    /**
+     * Add Project Budget
+     *
+     * Creates a new budget version with estimated and approved amounts, currency, and approval status.
+     */
     public function storeBudget(Request $request, Project $project)
     {
         $actor = $request->user();
@@ -310,6 +348,11 @@ class ProjectApiController extends Controller
         ], 201);
     }
 
+    /**
+     * List Project Budget History
+     *
+     * Retrieves all historical budget versions submitted for the specified project.
+     */
     public function budgets(Project $project)
     {
         $budgets = $project->budgets()->latest('version_no')->get();
@@ -320,6 +363,11 @@ class ProjectApiController extends Controller
         ]);
     }
 
+    /**
+     * Assign Team Member to Project
+     *
+     * Assigns a specific member to a project with designated role and timeframe.
+     */
     public function assignTeam(Request $request, Project $project): JsonResponse
     {
         $actor = $request->user();
@@ -369,6 +417,11 @@ class ProjectApiController extends Controller
         ]);
     }
 
+    /**
+     * Batch Assign Team Members
+     *
+     * Assigns multiple staff members to a project in a single transaction with designated roles and dates.
+     */
     public function assignBatch(Request $request): JsonResponse
     {
         $actor = $request->user();
@@ -463,6 +516,11 @@ class ProjectApiController extends Controller
         ]);
     }
 
+    /**
+     * Get Project Team Members
+     *
+     * Retrieves all assigned staff, roles, and schedules for the specified project.
+     */
     public function team(Project $project)
     {
         $team = $project->teamMembers()->with(['member', 'role'])->get();
@@ -473,6 +531,11 @@ class ProjectApiController extends Controller
         ]);
     }
 
+    /**
+     * Remove Project Team Member
+     *
+     * Unassigns and removes a team member from the project.
+     */
     public function removeTeamMember(Request $request, Project $project, $teamMemberId): JsonResponse
     {
         $actor = $request->user();
@@ -511,6 +574,11 @@ class ProjectApiController extends Controller
         ]);
     }
 
+    /**
+     * Get Construction Projects Statistics
+     *
+     * Returns total counts broken down by project stage, priority, and completion status.
+     */
     public function stats()
     {
         $total = Project::count();

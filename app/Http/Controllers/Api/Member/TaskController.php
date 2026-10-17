@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
+/**
+ * @tags Member Tasks
+ */
 class TaskController extends Controller
 {
     public function __construct(
@@ -45,6 +48,11 @@ class TaskController extends Controller
         return array_values(array_unique($adminIds));
     }
 
+    /**
+     * List Member Assigned Tasks
+     *
+     * Returns all unified tasks assigned to the authenticated member across accessible projects.
+     */
     public function index(Request $request)
     {
         /** @var Member $member */
@@ -57,6 +65,7 @@ class TaskController extends Controller
         $query = Task::query()
             ->with([
                 'creator',
+                'checklistItems.completedBy',
                 'assignedMembers' => function ($q) use ($member) {
                     $q->select('members.id', 'members.name', 'members.email', 'members.phone')
                         ->where('assigned_to', $member->id)
@@ -115,6 +124,11 @@ class TaskController extends Controller
         ]);
     }
 
+    /**
+     * Get Task Detail
+     *
+     * Retrieves specific task info including creator, assigned dates, priority, and instance tracking.
+     */
     public function show(Request $request, Task $task)
     {
         /** @var Member $member */
@@ -146,9 +160,13 @@ class TaskController extends Controller
             ], 403);
         }
 
-        $task->load(['creator', 'instances' => function ($q) use ($member) {
-            $q->where('assigned_to', $member->id)->latest();
-        }]);
+        $task->load([
+            'creator',
+            'checklistItems.completedBy',
+            'instances' => function ($q) use ($member) {
+                $q->where('assigned_to', $member->id)->latest();
+            }
+        ]);
 
         return response()->json([
             'success' => true,
@@ -156,6 +174,11 @@ class TaskController extends Controller
         ]);
     }
 
+    /**
+     * List Task Notes & Comments
+     *
+     * Retrieves comment thread and activity notes for a specific task.
+     */
     public function notesIndex(Request $request, Task $task)
     {
         /** @var Member $member */
@@ -199,6 +222,11 @@ class TaskController extends Controller
         ]);
     }
 
+    /**
+     * Add Task Note / Comment
+     *
+     * Posts a new note or threaded reply on the specified task.
+     */
     public function notesStore(Request $request, Task $task)
     {
         /** @var Member $member */
@@ -259,6 +287,11 @@ class TaskController extends Controller
         ]);
     }
 
+    /**
+     * Delete Task Note
+     *
+     * Deletes a note posted by the authenticated member.
+     */
     public function notesDestroy(Request $request, TaskComment $note)
     {
         $member = $request->user();

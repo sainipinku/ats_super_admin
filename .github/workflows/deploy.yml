@@ -1,0 +1,162 @@
+name: CI/CD Pipeline & VPS Auto Deploy
+
+on:
+  push:
+    branches:
+      - abhishek
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -------------------------------------------------------------
+  # Job 1: CI (Validate Code, Dependencies, & Build Frontend)
+  # -------------------------------------------------------------
+  test_and_build:
+    name: Code & Build Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, sqlite, pdo_sqlite, bcmath, curl, zip
+          coverage: none
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install Composer Dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install NPM Dependencies
+        run: npm ci || npm install
+
+      - name: Build Frontend Assets
+        run: npm run build
+
+      - name: Prepare Laravel Environment
+        run: |
+          cp .env.example .env
+          sed -i 's/DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
+          sed -i 's/DB_DATABASE=.*/DB_DATABASE=:memory:/' .env
+          php artisan key:generate --ansi
+
+      - name: Validate Scramble API Documentation & Routes
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
+          CACHE_STORE: array
+          SESSION_DRIVER: array
+          QUEUE_CONNECTION: sync
+          MAIL_MAILER: array
+        run: |
+          php artisan route:cache
+          php artisan route:clear
+          php artisan scramble:analyze
+
+  # -------------------------------------------------------------
+  # Job 2: CD (Auto Deploy to VPS Server via SSH)
+  # -------------------------------------------------------------
+  deploy:
+    name: Deploy to VPS Server
+    needs: [test_and_build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/abhishek' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 20
+
+    steps:
+      - name: Execute Remote Deployment via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            set -e
+            echo "🚀 Starting Deployment on $(hostname)..."
+            
+            # 1. Resolve and navigate to target web directory
+            RAW_DIR="${{ secrets.SSH_DEPLOY_PATH }}"
+            CLEAN_DIR=$(echo "$RAW_DIR" | sed -e 's/^cd //g' -e "s/['\"]//g" | xargs)
+
+            if [ -n "$CLEAN_DIR" ] && [ -d "$CLEAN_DIR" ]; then
+              DEPLOY_DIR="$CLEAN_DIR"
+            elif [ -d "/var/www/cadmax_consult_admin" ]; then
+              DEPLOY_DIR="/var/www/cadmax_consult_admin"
+            elif [ -d "/var/www/html/cadmax_consult_admin" ]; then
+              DEPLOY_DIR="/var/www/html/cadmax_consult_admin"
+            else
+              echo "❌ Error: Target deployment directory not found!"
+              echo "Specified: '$CLEAN_DIR'"
+              echo "Listing /var/www:"
+              ls -la /var/www || true
+              exit 1
+            fi
+
+            cd "$DEPLOY_DIR"
+            echo "📂 Working directory: $(pwd)"
+
+            # 2. Put application into maintenance mode (optional safe mode)
+            php artisan down --retry=15 || true
+
+            # 3. Pull latest code from the abhishek branch
+            echo "📥 Fetching latest commits from GitHub..."
+            git fetch origin abhishek
+            git reset --hard origin/abhishek
+
+            # 4. Install PHP dependencies (Production optimized)
+            echo "📦 Installing Composer dependencies..."
+            composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+
+            # 5. Install Node dependencies & compile frontend
+            echo "🎨 Building frontend assets..."
+            npm install --no-audit
+            npm run build
+
+            # 6. Run database migrations safely
+            echo "🗄️ Running database migrations..."
+            php artisan migrate --force
+
+            # 7. Optimize & cache config, routes, views
+            echo "⚡ Clearing and caching Laravel configuration..."
+            php artisan optimize:clear
+            php artisan config:cache
+            php artisan route:cache || { echo "⚠️ Route cache failed — clearing route cache to allow normal dynamic routing"; php artisan route:clear; }
+            php artisan view:cache
+
+            # 8. Restart queue workers (if any)
+            echo "🔄 Restarting queue workers..."
+            php artisan queue:restart || true
+
+            # 9. Set appropriate file permissions
+            echo "🔒 Ensuring correct directory permissions..."
+            chown -R www-data:www-data storage bootstrap/cache || true
+            chmod -R 775 storage bootstrap/cache || true
+
+            # 10. Bring application back up
+            php artisan up
+
+            echo "✅ Deployment completed successfully!"

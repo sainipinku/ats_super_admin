@@ -23,7 +23,7 @@ class MemberRoleAssignment extends Model
 
     public function role(): BelongsTo
     {
-        return $this->belongsTo(Role::class);
+        return $this->belongsTo(\App\Models\ConstructionRole::class, 'role_id');
     }
 
     public function project(): BelongsTo

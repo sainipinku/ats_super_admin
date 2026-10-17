@@ -12,6 +12,13 @@ use App\Http\Controllers\Api\Member\TaskController;
 use App\Http\Controllers\Api\ProjectApiController;
 use Illuminate\Support\Facades\Route;
 
+/**
+ * API Health & Index
+ *
+ * Verifies system availability and returns main API endpoint base paths.
+ *
+ * @tags System Health
+ */
 Route::get('/', function () {
     return response()->json([
         'success' => true,
@@ -45,7 +52,7 @@ Route::get('/signed/documents/{document}/view', [
     App\Http\Controllers\Construction\DocumentController::class, 'view',
 ])
     ->middleware('signed')
-    ->name('signed_documents.view');
+    ->name('api.signed_documents.view');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);

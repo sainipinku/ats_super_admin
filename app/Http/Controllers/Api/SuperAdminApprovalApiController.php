@@ -15,8 +15,16 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
+/**
+ * @tags Super Admin Approvals
+ */
 class SuperAdminApprovalApiController extends Controller
 {
+    /**
+     * Get Approval & Registration Statistics
+     *
+     * Returns total counts and approval rates for pending, approved, and rejected registrations.
+     */
     public function approvalStats(Request $request)
     {
         $pendingCount = Member::pending()->selfRegistered()->count();
@@ -40,6 +48,11 @@ class SuperAdminApprovalApiController extends Controller
         ]);
     }
 
+    /**
+     * List Pending Member Registrations
+     *
+     * Returns a paginated list of new self-registered members awaiting SuperAdmin approval.
+     */
     public function pendingList(Request $request)
     {
         $perPage = $request->input('per_page', 15);
@@ -74,6 +87,11 @@ class SuperAdminApprovalApiController extends Controller
         ]);
     }
 
+    /**
+     * List Approved Members
+     *
+     * Returns a paginated list of approved and active construction members.
+     */
     public function approvedList(Request $request)
     {
         $perPage = $request->input('per_page', 15);
@@ -101,6 +119,11 @@ class SuperAdminApprovalApiController extends Controller
         ]);
     }
 
+    /**
+     * List Rejected Registrations
+     *
+     * Returns a paginated list of rejected member applications with rejection remarks.
+     */
     public function rejectedList(Request $request)
     {
         $perPage = $request->input('per_page', 15);
@@ -127,6 +150,11 @@ class SuperAdminApprovalApiController extends Controller
         ]);
     }
 
+    /**
+     * Get Member Approval Details
+     *
+     * Retrieves full applicant profile, registration source, and available role assignments.
+     */
     public function show(Request $request, Member $member)
     {
         $member->loadMissing(['approver:id,name', 'assignedAdmin:id,name', 'employee']);
@@ -149,6 +177,11 @@ class SuperAdminApprovalApiController extends Controller
         ]);
     }
 
+    /**
+     * Approve Member Registration & Assign Roles
+     *
+     * Approves a pending applicant, generates their employee ID, and assigns construction roles, departments, and designations.
+     */
     public function approve(Request $request, Member $member)
     {
         if (! $member->isPending() && ! $member->isRejected()) {
@@ -228,6 +261,11 @@ class SuperAdminApprovalApiController extends Controller
         }
     }
 
+    /**
+     * Reject Member Registration
+     *
+     * Rejects an application with reason recorded for the applicant to review.
+     */
     public function reject(Request $request, Member $member)
     {
         if (! $member->isPending()) {
@@ -276,6 +314,11 @@ class SuperAdminApprovalApiController extends Controller
         }
     }
 
+    /**
+     * Assign Member to Admin Manager
+     *
+     * Links a construction team member under a supervising Admin.
+     */
     public function assignAdmin(Request $request, Member $member)
     {
         $validated = $request->validate([
@@ -316,6 +359,11 @@ class SuperAdminApprovalApiController extends Controller
         ]);
     }
 
+    /**
+     * List Construction Workflow Roles
+     *
+     * Returns all roles mapped to construction workflow phases (Driver, Surveyor, Draftsman, Supervisor).
+     */
     public function constructionRoles(Request $request)
     {
         $roles = Role::where('status', 1)
@@ -377,6 +425,11 @@ class SuperAdminApprovalApiController extends Controller
         ]);
     }
 
+    /**
+     * List All Active Departments
+     *
+     * Dropdown list of all active organizational departments.
+     */
     public function allDepartments(Request $request)
     {
         $departments = Department::where('status', 1)
@@ -389,6 +442,11 @@ class SuperAdminApprovalApiController extends Controller
         ]);
     }
 
+    /**
+     * List Designations by Department IDs
+     *
+     * Retrieves filtered designations associated with chosen department IDs.
+     */
     public function designationsByDepartments(Request $request)
     {
         $departmentIds = $request->input('department_ids', []);

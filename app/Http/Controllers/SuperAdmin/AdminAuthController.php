@@ -151,7 +151,14 @@ class AdminAuthController extends Controller
         session(['current_role' => $roleId]);
 
         if ($authenticatedUser instanceof Member) {
-            $assignedRoles = $authenticatedUser->assigned_roles;
+            $assignedRoles = $authenticatedUser->assigned_roles ?? [];
+            $roles = is_array($authenticatedUser->roles) ? $authenticatedUser->roles : [];
+
+            if (in_array(5, $roles) || in_array('draft_person', $roles) || in_array('draft_man', $roles) || in_array('draft_person', $assignedRoles) || in_array('draft_man', $assignedRoles)) {
+                session(['active_role' => 'draft_person']);
+                return redirect()->route('super.construction.drafting.index');
+            }
+
             if (!empty($assignedRoles)) {
                 $primaryRole = $assignedRoles[0];
                 session(['active_role' => $primaryRole]);
@@ -160,29 +167,27 @@ class AdminAuthController extends Controller
                     'surveyor', 'survey_man' => redirect()->route('member.construction.dashboard', ['role' => 'surveyor']),
                     'site_employee', 'execution' => redirect()->route('member.construction.execution.index'),
                     'vehicle_driver', 'driver' => redirect()->route('member.construction.vehicles.index'),
-                    'draft_person', 'draft_man' => redirect()->route('member.construction.dashboard', ['role' => 'draft_person']),
+                    'draft_person', 'draft_man' => redirect()->route('super.construction.drafting.index'),
                     'admin', 'project_admin' => redirect()->route('admin.dashboard'),
-                    default => redirect()->route('member.construction.dashboard', ['role' => $primaryRole]),
+                    default => redirect()->route('super.construction.dashboard'),
                 };
             }
         }
 
         return match ((int)$roleId) {
-            1 => redirect()->route('admin.dashboard'),
-            3 => redirect()->route('member.dashboard'),
+            9, 3 => redirect()->route('admin.dashboard'),
+            5 => redirect()->route('super.construction.drafting.index'),
+            1 => redirect()->route('super.construction.dashboard'),
             default => redirect()->intended('/'),
         };
     }
 
     protected function determineGuardFromRoles(array $roles): string
     {
-        if (in_array(1, $roles)) {
+        if (in_array(9, $roles) || in_array('admin', $roles) || in_array(3, $roles) || in_array('project_admin', $roles) || in_array(1, $roles) || in_array('member', $roles)) {
             return 'admin';
         }
-        if (in_array(3, $roles)) {
-            return 'member';
-        }
-        return 'web';
+        return 'admin';
     }
 
     protected function getFirstValidRoleId($user): ?int
@@ -193,14 +198,23 @@ class AdminAuthController extends Controller
 
         $roles = is_array($user->roles) ? $user->roles : [];
 
-        if (in_array(1, $roles)) {
-            return 1;
+        if (in_array(9, $roles) || in_array('admin', $roles)) {
+            return 9;
         }
-        if (in_array(3, $roles)) {
+        if (in_array(3, $roles) || in_array('project_admin', $roles)) {
             return 3;
         }
+        if (in_array(5, $roles) || in_array('draft_person', $roles)) {
+            return 5;
+        }
+        if (in_array(1, $roles) || in_array('member', $roles)) {
+            return 1;
+        }
+        if (!empty($roles)) {
+            return (int) $roles[0];
+        }
 
-        return null;
+        return 1;
     }
 
     protected function determineLoginField($login): string

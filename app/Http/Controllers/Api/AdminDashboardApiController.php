@@ -31,6 +31,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * @tags Admin Dashboard
+ */
 class AdminDashboardApiController extends Controller
 {
     use ResolvesConstructionActor;
@@ -39,6 +42,11 @@ class AdminDashboardApiController extends Controller
         protected SurveyDataService $surveyData,
     ) {}
 
+    /**
+     * Admin Dashboard Overview & KPIs
+     *
+     * Aggregates project stages, equipment allocations, active teams, fleet status, and financial summaries for construction admins.
+     */
     public function index(Request $request)
     {
         /** @var Member|null $actor */
@@ -1057,6 +1065,11 @@ class AdminDashboardApiController extends Controller
         ];
     }
 
+    /**
+     * Get Survey Configuration Defaults
+     *
+     * Inquires system defaults for survey shifts, site locations, total days, checklists, and supervisor templates.
+     */
     public function surveyDefaults(Request $request)
     {
         if (!Auth::guard('superadmin')->check() && !($this->constructionActor()?->isAdmin() ?? false)) {
@@ -1090,6 +1103,11 @@ class AdminDashboardApiController extends Controller
         }
     }
 
+    /**
+     * Update Survey Configuration Defaults
+     *
+     * Modifies global survey settings, shifts, step titles, and site coordinate defaults.
+     */
     public function updateSurveyDefaults(Request $request)
     {
         if (!Auth::guard('superadmin')->check() && !($this->constructionActor()?->isAdmin() ?? false)) {

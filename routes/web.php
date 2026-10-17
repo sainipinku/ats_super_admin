@@ -345,18 +345,18 @@ Route::prefix('super/construction')
             ->name('clients.destroy');
 
         Route::get('/projects', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'index'])
-            ->middleware('construction.permission:project.manage')
+            ->middleware('construction.permission:project.manage,project.view')
             ->name('projects.index');
         Route::get('/projects/next-code', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'nextProjectCode'])
             ->name('projects.next-code');
         Route::post('/projects', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'store'])
-            ->middleware('construction.permission:project.manage')
+            ->middleware('construction.permission:project.manage,project.create')
             ->name('projects.store');
         Route::put('/projects/{project}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'update'])
-            ->middleware('construction.permission:project.manage')
+            ->middleware('construction.permission:project.manage,project.edit')
             ->name('projects.update');
         Route::get('/projects/{project}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'show'])
-            ->middleware('construction.permission:project.manage')
+            ->middleware('construction.permission:project.manage,project.view')
             ->name('projects.show');
 
         Route::post('/projects/{project}/workflow/submit-survey', [App\Http\Controllers\Construction\ProjectWorkflowController::class, 'submitSurvey'])->name('projects.workflow.submit-survey');
@@ -440,6 +440,18 @@ Route::prefix('super/construction')
             ->middleware('construction.permission:execution_task.manage')
             ->scopeBindings()
             ->name('projects.tasks-v2.checklists.batch');
+        Route::post('/projects/{project}/tasks-v2/{taskId}/transfer', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'transferTask'])
+            ->middleware('construction.permission:execution_task.manage')
+            ->name('projects.tasks-v2.transfer');
+        Route::post('/projects/{project}/tasks-v2/{taskId}/review-survey', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'reviewSurvey'])
+            ->middleware('construction.permission:execution_task.manage,survey_submission.review')
+            ->name('projects.tasks-v2.review-survey');
+        Route::post('/projects/{project}/drafting-jobs/{draftingJob}/review', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'reviewDraftingJob'])
+            ->middleware('construction.permission:drafting.manage,drawing_approval.manage,execution_task.manage')
+            ->name('projects.drafting-jobs.review');
+        Route::post('/projects/{project}/tasks-v2/submit-draft', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'submitDraftDrawing'])
+            ->middleware('construction.permission:drafting.manage,document.manage,execution_task.manage')
+            ->name('projects.tasks-v2.submit-draft');
 
         Route::get('/survey', [App\Http\Controllers\SuperAdmin\Construction\SurveyController::class, 'index'])
             ->middleware('construction.permission:survey_plan.manage,survey_submission.review')
@@ -620,10 +632,10 @@ Route::prefix('admin/construction')
             ->middleware('construction.permission:dashboard.view')
             ->name('dashboard');
         Route::get('/projects', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'index'])
-            ->middleware('construction.permission:project.manage')
+            ->middleware('construction.permission:project.manage,project.view')
             ->name('projects.index');
         Route::get('/projects/{project}', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'show'])
-            ->middleware('construction.permission:project.manage')
+            ->middleware('construction.permission:project.manage,project.view')
             ->name('projects.show');
 
         Route::post('/projects/{project}/workflow/submit-survey', [App\Http\Controllers\Construction\ProjectWorkflowController::class, 'submitSurvey'])->name('projects.workflow.submit-survey');
@@ -861,13 +873,13 @@ Route::prefix('member')->middleware(['member'])->group(function () {
         ->name('member.construction.')
         ->group(function () {
             Route::get('/dashboard', [App\Http\Controllers\Member\ConstructionController::class, 'dashboard'])
-                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage')
+                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage,drafting.manage,project.view')
                 ->name('dashboard');
             Route::get('/projects', [App\Http\Controllers\Member\ConstructionController::class, 'projects'])
-                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage')
+                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage,drafting.manage,project.view')
                 ->name('projects.index');
             Route::get('/projects/{project}', [App\Http\Controllers\Member\ConstructionController::class, 'showProject'])
-                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage')
+                ->middleware('construction.permission:dashboard.view,execution_task.manage,dpr.manage,attendance.manage,drafting.manage,project.view')
                 ->name('projects.show');
 
             Route::post('/projects/{project}/workflow/submit-survey', [App\Http\Controllers\Construction\ProjectWorkflowController::class, 'submitSurvey'])->name('projects.workflow.submit-survey');
@@ -974,6 +986,7 @@ Route::post('/emulate/switch-role', [EmulationController::class, 'switchRole'])-
 
 // Password Reset Routes
 Route::get('/forget-password', [HomeController::class, 'forgetPassword'])->name('password.request');
+Route::redirect('/forgot-password', '/forget-password');
 Route::get('/super-forget-password', [HomeController::class, 'superForgetPassword'])->name('super.password.request');
 Route::post('/check-email', [HomeController::class, 'checkEmail'])->name('auth.checkEmail');
 Route::post('/super-check-email', [HomeController::class, 'superCheckEmail'])->name('super.auth.checkEmail');

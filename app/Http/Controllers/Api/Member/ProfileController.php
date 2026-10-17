@@ -10,6 +10,9 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
+/**
+ * @tags Member Profile
+ */
 class ProfileController extends Controller
 {
     private function getProfileCompletionData($member): array
@@ -68,6 +71,15 @@ class ProfileController extends Controller
         ];
     }
 
+    /**
+     * Get Member Profile
+     *
+     * Retrieves the authenticated member profile details, contact information, and role assignments.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function show(Request $request)
     {
         return response()->json([
@@ -76,6 +88,15 @@ class ProfileController extends Controller
         ]);
     }
 
+    /**
+     * Update Member Profile
+     *
+     * Updates profile personal details, contact info, job title, skills, experience, and location coordinates.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function update(Request $request)
     {
         $member = $request->user();
@@ -87,14 +108,14 @@ class ProfileController extends Controller
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('members', 'email')->ignore($member->id),
+                Rule::unique('members', 'email')->ignore($member?->id),
             ],
             'phone' => [
                 'sometimes',
                 'nullable',
                 'string',
                 'max:20',
-                Rule::unique('members', 'phone')->ignore($member->id),
+                Rule::unique('members', 'phone')->ignore($member?->id),
             ],
             'dob' => ['sometimes', 'nullable', 'date'],
             'gender' => ['sometimes', 'nullable', Rule::in(['male', 'female', 'other'])],
@@ -155,6 +176,15 @@ class ProfileController extends Controller
         ]);
     }
 
+    /**
+     * Upload Profile Photo
+     *
+     * Uploads and updates the member profile avatar image.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function updatePhoto(Request $request)
     {
         $member = $request->user();
@@ -176,6 +206,15 @@ class ProfileController extends Controller
         ]);
     }
 
+    /**
+     * Remove Profile Photo
+     *
+     * Deletes the member current profile image from disk and resets avatar.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function removePhoto(Request $request)
     {
         $member = $request->user();
@@ -192,6 +231,15 @@ class ProfileController extends Controller
         ]);
     }
 
+    /**
+     * Get Member Resume Details
+     *
+     * Checks if the member has uploaded a CV/resume and returns file metadata and view URL.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function resume(Request $request)
     {
         $member = $request->user();
@@ -214,6 +262,15 @@ class ProfileController extends Controller
         ]);
     }
 
+    /**
+     * Upload Member Resume
+     *
+     * Uploads a PDF or Word document as the member resume/CV.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function uploadResume(Request $request)
     {
         $member = $request->user();
@@ -252,6 +309,15 @@ class ProfileController extends Controller
         ]);
     }
 
+    /**
+     * Delete Member Resume
+     *
+     * Removes the uploaded resume file from storage.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function deleteResume(Request $request)
     {
         $member = $request->user();
@@ -272,6 +338,15 @@ class ProfileController extends Controller
         ]);
     }
 
+    /**
+     * View or Download Resume File
+     *
+     * Streams the uploaded resume document for viewing or downloading.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
+     */
     public function viewResume(Request $request)
     {
         $member = $request->user();
@@ -304,6 +379,15 @@ class ProfileController extends Controller
         ]);
     }
 
+    /**
+     * Get Profile Completion Score
+     *
+     * Calculates the member profile completion percentage and lists missing recommended fields.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function completion(Request $request)
     {
         $member = $request->user();
@@ -317,6 +401,15 @@ class ProfileController extends Controller
         ]);
     }
 
+    /**
+     * Change Member Password
+     *
+     * Validates the current password and securely updates to a new password.
+     *
+     * @tags Member Profile
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function changePassword(Request $request)
     {
         $member = $request->user();

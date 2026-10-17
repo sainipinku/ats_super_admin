@@ -48,6 +48,6 @@ class ConstructionRole extends Model
 
     public function assignments(): HasMany
     {
-        return $this->hasMany(MemberRoleAssignment::class);
+        return $this->hasMany(MemberRoleAssignment::class, 'role_id');
     }
 }
