@@ -76,14 +76,138 @@ public const STATUS_REVISION_REQUESTED = SurveyStatus::REVISION_REQUESTED;
     ];
 
     public function getStatusKeyAttribute(): string
-{
-    return SurveyStatus::key((int) $this->status);
-}
+    {
+        return SurveyStatus::key((int) $this->status);
+    }
 
-public function getStatusLabelAttribute(): string
-{
-    return SurveyStatus::label((int) $this->status);
-}
+    public function getStatusLabelAttribute(): string
+    {
+        return SurveyStatus::label((int) $this->status);
+    }
+
+    public static function toFullUrl(?string $path): ?string
+    {
+        if ($path === null || trim($path) === '') {
+            return null;
+        }
+
+        $path = trim($path);
+
+        if (preg_match('/^https?:\/\//i', $path)) {
+            return $path;
+        }
+
+        $clean = ltrim($path, '/');
+
+        if (str_starts_with($clean, 'storage/')) {
+            return asset($clean);
+        }
+
+        return asset('storage/' . $clean);
+    }
+
+    public function getFilePathAttribute($value): ?string
+    {
+        return self::toFullUrl($value);
+    }
+
+    public function getPhotosAttribute($value): array
+    {
+        $list = is_string($value)
+            ? (json_decode($value, true) ?: [])
+            : (is_array($value) ? $value : []);
+
+        return array_values(array_filter(array_map(function ($photo) {
+            return self::toFullUrl(is_string($photo) ? $photo : ($photo['url'] ?? $photo['path'] ?? null));
+        }, (array) $list)));
+    }
+
+    public function setPhotosAttribute($value): void
+    {
+        if (is_array($value)) {
+            $this->attributes['photos'] = json_encode(array_values($value), JSON_UNESCAPED_SLASHES);
+        } else {
+            $this->attributes['photos'] = $value;
+        }
+    }
+
+    public function getNotesAttribute($value)
+    {
+        if (is_array($value)) {
+            return $this->formatNotesUrls($value);
+        }
+
+        if (is_string($value) && $value !== '') {
+            $trimmed = trim($value);
+            if ((str_starts_with($trimmed, '{') && str_ends_with($trimmed, '}'))
+                || (str_starts_with($trimmed, '[') && str_ends_with($trimmed, ']'))) {
+                $decoded = json_decode($trimmed, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return $this->formatNotesUrls($decoded);
+                }
+            }
+        }
+
+        return $value;
+    }
+
+    public function setNotesAttribute($value): void
+    {
+        if (is_array($value)) {
+            $this->attributes['notes'] = json_encode($value, JSON_UNESCAPED_SLASHES);
+        } else {
+            $this->attributes['notes'] = $value;
+        }
+    }
+
+    public function formatNotesUrls(array $notes): array
+    {
+        if (!empty($notes['categorized_files']) && is_array($notes['categorized_files'])) {
+            foreach ($notes['categorized_files'] as $category => $files) {
+                if (is_array($files)) {
+                    foreach ($files as $idx => $f) {
+                        if (is_array($f)) {
+                            if (!empty($f['url'])) {
+                                $notes['categorized_files'][$category][$idx]['url'] = self::toFullUrl($f['url']);
+                            }
+                            if (!empty($f['path'])) {
+                                $notes['categorized_files'][$category][$idx]['full_url'] = self::toFullUrl($f['path']);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!empty($notes['member_reply']['files']) && is_array($notes['member_reply']['files'])) {
+            foreach ($notes['member_reply']['files'] as $idx => $f) {
+                if (is_array($f) && !empty($f['url'])) {
+                    $notes['member_reply']['files'][$idx]['url'] = self::toFullUrl($f['url']);
+                }
+            }
+        }
+
+        if (!empty($notes['revision_history']) && is_array($notes['revision_history'])) {
+            foreach ($notes['revision_history'] as $idx => $turn) {
+                if (!empty($turn['files']) && is_array($turn['files'])) {
+                    foreach ($turn['files'] as $fIdx => $f) {
+                        if (is_array($f) && !empty($f['url'])) {
+                            $notes['revision_history'][$idx]['files'][$fIdx]['url'] = self::toFullUrl($f['url']);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!empty($notes['file_path'])) {
+            $notes['file_path'] = self::toFullUrl($notes['file_path']);
+        }
+        if (!empty($notes['primary_file_path'])) {
+            $notes['primary_file_path'] = self::toFullUrl($notes['primary_file_path']);
+        }
+
+        return $notes;
+    }
 
     public function project(): BelongsTo
     {

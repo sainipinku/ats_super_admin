@@ -34,6 +34,16 @@ class TaskChecklist extends Model
         'assign_hours' => 'float',
     ];
 
+    public function getImageUrl1Attribute($value): ?string
+    {
+        return SurveyVisit::toFullUrl($value);
+    }
+
+    public function getImageUrl2Attribute($value): ?string
+    {
+        return SurveyVisit::toFullUrl($value);
+    }
+
     public function executionTask(): BelongsTo
     {
         return $this->belongsTo(ExecutionTask::class);
