@@ -163,11 +163,52 @@ class MemberDashboardController extends Controller
             ->with(['project', 'checklistItems'])
             ->find($taskId);
 
+        // If legacy task not found by ID, match by task_code or project_id + title
+        if ($legacyTask === null && $unifiedTask !== null) {
+            if (!empty($unifiedTask->task_code)) {
+                $legacyTask = ExecutionTask::query()
+                    ->with('project')
+                    ->where('task_code', $unifiedTask->task_code)
+                    ->first();
+            }
+            if ($legacyTask === null && !empty($unifiedTask->title) && !empty($unifiedTask->project_id)) {
+                $legacyTask = ExecutionTask::query()
+                    ->with('project')
+                    ->where('project_id', $unifiedTask->project_id)
+                    ->where('title', $unifiedTask->title)
+                    ->first();
+            }
+        }
+
+        // If unified task not found by ID, match by task_code or project_id + title
+        if ($legacyTask !== null && $unifiedTask === null) {
+            if (!empty($legacyTask->task_code)) {
+                $unifiedTask = Task::query()
+                    ->with(['project', 'checklistItems'])
+                    ->where('task_code', $legacyTask->task_code)
+                    ->first();
+            }
+            if ($unifiedTask === null && !empty($legacyTask->title) && !empty($legacyTask->project_id)) {
+                $unifiedTask = Task::query()
+                    ->with(['project', 'checklistItems'])
+                    ->where('project_id', $legacyTask->project_id)
+                    ->where('title', $legacyTask->title)
+                    ->first();
+            }
+        }
+
         if ($legacyTask === null && $unifiedTask === null) {
             return null;
         }
 
         if ($legacyTask !== null) {
+            if ($unifiedTask !== null) {
+                try {
+                    $this->mirrorChecklistItemsToLegacy($unifiedTask, $legacyTask);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
             return [
                 'task' => $legacyTask,
                 'unifiedTask' => $unifiedTask,
@@ -177,54 +218,97 @@ class MemberDashboardController extends Controller
         // Create a mirror ExecutionTask so construction_task_checklists FK stays valid.
         $planId = $this->resolveOrCreateExecutionPlanIdForProject((int) $unifiedTask->project_id);
 
-        $legacyTask = DB::transaction(function () use ($unifiedTask, $planId, $taskId) {
-            $mirror = ExecutionTask::create([
-                'id' => $taskId,
-                'task_code' => $unifiedTask->task_code
-                    ?? ('TSK-' . str_pad((string) $taskId, 5, '0', STR_PAD_LEFT)),
-                'title' => $unifiedTask->title,
-                'description' => $unifiedTask->description,
-                'project_id' => $unifiedTask->project_id,
-                'execution_plan_id' => $planId,
-                'priority' => in_array($unifiedTask->priority, ['low','medium','high','critical'], true)
-                    ? $unifiedTask->priority
-                    : 'medium',
-                'planned_start_date' => $unifiedTask->start_date ?? now(),
-                'planned_end_date' => $unifiedTask->end_date ?? now()->addDays(1),
-                'supervisor_member_id' => $unifiedTask->assigned_supervisor_member_id
-                    ?? $unifiedTask->member_id
-                    ?? null,
-                'status' => $this->mapUnifiedStatusToLegacy((string) $unifiedTask->status),
-                'progress_percent' => (int) ($unifiedTask->progress_percent ?? 0),
-            ]);
-
-            $memberId = $unifiedTask->assigned_supervisor_member_id
-                ?? $unifiedTask->member_id
-                ?? null;
-            if ($memberId !== null && $unifiedTask->project_id !== null) {
-                try {
-                    ExecutionTaskAssignee::updateOrCreate(
-                        [
-                            'execution_task_id' => $mirror->id,
-                            'project_id' => (int) $unifiedTask->project_id,
-                            'member_id' => (int) $memberId,
-                        ],
-                        [
-                            'assigned_at' => now(),
-                            'status' => 'active',
-                        ]
-                    );
-                } catch (\Throwable $e) {
-                    report($e);
+        $targetCode = $unifiedTask->task_code;
+        if (empty($targetCode) || ExecutionTask::where('task_code', $targetCode)->exists()) {
+            $existing = !empty($targetCode)
+                ? ExecutionTask::with('project')->where('task_code', $targetCode)->first()
+                : null;
+            if ($existing) {
+                if ($unifiedTask !== null) {
+                    try {
+                        $this->mirrorChecklistItemsToLegacy($unifiedTask, $existing);
+                    } catch (\Throwable $e) {
+                        report($e);
+                    }
                 }
+                return [
+                    'task' => $existing,
+                    'unifiedTask' => $unifiedTask,
+                ];
             }
+            $baseCode = $targetCode ?: ('TSK-' . str_pad((string) $taskId, 5, '0', STR_PAD_LEFT));
+            $counter = 1;
+            $newCode = $baseCode;
+            while (ExecutionTask::where('task_code', $newCode)->exists()) {
+                $newCode = $baseCode . '-M' . $counter;
+                $counter++;
+            }
+            $targetCode = $newCode;
+        }
 
-            // Mirror unified Task's TaskChecklistItems into legacy TaskChecklist rows
-            // so endpoints using construction_task_checklists continue to work.
-            $this->mirrorChecklistItemsToLegacy($unifiedTask, $mirror);
+        $idPayload = ExecutionTask::where('id', $taskId)->exists() ? [] : ['id' => $taskId];
 
-            return $mirror;
-        });
+        try {
+            $legacyTask = DB::transaction(function () use ($unifiedTask, $planId, $targetCode, $idPayload) {
+                $createData = array_merge($idPayload, [
+                    'task_code' => $targetCode,
+                    'title' => $unifiedTask->title,
+                    'description' => $unifiedTask->description,
+                    'project_id' => $unifiedTask->project_id,
+                    'execution_plan_id' => $planId,
+                    'priority' => in_array($unifiedTask->priority, ['low','medium','high','critical'], true)
+                        ? $unifiedTask->priority
+                        : 'medium',
+                    'planned_start_date' => $unifiedTask->start_date ?? now(),
+                    'planned_end_date' => $unifiedTask->end_date ?? now()->addDays(1),
+                    'supervisor_member_id' => $unifiedTask->assigned_supervisor_member_id
+                        ?? $unifiedTask->member_id
+                        ?? null,
+                    'status' => $this->mapUnifiedStatusToLegacy((string) $unifiedTask->status),
+                    'progress_percent' => (int) ($unifiedTask->progress_percent ?? 0),
+                ]);
+
+                $mirror = ExecutionTask::create($createData);
+
+                $memberId = $unifiedTask->assigned_supervisor_member_id
+                    ?? $unifiedTask->member_id
+                    ?? null;
+                if ($memberId !== null && $unifiedTask->project_id !== null) {
+                    try {
+                        ExecutionTaskAssignee::updateOrCreate(
+                            [
+                                'execution_task_id' => $mirror->id,
+                                'project_id' => (int) $unifiedTask->project_id,
+                                'member_id' => (int) $memberId,
+                            ],
+                            [
+                                'assigned_at' => now(),
+                                'status' => 'active',
+                            ]
+                        );
+                    } catch (\Throwable $e) {
+                        report($e);
+                    }
+                }
+
+                $this->mirrorChecklistItemsToLegacy($unifiedTask, $mirror);
+
+                return $mirror;
+            });
+        } catch (\Illuminate\Database\UniqueConstraintViolationException|\Illuminate\Database\QueryException $e) {
+            report($e);
+            $recovered = ExecutionTask::with('project')
+                ->where('task_code', $targetCode)
+                ->orWhere('id', $taskId)
+                ->first();
+            if ($recovered) {
+                return [
+                    'task' => $recovered,
+                    'unifiedTask' => $unifiedTask,
+                ];
+            }
+            throw $e;
+        }
 
         return [
             'task' => $legacyTask->load('project'),
@@ -765,6 +849,11 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             'todays_summary' => $todaysSummaryCard,
             'current_project' => $currentProjectCard,
             'todays_tasks' => $todaysTasksList,
+            'today_tasks' => $todaysTasksList,
+            'today_task' => $todaysTasksList,
+            'tasks' => $last20TasksFormatted,
+            'task' => $last20TasksFormatted,
+            'all_tasks' => $last20TasksFormatted,
             'quick_actions' => $quickActionsList,
             'field_activity' => $fieldActivityCard,
             'performance' => $performanceCard,
@@ -4685,90 +4774,141 @@ $completed = SurveyPlan::whereHas(
      */
     public function submitTaskData(Request $request, $task = null)
     {
-        $taskId = $task instanceof ExecutionTask || $task instanceof Task
-            ? $task->id
-            : ($task ?? $request->input('task_id') ?? $request->input('task'));
+        try {
+            $taskId = $task instanceof ExecutionTask || $task instanceof Task
+                ? $task->id
+                : ($task ?? $request->input('task_id') ?? $request->input('task'));
 
-        if (!$taskId || !is_numeric($taskId)) {
-            return response()->json([
-                'success' => false,
-                'error_code' => 'INVALID_TASK_ID',
-                'message' => 'A valid task ID is required in the URL or payload.',
-            ], 422);
-        }
+            if (!$taskId || !is_numeric($taskId)) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'INVALID_TASK_ID',
+                    'message' => 'A valid task ID is required in the URL or payload.',
+                ], 422);
+            }
 
-        $resolvedTaskData = $this->resolveTaskAcrossTables((int) $taskId);
-        if (!$resolvedTaskData) {
-            return response()->json([
-                'success' => false,
-                'error_code' => 'TASK_NOT_FOUND',
-                'message' => 'No task found with the given identifier: ' . $taskId,
-            ], 404);
-        }
+            $resolvedTaskData = $this->resolveTaskAcrossTables((int) $taskId);
+            if (!$resolvedTaskData) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'TASK_NOT_FOUND',
+                    'message' => 'No task found with the given identifier: ' . $taskId,
+                ], 404);
+            }
 
-        $legacyTask = $resolvedTaskData['task'];
-        $unifiedTask = $resolvedTaskData['unifiedTask'];
+            $legacyTask = $resolvedTaskData['task'];
+            $unifiedTask = $resolvedTaskData['unifiedTask'];
 
-        // Task assignment access validation removed per request
+            // Task assignment access validation removed per request
 
-        $member = $request->user();
-        $project = $legacyTask->project
-            ?? ($legacyTask->project_id ? Project::find($legacyTask->project_id) : null)
-            ?? ($unifiedTask?->project_id ? Project::find($unifiedTask->project_id) : null);
+            $member = $request->user();
+            if (!$member) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'UNAUTHENTICATED',
+                    'message' => 'You must be authenticated to submit task data.',
+                ], 401);
+            }
 
-        $preferredPlanId = (int) ($request->input('survey_plan_id')
-            ?? $request->input('survey_plan')
-            ?? $legacyTask->survey_plan_id
-            ?? $unifiedTask?->survey_plan_id
-            ?? 0);
+            $project = $legacyTask->project
+                ?? ($legacyTask->project_id ? Project::find($legacyTask->project_id) : null)
+                ?? ($unifiedTask?->project_id ? Project::find($unifiedTask->project_id) : null);
 
-        $plan = $legacyTask->surveyPlan
-            ?? $this->resolveOrCreateSurveyPlan(
-                $project,
-                $member,
-                $preferredPlanId ?: null,
-                $legacyTask->title ?? $unifiedTask?->title
-            );
+            $preferredPlanId = (int) ($request->input('survey_plan_id')
+                ?? $request->input('survey_plan')
+                ?? $legacyTask->survey_plan_id
+                ?? $unifiedTask?->survey_plan_id
+                ?? 0);
 
-        $totalDays = $this->surveyData->getTotalSurveyDays($plan, $project);
+            $plan = $legacyTask->surveyPlan
+                ?? $this->resolveOrCreateSurveyPlan(
+                    $project,
+                    $member,
+                    $preferredPlanId ?: null,
+                    $legacyTask->title ?? $unifiedTask?->title
+                );
 
-        $existingVisit = SurveyVisit::where('task_id', $legacyTask->id)
-            ->where(function ($q) use ($member) {
-                $q->where('checked_in_by_member_id', $member->id)
-                    ->orWhereNull('checked_in_by_member_id');
-            })
-            ->latest()
-            ->first();
+            $totalDays = $this->surveyData->getTotalSurveyDays($plan, $project);
 
-        $currentDay = $this->surveyData->getCurrentDayNumber($existingVisit, $plan, $project);
-        if ($request->filled('day_number') && is_numeric($request->input('day_number'))) {
-            $currentDay = max(1, (int) $request->input('day_number'));
-        }
+            $existingVisit = SurveyVisit::where('task_id', $legacyTask->id)
+                ->where(function ($q) use ($member) {
+                    $q->where('checked_in_by_member_id', $member->id)
+                        ->orWhereNull('checked_in_by_member_id');
+                })
+                ->latest()
+                ->first();
 
-        // 1. Checklist processing (Image 1: Work checklist 6/7 done)
-        $this->surveyData->ensureDefaultTaskChecklists($legacyTask, $currentDay);
-        $allChecklists = TaskChecklist::where('execution_task_id', $legacyTask->id)->get();
+            $currentDay = $this->surveyData->getCurrentDayNumber($existingVisit, $plan, $project);
+            if ($request->filled('day_number') && is_numeric($request->input('day_number'))) {
+                $currentDay = max(1, (int) $request->input('day_number'));
+            }
 
-        $rawChecklistIds = $request->input('checklist_ids', []);
-        if (is_string($rawChecklistIds)) {
-            $decoded = json_decode($rawChecklistIds, true);
-            $rawChecklistIds = is_array($decoded) ? $decoded : explode(',', $rawChecklistIds);
-        }
-        $completedIds = array_map('intval', array_filter((array) $rawChecklistIds, fn ($v) => is_numeric($v)));
+            // 1. Checklist processing (Image 1: Work checklist done)
+            $this->surveyData->ensureDefaultTaskChecklists($legacyTask, $currentDay);
+            if ($unifiedTask) {
+                try {
+                    $this->mirrorChecklistItemsToLegacy($unifiedTask, $legacyTask);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+            $allChecklists = TaskChecklist::where('execution_task_id', $legacyTask->id)->get();
 
-        $now = now();
-        foreach ($allChecklists as $chk) {
-            $isDone = in_array((int) $chk->id, $completedIds, true);
-            $chk->update([
-                'is_completed' => $isDone,
-                'status' => $isDone ? 'completed' : 'pending',
-                'completed_by_member_id' => $isDone ? $member->id : null,
-                'completed_at' => $isDone ? $now : null,
-            ]);
-        }
-        $allChecklists = $allChecklists->fresh();
-        $completedChecklistCount = $allChecklists->where('is_completed', true)->count();
-        $totalChecklistCount = $allChecklists->count();
+            $rawChecklistIds = $request->input('checklist_ids', []);
+            if (is_string($rawChecklistIds)) {
+                $decoded = json_decode($rawChecklistIds, true);
+                $rawChecklistIds = is_array($decoded) ? $decoded : explode(',', $rawChecklistIds);
+            }
+            $completedIds = array_map('intval', array_filter((array) $rawChecklistIds, fn ($v) => is_numeric($v)));
+
+            // Gather completed item titles from both legacy and unified checklist tables
+            $completedTitles = [];
+            if (!empty($completedIds)) {
+                $completedLegacy = TaskChecklist::whereIn('id', $completedIds)->get(['id', 'item_title']);
+                foreach ($completedLegacy as $c) {
+                    $completedTitles[] = strtolower(trim((string) $c->item_title));
+                }
+                $completedUnified = \App\Models\TaskChecklistItem::whereIn('id', $completedIds)->get(['id', 'item_title']);
+                foreach ($completedUnified as $c) {
+                    $completedTitles[] = strtolower(trim((string) $c->item_title));
+                }
+            }
+
+            $now = now();
+            foreach ($allChecklists as $chk) {
+                $chkTitle = strtolower(trim((string) $chk->item_title));
+                $isDone = in_array((int) $chk->id, $completedIds, true)
+                    || (!empty($chkTitle) && in_array($chkTitle, $completedTitles, true));
+                $chk->update([
+                    'is_completed' => $isDone,
+                    'status' => $isDone ? 'completed' : 'pending',
+                    'completed_by_member_id' => $isDone ? $member->id : null,
+                    'completed_at' => $isDone ? $now : null,
+                ]);
+            }
+            $allChecklists = $allChecklists->fresh();
+            $completedChecklistCount = $allChecklists->where('is_completed', true)->count();
+            $totalChecklistCount = $allChecklists->count();
+
+            // Also synchronize unified task checklist items if unified task exists
+            if ($unifiedTask) {
+                try {
+                    $unifiedChecklistItems = \App\Models\TaskChecklistItem::where('task_id', $unifiedTask->id)->get();
+                    foreach ($unifiedChecklistItems as $uChk) {
+                        $uTitle = strtolower(trim((string) ($uChk->item_title ?? $uChk->title)));
+                        $isDone = in_array((int) $uChk->id, $completedIds, true)
+                            || (!empty($uTitle) && in_array($uTitle, $completedTitles, true));
+                        $uChk->update([
+                            'is_completed' => $isDone,
+                            'status' => $isDone ? 'completed' : 'pending',
+                            'completed_by_member_id' => $isDone ? $member->id : null,
+                            'completed_at' => $isDone ? $now : null,
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
 
         // 2. Photos (Site Photos: Image 2)
         $newPhotoUrls = [];
@@ -5111,6 +5251,21 @@ $completed = SurveyPlan::whereHas(
                 ],
             ],
         ]);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'VALIDATION_ERROR',
+                'message' => $ve->getMessage(),
+                'errors' => $ve->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json([
+                'success' => false,
+                'error_code' => 'TASK_SUBMISSION_FAILED',
+                'message' => 'Failed to submit task data: ' . ($e->getMessage() ?: 'An unexpected error occurred while processing task submission.'),
+            ], 500);
+        }
     }
 
     private function createTaskDocumentRecord(int $taskId, int $memberId, string $url, string $path, string $type): void

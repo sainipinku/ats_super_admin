@@ -28,6 +28,7 @@ public const STATUS_REJECTED = SurveyStatus::REJECTED;
         'project_id',
         'survey_plan_id',
         'task_id',
+        'execution_task_id',
         'checked_in_by_member_id',
         'check_in_at',
         'check_in_latitude',
