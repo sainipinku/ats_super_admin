@@ -22,6 +22,8 @@ public const STATUS_APPROVED = SurveyStatus::APPROVED;
 
 public const STATUS_REJECTED = SurveyStatus::REJECTED;
 
+public const STATUS_REVISION_REQUESTED = SurveyStatus::REVISION_REQUESTED;
+
     protected $table = 'construction_survey_visits';
 
     protected $fillable = [

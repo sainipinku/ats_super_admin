@@ -1191,6 +1191,7 @@ $completed = SurveyPlan::whereHas(
             'executionPlan',
             'supervisor',
             'checklists',
+            'surveyVisits.submission.reviewedBy',
         ])->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
             $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
                 $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
@@ -1226,6 +1227,7 @@ $completed = SurveyPlan::whereHas(
             'assignedSupervisor',
             'supervisor',
             'checklistItems',
+            'surveyVisits.submission.reviewedBy',
         ])->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
             $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
                 $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
@@ -1573,6 +1575,140 @@ $completed = SurveyPlan::whereHas(
         return strtolower((string) ($priority ?? $default));
     }
 
+    private function resolveTaskRevisionInfo($t): ?array
+    {
+        if ($t === null) {
+            return null;
+        }
+
+        $taskId = (int) ($t->id ?? 0);
+
+        // Find associated SurveyVisit
+        $visit = null;
+        if (method_exists($t, 'relationLoaded') && $t->relationLoaded('surveyVisits')) {
+            $visit = $t->surveyVisits->sortByDesc('id')->first();
+        }
+        if (!$visit) {
+            $taskIds = [$taskId];
+            if (!empty($t->task_code)) {
+                $otherId = $t instanceof ExecutionTask
+                    ? Task::where('task_code', $t->task_code)->value('id')
+                    : ExecutionTask::where('task_code', $t->task_code)->value('id');
+                if ($otherId) {
+                    $taskIds[] = (int) $otherId;
+                }
+            }
+            $visit = SurveyVisit::with(['submission.reviewedBy', 'checkedInBy'])
+                ->where(function ($q) use ($taskIds) {
+                    $q->whereIn('task_id', $taskIds)
+                        ->orWhereIn('execution_task_id', $taskIds);
+                })
+                ->latest('id')
+                ->first();
+        }
+
+        $sub = $visit?->relationLoaded('submission')
+            ? $visit->submission
+            : ($visit ? SurveySubmission::with('reviewedBy')->where('survey_visit_id', $visit->id)->first() : null);
+
+        $visitNotes = [];
+        if ($visit && !empty($visit->notes)) {
+            if (is_array($visit->notes)) {
+                $visitNotes = $visit->notes;
+            } elseif (is_string($visit->notes)) {
+                $visitNotes = json_decode($visit->notes, true) ?: [];
+            }
+        }
+
+        $subStatus = (int) ($sub?->status ?? 0);
+        $visitStatus = (int) ($visit?->status ?? 0);
+        $clientReviewStatus = $t->client_review_status instanceof \App\Enums\ClientReviewStatus
+            ? $t->client_review_status->value
+            : (string) ($t->client_review_status ?? '');
+
+        $isRevisionRequested = (
+            $subStatus === SurveySubmission::STATUS_REVISION_REQUESTED
+            || $subStatus === 5
+            || $visitStatus === SurveyStatus::REVISION_REQUESTED
+            || $visitStatus === 5
+            || $clientReviewStatus === 'revision_requested'
+            || !empty($visitNotes['revision_request'])
+        );
+
+        if (!$isRevisionRequested && empty($sub) && empty($visit)) {
+            return null;
+        }
+
+        $memberReply = $sub?->member_reply ?? ($visitNotes['member_reply']['message'] ?? null);
+        $isReplied = !empty($memberReply) || ($isRevisionRequested && in_array($clientReviewStatus, ['requested', 'revision_submitted'], true));
+
+        $remarks = $sub?->review_notes ?? ($visitNotes['revision_request']['remarks'] ?? null);
+        $managerName = $sub?->reviewedBy?->name ?? ($visitNotes['revision_request']['requested_by_name'] ?? 'Project Manager');
+        $requestedAt = $sub?->reviewed_at?->toIso8601String() ?? ($visitNotes['revision_request']['requested_at'] ?? null);
+        $requestedAtFormatted = $sub?->reviewed_at
+            ? $sub->reviewed_at->setTimezone('Asia/Kolkata')->format('d M Y · h:i A')
+            : ($visitNotes['revision_request']['requested_at_formatted'] ?? ($requestedAt ? date('d M Y · h:i A', strtotime($requestedAt)) : null));
+
+        $repliedAt = $sub?->member_replied_at?->toIso8601String() ?? ($visitNotes['member_reply']['replied_at'] ?? null);
+        $repliedAtFormatted = $sub?->member_replied_at
+            ? $sub->member_replied_at->setTimezone('Asia/Kolkata')->format('d M Y · h:i A')
+            : ($visitNotes['member_reply']['replied_at_formatted'] ?? ($repliedAt ? date('d M Y · h:i A', strtotime($repliedAt)) : null));
+
+        $history = $visitNotes['revision_history'] ?? [];
+        if (empty($history) && $isRevisionRequested) {
+            $history = [
+                [
+                    'type' => 'revision_requested',
+                    'sender_role' => 'manager',
+                    'sender_name' => $managerName,
+                    'message' => $remarks,
+                    'created_at' => $requestedAt,
+                    'created_at_formatted' => $requestedAtFormatted,
+                ],
+            ];
+            if ($isReplied && $memberReply) {
+                $history[] = [
+                    'type' => 'member_reply',
+                    'sender_role' => 'surveyor',
+                    'sender_name' => $visit?->checkedInBy?->name ?? 'Field Surveyor',
+                    'message' => $memberReply,
+                    'created_at' => $repliedAt,
+                    'created_at_formatted' => $repliedAtFormatted,
+                ];
+            }
+        }
+
+        $reviewStatus = 'pending';
+        $statusLabel = 'Planned';
+        if ($isRevisionRequested) {
+            $reviewStatus = $isReplied ? 'revision_replied' : 'revision_requested';
+            $statusLabel = $isReplied ? 'Revision Submitted' : 'Revision Requested';
+        } elseif ($subStatus === SurveySubmission::STATUS_APPROVED || $visitStatus === SurveyStatus::APPROVED) {
+            $reviewStatus = 'approved';
+            $statusLabel = 'Approved';
+        } elseif ($subStatus === SurveySubmission::STATUS_SUBMITTED || $visitStatus === SurveyStatus::SUBMITTED) {
+            $reviewStatus = 'submitted';
+            $statusLabel = 'Under Review';
+        }
+
+        return [
+            'has_revision' => $isRevisionRequested,
+            'is_revision_requested' => $isRevisionRequested,
+            'is_replied' => $isReplied,
+            'review_status' => $reviewStatus,
+            'status' => $reviewStatus,
+            'status_label' => $statusLabel,
+            'remarks' => $remarks,
+            'revision_remarks' => $remarks,
+            'manager_name' => $managerName,
+            'requested_by' => $managerName,
+            'requested_at' => $requestedAtFormatted,
+            'member_reply' => $memberReply,
+            'member_replied_at' => $repliedAtFormatted,
+            'history' => $history,
+        ];
+    }
+
     private function normalizeExecutionTaskListItem(ExecutionTask $t, bool $sourceLegacy): array
     {
         $status = (string) $t->status;
@@ -1588,6 +1724,7 @@ $completed = SurveyPlan::whereHas(
 
         $priority = $this->formatPriorityValue($t->priority, 'medium');
         $dueDate = $t->planned_end_date;
+        $revInfo = $this->resolveTaskRevisionInfo($t);
 
         return [
             'source' => $sourceLegacy ? 'legacy' : 'unified',
@@ -1607,6 +1744,14 @@ $completed = SurveyPlan::whereHas(
             'checklist_total' => $t->relationLoaded('checklists') ? $t->checklists->count() : 0,
             'checklist_completed' => $t->relationLoaded('checklists') ? $t->checklists->where('is_completed', true)->count() : 0,
             'sort_key' => $sortKey,
+            'review_status' => $revInfo['review_status'] ?? ($status === 'review' ? 'submitted' : $normalized),
+            'is_revision_requested' => $revInfo['is_revision_requested'] ?? false,
+            'revision_remarks' => $revInfo['revision_remarks'] ?? null,
+            'revision_requested_at' => $revInfo['requested_at'] ?? null,
+            'revision_requested_by' => $revInfo['requested_by'] ?? null,
+            'revision_reply' => $revInfo['member_reply'] ?? null,
+            'revision_replied_at' => $revInfo['member_replied_at'] ?? null,
+            'revision' => $revInfo,
         ];
     }
 
@@ -1622,6 +1767,7 @@ $completed = SurveyPlan::whereHas(
 
         $priority = $this->formatPriorityValue($t->priority, 'medium');
         $dueDate = $t->end_date;
+        $revInfo = $this->resolveTaskRevisionInfo($t);
 
         return [
             'source' => $sourceLegacy ? 'legacy' : 'unified',
@@ -1641,6 +1787,14 @@ $completed = SurveyPlan::whereHas(
             'checklist_total' => $t->relationLoaded('checklistItems') ? $t->checklistItems->count() : 0,
             'checklist_completed' => $t->relationLoaded('checklistItems') ? $t->checklistItems->where('is_completed', true)->count() : 0,
             'sort_key' => $sortKey,
+            'review_status' => $revInfo['review_status'] ?? ($status === 'review' ? 'submitted' : $normalized),
+            'is_revision_requested' => $revInfo['is_revision_requested'] ?? false,
+            'revision_remarks' => $revInfo['revision_remarks'] ?? null,
+            'revision_requested_at' => $revInfo['requested_at'] ?? null,
+            'revision_requested_by' => $revInfo['requested_by'] ?? null,
+            'revision_reply' => $revInfo['member_reply'] ?? null,
+            'revision_replied_at' => $revInfo['member_replied_at'] ?? null,
+            'revision' => $revInfo,
         ];
     }
 
@@ -2944,6 +3098,13 @@ $completed = SurveyPlan::whereHas(
         $endParsed = $parseDate($endVal);
         $due = $endParsed;
         $supervisor = $t->supervisor ?? $t->assignedSupervisor ?? null;
+        $revInfo = $this->resolveTaskRevisionInfo($t);
+        $normalizedStatus = match (strtolower($statusStr)) {
+            'planned' => 'pending',
+            default => in_array(strtolower($statusStr), ['pending', 'in_progress', 'review', 'completed', 'blocked', 'cancelled'], true)
+                ? strtolower($statusStr)
+                : 'pending',
+        };
 
         return [
             'id' => $t->id,
@@ -2962,10 +3123,19 @@ $completed = SurveyPlan::whereHas(
             'priority_label' => ucfirst($priority),
             'is_completed' => $isCompleted,
             'status' => $statusStr,
+            'normalized_status' => $normalizedStatus,
             'source' => $isLegacy ? 'legacy' : 'unified',
             'task_code' => $t->task_code ?? null,
             'supervisor_name' => $supervisor?->name ?? null,
             'created_at' => $t->created_at?->toIso8601String(),
+            'review_status' => $revInfo['review_status'] ?? ($statusStr === 'review' ? 'submitted' : $normalizedStatus),
+            'is_revision_requested' => $revInfo['is_revision_requested'] ?? false,
+            'revision_remarks' => $revInfo['revision_remarks'] ?? null,
+            'revision_requested_at' => $revInfo['requested_at'] ?? null,
+            'revision_requested_by' => $revInfo['requested_by'] ?? null,
+            'revision_reply' => $revInfo['member_reply'] ?? null,
+            'revision_replied_at' => $revInfo['member_replied_at'] ?? null,
+            'revision' => $revInfo,
         ];
     }
 
@@ -4015,34 +4185,66 @@ $completed = SurveyPlan::whereHas(
 
         $priorityStr = $this->formatPriorityValue($task->priority, 'high');
 
-        $submittedVisits = SurveyVisit::where('task_id', $task->id)
-            ->when($project, function ($q) use ($project) {
-                $q->orWhere('project_id', $project->id);
+        $revInfo = $this->resolveTaskRevisionInfo($task) ?? ($unifiedTask ? $this->resolveTaskRevisionInfo($unifiedTask) : null);
+
+        $taskIds = array_values(array_unique(array_filter([(int) $task->id, (int) ($unifiedTask?->id ?? 0)])));
+        $rawVisits = SurveyVisit::with(['submission.reviewedBy', 'checkedInBy'])
+            ->where(function ($q) use ($taskIds) {
+                $q->whereIn('task_id', $taskIds)
+                    ->orWhereIn('execution_task_id', $taskIds);
             })
-            ->latest()
-            ->get()
-            ->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'task_id' => $v->task_id,
-                    'day_number' => $v->day_number,
-                    'elevation_m' => (float) $v->elevation_m,
-                    'distance_covered_m' => (float) $v->distance_covered_m,
-                    'total_points_captured' => (int) $v->total_points_captured,
-                    'remarks' => $v->remarks,
-                    'notes' => $v->notes,
-                    'photos' => $v->photos ?? [],
-                    'file_path' => $v->file_path,
-                    'status' => $v->status_label ?? 'Submitted',
-                    'date_time' => $v->updated_at ? $v->updated_at->setTimezone('Asia/Kolkata')->format('d M Y, h:i A') : null,
-                ];
-            });
+            ->latest('id')
+            ->get();
+
+        if ($rawVisits->isEmpty() && $project) {
+            $rawVisits = SurveyVisit::with(['submission.reviewedBy', 'checkedInBy'])
+                ->where('project_id', $project->id)
+                ->latest('id')
+                ->take(5)
+                ->get();
+        }
+
+        $submittedVisits = $rawVisits->map(function ($v) {
+            $vNotes = is_array($v->notes) ? $v->notes : (json_decode($v->notes ?? '', true) ?: []);
+            return [
+                'id' => $v->id,
+                'task_id' => $v->task_id ?? $v->execution_task_id,
+                'day_number' => $v->day_number,
+                'elevation_m' => (float) $v->elevation_m,
+                'distance_covered_m' => (float) $v->distance_covered_m,
+                'total_points_captured' => (int) $v->total_points_captured,
+                'remarks' => $v->remarks,
+                'notes' => $v->notes,
+                'photos' => $v->photos ?? [],
+                'file_path' => $v->file_path,
+                'status' => $v->status_label ?? 'Submitted',
+                'date_time' => $v->updated_at ? $v->updated_at->setTimezone('Asia/Kolkata')->format('d M Y, h:i A') : null,
+                'revision_request' => $vNotes['revision_request'] ?? null,
+                'member_reply' => $vNotes['member_reply'] ?? null,
+                'revision_history' => $vNotes['revision_history'] ?? [],
+            ];
+        });
+
+        $taskStatus = strtolower((string) ($task->status ?? 'pending'));
+        $buttonLabel = 'Start Day ' . $currentDay . ' Task';
+        if ($revInfo && ($revInfo['is_revision_requested'] ?? false)) {
+            if (!($revInfo['is_replied'] ?? false)) {
+                $buttonLabel = 'Submit Revision Reply';
+            } else {
+                $buttonLabel = 'Revision Under Review';
+            }
+        } elseif ($taskStatus === 'review') {
+            $buttonLabel = 'Under Review';
+        } elseif (in_array($taskStatus, ['completed', 'survey_approved', 'approved'], true)) {
+            $buttonLabel = 'Task Completed';
+        }
 
         return response()->json([
             'success' => true,
             'day_stepper' => $dayStepper,
             'task' => [
                 'id' => $task->id,
+                'task_code' => $task->task_code ?? $unifiedTask?->task_code,
                 'title' => $task->title,
                 'status' => $task->status === 'planned' ? 'in_progress' : $task->status,
                 'status_label' => ucfirst($task->status === 'planned' ? 'In Progress' : $task->status),
@@ -4050,6 +4252,14 @@ $completed = SurveyPlan::whereHas(
                 'priority' => $priorityStr,
                 'priority_label' => ucfirst($priorityStr),
                 'instructions' => $instructions,
+                'review_status' => $revInfo['review_status'] ?? ($taskStatus === 'review' ? 'submitted' : $taskStatus),
+                'is_revision_requested' => $revInfo['is_revision_requested'] ?? false,
+                'revision_remarks' => $revInfo['revision_remarks'] ?? null,
+                'revision_requested_at' => $revInfo['requested_at'] ?? null,
+                'revision_requested_by' => $revInfo['requested_by'] ?? null,
+                'revision_reply' => $revInfo['member_reply'] ?? null,
+                'revision_replied_at' => $revInfo['member_replied_at'] ?? null,
+                'revision' => $revInfo,
             ],
             'assigned_by' => [
                 'name' => $supervisor['name'],
@@ -4058,7 +4268,8 @@ $completed = SurveyPlan::whereHas(
             ],
             'checklist' => $formattedChecklist,
             'submitted_data' => $submittedVisits,
-            'button_label' => 'Start Day ' . $currentDay . ' Task',
+            'revision' => $revInfo,
+            'button_label' => $buttonLabel,
         ]);
     }
 
@@ -5264,6 +5475,286 @@ $completed = SurveyPlan::whereHas(
                 'success' => false,
                 'error_code' => 'TASK_SUBMISSION_FAILED',
                 'message' => 'Failed to submit task data: ' . ($e->getMessage() ?: 'An unexpected error occurred while processing task submission.'),
+            ], 500);
+        }
+    }
+
+    /**
+     * Submit Field Team Revision Reply
+     *
+     * Allows field surveyors / assignees to submit a reply/clarification to a requested survey revision,
+     * upload additional photos or files, update checklist statuses, and return task to review state.
+     *
+     * @tags Tasks & Checklists
+     * @param Request $request
+     * @param mixed $task
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function submitRevisionReply(Request $request, $task = null)
+    {
+        try {
+            $taskId = $task instanceof ExecutionTask || $task instanceof Task
+                ? $task->id
+                : ($task ?? $request->input('task_id') ?? $request->input('task'));
+
+            if (!$taskId || !is_numeric($taskId)) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'INVALID_TASK_ID',
+                    'message' => 'A valid task ID is required in the URL or payload.',
+                ], 422);
+            }
+
+            $resolvedTaskData = $this->resolveTaskAcrossTables((int) $taskId);
+            if (!$resolvedTaskData) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'TASK_NOT_FOUND',
+                    'message' => 'No task found with the given identifier: ' . $taskId,
+                ], 404);
+            }
+
+            $legacyTask = $resolvedTaskData['task'];
+            $unifiedTask = $resolvedTaskData['unifiedTask'];
+
+            $member = $request->user();
+            if (!$member) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'UNAUTHENTICATED',
+                    'message' => 'You must be authenticated to submit a revision reply.',
+                ], 401);
+            }
+
+            $replyMessage = trim((string) (
+                $request->input('reply')
+                ?? $request->input('message')
+                ?? $request->input('remarks')
+                ?? $request->input('notes')
+                ?? ''
+            ));
+
+            if ($replyMessage === '') {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'VALIDATION_ERROR',
+                    'message' => 'A reply message or explanation is required.',
+                    'errors' => [
+                        'reply' => ['Please enter your revision reply or clarification notes.'],
+                    ],
+                ], 422);
+            }
+
+            $project = $legacyTask->project
+                ?? ($legacyTask->project_id ? Project::find($legacyTask->project_id) : null)
+                ?? ($unifiedTask?->project_id ? Project::find($unifiedTask->project_id) : null);
+
+            $taskIds = array_values(array_unique(array_filter([(int) $legacyTask->id, (int) ($unifiedTask?->id ?? 0)])));
+            $visit = SurveyVisit::where(function ($q) use ($taskIds) {
+                $q->whereIn('task_id', $taskIds)
+                    ->orWhereIn('execution_task_id', $taskIds);
+            })->latest('id')->first();
+
+            if (!$visit && $project) {
+                $visit = SurveyVisit::where('project_id', $project->id)->latest('id')->first();
+            }
+
+            $uploadedFiles = [];
+            $newPhotos = [];
+
+            if ($request->hasFile('photos')) {
+                foreach ((array) $request->file('photos') as $idx => $photoFile) {
+                    if ($photoFile && $photoFile->isValid()) {
+                        $filename = 'rev_photo_' . time() . '_' . $idx . '.' . $photoFile->getClientOriginalExtension();
+                        $relPath = $photoFile->storeAs('survey_visits/revisions', $filename, 'public');
+                        $url = Storage::disk('public')->url($relPath);
+                        $newPhotos[] = $url;
+                        $uploadedFiles[] = [
+                            'name' => $photoFile->getClientOriginalName(),
+                            'url' => $url,
+                            'path' => $relPath,
+                            'type' => 'photo',
+                            'size' => $this->formatFileSize($photoFile->getSize() ?: 0),
+                        ];
+                        $this->createTaskDocumentRecord($legacyTask->id, $member->id, $url, $relPath, 'photo');
+                    }
+                }
+            }
+
+            if ($request->hasFile('files')) {
+                foreach ((array) $request->file('files') as $idx => $file) {
+                    if ($file && $file->isValid()) {
+                        $filename = 'rev_file_' . time() . '_' . $idx . '.' . $file->getClientOriginalExtension();
+                        $relPath = $file->storeAs('survey_visits/revisions', $filename, 'public');
+                        $url = Storage::disk('public')->url($relPath);
+                        $uploadedFiles[] = [
+                            'name' => $file->getClientOriginalName(),
+                            'url' => $url,
+                            'path' => $relPath,
+                            'type' => 'document',
+                            'size' => $this->formatFileSize($file->getSize() ?: 0),
+                        ];
+                        $this->createTaskDocumentRecord($legacyTask->id, $member->id, $url, $relPath, 'document');
+                    }
+                }
+            }
+
+            if ($request->hasFile('file')) {
+                $file = $request->file('file');
+                if ($file && $file->isValid()) {
+                    $filename = 'rev_doc_' . time() . '.' . $file->getClientOriginalExtension();
+                    $relPath = $file->storeAs('survey_visits/revisions', $filename, 'public');
+                    $url = Storage::disk('public')->url($relPath);
+                    $uploadedFiles[] = [
+                        'name' => $file->getClientOriginalName(),
+                        'url' => $url,
+                        'path' => $relPath,
+                        'type' => 'document',
+                        'size' => $this->formatFileSize($file->getSize() ?: 0),
+                    ];
+                    $this->createTaskDocumentRecord($legacyTask->id, $member->id, $url, $relPath, 'document');
+                }
+            }
+
+            $now = now();
+            $nowFormatted = $now->setTimezone('Asia/Kolkata')->format('d M Y · h:i A');
+
+            if ($visit) {
+                $visitNotes = is_array($visit->notes) ? $visit->notes : (json_decode($visit->notes ?? '', true) ?: []);
+
+                $memberReplyData = [
+                    'message' => $replyMessage,
+                    'replied_at' => $now->toIso8601String(),
+                    'replied_at_formatted' => $nowFormatted,
+                    'member_id' => $member->id,
+                    'member_name' => $member->name,
+                    'files' => $uploadedFiles,
+                ];
+
+                $visitNotes['member_reply'] = $memberReplyData;
+
+                $history = $visitNotes['revision_history'] ?? [];
+                $history[] = [
+                    'type' => 'member_reply',
+                    'sender_role' => 'surveyor',
+                    'sender_name' => $member->name,
+                    'sender_id' => $member->id,
+                    'message' => $replyMessage,
+                    'files' => $uploadedFiles,
+                    'created_at' => $now->toIso8601String(),
+                    'created_at_formatted' => $nowFormatted,
+                ];
+                $visitNotes['revision_history'] = $history;
+
+                $existingPhotos = is_array($visit->photos) ? $visit->photos : [];
+                $finalPhotos = array_values(array_unique(array_merge($existingPhotos, $newPhotos)));
+
+                $visit->update([
+                    'status' => SurveyStatus::SUBMITTED,
+                    'notes' => json_encode($visitNotes, JSON_UNESCAPED_SLASHES),
+                    'photos' => $finalPhotos,
+                ]);
+
+                $sub = SurveySubmission::where('survey_visit_id', $visit->id)->first();
+                if ($sub) {
+                    $sub->update([
+                        'member_reply' => $replyMessage,
+                        'member_replied_at' => $now,
+                        'status' => SurveySubmission::STATUS_SUBMITTED,
+                    ]);
+                } elseif ($project) {
+                    SurveySubmission::create([
+                        'project_id' => $project->id,
+                        'survey_visit_id' => $visit->id,
+                        'task_id' => $legacyTask->id,
+                        'execution_task_id' => $legacyTask->id,
+                        'submitted_by_member_id' => $member->id,
+                        'submitted_at' => $now,
+                        'status' => SurveySubmission::STATUS_SUBMITTED,
+                        'member_reply' => $replyMessage,
+                        'member_replied_at' => $now,
+                    ]);
+                }
+            }
+
+            $legacyTask->update([
+                'status' => 'review',
+            ]);
+            if ($unifiedTask) {
+                $unifiedTask->update([
+                    'status' => 'review',
+                    'client_review_status' => \App\Enums\ClientReviewStatus::REQUESTED,
+                ]);
+            }
+
+            try {
+                \App\Models\TaskComment::create([
+                    'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                    'task_id' => $unifiedTask?->id ?? $legacyTask->id,
+                    'project_id' => $project?->id,
+                    'commented_by' => $member->id,
+                    'comment' => "Field team replied to survey revision: " . $replyMessage,
+                    'kind' => 'revision_reply',
+                    'from_status' => 'in_progress',
+                    'to_status' => 'review',
+                ]);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
+            if ($request->has('checklist_ids')) {
+                $rawChecklistIds = $request->input('checklist_ids');
+                if (is_string($rawChecklistIds)) {
+                    $rawChecklistIds = json_decode($rawChecklistIds, true) ?: explode(',', $rawChecklistIds);
+                }
+                $cIds = array_map('intval', array_filter((array) $rawChecklistIds, fn ($v) => is_numeric($v)));
+                if (!empty($cIds)) {
+                    TaskChecklist::where('execution_task_id', $legacyTask->id)
+                        ->whereIn('id', $cIds)
+                        ->update(['is_completed' => true, 'status' => 'completed']);
+                    if ($unifiedTask) {
+                        \App\Models\TaskChecklistItem::where('task_id', $unifiedTask->id)
+                            ->whereIn('id', $cIds)
+                            ->update(['is_completed' => true, 'status' => 'completed']);
+                    }
+                }
+            }
+
+            $revInfo = $this->resolveTaskRevisionInfo($legacyTask) ?? ($unifiedTask ? $this->resolveTaskRevisionInfo($unifiedTask) : null);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Revision reply submitted successfully. The task is now under review.',
+                'task' => [
+                    'id' => $legacyTask->id,
+                    'task_code' => $legacyTask->task_code ?? $unifiedTask?->task_code,
+                    'title' => $legacyTask->title,
+                    'status' => 'review',
+                    'status_label' => 'Under Review',
+                    'review_status' => 'revision_replied',
+                    'is_revision_requested' => true,
+                    'is_replied' => true,
+                    'revision_remarks' => $revInfo['revision_remarks'] ?? null,
+                    'revision_reply' => $replyMessage,
+                    'revision_replied_at' => $nowFormatted,
+                    'revision' => $revInfo,
+                ],
+                'revision' => $revInfo,
+                'uploaded_files' => $uploadedFiles,
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'VALIDATION_ERROR',
+                'message' => $ve->getMessage(),
+                'errors' => $ve->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json([
+                'success' => false,
+                'error_code' => 'REVISION_REPLY_FAILED',
+                'message' => 'Failed to submit revision reply: ' . $e->getMessage(),
             ], 500);
         }
     }
