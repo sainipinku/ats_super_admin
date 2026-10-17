@@ -35,6 +35,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class MemberDashboardController extends Controller
@@ -1600,10 +1601,13 @@ $completed = SurveyPlan::whereHas(
                     $taskIds[] = (int) $otherId;
                 }
             }
+            $hasExecCol = $this->hasSurveyVisitExecutionTaskIdColumn();
             $visit = SurveyVisit::with(['submission.reviewedBy', 'checkedInBy'])
-                ->where(function ($q) use ($taskIds) {
-                    $q->whereIn('task_id', $taskIds)
-                        ->orWhereIn('execution_task_id', $taskIds);
+                ->where(function ($q) use ($taskIds, $hasExecCol) {
+                    $q->whereIn('task_id', $taskIds);
+                    if ($hasExecCol) {
+                        $q->orWhereIn('execution_task_id', $taskIds);
+                    }
                 })
                 ->latest('id')
                 ->first();
@@ -4190,10 +4194,13 @@ $completed = SurveyPlan::whereHas(
         $revInfo = $this->resolveTaskRevisionInfo($task) ?? ($unifiedTask ? $this->resolveTaskRevisionInfo($unifiedTask) : null);
 
         $taskIds = array_values(array_unique(array_filter([(int) $task->id, (int) ($unifiedTask?->id ?? 0)])));
+        $hasExecCol = $this->hasSurveyVisitExecutionTaskIdColumn();
         $rawVisits = SurveyVisit::with(['submission.reviewedBy', 'checkedInBy'])
-            ->where(function ($q) use ($taskIds) {
-                $q->whereIn('task_id', $taskIds)
-                    ->orWhereIn('execution_task_id', $taskIds);
+            ->where(function ($q) use ($taskIds, $hasExecCol) {
+                $q->whereIn('task_id', $taskIds);
+                if ($hasExecCol) {
+                    $q->orWhereIn('execution_task_id', $taskIds);
+                }
             })
             ->latest('id')
             ->get();
@@ -5552,9 +5559,12 @@ $completed = SurveyPlan::whereHas(
                 ?? ($unifiedTask?->project_id ? Project::find($unifiedTask->project_id) : null);
 
             $taskIds = array_values(array_unique(array_filter([(int) $legacyTask->id, (int) ($unifiedTask?->id ?? 0)])));
-            $visit = SurveyVisit::where(function ($q) use ($taskIds) {
-                $q->whereIn('task_id', $taskIds)
-                    ->orWhereIn('execution_task_id', $taskIds);
+            $hasExecCol = $this->hasSurveyVisitExecutionTaskIdColumn();
+            $visit = SurveyVisit::where(function ($q) use ($taskIds, $hasExecCol) {
+                $q->whereIn('task_id', $taskIds);
+                if ($hasExecCol) {
+                    $q->orWhereIn('execution_task_id', $taskIds);
+                }
             })->latest('id')->first();
 
             if (!$visit && $project) {
@@ -5759,6 +5769,15 @@ $completed = SurveyPlan::whereHas(
                 'message' => 'Failed to submit revision reply: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    private function hasSurveyVisitExecutionTaskIdColumn(): bool
+    {
+        static $hasCol = null;
+        if ($hasCol === null) {
+            $hasCol = Schema::hasTable('construction_survey_visits') && Schema::hasColumn('construction_survey_visits', 'execution_task_id');
+        }
+        return $hasCol;
     }
 
     private function createTaskDocumentRecord(int $taskId, int $memberId, string $url, string $path, string $type): void

@@ -183,7 +183,8 @@ jobs:
 
             # 6. Run database migrations safely
             echo "🗄️ Running database migrations..."
-            php artisan migrate --force
+            php artisan migrate --force --no-interaction
+            php artisan migrate:status || true
 
             # 7. Optimize & cache config, routes, views
             echo "⚡ Clearing and caching Laravel configuration..."

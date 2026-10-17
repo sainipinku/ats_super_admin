@@ -531,9 +531,14 @@ class ProjectTaskController extends Controller implements HasMiddleware
         }
 
         $taskIds = array_values(array_unique(array_filter([$taskId, $legacyTask?->id, $unifiedTask?->id])));
-        $visits = SurveyVisit::where(function ($q) use ($taskIds, $project) {
-            $q->whereIn('task_id', $taskIds)
-                ->orWhereIn('execution_task_id', $taskIds);
+        $hasExecCol = \Illuminate\Support\Facades\Schema::hasTable('construction_survey_visits')
+            && \Illuminate\Support\Facades\Schema::hasColumn('construction_survey_visits', 'execution_task_id');
+
+        $visits = SurveyVisit::where(function ($q) use ($taskIds, $project, $hasExecCol) {
+            $q->whereIn('task_id', $taskIds);
+            if ($hasExecCol) {
+                $q->orWhereIn('execution_task_id', $taskIds);
+            }
             if ($project) {
                 $q->orWhere(fn ($sub) => $sub->where('project_id', $project->id)->whereIn('task_id', $taskIds));
             }
