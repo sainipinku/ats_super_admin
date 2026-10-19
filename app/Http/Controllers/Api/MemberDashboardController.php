@@ -45,6 +45,9 @@ class MemberDashboardController extends Controller
         protected readonly ConstructionAuthorizationService $authz,
     ) {}
 
+
+
+    
     private function accessibleProjectIds(Member $member): array
     {
         $team = ProjectTeamMember::query()
