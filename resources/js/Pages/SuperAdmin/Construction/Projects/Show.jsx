@@ -3605,8 +3605,8 @@ function LocationDisplay({ locationName, address, lat, lng, className = "" }) {
 }
 
 function mergedTasksForExecutionList(project) {
-    const legacy = Array.isArray(project?.execution_tasks) ? project.execution_tasks : [];
-    const unified = Array.isArray(project?.tasks) ? project.tasks : [];
+    const legacyTasks = Array.isArray(project?.execution_tasks) ? project.execution_tasks : [];
+    const unifiedTasks = Array.isArray(project?.tasks) ? project.tasks : [];
 
     const normalize = (task, sourceTag) => {
         const legacyChecklists = Array.isArray(task.checklists) ? task.checklists : [];
@@ -3622,7 +3622,7 @@ function mergedTasksForExecutionList(project) {
         // Cross-match if checklists were attached to the other table representation
         let fallbackChecklists = [];
         if (sourceTag === "unified" && legacyChecklists.length === 0 && unifiedChecklists.length === 0) {
-            const match = legacy.find((et) =>
+            const match = legacyTasks.find((et) =>
                 et.id === task.id ||
                 (et.task_code && task.task_code && et.task_code === task.task_code) ||
                 (et.title && task.title && et.title.trim().toLowerCase() === task.title.trim().toLowerCase())
@@ -3631,7 +3631,7 @@ function mergedTasksForExecutionList(project) {
                 fallbackChecklists = match.checklists;
             }
         } else if (sourceTag === "legacy" && legacyChecklists.length === 0 && unifiedChecklists.length === 0) {
-            const match = unified.find((ut) =>
+            const match = unifiedTasks.find((ut) =>
                 ut.id === task.id ||
                 (ut.task_code && task.task_code && ut.task_code === task.task_code) ||
                 (ut.title && task.title && ut.title.trim().toLowerCase() === task.title.trim().toLowerCase())
@@ -3667,29 +3667,29 @@ function mergedTasksForExecutionList(project) {
             });
             return out;
         };
-        const legacy = sourceTag === "legacy";
-        const plannedStart = legacy
+        const isLegacy = sourceTag === "legacy";
+        const plannedStart = isLegacy
             ? (task.planned_start_date ?? "")
             : (task.start_date ?? task.planned_start_date ?? "");
-        const plannedEnd = legacy
+        const plannedEnd = isLegacy
             ? (task.planned_end_date ?? "")
             : (task.end_date ?? task.planned_end_date ?? "");
-        const actualStart = legacy
+        const actualStart = isLegacy
             ? (task.actual_start_date ?? "")
             : (task.actual_start_date ?? task.start_date ?? "");
-        const actualEnd = legacy
+        const actualEnd = isLegacy
             ? (task.actual_end_date ?? "")
             : (task.actual_end_date ?? task.end_date ?? "");
-        const plannedQty = legacy
+        const plannedQty = isLegacy
             ? (task.planned_quantity ?? "")
             : (task.planned_qty ?? task.planned_quantity ?? "");
-        const completedQty = legacy
+        const completedQty = isLegacy
             ? (task.completed_quantity ?? "")
             : (task.completed_qty ?? task.completed_quantity ?? "");
-        const unitVal = legacy
+        const unitVal = isLegacy
             ? (task.unit ?? "")
             : (task.qty_unit ?? task.unit ?? "");
-        const supervisorId = legacy
+        const supervisorId = isLegacy
             ? (task.supervisor_member_id ?? "")
             : (task.assigned_supervisor_member_id ?? task.supervisor_member_id ?? "");
         return {
@@ -3719,8 +3719,8 @@ function mergedTasksForExecutionList(project) {
     };
 
     const rows = [
-        ...legacy.map((t) => normalize(t, "legacy")),
-        ...unified.map((t) => normalize(t, "unified")),
+        ...legacyTasks.map((t) => normalize(t, "legacy")),
+        ...unifiedTasks.map((t) => normalize(t, "unified")),
     ];
 
     rows.sort((a, b) => {
