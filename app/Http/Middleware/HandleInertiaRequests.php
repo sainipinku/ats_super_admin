@@ -170,8 +170,10 @@ class HandleInertiaRequests extends Middleware
             'messages' => flash()->render('array'),
             'delete_approval_requests' => $deleteApprovalRequestsMap,
             'available_roles' => $userAvailableRoles,
-            'active_role' => $activeRole,
             'google_maps_api_key' => (string) (config('services.google.maps_api_key') ?: env('GOOGLE_MAPS_API_KEY') ?: env('VITE_GOOGLE_MAPS_API_KEY') ?: ''),
+            'mapbox_token' => (string) (config('services.mapbox.token') ?: env('MAPBOX_TOKEN') ?: env('VITE_MAPBOX_TOKEN') ?: ''),
+            'openrouteservice_api_key' => (string) (config('services.openrouteservice.api_key') ?: env('OPENROUTESERVICE_API_KEY') ?: env('VITE_OPENROUTESERVICE_API_KEY') ?: ''),
+            'carto_api_key' => (string) (config('services.carto.api_key') ?: env('CARTO_API_KEY') ?: env('VITE_CARTO_API_KEY') ?: ''),
 
             'auth' => [
                 'user' => $user,

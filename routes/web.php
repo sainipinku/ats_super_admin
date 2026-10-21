@@ -238,6 +238,7 @@ Route::middleware('auth:superadmin')->group(function () {
     Route::prefix('api/admin')->group(function () {
         Route::get('/employee-locations', [App\Http\Controllers\Api\AdminEmployeeLocationController::class, 'index']);
         Route::get('/employees/{employeeId}/location-history', [App\Http\Controllers\Api\AdminEmployeeLocationController::class, 'history']);
+        Route::post('/route-directions', [App\Http\Controllers\Api\AdminEmployeeLocationController::class, 'directions']);
     });
 });
 

@@ -7,13 +7,16 @@ import {
 import { usePage } from '@inertiajs/react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '@/Components/LoadingSpinner.jsx';
+import {
+  GOOGLE_MAPS_LOADER_ID,
+  GOOGLE_MAPS_LIBRARIES,
+  resolveGoogleMapsApiKey,
+} from '@/lib/googleMaps';
 
 const mapContainerStyle = {
   width: '100%',
   height: '360px',
 };
-
-const libraries = ['places'];
 
 /**
  * Inner component that loads the Google Maps API via useJsApiLoader.
@@ -50,8 +53,8 @@ function GoogleMapLocationPickerInner({
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey,
-    libraries,
-    id: 'google-maps-location-picker',
+    libraries: GOOGLE_MAPS_LIBRARIES,
+    id: GOOGLE_MAPS_LOADER_ID,
   });
 
   const mapRef = useRef(null);
@@ -692,14 +695,7 @@ export default function GoogleMapLocationSection({
   apiKey: propApiKey,
 }) {
   const page = usePage();
-  const apiKey = (
-    propApiKey ||
-    page?.props?.google_maps_api_key ||
-    (typeof window !== 'undefined' && window.GOOGLE_MAPS_API_KEY) ||
-    (typeof window !== 'undefined' && window.__APP_SETTINGS?.google_maps_api_key) ||
-    import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
-    ''
-  ).trim();
+  const apiKey = resolveGoogleMapsApiKey(propApiKey, page?.props);
 
   const hasInitialCoords =
     initialLat != null && initialLng != null && initialLat !== '' && initialLng !== '';

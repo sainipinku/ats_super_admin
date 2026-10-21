@@ -22,8 +22,6 @@ class AdminEmployeeLocationController extends Controller
         $hasMemberLocationTimestamp = Schema::hasColumn('members', 'location_captured_at');
         $relations = [
             'member.latestAttendanceLocation',
-            'member.departmentList:id,name',
-            'member.designationList:id,name',
         ];
         if ($hasLocationTable) {
             $relations[] = 'member.latestLocation';
@@ -81,10 +79,8 @@ class AdminEmployeeLocationController extends Controller
                     'employeeId' => $employee->employee_id,
                     'name' => $member->name,
                     'profileImage' => $member->profile_photo_url,
-                    'designation' => $member->designationList->pluck('name')->implode(', ')
-                        ?: ($member->designation_names ?: 'Not specified'),
-                    'department' => $member->departmentList->pluck('name')->implode(', ')
-                        ?: ($member->department_names ?: 'Not specified'),
+                    'designation' => $member->designation_names ?: 'Not specified',
+                    'department' => $member->department_names ?: 'Not specified',
                     'latitude' => (float) $position['latitude'],
                     'longitude' => (float) $position['longitude'],
                     'accuracy' => $position['accuracy'] === null ? null : (float) $position['accuracy'],
@@ -396,6 +392,123 @@ class AdminEmployeeLocationController extends Controller
         }
 
         return $ageSeconds <= $interval * 10 ? 'Stale' : 'Offline / not reporting';
+    }
+
+    public function directions(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'coordinates' => ['required', 'array', 'min:2'],
+            'coordinates.*' => ['required'],
+        ]);
+
+        $apiKey = config('services.openrouteservice.api_key') ?: env('OPENROUTESERVICE_API_KEY');
+        $rawCoordinates = $validated['coordinates'];
+
+        $validPairs = [];
+        foreach ($rawCoordinates as $coord) {
+            $lat = null;
+            $lng = null;
+            if (is_array($coord)) {
+                if (isset($coord['lat']) && isset($coord['lng'])) {
+                    $lat = (float) $coord['lat'];
+                    $lng = (float) $coord['lng'];
+                } elseif (isset($coord[0]) && isset($coord[1])) {
+                    $lat = (float) $coord[0];
+                    $lng = (float) $coord[1];
+                }
+            }
+            if ($lat !== null && $lng !== null && $this->validCoordinates($lat, $lng)) {
+                // OpenRouteService expects [longitude, latitude]
+                $validPairs[] = [$lng, $lat];
+            }
+        }
+
+        if (count($validPairs) < 2) {
+            return response()->json([
+                'success' => false,
+                'message' => 'At least two valid coordinate pairs are required.',
+            ], 422);
+        }
+
+        $directCoordinates = array_map(fn ($p) => ['lat' => $p[1], 'lng' => $p[0]], $validPairs);
+
+        if (empty($apiKey)) {
+            return response()->json([
+                'success' => true,
+                'source' => 'direct',
+                'coordinates' => $directCoordinates,
+            ]);
+        }
+
+        // Downsample if more than 50 points to respect ORS limit
+        $orsCoordinates = $this->downsampleCoordinates($validPairs, 50);
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(6)
+                ->withHeaders([
+                    'Authorization' => $apiKey,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json, application/geo+json',
+                ])
+                ->post('https://api.openrouteservice.org/v2/directions/driving-car/geojson', [
+                    'coordinates' => $orsCoordinates,
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $feature = $data['features'][0] ?? null;
+                $geometry = $feature['geometry'] ?? null;
+                $summary = $feature['properties']['summary'] ?? null;
+
+                $routePath = [];
+                if (isset($geometry['coordinates']) && is_array($geometry['coordinates'])) {
+                    foreach ($geometry['coordinates'] as $point) {
+                        $routePath[] = [
+                            'lat' => (float) $point[1],
+                            'lng' => (float) $point[0],
+                        ];
+                    }
+                }
+
+                if (!empty($routePath)) {
+                    return response()->json([
+                        'success' => true,
+                        'source' => 'openrouteservice',
+                        'distance_meters' => $summary['distance'] ?? null,
+                        'distance_km' => isset($summary['distance']) ? round($summary['distance'] / 1000, 2) : null,
+                        'duration_seconds' => $summary['duration'] ?? null,
+                        'duration_minutes' => isset($summary['duration']) ? round($summary['duration'] / 60, 1) : null,
+                        'coordinates' => $routePath,
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('OpenRouteService directions error: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'source' => 'direct',
+            'coordinates' => $directCoordinates,
+        ]);
+    }
+
+    private function downsampleCoordinates(array $coordinates, int $maxPoints = 50): array
+    {
+        $count = count($coordinates);
+        if ($count <= $maxPoints) {
+            return $coordinates;
+        }
+
+        $sampled = [$coordinates[0]];
+        $step = ($count - 1) / ($maxPoints - 1);
+        for ($i = 1; $i < $maxPoints - 1; $i++) {
+            $index = (int) round($i * $step);
+            $sampled[] = $coordinates[$index];
+        }
+        $sampled[] = $coordinates[$count - 1];
+
+        return $sampled;
     }
 
     private function reportingInterval(): int
