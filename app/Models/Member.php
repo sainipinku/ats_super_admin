@@ -75,6 +75,9 @@ class Member extends Authenticatable
         'is_calling_team' => 'boolean',
         'must_change_password' => 'boolean',
         'status' => 'integer',
+        'latitude' => 'float',
+        'longitude' => 'float',
+        'location_captured_at' => 'datetime',
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
     ];
@@ -474,6 +477,30 @@ class Member extends Authenticatable
     public function employee()
     {
         return $this->hasOne(Employee::class, 'member_id');
+    }
+
+    public function latestLocation()
+    {
+        return $this->hasOne(EmployeeLocation::class, 'member_id')->latestOfMany('captured_at');
+    }
+
+    public function latestAttendanceLocation()
+    {
+        return $this->hasOne(AttendanceRecord::class, 'member_id')
+            ->where(function ($query) {
+                $query->where(function ($checkIn) {
+                    $checkIn->whereNotNull('check_in_latitude')
+                        ->whereNotNull('check_in_longitude')
+                        ->whereBetween('check_in_latitude', [-90, 90])
+                        ->whereBetween('check_in_longitude', [-180, 180]);
+                })->orWhere(function ($checkOut) {
+                    $checkOut->whereNotNull('check_out_latitude')
+                        ->whereNotNull('check_out_longitude')
+                        ->whereBetween('check_out_latitude', [-90, 90])
+                        ->whereBetween('check_out_longitude', [-180, 180]);
+                });
+            })
+            ->latestOfMany('attendance_date');
     }
 
     public function departmentList()

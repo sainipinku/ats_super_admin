@@ -231,6 +231,16 @@ Route::prefix('super')->name('super.')->group(function () {
 
 /** SUPER ADMIN ROUTES END HERE **/
 
+Route::middleware('auth:superadmin')->group(function () {
+    Route::get('/super/location-tracking', fn () => Inertia::render('SuperAdmin/LocationTracking'))
+        ->name('super.location_tracking');
+
+    Route::prefix('api/admin')->group(function () {
+        Route::get('/employee-locations', [App\Http\Controllers\Api\AdminEmployeeLocationController::class, 'index']);
+        Route::get('/employees/{employeeId}/location-history', [App\Http\Controllers\Api\AdminEmployeeLocationController::class, 'history']);
+    });
+});
+
 /** ADMIN ROUTES START HERE **/
 Route::prefix('admin')->middleware(['admin'])->group(function () {
     // Profile routes

@@ -2752,22 +2752,43 @@ $completed = SurveyPlan::whereHas(
         $notes = $request->input('notes', $request->input('check_in_notes'));
         $attendanceType = $request->input('attendance_type', 'present');
 
+        $attendanceData = [
+            'project_id' => $projectId,
+            'execution_task_id' => $request->input('execution_task_id'),
+            'check_in_at' => now(),
+            'attendance_type' => $attendanceType,
+            'notes' => $notes,
+            'status' => 'submitted',
+        ];
+        if (
+            is_numeric($latitude)
+            && is_numeric($longitude)
+            && $latitude >= -90
+            && $latitude <= 90
+            && $longitude >= -180
+            && $longitude <= 180
+        ) {
+            $attendanceData['check_in_latitude'] = $latitude;
+            $attendanceData['check_in_longitude'] = $longitude;
+        }
+        if (is_numeric($accuracy) && $accuracy >= 0 && $accuracy <= 100000) {
+            $attendanceData['gps_accuracy_meters'] = $accuracy;
+        }
+
         $attendance = AttendanceRecord::updateOrCreate(
             [
                 'member_id' => $member->id,
                 'attendance_date' => $today,
             ],
-            [
-                'project_id' => $projectId,
-                'execution_task_id' => $request->input('execution_task_id'),
-                'check_in_at' => now(),
-                'check_in_latitude' => $latitude,
-                'check_in_longitude' => $longitude,
-                'gps_accuracy_meters' => $accuracy,
-                'attendance_type' => $attendanceType,
-                'notes' => $notes,
-                'status' => 'submitted',
-            ]
+            $attendanceData
+        );
+
+        \App\Models\EmployeeLocation::recordIfValid(
+            $member,
+            $latitude,
+            $longitude,
+            $accuracy,
+            $attendance->check_in_at
         );
 
         try {
@@ -2905,11 +2926,20 @@ $completed = SurveyPlan::whereHas(
 
         $updateData = [
             'check_out_at' => $now,
-            'check_out_latitude' => $latitude,
-            'check_out_longitude' => $longitude,
         ];
 
-        if ($accuracy !== null) {
+        if (
+            is_numeric($latitude)
+            && is_numeric($longitude)
+            && $latitude >= -90
+            && $latitude <= 90
+            && $longitude >= -180
+            && $longitude <= 180
+        ) {
+            $updateData['check_out_latitude'] = $latitude;
+            $updateData['check_out_longitude'] = $longitude;
+        }
+        if (is_numeric($accuracy) && $accuracy >= 0 && $accuracy <= 100000) {
             $updateData['gps_accuracy_meters'] = $accuracy;
         }
         if ($notes !== null) {
@@ -2917,6 +2947,14 @@ $completed = SurveyPlan::whereHas(
         }
 
         $record->update($updateData);
+
+        \App\Models\EmployeeLocation::recordIfValid(
+            $member,
+            $latitude,
+            $longitude,
+            $accuracy,
+            $now
+        );
 
         try {
             $checkInOut = \App\Models\CheckInOut::where('member_id', $member->id)
@@ -3910,6 +3948,16 @@ $completed = SurveyPlan::whereHas(
                 'gps_verified' => true,
                 'status' => SurveyStatus::IN_PROGRESS,
             ]);
+
+            if ($request->filled('latitude') && $request->filled('longitude')) {
+                \App\Models\EmployeeLocation::recordIfValid(
+                    $member,
+                    $request->input('latitude'),
+                    $request->input('longitude'),
+                    $request->input('gps_accuracy_meters', $request->input('accuracy')),
+                    $visit->check_in_at
+                );
+            }
         } catch (\Throwable $e) {
             report($e);
 

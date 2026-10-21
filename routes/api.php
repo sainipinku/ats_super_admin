@@ -79,12 +79,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/tasks', [TaskController::class, 'index']);
     Route::get('/tasks/{task}', [TaskController::class, 'show']);
-<<<<<<< HEAD
-    Route::post('/tasks/{taskId}/submit', [MemberDashboardController::class, 'submitSurveyTask']);
-=======
     Route::post('/tasks/{task}/submit', [MemberDashboardController::class, 'submitTaskData']);
     Route::post('/tasks/{task}/revision-reply', [MemberDashboardController::class, 'submitRevisionReply']);
->>>>>>> ed706696af69402228bdff36f10ca79f87d23f97
     Route::get('/tasks/{task}/notes', [TaskController::class, 'notesIndex']);
     Route::post('/tasks/{task}/notes', [TaskController::class, 'notesStore']);
     Route::delete('/notes/{note}', [TaskController::class, 'notesDestroy']);
@@ -94,6 +90,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/attendance/check-in', [MemberDashboardController::class, 'checkIn']);
     Route::post('/attendance/check-out', [MemberDashboardController::class, 'checkOut']);
     Route::post('/attendance/{attendance}/check-out', [MemberDashboardController::class, 'checkOut']);
+    Route::post('/member/location', [App\Http\Controllers\Api\AdminEmployeeLocationController::class, 'report'])
+        ->middleware('throttle:5,1');
 
     Route::prefix('member')->name('member.')->group(function () {
         Route::get('/dashboard', [MemberDashboardController::class, 'index']);

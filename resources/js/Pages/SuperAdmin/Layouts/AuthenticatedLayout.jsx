@@ -706,7 +706,15 @@ export default function AuthenticatedLayout({ header, children }) {
                         </header>
                     )}
 
-                    <main className="pt-[72px] px-1 sm:px-2 lg:px-3 pb-8">{children}</main>
+                    <main
+                        className={
+                            route().current("super.location_tracking")
+                                ? "h-[100dvh] overflow-hidden pt-[72px]"
+                                : "pt-[72px] px-1 pb-8 sm:px-2 lg:px-3"
+                        }
+                    >
+                        {children}
+                    </main>
 
                     <Toaster
                         position="top-right"
