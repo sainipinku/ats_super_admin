@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePage } from "@inertiajs/react";
 import {
     GoogleMap,
     InfoWindowF,
@@ -86,7 +87,13 @@ function localDateTime(value) {
 }
 
 export default function LocationTracking() {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+    const { props: pageProps } = usePage();
+    const apiKey =
+        pageProps?.google_maps_api_key ||
+        (typeof window !== "undefined" && window.GOOGLE_MAPS_API_KEY) ||
+        (typeof window !== "undefined" && window.__APP_SETTINGS?.google_maps_api_key) ||
+        import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
+        "";
     const { isLoaded, loadError } = useJsApiLoader({
         id: "cadmax-employee-location-map",
         googleMapsApiKey: apiKey,

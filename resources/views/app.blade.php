@@ -42,6 +42,7 @@
     </script>
     <script>
     window.__APP_SETTINGS = @json(\App\Models\SiteSetting::getAllSettings());
+    window.GOOGLE_MAPS_API_KEY = @json((string) (config('services.google.maps_api_key') ?: env('GOOGLE_MAPS_API_KEY') ?: env('VITE_GOOGLE_MAPS_API_KEY') ?: ''));
 </script>
 
 </body>

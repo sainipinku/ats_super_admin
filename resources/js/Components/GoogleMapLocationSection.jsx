@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GoogleMap,
-  Marker,
+  MarkerF,
   useJsApiLoader,
 } from '@react-google-maps/api';
+import { usePage } from '@inertiajs/react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '@/Components/LoadingSpinner.jsx';
 
@@ -14,14 +15,38 @@ const mapContainerStyle = {
 
 const libraries = ['places'];
 
-export default function GoogleMapLocationSection({
-  initialLat = null,
-  initialLng = null,
-  initialAddress = '',
-  initialLocationName = '',
-  onChange,
+/**
+ * Inner component that loads the Google Maps API via useJsApiLoader.
+ * ONLY mounted when an apiKey is present, preventing NoApiKeys warnings.
+ */
+function GoogleMapLocationPickerInner({
+  apiKey,
+  hasInitialCoords,
+  markerPosition,
+  setMarkerPosition,
+  formattedAddress,
+  setFormattedAddress,
+  manualCoords,
+  setManualCoords,
+  emitChange,
+  handleCurrentLocation,
+  handleManualCoordChange,
 }) {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+  const [authError, setAuthError] = useState(false);
+
+  // Catch Google Maps authentication failures (ApiProjectMapError, Referer restrictions, billing, etc.)
+  useEffect(() => {
+    const originalAuthFailure = window.gm_authFailure;
+    window.gm_authFailure = () => {
+      setAuthError(true);
+      if (typeof originalAuthFailure === 'function') {
+        originalAuthFailure();
+      }
+    };
+    return () => {
+      window.gm_authFailure = originalAuthFailure;
+    };
+  }, []);
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey,
@@ -34,65 +59,19 @@ export default function GoogleMapLocationSection({
   const searchContainerRef = useRef(null);
   const debounceTimerRef = useRef(null);
 
-  const hasInitialCoords =
-    initialLat != null && initialLng != null && initialLat !== '' && initialLng !== '';
-
-  const [markerPosition, setMarkerPosition] = useState(
-    hasInitialCoords
-      ? { lat: Number(initialLat), lng: Number(initialLng) }
-      : { lat: 20.5937, lng: 78.9629 }
-  );
-  const [formattedAddress, setFormattedAddress] = useState(
-    initialLocationName || initialAddress || ''
-  );
-  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState(formattedAddress || '');
   const [suggestions, setSuggestions] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState('');
-  const [manualCoords, setManualCoords] = useState({
-    lat: hasInitialCoords ? String(initialLat) : '',
-    lng: hasInitialCoords ? String(initialLng) : '',
-  });
-
-  const [searchQuery, setSearchQuery] = useState(initialLocationName || initialAddress || '');
   const [showDropdown, setShowDropdown] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [isSearching, setIsSearching] = useState(false);
 
-  // Sync initial coordinates
+  // Sync searchQuery when address changes externally
   useEffect(() => {
-    const lat = Number(initialLat);
-    const lng = Number(initialLng);
-    if (
-      initialLat != null &&
-      initialLng != null &&
-      initialLat !== '' &&
-      initialLng !== '' &&
-      Number.isFinite(lat) &&
-      Number.isFinite(lng)
-    ) {
-      setMarkerPosition({ lat, lng });
-      setManualCoords({ lat: String(initialLat), lng: String(initialLng) });
+    if (formattedAddress) {
+      setSearchQuery(formattedAddress);
     }
-    if (initialLocationName || initialAddress) {
-      const addr = initialLocationName || initialAddress;
-      setFormattedAddress(addr);
-      setSearchQuery(addr);
-    }
-  }, [initialLat, initialLng, initialLocationName, initialAddress]);
-
-  const emitChange = useCallback(
-    (patch) => {
-      if (!onChange) return;
-      onChange({
-        location_name: patch.location_name ?? formattedAddress,
-        project_address: patch.project_address ?? formattedAddress,
-        latitude: patch.latitude ?? markerPosition.lat,
-        longitude: patch.longitude ?? markerPosition.lng,
-      });
-    },
-    [onChange, formattedAddress, markerPosition]
-  );
+  }, [formattedAddress]);
 
   const reverseGeocode = useCallback(
     (lat, lng) => {
@@ -125,7 +104,7 @@ export default function GoogleMapLocationSection({
         }
       );
     },
-    [emitChange]
+    [emitChange, setFormattedAddress]
   );
 
   const onLoad = useCallback(
@@ -137,15 +116,12 @@ export default function GoogleMapLocationSection({
       if (hasInitialCoords && mapRef.current && markerPosition) {
         mapRef.current.setCenter(markerPosition);
         mapRef.current.setZoom(15);
-        if (!initialLocationName && !initialAddress) {
-          reverseGeocode(markerPosition.lat, markerPosition.lng);
-        }
       }
     },
-    [hasInitialCoords, markerPosition, initialLocationName, initialAddress, reverseGeocode]
+    [hasInitialCoords, markerPosition]
   );
 
-  // Fetch address & landmark suggestions with location bias (Places API New -> Places Service -> Geocoder)
+  // Fetch address & landmark suggestions with location bias
   const fetchSuggestions = useCallback(
     async (query) => {
       const trimmed = query.trim();
@@ -163,7 +139,6 @@ export default function GoogleMapLocationSection({
       setLoadingSuggestions(true);
       setHighlightedIndex(-1);
 
-      // Local bias: Use current map bounds or marker position
       const bounds = mapRef.current?.getBounds();
       const currentCenter = markerPosition
         ? { lat: Number(markerPosition.lat), lng: Number(markerPosition.lng) }
@@ -171,7 +146,7 @@ export default function GoogleMapLocationSection({
 
       let items = [];
 
-      // 1. Try Places API (New) AutocompleteSuggestion (Finds establishments, landmarks, hubs, shops)
+      // 1. Try Places API (New) AutocompleteSuggestion
       try {
         if (window.google?.maps?.importLibrary) {
           const { AutocompleteSuggestion } = await window.google.maps.importLibrary('places');
@@ -198,10 +173,10 @@ export default function GoogleMapLocationSection({
           }
         }
       } catch (err) {
-        // Places API (New) not active or errored
+        // Places API (New) fallback
       }
 
-      // 2. If no items yet, try classic Places AutocompleteService
+      // 2. Fallback to classic Places AutocompleteService
       if (items.length === 0) {
         try {
           if (window.google?.maps?.places?.AutocompleteService) {
@@ -236,7 +211,7 @@ export default function GoogleMapLocationSection({
         }
       }
 
-      // 3. If still no items, fallback to Geocoder with bounds
+      // 3. Fallback to Geocoder
       if (items.length === 0) {
         try {
           const geoResults = await new Promise((resolve) => {
@@ -268,7 +243,7 @@ export default function GoogleMapLocationSection({
             });
           }
         } catch (err) {
-          console.warn('Geocoder error:', err);
+          // Geocoder error
         }
       }
 
@@ -279,7 +254,6 @@ export default function GoogleMapLocationSection({
     [markerPosition]
   );
 
-  // Handle typing with 300ms debounce
   const handleInputChange = (e) => {
     const val = e.target.value;
     setSearchQuery(val);
@@ -301,7 +275,6 @@ export default function GoogleMapLocationSection({
     }
   };
 
-  // Select suggestion from dropdown
   const handleSelectSuggestion = async (item) => {
     if (!item) return;
     setSearchQuery(item.fullAddress);
@@ -329,7 +302,6 @@ export default function GoogleMapLocationSection({
       toast.success('Location selected & pinned!');
     };
 
-    // Case 1: Place prediction from Places API (New)
     if (item.prediction?.toPlace) {
       try {
         toast.loading('Pinning place…', { id: 'place-load' });
@@ -351,142 +323,98 @@ export default function GoogleMapLocationSection({
       }
     }
 
-    // Case 2: placeId lookup via Geocoder
-    if (item.placeId) {
-      if (!geocoderRef.current) {
-        if (typeof window !== 'undefined' && window.google?.maps?.Geocoder) {
-          geocoderRef.current = new window.google.maps.Geocoder();
-        }
-      }
-      if (geocoderRef.current) {
-        geocoderRef.current.geocode({ placeId: item.placeId }, (results, status) => {
-          if (status === 'OK' && results?.[0]) {
-            const best = results[0];
-            const lat = best.geometry?.location?.lat();
-            const lng = best.geometry?.location?.lng();
-            if (lat != null && lng != null) {
-              applyLocation(lat, lng, best.formatted_address || item.fullAddress);
-              return;
+    if (item.placeId && window.google?.maps?.places?.PlacesService && mapRef.current) {
+      try {
+        const placesService = new window.google.maps.places.PlacesService(mapRef.current);
+        placesService.getDetails(
+          { placeId: item.placeId, fields: ['geometry', 'formatted_address', 'name'] },
+          (detail, status) => {
+            if (status === 'OK' && detail?.geometry?.location) {
+              const lat = detail.geometry.location.lat();
+              const lng = detail.geometry.location.lng();
+              const address = detail.formatted_address || detail.name || item.fullAddress;
+              applyLocation(lat, lng, address);
+            } else if (item.lat != null && item.lng != null) {
+              applyLocation(item.lat, item.lng, item.fullAddress);
             }
           }
-          if (item.lat != null && item.lng != null) {
-            applyLocation(item.lat, item.lng, item.fullAddress);
-          }
-        });
+        );
         return;
+      } catch (e) {
+        // PlacesService fallback
       }
     }
 
-    // Case 3: direct lat/lng
     if (item.lat != null && item.lng != null) {
       applyLocation(item.lat, item.lng, item.fullAddress);
+      return;
+    }
+
+    if (geocoderRef.current) {
+      geocoderRef.current.geocode({ address: item.fullAddress }, (results, status) => {
+        if (status === 'OK' && results?.[0]?.geometry?.location) {
+          const lat = results[0].geometry.location.lat();
+          const lng = results[0].geometry.location.lng();
+          applyLocation(lat, lng, results[0].formatted_address || item.fullAddress);
+        } else {
+          toast.error('Could not pin exact coordinates. Drag marker manually.');
+        }
+      });
     }
   };
 
-  // Direct search (Enter key or Search button)
-  const handleGeocodeSearch = useCallback(
-    async (explicitQuery) => {
-      const query = (explicitQuery || searchQuery).trim();
-      if (!query) {
-        toast.error('Please enter an address or place name to search.');
-        return;
-      }
+  const handleGeocodeSearch = useCallback(() => {
+    const query = searchQuery.trim();
+    if (!query) return;
 
-      // If dropdown has active results, select top result
-      if (suggestions.length > 0) {
-        const top = highlightedIndex >= 0 ? suggestions[highlightedIndex] : suggestions[0];
-        handleSelectSuggestion(top);
-        return;
-      }
+    if (showDropdown && suggestions.length > 0 && highlightedIndex >= 0) {
+      handleSelectSuggestion(suggestions[highlightedIndex]);
+      return;
+    }
 
-      setShowDropdown(false);
-      setIsSearching(true);
+    setIsSearching(true);
+    setShowDropdown(false);
 
-      const bounds = mapRef.current?.getBounds();
+    if (!geocoderRef.current) {
+      if (typeof window === 'undefined' || !window.google?.maps?.Geocoder) return;
+      geocoderRef.current = new window.google.maps.Geocoder();
+    }
 
-      // Try Places API (New) first for landmarks
-      try {
-        if (window.google?.maps?.importLibrary) {
-          const { AutocompleteSuggestion } = await window.google.maps.importLibrary('places');
-          if (AutocompleteSuggestion?.fetchAutocompleteSuggestions) {
-            const res = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
-              input: query,
-              locationBias: bounds || markerPosition,
-            });
-            if (res?.suggestions?.length > 0) {
-              const p = res.suggestions[0].placePrediction;
-              const place = p.toPlace();
-              await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
-              if (place.location) {
-                setIsSearching(false);
-                const lat = place.location.lat();
-                const lng = place.location.lng();
-                const addr = place.formattedAddress || place.displayName || query;
-                setMarkerPosition({ lat, lng });
-                setManualCoords({ lat: String(lat), lng: String(lng) });
-                setFormattedAddress(addr);
-                setSearchQuery(addr);
-                if (mapRef.current) {
-                  mapRef.current.panTo({ lat, lng });
-                  mapRef.current.setZoom(17);
-                }
-                emitChange({
-                  location_name: addr,
-                  project_address: addr,
-                  latitude: lat,
-                  longitude: lng,
-                });
-                toast.success('Location found & pinned!');
-                return;
-              }
-            }
-          }
+    const bounds = mapRef.current?.getBounds();
+
+    geocoderRef.current.geocode({ address: query, bounds }, (results, status) => {
+      setIsSearching(false);
+      if (status === 'OK' && results?.[0]) {
+        const best = results[0];
+        const lat = best.geometry.location.lat();
+        const lng = best.geometry.location.lng();
+        const formatted = best.formatted_address || query;
+
+        setMarkerPosition({ lat, lng });
+        setManualCoords({ lat: String(lat), lng: String(lng) });
+        setFormattedAddress(formatted);
+        setSearchQuery(formatted);
+
+        if (mapRef.current) {
+          mapRef.current.panTo({ lat, lng });
+          mapRef.current.setZoom(16);
         }
-      } catch (e) {
-        // Fallback to Geocoder
+
+        emitChange({
+          location_name: formatted,
+          project_address: formatted,
+          latitude: lat,
+          longitude: lng,
+        });
+        toast.success('Location found & pinned!');
+      } else if (status === 'ZERO_RESULTS') {
+        toast.error('No matching location found. Check spelling or try nearby landmarks.');
+      } else {
+        toast.error(`Search unavailable (${status}). Click on the map to pin.`);
       }
+    });
+  }, [searchQuery, showDropdown, suggestions, highlightedIndex, emitChange, setFormattedAddress, setMarkerPosition, setManualCoords]);
 
-      if (!geocoderRef.current) {
-        if (typeof window === 'undefined' || !window.google?.maps?.Geocoder) return;
-        geocoderRef.current = new window.google.maps.Geocoder();
-      }
-
-      geocoderRef.current.geocode({ address: query, bounds }, (results, status) => {
-        setIsSearching(false);
-        if (status === 'OK' && results?.[0]) {
-          const best = results[0];
-          const lat = best.geometry.location.lat();
-          const lng = best.geometry.location.lng();
-          const formatted = best.formatted_address || query;
-
-          setMarkerPosition({ lat, lng });
-          setManualCoords({ lat: String(lat), lng: String(lng) });
-          setFormattedAddress(formatted);
-          setSearchQuery(formatted);
-
-          if (mapRef.current) {
-            mapRef.current.panTo({ lat, lng });
-            mapRef.current.setZoom(16);
-          }
-
-          emitChange({
-            location_name: formatted,
-            project_address: formatted,
-            latitude: lat,
-            longitude: lng,
-          });
-          toast.success('Location found & pinned!');
-        } else if (status === 'ZERO_RESULTS') {
-          toast.error('No matching location found. Check spelling or try nearby landmarks.');
-        } else {
-          toast.error(`Search unavailable (${status}). Click on the map to pin.`);
-        }
-      });
-    },
-    [searchQuery, suggestions, highlightedIndex, markerPosition, emitChange]
-  );
-
-  // Keyboard navigation for dropdown
   const handleKeyDown = (e) => {
     if (!showDropdown || suggestions.length === 0) {
       if (e.key === 'Enter') {
@@ -514,7 +442,6 @@ export default function GoogleMapLocationSection({
     }
   };
 
-  // Click outside listener
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
@@ -527,7 +454,6 @@ export default function GoogleMapLocationSection({
     };
   }, []);
 
-  // Click on map to place pin
   const onMapClick = useCallback(
     (event) => {
       if (!event.latLng) return;
@@ -537,10 +463,9 @@ export default function GoogleMapLocationSection({
       setManualCoords({ lat: String(lat), lng: String(lng) });
       reverseGeocode(lat, lng);
     },
-    [reverseGeocode]
+    [reverseGeocode, setMarkerPosition, setManualCoords]
   );
 
-  // Drag marker to adjust location
   const onMarkerDragEnd = useCallback(
     (event) => {
       const lat = event.latLng.lat();
@@ -549,65 +474,10 @@ export default function GoogleMapLocationSection({
       setManualCoords({ lat: String(lat), lng: String(lng) });
       reverseGeocode(lat, lng);
     },
-    [reverseGeocode]
+    [reverseGeocode, setMarkerPosition, setManualCoords]
   );
 
-  // Detect current location via browser GPS
-  const handleCurrentLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser.');
-      return;
-    }
-    toast.loading('Detecting current GPS location…', { id: 'gps-detect' });
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        toast.dismiss('gps-detect');
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        setMarkerPosition({ lat, lng });
-        setManualCoords({ lat: String(lat), lng: String(lng) });
-        if (mapRef.current) {
-          mapRef.current.panTo({ lat, lng });
-          mapRef.current.setZoom(16);
-        }
-        reverseGeocode(lat, lng);
-        toast.success('Current location detected!');
-      },
-      (error) => {
-        toast.dismiss('gps-detect');
-        toast.error(error.message || 'Unable to retrieve location.');
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  }, [reverseGeocode]);
-
-  const handleManualCoordChange = useCallback(
-    (field, rawValue) => {
-      setManualCoords((prev) => ({ ...prev, [field]: rawValue }));
-      const other = field === 'lat' ? manualCoords.lng : manualCoords.lat;
-      const parsedField = Number(rawValue);
-      const parsedOther = Number(other);
-      if (
-        rawValue !== '' &&
-        Number.isFinite(parsedField) &&
-        other !== '' &&
-        Number.isFinite(parsedOther)
-      ) {
-        if (field === 'lat' && (parsedField < -90 || parsedField > 90)) return;
-        if (field === 'lng' && (parsedOther < -180 || parsedOther > 180)) return;
-        const nextLat = field === 'lat' ? parsedField : parsedOther;
-        const nextLng = field === 'lng' ? parsedField : parsedOther;
-        setMarkerPosition({ lat: nextLat, lng: nextLng });
-        if (mapRef.current) {
-          mapRef.current.panTo({ lat, nextLat });
-        }
-        reverseGeocode(nextLat, nextLng);
-      }
-    },
-    [manualCoords, reverseGeocode]
-  );
-
-  const options = useMemo(
+  const mapOptions = useMemo(
     () => ({
       disableDefaultUI: false,
       zoomControl: true,
@@ -618,14 +488,25 @@ export default function GoogleMapLocationSection({
     []
   );
 
-  if (loadError) {
+  if (loadError || authError) {
     return (
-      <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
-        <p className="font-semibold">Unable to load Google Maps</p>
-        <p className="mt-1">
-          Please check your internet connection or verify that the Google Maps API key in{' '}
-          <code className="rounded bg-rose-100 px-1 py-0.5 dark:bg-rose-900/40">.env</code> is active with Maps JavaScript API enabled.
-        </p>
+      <div className="space-y-3">
+        <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-4 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
+          <div className="flex items-center gap-2 font-semibold">
+            <span>⚠️</span> Google Maps Authorization Notice ({loadError ? 'Load Error' : 'ApiProjectMapError'})
+          </div>
+          <p className="mt-1">
+            Google Maps could not authenticate with the provided API key. To resolve this:
+          </p>
+          <ul className="mt-1.5 list-disc list-inside space-y-0.5 text-[11px] text-rose-700 dark:text-rose-300">
+            <li>Ensure <strong>Maps JavaScript API</strong> and <strong>Places API</strong> are enabled in your Google Cloud Console.</li>
+            <li>If HTTP referrer restrictions are set on your key, include this domain (e.g. <code>localhost:8000</code> or <code>*</code>).</li>
+            <li>Confirm billing is active on your Google Cloud project.</li>
+          </ul>
+          <p className="mt-2 text-[11px] font-medium text-slate-600 dark:text-slate-400">
+            ℹ️ You can still enter project location address and coordinates manually below.
+          </p>
+        </div>
       </div>
     );
   }
@@ -673,7 +554,6 @@ export default function GoogleMapLocationSection({
               placeholder="Search landmark, business, address, or PIN code… (min. 3 characters)"
               className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 pl-9 pr-8 text-xs text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:focus:border-indigo-400"
             />
-            {/* Search icon or loading spinner */}
             <div className="pointer-events-none absolute left-3 top-2.5 flex items-center">
               {loadingSuggestions ? (
                 <svg className="h-4 w-4 animate-spin text-indigo-600" viewBox="0 0 24 24" fill="none">
@@ -692,7 +572,6 @@ export default function GoogleMapLocationSection({
               )}
             </div>
 
-            {/* Clear Input Button */}
             {searchQuery && (
               <button
                 type="button"
@@ -719,7 +598,7 @@ export default function GoogleMapLocationSection({
           </button>
         </div>
 
-        {/* Live Suggestions Dropdown (Opens after 3 characters) */}
+        {/* Live Suggestions Dropdown */}
         {showDropdown && searchQuery.trim().length >= 3 && (
           <div className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
             {loadingSuggestions && suggestions.length === 0 ? (
@@ -772,18 +651,18 @@ export default function GoogleMapLocationSection({
         )}
       </div>
 
-      {/* Map Display */}
+      {/* Map Display using modern MarkerF */}
       <div className="relative overflow-hidden rounded-xl border border-slate-200 shadow-sm dark:border-slate-800">
         <GoogleMap
           mapContainerStyle={mapContainerStyle}
           zoom={hasInitialCoords ? 15 : 5}
           center={markerPosition}
-          options={options}
+          options={mapOptions}
           onLoad={onLoad}
           onClick={onMapClick}
         >
           {markerPosition && (
-            <Marker
+            <MarkerF
               position={markerPosition}
               draggable={true}
               onDragEnd={onMarkerDragEnd}
@@ -794,8 +673,192 @@ export default function GoogleMapLocationSection({
           💡 Click anywhere on map or drag pin to adjust
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Formatted Address & Coordinates Details */}
+/**
+ * Main GoogleMapLocationSection component.
+ * Resolves the Google Maps API key from props, Inertia page props, window, or import.meta.env.
+ * If no API key is available, renders a clean fallback banner without calling useJsApiLoader,
+ * preventing Google Maps NoApiKeys and ApiProjectMapError popups.
+ */
+export default function GoogleMapLocationSection({
+  initialLat = null,
+  initialLng = null,
+  initialAddress = '',
+  initialLocationName = '',
+  onChange,
+  apiKey: propApiKey,
+}) {
+  const page = usePage();
+  const apiKey = (
+    propApiKey ||
+    page?.props?.google_maps_api_key ||
+    (typeof window !== 'undefined' && window.GOOGLE_MAPS_API_KEY) ||
+    (typeof window !== 'undefined' && window.__APP_SETTINGS?.google_maps_api_key) ||
+    import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
+    ''
+  ).trim();
+
+  const hasInitialCoords =
+    initialLat != null && initialLng != null && initialLat !== '' && initialLng !== '';
+
+  const [markerPosition, setMarkerPosition] = useState(
+    hasInitialCoords
+      ? { lat: Number(initialLat), lng: Number(initialLng) }
+      : { lat: 20.5937, lng: 78.9629 }
+  );
+
+  const [formattedAddress, setFormattedAddress] = useState(
+    initialLocationName || initialAddress || ''
+  );
+
+  const [manualCoords, setManualCoords] = useState({
+    lat: hasInitialCoords ? String(initialLat) : '',
+    lng: hasInitialCoords ? String(initialLng) : '',
+  });
+
+  // Sync initial coordinates if changed externally
+  useEffect(() => {
+    const lat = Number(initialLat);
+    const lng = Number(initialLng);
+    if (
+      initialLat != null &&
+      initialLng != null &&
+      initialLat !== '' &&
+      initialLng !== '' &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lng)
+    ) {
+      setMarkerPosition({ lat, lng });
+      setManualCoords({ lat: String(initialLat), lng: String(initialLng) });
+    }
+    if (initialLocationName || initialAddress) {
+      const addr = initialLocationName || initialAddress;
+      setFormattedAddress(addr);
+    }
+  }, [initialLat, initialLng, initialLocationName, initialAddress]);
+
+  const emitChange = useCallback(
+    (patch) => {
+      if (!onChange) return;
+      onChange({
+        location_name: patch.location_name ?? formattedAddress,
+        project_address: patch.project_address ?? formattedAddress,
+        latitude: patch.latitude ?? markerPosition.lat,
+        longitude: patch.longitude ?? markerPosition.lng,
+      });
+    },
+    [onChange, formattedAddress, markerPosition]
+  );
+
+  // Fallback geolocation if no map is loaded
+  const handleCurrentLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser.');
+      return;
+    }
+    toast.loading('Detecting current GPS location…', { id: 'gps-detect' });
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        toast.dismiss('gps-detect');
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setMarkerPosition({ lat, lng });
+        setManualCoords({ lat: String(lat), lng: String(lng) });
+        const coordStr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        setFormattedAddress(coordStr);
+        emitChange({
+          latitude: lat,
+          longitude: lng,
+          location_name: coordStr,
+          project_address: coordStr,
+        });
+        toast.success('Current location detected!');
+      },
+      (error) => {
+        toast.dismiss('gps-detect');
+        toast.error(error.message || 'Unable to retrieve location.');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, [emitChange]);
+
+  const handleManualCoordChange = useCallback(
+    (field, rawValue) => {
+      setManualCoords((prev) => ({ ...prev, [field]: rawValue }));
+      const other = field === 'lat' ? manualCoords.lng : manualCoords.lat;
+      const parsedField = Number(rawValue);
+      const parsedOther = Number(other);
+      if (
+        rawValue !== '' &&
+        Number.isFinite(parsedField) &&
+        other !== '' &&
+        Number.isFinite(parsedOther)
+      ) {
+        if (field === 'lat' && (parsedField < -90 || parsedField > 90)) return;
+        if (field === 'lng' && (parsedOther < -180 || parsedOther > 180)) return;
+        const nextLat = field === 'lat' ? parsedField : parsedOther;
+        const nextLng = field === 'lng' ? parsedField : parsedOther;
+        setMarkerPosition({ lat: nextLat, lng: nextLng });
+        emitChange({
+          latitude: nextLat,
+          longitude: nextLng,
+        });
+      }
+    },
+    [manualCoords, emitChange]
+  );
+
+  return (
+    <div className="space-y-3">
+      {/* Map Section or Missing Key Fallback */}
+      {apiKey ? (
+        <GoogleMapLocationPickerInner
+          apiKey={apiKey}
+          hasInitialCoords={hasInitialCoords}
+          markerPosition={markerPosition}
+          setMarkerPosition={setMarkerPosition}
+          formattedAddress={formattedAddress}
+          setFormattedAddress={setFormattedAddress}
+          manualCoords={manualCoords}
+          setManualCoords={setManualCoords}
+          emitChange={emitChange}
+          handleCurrentLocation={handleCurrentLocation}
+          handleManualCoordChange={handleManualCoordChange}
+        />
+      ) : (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Project Coordinates & Location
+            </label>
+            <button
+              type="button"
+              onClick={handleCurrentLocation}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/60 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-300"
+            >
+              <span>📍</span>
+              Use My Current GPS
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            <div className="flex items-center gap-2 font-semibold">
+              <span>📍</span> Google Maps API Key Not Set
+            </div>
+            <p className="mt-1 text-amber-800 dark:text-amber-300">
+              To enable interactive Google Maps pin placement and landmark search, add <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px] dark:bg-amber-900/60">GOOGLE_MAPS_API_KEY</code> to your <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px] dark:bg-amber-900/60">.env</code> file.
+            </p>
+            <p className="mt-1 text-amber-700 dark:text-amber-400">
+              You can still manually enter the address and GPS coordinates below to save this project.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Formatted Address & Coordinates Details (Always available & editable) */}
       <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 text-xs dark:border-slate-800 dark:bg-slate-900/40">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -804,7 +867,7 @@ export default function GoogleMapLocationSection({
           <div className="mt-1 font-medium text-slate-800 break-words dark:text-slate-200">
             {formattedAddress || (
               <span className="italic text-slate-400">
-                Search an address above or click anywhere on the map to pin a location.
+                Search an address above or enter coordinates manually below.
               </span>
             )}
           </div>
@@ -822,7 +885,7 @@ export default function GoogleMapLocationSection({
             placeholder="-90.0 to 90.0"
             error={
               manualCoords.lat !== '' &&
-                (Number(manualCoords.lat) < -90 || Number(manualCoords.lat) > 90)
+              (Number(manualCoords.lat) < -90 || Number(manualCoords.lat) > 90)
                 ? 'Must be -90 to 90'
                 : undefined
             }
@@ -838,7 +901,7 @@ export default function GoogleMapLocationSection({
             placeholder="-180.0 to 180.0"
             error={
               manualCoords.lng !== '' &&
-                (Number(manualCoords.lng) < -180 || Number(manualCoords.lng) > 180)
+              (Number(manualCoords.lng) < -180 || Number(manualCoords.lng) > 180)
                 ? 'Must be -180 to 180'
                 : undefined
             }

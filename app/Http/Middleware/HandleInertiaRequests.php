@@ -171,6 +171,7 @@ class HandleInertiaRequests extends Middleware
             'delete_approval_requests' => $deleteApprovalRequestsMap,
             'available_roles' => $userAvailableRoles,
             'active_role' => $activeRole,
+            'google_maps_api_key' => (string) (config('services.google.maps_api_key') ?: env('GOOGLE_MAPS_API_KEY') ?: env('VITE_GOOGLE_MAPS_API_KEY') ?: ''),
 
             'auth' => [
                 'user' => $user,
