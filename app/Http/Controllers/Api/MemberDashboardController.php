@@ -786,20 +786,33 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
         $checkInCard = $this->getCheckInCard($todayAttendance);
         $todaysSummaryCard = $this->getTodaysSummary($projects, $tasks, $hoursWorked);
         $todaysTasksList = $this->getTodaysTasks($tasks, $requestedProjectId, $targetDate);
-        $last20TasksFormatted = $tasks->take(20)->map(fn ($t) => $this->formatTaskItem($t))->values()->all();
+        $todayTaskKeys = collect($todaysTasksList)->mapWithKeys(
+            fn ($task) => [($task['source'] ?? 'unified') . ':' . ($task['id'] ?? '') => true]
+        );
+        $dashboardTasks = $tasks
+            ->filter(function ($task, $index) use ($todayTaskKeys) {
+                $key = (($task->_source ?? null) === 'legacy' || $task instanceof \App\Models\ExecutionTask ? 'legacy' : 'unified')
+                    . ':' . ($task->id ?? '');
 
-        // Group formatted today's tasks by project_id
+                return $index < 20 || $todayTaskKeys->has($key);
+            })
+            ->map(function ($task) use ($todayTaskKeys) {
+                $formatted = $this->formatTaskItem($task);
+                $key = $formatted['source'] . ':' . ($formatted['id'] ?? '');
+                $formatted['is_today'] = $todayTaskKeys->has($key);
+
+                return $formatted;
+            })
+            ->values()
+            ->all();
+
         $todayTasksByProject = collect($todaysTasksList)->groupBy('project_id');
 
-        // Group all deduped tasks by project_id
         $tasksByProject = $tasks->groupBy(fn ($t) => (int) ($t->project_id ?? 0));
 
         $attachTasksToProject = function (Project $project) use ($todayTasksByProject, $tasksByProject) {
             $projId = (int) $project->id;
-            $projTodayTasks = $todayTasksByProject->get($projId, collect())->values()->all();
-
             $projAllTasksModels = $tasksByProject->get($projId, collect());
-            $projLast20Tasks = $projAllTasksModels->take(20)->map(fn ($t) => $this->formatTaskItem($t))->values()->all();
 
             $teamMembers = $project->teamMembers
                 ? $project->teamMembers
@@ -2739,22 +2752,43 @@ $completed = SurveyPlan::whereHas(
         $notes = $request->input('notes', $request->input('check_in_notes'));
         $attendanceType = $request->input('attendance_type', 'present');
 
+        $attendanceData = [
+            'project_id' => $projectId,
+            'execution_task_id' => $request->input('execution_task_id'),
+            'check_in_at' => now(),
+            'attendance_type' => $attendanceType,
+            'notes' => $notes,
+            'status' => 'submitted',
+        ];
+        if (
+            is_numeric($latitude)
+            && is_numeric($longitude)
+            && $latitude >= -90
+            && $latitude <= 90
+            && $longitude >= -180
+            && $longitude <= 180
+        ) {
+            $attendanceData['check_in_latitude'] = $latitude;
+            $attendanceData['check_in_longitude'] = $longitude;
+        }
+        if (is_numeric($accuracy) && $accuracy >= 0 && $accuracy <= 100000) {
+            $attendanceData['gps_accuracy_meters'] = $accuracy;
+        }
+
         $attendance = AttendanceRecord::updateOrCreate(
             [
                 'member_id' => $member->id,
                 'attendance_date' => $today,
             ],
-            [
-                'project_id' => $projectId,
-                'execution_task_id' => $request->input('execution_task_id'),
-                'check_in_at' => now(),
-                'check_in_latitude' => $latitude,
-                'check_in_longitude' => $longitude,
-                'gps_accuracy_meters' => $accuracy,
-                'attendance_type' => $attendanceType,
-                'notes' => $notes,
-                'status' => 'submitted',
-            ]
+            $attendanceData
+        );
+
+        \App\Models\EmployeeLocation::recordIfValid(
+            $member,
+            $latitude,
+            $longitude,
+            $accuracy,
+            $attendance->check_in_at
         );
 
         try {
@@ -2892,11 +2926,20 @@ $completed = SurveyPlan::whereHas(
 
         $updateData = [
             'check_out_at' => $now,
-            'check_out_latitude' => $latitude,
-            'check_out_longitude' => $longitude,
         ];
 
-        if ($accuracy !== null) {
+        if (
+            is_numeric($latitude)
+            && is_numeric($longitude)
+            && $latitude >= -90
+            && $latitude <= 90
+            && $longitude >= -180
+            && $longitude <= 180
+        ) {
+            $updateData['check_out_latitude'] = $latitude;
+            $updateData['check_out_longitude'] = $longitude;
+        }
+        if (is_numeric($accuracy) && $accuracy >= 0 && $accuracy <= 100000) {
             $updateData['gps_accuracy_meters'] = $accuracy;
         }
         if ($notes !== null) {
@@ -2904,6 +2947,14 @@ $completed = SurveyPlan::whereHas(
         }
 
         $record->update($updateData);
+
+        \App\Models\EmployeeLocation::recordIfValid(
+            $member,
+            $latitude,
+            $longitude,
+            $accuracy,
+            $now
+        );
 
         try {
             $checkInOut = \App\Models\CheckInOut::where('member_id', $member->id)
@@ -3030,9 +3081,7 @@ $completed = SurveyPlan::whereHas(
         }
 
         $tasksCount = $primary->tasks_count ?? ($primary->executionTasks ? $primary->executionTasks->count() : 0);
-        $todayTasks = $primary->today_tasks ?? [];
-        $todayTasksCount = $primary->today_tasks_count ?? count($todayTasks);
-        $tasks = $primary->tasks ?? [];
+        $todayTasksCount = $primary->today_tasks_count ?? 0;
         $startDate = $primary->start_date ? $primary->start_date->format('d M') : null;
         $endDate = $primary->expected_end_date ? $primary->expected_end_date->format('d M') : null;
 
@@ -3070,10 +3119,6 @@ $completed = SurveyPlan::whereHas(
             'team_members' => $teamMembers,
             'tasks_count' => $tasksCount,
             'today_tasks_count' => $todayTasksCount,
-            'today_tasks' => $todayTasks,
-            'today_task' => $todayTasks,
-            'tasks' => $tasks,
-            'task' => $tasks,
             'manager_name' => $primary->client?->name ?? $primary->company?->name ?? null,
         ];
     }
@@ -3903,6 +3948,16 @@ $completed = SurveyPlan::whereHas(
                 'gps_verified' => true,
                 'status' => SurveyStatus::IN_PROGRESS,
             ]);
+
+            if ($request->filled('latitude') && $request->filled('longitude')) {
+                \App\Models\EmployeeLocation::recordIfValid(
+                    $member,
+                    $request->input('latitude'),
+                    $request->input('longitude'),
+                    $request->input('gps_accuracy_meters', $request->input('accuracy')),
+                    $visit->check_in_at
+                );
+            }
         } catch (\Throwable $e) {
             report($e);
 

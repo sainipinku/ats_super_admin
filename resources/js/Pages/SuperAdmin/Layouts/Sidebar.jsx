@@ -19,6 +19,7 @@ import {
     FaMoneyBillWave,
     FaChevronRight,
     FaShieldAlt,
+    FaMapMarkerAlt,
 } from "react-icons/fa";
 
 const navigation = [
@@ -31,6 +32,13 @@ const navigation = [
                 href: route("super.dashboard"),
                 active: ["super.dashboard", "super.construction.dashboard"],
                 icon: FaTachometerAlt,
+            },
+            {
+                label: "Location Tracking",
+                superAdminOnly: true,
+                href: route("super.location_tracking"),
+                active: ["super.location_tracking"],
+                icon: FaMapMarkerAlt,
             },
             {
                 label: "Permission Requests",
@@ -267,6 +275,7 @@ export default function Sidebar({ isOpen, onClose }) {
         .map((group) => {
             const items = group.items
                 .filter((item) => {
+                    if (item.superAdminOnly && !isSuperAdmin) return false;
                     if (isSuperAdmin) return true;
                     if (item.adminOnly && !isAdminUser) return false;
                     return hasPerm(item.permissions || item.permission);

@@ -90,6 +90,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/attendance/check-in', [MemberDashboardController::class, 'checkIn']);
     Route::post('/attendance/check-out', [MemberDashboardController::class, 'checkOut']);
     Route::post('/attendance/{attendance}/check-out', [MemberDashboardController::class, 'checkOut']);
+    Route::post('/member/location', [App\Http\Controllers\Api\AdminEmployeeLocationController::class, 'report'])
+        ->middleware('throttle:5,1');
 
     Route::prefix('member')->name('member.')->group(function () {
         Route::get('/dashboard', [MemberDashboardController::class, 'index']);
