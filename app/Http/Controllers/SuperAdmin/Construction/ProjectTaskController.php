@@ -18,6 +18,7 @@ use App\Models\Task;
 use App\Models\TaskAssignment;
 use App\Services\Construction\ConstructionActivityService;
 use App\Services\Construction\TaskManagementService;
+use App\Support\Construction\SurveyStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -509,20 +510,80 @@ class ProjectTaskController extends Controller implements HasMiddleware
         };
 
         $taskId = (int) $taskId;
-        $visits = SurveyVisit::where('task_id', $taskId)
-            ->orWhere(fn ($q) => $q->where('project_id', $project->id)->where('task_id', $taskId))
-            ->get();
+        $legacyTask = ExecutionTask::find($taskId);
+        $unifiedTask = Task::find($taskId);
+
+        if ($legacyTask === null && $unifiedTask !== null) {
+            if (!empty($unifiedTask->task_code)) {
+                $legacyTask = ExecutionTask::where('task_code', $unifiedTask->task_code)->first();
+            }
+            if ($legacyTask === null && !empty($unifiedTask->title)) {
+                $legacyTask = ExecutionTask::where('project_id', $project->id)->where('title', $unifiedTask->title)->first();
+            }
+        }
+        if ($unifiedTask === null && $legacyTask !== null) {
+            if (!empty($legacyTask->task_code)) {
+                $unifiedTask = Task::where('task_code', $legacyTask->task_code)->first();
+            }
+            if ($unifiedTask === null && !empty($legacyTask->title)) {
+                $unifiedTask = Task::where('project_id', $project->id)->where('title', $legacyTask->title)->first();
+            }
+        }
+
+        $taskIds = array_values(array_unique(array_filter([$taskId, $legacyTask?->id, $unifiedTask?->id])));
+        $hasExecCol = \Illuminate\Support\Facades\Schema::hasTable('construction_survey_visits')
+            && \Illuminate\Support\Facades\Schema::hasColumn('construction_survey_visits', 'execution_task_id');
+
+        $visits = SurveyVisit::where(function ($q) use ($taskIds, $project, $hasExecCol) {
+            $q->whereIn('task_id', $taskIds);
+            if ($hasExecCol) {
+                $q->orWhereIn('execution_task_id', $taskIds);
+            }
+            if ($project) {
+                $q->orWhere(fn ($sub) => $sub->where('project_id', $project->id)->whereIn('task_id', $taskIds));
+            }
+        })->get();
 
         if ($visits->isEmpty()) {
             $visits = SurveyVisit::where('project_id', $project->id)->latest()->take(1)->get();
         }
 
+        $now = now();
+        $nowFormatted = $now->setTimezone('Asia/Kolkata')->format('d M Y · h:i A');
+
         foreach ($visits as $visit) {
             $visit->status = match ($decision) {
                 'approved' => SurveyVisit::STATUS_APPROVED,
-                'rejected', 'revision_requested' => SurveyVisit::STATUS_REJECTED,
+                'revision_requested' => SurveyStatus::REVISION_REQUESTED,
+                'rejected' => SurveyVisit::STATUS_REJECTED,
                 default => SurveyVisit::STATUS_SUBMITTED,
             };
+
+            // Update visit notes with structured revision history
+            $visitNotes = is_array($visit->notes) ? $visit->notes : (json_decode($visit->notes ?? '', true) ?: []);
+            if ($decision === 'revision_requested') {
+                $history = $visitNotes['revision_history'] ?? [];
+                $history[] = [
+                    'type' => 'revision_requested',
+                    'sender_role' => 'manager',
+                    'sender_name' => $actor instanceof Member ? $actor->name : 'Manager',
+                    'sender_id' => $actor instanceof Member ? $actor->id : null,
+                    'message' => $remarks,
+                    'created_at' => $now->toIso8601String(),
+                    'created_at_formatted' => $nowFormatted,
+                ];
+                $visitNotes['revision_request'] = [
+                    'status' => 'revision_requested',
+                    'remarks' => $remarks,
+                    'requested_by_id' => $actor instanceof Member ? $actor->id : null,
+                    'requested_by_name' => $actor instanceof Member ? $actor->name : 'Manager',
+                    'requested_at' => $now->toIso8601String(),
+                    'requested_at_formatted' => $nowFormatted,
+                ];
+                $visitNotes['revision_history'] = $history;
+                unset($visitNotes['member_reply']);
+                $visit->notes = json_encode($visitNotes, JSON_UNESCAPED_SLASHES);
+            }
             $visit->saveQuietly();
 
             $sub = SurveySubmission::where('survey_visit_id', $visit->id)->first();
@@ -530,24 +591,27 @@ class ProjectTaskController extends Controller implements HasMiddleware
                 $sub->status = $surveyStatusInt;
                 $sub->review_notes = $remarks;
                 $sub->reviewed_by_member_id = $actor instanceof Member ? $actor->id : null;
-                $sub->reviewed_at = now();
+                $sub->reviewed_at = $now;
+                if ($decision === 'revision_requested') {
+                    $sub->member_reply = null;
+                    $sub->member_replied_at = null;
+                }
                 $sub->save();
             } else {
                 SurveySubmission::create([
                     'project_id' => $project->id,
                     'survey_visit_id' => $visit->id,
+                    'task_id' => $legacyTask?->id ?? $unifiedTask?->id ?? $taskId,
+                    'execution_task_id' => $legacyTask?->id,
                     'submitted_by_member_id' => $visit->checked_in_by_member_id,
-                    'submitted_at' => $visit->check_out_at ?? $visit->created_at ?? now(),
+                    'submitted_at' => $visit->check_out_at ?? $visit->created_at ?? $now,
                     'status' => $surveyStatusInt,
                     'review_notes' => $remarks,
                     'reviewed_by_member_id' => $actor instanceof Member ? $actor->id : null,
-                    'reviewed_at' => now(),
+                    'reviewed_at' => $now,
                 ]);
             }
         }
-
-        $legacyTask = ExecutionTask::find($taskId);
-        $unifiedTask = Task::find($taskId);
 
         if ($decision === 'approved') {
             if ($legacyTask) {
@@ -556,6 +620,7 @@ class ProjectTaskController extends Controller implements HasMiddleware
             }
             if ($unifiedTask) {
                 $unifiedTask->status = 'review';
+                $unifiedTask->client_review_status = 'approved';
                 $unifiedTask->save();
             }
 
@@ -576,7 +641,22 @@ class ProjectTaskController extends Controller implements HasMiddleware
             }
             if ($unifiedTask) {
                 $unifiedTask->status = 'in_progress';
+                $unifiedTask->client_review_status = 'revision_requested';
                 $unifiedTask->save();
+            }
+            try {
+                \App\Models\TaskComment::create([
+                    'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                    'task_id' => $unifiedTask?->id ?? $legacyTask?->id ?? $taskId,
+                    'project_id' => $project->id,
+                    'commented_by' => $actor instanceof Member ? $actor->id : null,
+                    'comment' => "Manager requested survey revision: " . $remarks,
+                    'kind' => 'revision_requested',
+                    'from_status' => 'review',
+                    'to_status' => 'in_progress',
+                ]);
+            } catch (\Throwable $e) {
+                report($e);
             }
         } elseif ($decision === 'rejected') {
             if ($legacyTask) {
@@ -585,6 +665,7 @@ class ProjectTaskController extends Controller implements HasMiddleware
             }
             if ($unifiedTask) {
                 $unifiedTask->status = 'blocked';
+                $unifiedTask->client_review_status = 'rejected';
                 $unifiedTask->save();
             }
         }

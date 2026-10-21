@@ -56,6 +56,9 @@ export default function FieldNotesDisplay({ notes, compact = false, hideRemarks 
         remarks,
         checklist_summary,
         submitted_at,
+        revision_request,
+        member_reply,
+        revision_history,
     } = data;
 
     const isObstruction =
@@ -152,6 +155,106 @@ export default function FieldNotesDisplay({ notes, compact = false, hideRemarks 
                     )}
                 </div>
             </div>
+
+            {/* Manager Survey Revision Request Card */}
+            {revision_request && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-3 text-amber-900 dark:border-amber-700/80 dark:bg-amber-950/40 dark:text-amber-200">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 pb-2 dark:border-amber-800/60">
+                        <span className="font-bold flex items-center gap-1.5 text-amber-900 dark:text-amber-100">
+                            <span>🔄</span>
+                            <span>Survey Revision Requested by {revision_request.requested_by_name || "Manager"}</span>
+                        </span>
+                        {revision_request.requested_at_formatted && (
+                            <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                                {revision_request.requested_at_formatted}
+                            </span>
+                        )}
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-amber-950 dark:text-amber-100 whitespace-pre-wrap font-medium">
+                        {revision_request.remarks || "Survey needs correction and resubmission."}
+                    </p>
+                </div>
+            )}
+
+            {/* Field Member Revision Reply Card */}
+            {member_reply && (
+                <div className="rounded-xl border border-emerald-300 bg-emerald-50/90 p-3 text-emerald-900 dark:border-emerald-700/80 dark:bg-emerald-950/40 dark:text-emerald-200">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 pb-2 dark:border-emerald-800/60">
+                        <span className="font-bold flex items-center gap-1.5 text-emerald-900 dark:text-emerald-100">
+                            <span>💬</span>
+                            <span>Field Surveyor Reply ({member_reply.member_name || "Surveyor"})</span>
+                        </span>
+                        {member_reply.replied_at_formatted && (
+                            <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                                {member_reply.replied_at_formatted}
+                            </span>
+                        )}
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-emerald-950 dark:text-emerald-100 whitespace-pre-wrap font-medium">
+                        {member_reply.message || "Revision comments submitted."}
+                    </p>
+
+                    {/* Attached files in reply if any */}
+                    {Array.isArray(member_reply.files) && member_reply.files.length > 0 && (
+                        <div className="mt-2.5 flex flex-wrap gap-2 pt-2 border-t border-emerald-200/60 dark:border-emerald-800/40">
+                            {member_reply.files.map((rf, rIdx) => {
+                                const href = rf.url || rf.path;
+                                const safeHref = href ? (/^https?:\/\//i.test(href) ? href : href.startsWith('/') ? href : '/' + href) : null;
+                                return (
+                                    <a
+                                        key={rIdx}
+                                        href={safeHref}
+                                        target="_blank"
+                                        rel="noreferrer noopener"
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-slate-900 dark:text-emerald-200 shadow-2xs"
+                                    >
+                                        <span>📎</span>
+                                        <span className="max-w-[180px] truncate">{rf.name || "Attachment"}</span>
+                                        <span>↗</span>
+                                    </a>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Revision Dialogue Thread Timeline */}
+            {Array.isArray(revision_history) && revision_history.length > 1 && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-950/60">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5 border-b border-slate-200 pb-2 dark:border-slate-800">
+                        <span>💬</span>
+                        <span>Revision Dialogue Thread ({revision_history.length} turns)</span>
+                    </p>
+                    <div className="mt-2.5 space-y-2">
+                        {revision_history.map((turn, tIdx) => {
+                            const isManager = turn.type === 'revision_requested' || turn.sender_role === 'manager';
+                            return (
+                                <div
+                                    key={tIdx}
+                                    className={`rounded-lg p-2.5 text-xs border ${
+                                        isManager
+                                            ? 'border-amber-200 bg-amber-50/60 dark:border-amber-900/40 dark:bg-amber-950/20'
+                                            : 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between text-[11px] font-semibold mb-1">
+                                        <span className={isManager ? 'text-amber-800 dark:text-amber-300' : 'text-emerald-800 dark:text-emerald-300'}>
+                                            {isManager ? '👔 Manager Revision Request' : '👷 Surveyor Reply'} — {turn.sender_name || (isManager ? 'Manager' : 'Field Surveyor')}
+                                        </span>
+                                        <span className="text-slate-400 font-normal">
+                                            {turn.created_at_formatted || (turn.created_at ? new Date(turn.created_at).toLocaleDateString() : '')}
+                                        </span>
+                                    </div>
+                                    <p className="whitespace-pre-wrap leading-relaxed text-slate-800 dark:text-slate-200">
+                                        {turn.message}
+                                    </p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Obstruction Details Callout */}
             {isObstruction && obstruction_details && (
