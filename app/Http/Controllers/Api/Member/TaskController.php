@@ -163,14 +163,83 @@ class TaskController extends Controller
         $task->load([
             'creator',
             'checklistItems.completedBy',
+            'surveyVisits.submission.reviewedBy',
             'instances' => function ($q) use ($member) {
                 $q->where('assigned_to', $member->id)->latest();
             }
         ]);
 
+        $latestVisit = $task->surveyVisits->sortByDesc('id')->first();
+        $sub = $latestVisit?->submission;
+        $visitNotes = is_array($latestVisit?->notes) ? $latestVisit->notes : (json_decode($latestVisit?->notes ?? '', true) ?: []);
+        $isRevisionRequested = (
+            $sub?->status === 5
+            || ($latestVisit && (int) $latestVisit->status === 5)
+            || $task->client_review_status === 'revision_requested'
+            || !empty($visitNotes['revision_request'])
+        );
+        $memberReply = $sub?->member_reply ?? ($visitNotes['member_reply']['message'] ?? null);
+        $isReplied = !empty($memberReply) || $task->client_review_status === 'revision_submitted';
+
+        $revInfo = null;
+        if ($isRevisionRequested || $latestVisit) {
+            $managerName = $sub?->reviewedBy?->name ?? ($visitNotes['revision_request']['requested_by_name'] ?? 'Project Manager');
+            $requestedAt = $sub?->reviewed_at?->toIso8601String() ?? ($visitNotes['revision_request']['requested_at'] ?? null);
+            $requestedAtFormatted = $sub?->reviewed_at
+                ? $sub->reviewed_at->setTimezone('Asia/Kolkata')->format('d M Y · h:i A')
+                : ($visitNotes['revision_request']['requested_at_formatted'] ?? ($requestedAt ? date('d M Y · h:i A', strtotime($requestedAt)) : null));
+            $repliedAt = $sub?->member_replied_at?->toIso8601String() ?? ($visitNotes['member_reply']['replied_at'] ?? null);
+            $repliedAtFormatted = $sub?->member_replied_at
+                ? $sub->member_replied_at->setTimezone('Asia/Kolkata')->format('d M Y · h:i A')
+                : ($visitNotes['member_reply']['replied_at_formatted'] ?? ($repliedAt ? date('d M Y · h:i A', strtotime($repliedAt)) : null));
+
+            $reviewStatus = 'pending';
+            $statusLabel = 'Planned';
+            if ($isRevisionRequested) {
+                $reviewStatus = $isReplied ? 'revision_replied' : 'revision_requested';
+                $statusLabel = $isReplied ? 'Revision Submitted' : 'Revision Requested';
+            } elseif ($latestVisit && (int) $latestVisit->status === 4) {
+                $reviewStatus = 'approved';
+                $statusLabel = 'Approved';
+            } elseif ($latestVisit && (int) $latestVisit->status === 3) {
+                $reviewStatus = 'submitted';
+                $statusLabel = 'Under Review';
+            }
+
+            $revInfo = [
+                'has_revision' => $isRevisionRequested,
+                'is_revision_requested' => $isRevisionRequested,
+                'is_replied' => $isReplied,
+                'review_status' => $reviewStatus,
+                'status' => $reviewStatus,
+                'status_label' => $statusLabel,
+                'remarks' => $sub?->review_notes ?? ($visitNotes['revision_request']['remarks'] ?? null),
+                'revision_remarks' => $sub?->review_notes ?? ($visitNotes['revision_request']['remarks'] ?? null),
+                'manager_name' => $managerName,
+                'requested_by' => $managerName,
+                'requested_at' => $requestedAtFormatted,
+                'member_reply' => $memberReply,
+                'member_replied_at' => $repliedAtFormatted,
+                'history' => $visitNotes['revision_history'] ?? [],
+            ];
+        }
+
+        $taskData = $task->toArray();
+        if ($revInfo) {
+            $taskData['review_status'] = $revInfo['review_status'];
+            $taskData['is_revision_requested'] = $revInfo['is_revision_requested'];
+            $taskData['revision_remarks'] = $revInfo['revision_remarks'];
+            $taskData['revision_requested_at'] = $revInfo['requested_at'];
+            $taskData['revision_requested_by'] = $revInfo['requested_by'];
+            $taskData['revision_reply'] = $revInfo['member_reply'];
+            $taskData['revision_replied_at'] = $revInfo['member_replied_at'];
+            $taskData['revision'] = $revInfo;
+        }
+
         return response()->json([
             'success' => true,
-            'task' => $task,
+            'task' => $taskData,
+            'revision' => $revInfo,
         ]);
     }
 

@@ -79,7 +79,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/tasks', [TaskController::class, 'index']);
     Route::get('/tasks/{task}', [TaskController::class, 'show']);
+<<<<<<< HEAD
     Route::post('/tasks/{taskId}/submit', [MemberDashboardController::class, 'submitSurveyTask']);
+=======
+    Route::post('/tasks/{task}/submit', [MemberDashboardController::class, 'submitTaskData']);
+    Route::post('/tasks/{task}/revision-reply', [MemberDashboardController::class, 'submitRevisionReply']);
+>>>>>>> ed706696af69402228bdff36f10ca79f87d23f97
     Route::get('/tasks/{task}/notes', [TaskController::class, 'notesIndex']);
     Route::post('/tasks/{task}/notes', [TaskController::class, 'notesStore']);
     Route::delete('/notes/{note}', [TaskController::class, 'notesDestroy']);
@@ -128,6 +133,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/projects/{project}/survey-details', [MemberDashboardController::class, 'projectSurveyDetails']);
         Route::get('/tasks/{task}/details', [MemberDashboardController::class, 'taskDetails']);
         Route::post('/tasks/{task}/submit', [MemberDashboardController::class, 'submitTaskData']);
+        Route::post('/tasks/{task}/revision-reply', [MemberDashboardController::class, 'submitRevisionReply']);
         Route::post('/tasks/{task}/checklists', [MemberDashboardController::class, 'storeChecklist']);
         Route::post('/checklists/{checklist}/toggle', [MemberDashboardController::class, 'toggleChecklist']);
 

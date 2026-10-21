@@ -387,7 +387,10 @@ export default function DynamicChecklistManager({
         router.post(route(`${routePrefix}.checklists.store`, project.id), createForm.data, {
             preserveScroll: true,
             forceFormData: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
+                if (page?.props?.flash?.error) {
+                    return;
+                }
                 createForm.reset("item_title", "assign_hours", "notes", "image_1", "image_2");
                 createForm.setData("status", "pending");
                 setImg1Preview(null);
@@ -416,7 +419,10 @@ export default function DynamicChecklistManager({
             {
                 preserveScroll: true,
                 forceFormData: true,
-                onSuccess: () => {
+                onSuccess: (page) => {
+                    if (page?.props?.flash?.error) {
+                        return;
+                    }
                     setEditing(null);
                     toast.success("Checklist item updated.");
                 },
@@ -450,7 +456,10 @@ export default function DynamicChecklistManager({
         if (!confirm("Are you sure you want to delete this checklist item?")) return;
         router.delete(route(`${routePrefix}.checklists.destroy`, [project.id, item.id]), {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
+                if (page?.props?.flash?.error) {
+                    return;
+                }
                 if (editing?.item?.id === item.id) setEditing(null);
                 toast.success("Checklist item deleted.");
             },

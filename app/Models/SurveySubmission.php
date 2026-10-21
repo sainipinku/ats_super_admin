@@ -39,6 +39,8 @@ public const STATUS_REJECTED = SurveyStatus::REJECTED;
         'review_notes',
         'reviewed_by_member_id',
         'reviewed_at',
+        'member_reply',
+        'member_replied_at',
     ];
 
     protected $appends = [
@@ -50,6 +52,7 @@ public const STATUS_REJECTED = SurveyStatus::REJECTED;
     protected $casts = [
         'submitted_at' => 'datetime',
         'reviewed_at' => 'datetime',
+        'member_replied_at' => 'datetime',
         'status' => 'integer',
     ];
 
@@ -130,6 +133,12 @@ public const STATUS_REJECTED = SurveyStatus::REJECTED;
             'checklist_completed_count' => $completedCount,
             'checklist_total_count' => $totalCount,
             'remarks' => $visit?->remarks ?? ($meta['remarks'] ?? null),
+            'review_notes' => $this->review_notes,
+            'reviewed_by' => $this->reviewedBy?->name,
+            'reviewed_at' => $this->reviewed_at?->format('d M Y · h:i A'),
+            'member_reply' => $this->member_reply ?? ($meta['member_reply']['message'] ?? null),
+            'member_replied_at' => $this->member_replied_at?->format('d M Y · h:i A') ?? ($meta['member_reply']['replied_at_formatted'] ?? null),
+            'revision_history' => $meta['revision_history'] ?? [],
         ];
     }
 
