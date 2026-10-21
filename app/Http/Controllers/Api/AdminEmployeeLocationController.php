@@ -221,24 +221,78 @@ class AdminEmployeeLocationController extends Controller
     public function report(Request $request): JsonResponse
     {
         $member = $request->user();
-        if (!$member instanceof Member || !$member->employee || (int) $member->status !== 1) {
+        if (!$member instanceof Member || (int) $member->status !== 1) {
             return response()->json(['success' => false, 'message' => 'An active employee account is required.'], 403);
         }
 
-        $validated = $request->validate([
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'accuracy' => ['nullable', 'numeric', 'min:0', 'max:100000'],
-            'capturedAt' => ['nullable', 'date'],
-        ]);
+        $employee = $member->employee;
+        if (!$employee && class_exists(Employee::class)) {
+            $employee = Employee::firstOrCreate(
+                ['member_id' => $member->getKey()],
+                ['uuid' => (string) \Illuminate\Support\Str::uuid()]
+            );
+            $member->setRelation('employee', $employee);
+        }
 
-        $capturedAt = isset($validated['capturedAt'])
-            ? Carbon::parse($validated['capturedAt'])
-            : now();
+        // Handle batch reporting
+        if ($request->has('locations') && is_array($request->input('locations'))) {
+            $locations = $request->input('locations');
+            $recordedCount = 0;
+            $lastRecord = null;
 
-        if ($capturedAt->greaterThan(now()->addMinutes(5))) {
+            foreach ($locations as $loc) {
+                if (!is_array($loc)) continue;
+                $lat = $loc['latitude'] ?? $loc['lat'] ?? null;
+                $long = $loc['longitude'] ?? $loc['lng'] ?? $loc['long'] ?? $loc['lon'] ?? null;
+                $accuracy = $loc['accuracy'] ?? $loc['gps_accuracy_meters'] ?? $loc['gps_accuracy'] ?? null;
+                $time = $loc['captured_at'] ?? $loc['capturedAt'] ?? $loc['timestamp'] ?? $loc['time'] ?? now();
+
+                if (is_numeric($lat) && is_numeric($long) && $lat >= -90 && $lat <= 90 && $long >= -180 && $long <= 180) {
+                    $saved = EmployeeLocation::recordIfValid($member, $lat, $long, $accuracy, $time);
+                    if ($saved) {
+                        $recordedCount++;
+                        $lastRecord = $saved;
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully recorded {$recordedCount} location points.",
+                'data' => [
+                    'member_id' => $member->id,
+                    'employee_id' => $employee?->employee_id,
+                    'count' => $recordedCount,
+                    'latest_latitude' => $lastRecord ? (float) $lastRecord->latitude : null,
+                    'latest_longitude' => $lastRecord ? (float) $lastRecord->longitude : null,
+                    'latest_accuracy' => $lastRecord && $lastRecord->accuracy !== null ? (float) $lastRecord->accuracy : null,
+                    'latest_captured_at' => $lastRecord ? $lastRecord->captured_at?->toIso8601String() : null,
+                    'sync_interval_minutes' => 20,
+                ],
+            ]);
+        }
+
+        $lat = $request->input('latitude', $request->input('lat'));
+        $long = $request->input('longitude', $request->input('lng', $request->input('long', $request->input('lon'))));
+        $accuracy = $request->input('accuracy', $request->input('gps_accuracy_meters', $request->input('gps_accuracy')));
+        $rawCapturedAt = $request->input('captured_at', $request->input('capturedAt', $request->input('timestamp', $request->input('time'))));
+
+        if (!is_numeric($lat) || !is_numeric($long) || $lat < -90 || $lat > 90 || $long < -180 || $long > 180) {
             throw ValidationException::withMessages([
-                'capturedAt' => 'The location capture time cannot be more than five minutes in the future.',
+                'latitude' => ['The latitude field is required and must be between -90 and 90.'],
+                'longitude' => ['The longitude field is required and must be between -180 and 180.'],
+            ]);
+        }
+
+        try {
+            $capturedAt = $rawCapturedAt ? Carbon::parse($rawCapturedAt) : now();
+        } catch (\Throwable $e) {
+            $capturedAt = now();
+        }
+
+        if ($capturedAt->greaterThan(now()->addMinutes(10))) {
+            throw ValidationException::withMessages([
+                'capturedAt' => ['The location capture time cannot be more than ten minutes in the future.'],
             ]);
         }
 
@@ -254,21 +308,27 @@ class AdminEmployeeLocationController extends Controller
             ], 503);
         }
 
-        EmployeeLocation::recordIfValid(
+        $record = EmployeeLocation::recordIfValid(
             $member,
-            $validated['latitude'],
-            $validated['longitude'],
-            $validated['accuracy'] ?? null,
+            $lat,
+            $long,
+            $accuracy,
             $capturedAt
         );
 
         return response()->json([
             'success' => true,
+            'message' => 'Location recorded successfully.',
             'data' => [
-                'latitude' => (float) $validated['latitude'],
-                'longitude' => (float) $validated['longitude'],
-                'accuracy' => isset($validated['accuracy']) ? (float) $validated['accuracy'] : null,
+                'id' => $record?->id,
+                'member_id' => $member->id,
+                'employee_id' => $employee?->employee_id,
+                'latitude' => (float) $lat,
+                'longitude' => (float) $long,
+                'accuracy' => is_numeric($accuracy) ? (float) $accuracy : null,
                 'capturedAt' => $capturedAt->toIso8601String(),
+                'captured_at' => $capturedAt->toIso8601String(),
+                'sync_interval_minutes' => 20,
             ],
         ], 201);
     }

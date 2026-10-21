@@ -85,13 +85,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tasks/{task}/notes', [TaskController::class, 'notesStore']);
     Route::delete('/notes/{note}', [TaskController::class, 'notesDestroy']);
 
-    // Direct Attendance APIs (Token-based)
+    // Direct Attendance & GPS Location APIs (Token-based)
     Route::get('/attendance', [MemberDashboardController::class, 'myAttendance']);
     Route::post('/attendance/check-in', [MemberDashboardController::class, 'checkIn']);
     Route::post('/attendance/check-out', [MemberDashboardController::class, 'checkOut']);
     Route::post('/attendance/{attendance}/check-out', [MemberDashboardController::class, 'checkOut']);
-    Route::post('/member/location', [App\Http\Controllers\Api\AdminEmployeeLocationController::class, 'report'])
-        ->middleware('throttle:5,1');
+    Route::post('/member/location', [MemberDashboardController::class, 'recordLocation'])
+        ->middleware('throttle:60,1');
+    Route::post('/member/track-location', [MemberDashboardController::class, 'recordLocation'])
+        ->middleware('throttle:60,1');
+    Route::post('/member/locations', [MemberDashboardController::class, 'recordLocation'])
+        ->middleware('throttle:60,1');
 
     Route::prefix('member')->name('member.')->group(function () {
         Route::get('/dashboard', [MemberDashboardController::class, 'index']);
@@ -115,6 +119,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/attendance/check-out', [MemberDashboardController::class, 'checkOut']);
         Route::post('/attendance/{attendance}/check-out', [MemberDashboardController::class, 'checkOut']);
         Route::get('/notifications', [MemberDashboardController::class, 'notifications']);
+
+        // Periodic 20-min Member Location Tracking APIs
+        Route::post('/location', [MemberDashboardController::class, 'recordLocation'])
+            ->middleware('throttle:60,1');
+        Route::post('/track-location', [MemberDashboardController::class, 'recordLocation'])
+            ->middleware('throttle:60,1');
+        Route::post('/locations', [MemberDashboardController::class, 'recordLocation'])
+            ->middleware('throttle:60,1');
+        Route::post('/ping-location', [MemberDashboardController::class, 'recordLocation'])
+            ->middleware('throttle:60,1');
 
         // Type 2: Survey & Driver Duty Location Check-In & Check-Out APIs (Image 2 & 5)
         Route::get('/survey-duty/status', [MemberDashboardController::class, 'surveyDutyStatus']);
