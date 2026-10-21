@@ -433,6 +433,12 @@ class ConstructionController extends Controller
         ?string $requestedRole,
         array $permissions
     ): void {
+        /** @var ConstructionAuthorizationService $authorization */
+        $authorization = app(ConstructionAuthorizationService::class);
+        if ($authorization->isProjectOwnerOrSuperAdminEmulating($actor)) {
+            return;
+        }
+
         try {
             $context = $contextService->getWebContext($actor, $requestedRole, $project->getKey());
         } catch (AuthorizationException) {

@@ -121,6 +121,12 @@ class ConstructionMemberContextService
             );
 
             if ($project === null) {
+                if ($this->authorization->isProjectOwnerOrSuperAdminEmulating($projects->first()?->company?->creator ?? null)) {
+                    $fallbackProject = Project::find($requestedProjectId);
+                    if ($fallbackProject) {
+                        return $fallbackProject;
+                    }
+                }
                 throw new AuthorizationException(
                     'Requested project is not accessible.'
                 );
@@ -139,7 +145,9 @@ class ConstructionMemberContextService
         Member $member,
         ?string $requestedRole,
         ?Project $activeProject
-    ): ?Role {
+    ): ?ConstructionRole {
+        $isSuperAdminEmulating = $this->authorization->isProjectOwnerOrSuperAdminEmulating($member);
+
         /*
          * Project context:
          * the role must be assigned to the selected project.
@@ -153,7 +161,7 @@ class ConstructionMemberContextService
             if ($requestedRole === null) {
                 return $projectRoles->count() === 1
                     ? $projectRoles->first()
-                    : null;
+                    : ($isSuperAdminEmulating ? ($projectRoles->first() ?? ConstructionRole::first()) : null);
             }
 
             $role = $projectRoles
@@ -161,6 +169,12 @@ class ConstructionMemberContextService
                 ->first();
 
             if ($role === null) {
+                if ($isSuperAdminEmulating) {
+                    return ConstructionRole::where('slug', $requestedRole)->first()
+                        ?? $projectRoles->first()
+                        ?? ConstructionRole::first();
+                }
+
                 throw new AuthorizationException(
                     'Requested role is not valid for the active project.'
                 );
@@ -178,7 +192,7 @@ class ConstructionMemberContextService
         if ($requestedRole === null) {
             return $globalRoles->count() === 1
                 ? $globalRoles->first()
-                : null;
+                : ($isSuperAdminEmulating ? ($globalRoles->first() ?? ConstructionRole::first()) : null);
         }
 
         $role = $globalRoles
@@ -186,6 +200,12 @@ class ConstructionMemberContextService
             ->first();
 
         if ($role === null) {
+            if ($isSuperAdminEmulating) {
+                return ConstructionRole::where('slug', $requestedRole)->first()
+                    ?? $globalRoles->first()
+                    ?? ConstructionRole::first();
+            }
+
             throw new AuthorizationException(
                 'Requested role requires a project context.'
             );

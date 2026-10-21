@@ -24,6 +24,10 @@ class EnsureConstructionPermission
         $actor = $this->authorizationService->resolveActor($request);
         $projectId = $this->authorizationService->inferProjectId($request);
 
+        if ($this->authorizationService->isProjectOwnerOrSuperAdminEmulating($actor)) {
+            return $next($request);
+        }
+
         if (!$this->authorizationService->hasAnyPermission(
             $actor,
             $permissions,

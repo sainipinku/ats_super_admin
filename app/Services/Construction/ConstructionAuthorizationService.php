@@ -34,6 +34,40 @@ class ConstructionAuthorizationService
         return $requestUser instanceof Model ? $requestUser : null;
     }
 
+    public function isProjectOwnerOrSuperAdminEmulating(?Model $actor = null): bool
+    {
+        // 1. Direct project owner or super admin check on actor model
+        if ($actor instanceof SuperAdmin) {
+            return true;
+        }
+
+        if ($actor instanceof Member) {
+            if ((int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1)) {
+                return true;
+            }
+        }
+
+        // 2. Check if a Super Admin / Project Owner is emulating any account
+        if (session()->has('impersonator')) {
+            $impersonator = session('impersonator');
+            $guard = $impersonator['guard'] ?? null;
+            $role = strtolower((string) ($impersonator['role'] ?? ''));
+
+            if ($guard === 'superadmin' || str_contains($role, 'super admin') || str_contains($role, 'superadmin')) {
+                return true;
+            }
+
+            if (!empty($impersonator['id'])) {
+                $superAdmin = SuperAdmin::find($impersonator['id']);
+                if ($superAdmin) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Get all effective construction permissions for the actor.
      *
@@ -51,29 +85,18 @@ class ConstructionAuthorizationService
             return [];
         }
 
-        $isImpersonating = session()->has('impersonator');
+        if ($this->isProjectOwnerOrSuperAdminEmulating($actor)) {
+            return Permission::query()
+                ->orderBy('slug')
+                ->pluck('slug')
+                ->all();
+        }
 
-        $isUnrestrictedSuperAdmin = false;
-        if (!$isImpersonating) {
-            if ($actor instanceof SuperAdmin) {
-                $isUnrestrictedSuperAdmin = true;
-            } elseif ($actor instanceof Member) {
-                $isUnrestrictedSuperAdmin = ((int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1));
-            }
-
-            if ($isUnrestrictedSuperAdmin) {
-                return Permission::query()
-                    ->orderBy('slug')
-                    ->pluck('slug')
-                    ->all();
-            }
-
-            if ($actor instanceof Member && $actor->isAdmin()) {
-                return Permission::query()
-                    ->orderBy('slug')
-                    ->pluck('slug')
-                    ->all();
-            }
+        if ($actor instanceof Member && $actor->isAdmin()) {
+            return Permission::query()
+                ->orderBy('slug')
+                ->pluck('slug')
+                ->all();
         }
 
         $roleIds = [];
@@ -176,6 +199,10 @@ class ConstructionAuthorizationService
         array $permissions,
         ?int $projectId = null
     ): bool {
+        if ($this->isProjectOwnerOrSuperAdminEmulating($actor)) {
+            return true;
+        }
+
         if (!$actor || empty($permissions)) {
             return false;
         }
@@ -315,6 +342,10 @@ class ConstructionAuthorizationService
      */
     public function getProjects(Member $member): Collection
     {
+        if ($this->isProjectOwnerOrSuperAdminEmulating($member)) {
+            return Project::latest()->get();
+        }
+
         $companyId = null;
         if ($member->created_by) {
             $creator = SuperAdmin::find($member->created_by);
@@ -393,6 +424,13 @@ class ConstructionAuthorizationService
         ConstructionRole $role,
         ?int $projectId = null
     ): array {
+        if ($this->isProjectOwnerOrSuperAdminEmulating($member)) {
+            return Permission::query()
+                ->orderBy('slug')
+                ->pluck('slug')
+                ->all();
+        }
+
         $query = Permission::query()
             ->select('construction_permissions.slug')
             ->join(

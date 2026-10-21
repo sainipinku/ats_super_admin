@@ -51,6 +51,42 @@ class AdminEmulationTest extends TestCase
         $dashboardResponse->assertOk();
     }
 
+    public function test_super_admin_project_owner_emulating_member_never_receives_permission_denied_error(): void
+    {
+        $superAdmin = SuperAdmin::create([
+            'name' => 'Project Owner Super Admin',
+            'email' => 'owner_admin@company.com',
+            'username' => 'owner_admin',
+            'password' => Hash::make('password'),
+            'status' => 1,
+        ]);
+
+        $plainMember = Member::create([
+            'name' => 'Plain Field Worker',
+            'username' => 'field_worker',
+            'email' => 'field_worker@company.com',
+            'password' => Hash::make('password'),
+            'created_by' => $superAdmin->id,
+            'slug' => 'field-worker',
+            'status' => 1,
+            'roles' => [],
+        ]);
+
+        // Start emulation on plain member
+        $response = $this->actingAs($superAdmin, 'superadmin')
+            ->post(route('emulate.start'), [
+                'target_type' => 'member',
+                'target_id' => $plainMember->id,
+            ]);
+
+        $response->assertRedirect();
+
+        // Access member construction dashboard protected by EnsureConstructionPermission
+        $dashboardResponse = $this->get(route('member.construction.dashboard'));
+        $dashboardResponse->assertOk();
+        $this->assertFalse(str_contains((string) $dashboardResponse->getContent(), 'Access Denied'));
+    }
+
     public function test_duplicate_phone_number_returns_validation_error_instead_of_500_sql_exception(): void
     {
         $superAdmin = SuperAdmin::create([
