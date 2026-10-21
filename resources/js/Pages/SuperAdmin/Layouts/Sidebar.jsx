@@ -57,6 +57,7 @@ const navigation = [
             },
             {
                 label: "Role Management",
+                superAdminRoleManagerOnly: true,
                 permissions: ["role.manage", "role.view"],
                 href: route("super.role.list"),
                 active: ["super.role.*"],
@@ -270,12 +271,15 @@ export default function Sidebar({ isOpen, onClose }) {
     };
 
     const isProjectOwner = user?.is_project_owner == 1 || (user && (user.id == 1 || user.id === '1'));
+    const canManageRoles = guard === "superadmin"
+        && (isProjectOwner || user?.company_id !== null && user?.company_id !== undefined);
 
     const visibleNavigation = navigation
         .map((group) => {
             const items = group.items
                 .filter((item) => {
                     if (item.superAdminOnly && !isSuperAdmin) return false;
+                    if (item.superAdminRoleManagerOnly && !canManageRoles) return false;
                     if (isSuperAdmin) return true;
                     if (item.adminOnly && !isAdminUser) return false;
                     return hasPerm(item.permissions || item.permission);

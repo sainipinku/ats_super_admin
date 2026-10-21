@@ -6,6 +6,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PartnerMiddleware;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\SuperAdminMiddleware;
+use App\Http\Middleware\SuperAdminRoleManagementMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -31,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
             'ability' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
             'auth.superadmin' => SuperAdminMiddleware::class,
+            'superadmin.role-management' => SuperAdminRoleManagementMiddleware::class,
             'authorized' => RedirectIfAuthenticated::class,
             'member' => \App\Http\Middleware\MemberMiddleware::class,
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
