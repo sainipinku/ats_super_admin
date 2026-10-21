@@ -21,7 +21,7 @@ export default function GoogleMapLocationSection({
   initialLocationName = '',
   onChange,
 }) {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+  const apiKey = import.meta.env.GOOGLE_MAPS_API_KEY || '';
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey,
@@ -743,8 +743,8 @@ export default function GoogleMapLocationSection({
                     onClick={() => handleSelectSuggestion(item)}
                     onMouseEnter={() => setHighlightedIndex(idx)}
                     className={`flex w-full items-start gap-3 px-3.5 py-2.5 text-left transition ${highlightedIndex === idx
-                        ? 'bg-indigo-50/80 text-indigo-950 dark:bg-indigo-950/60 dark:text-indigo-200'
-                        : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60'
+                      ? 'bg-indigo-50/80 text-indigo-950 dark:bg-indigo-950/60 dark:text-indigo-200'
+                      : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60'
                       }`}
                   >
                     <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-[13px] text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">

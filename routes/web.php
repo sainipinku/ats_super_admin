@@ -98,7 +98,7 @@ Route::prefix('super')->name('super.')->group(function () {
         Route::delete('departments/{id}', [DepartmentController::class, 'destroy'])->name('department.destroy');
 
         // Roles Route
-        Route::prefix('role')->name('role.')->group(function () {
+        Route::prefix('role')->name('role.')->middleware('superadmin.role-management')->group(function () {
             Route::get('/list', [RolesController::class, 'list'])->name('list');
             Route::post('/add', [RolesController::class, 'addRole'])->name('add');
             Route::put('/{uuid}/update', [RolesController::class, 'addRole'])->name('update');
