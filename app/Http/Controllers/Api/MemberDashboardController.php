@@ -806,11 +806,9 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             ->values()
             ->all();
 
-        $todayTasksByProject = collect($todaysTasksList)->groupBy('project_id');
-
         $tasksByProject = $tasks->groupBy(fn ($t) => (int) ($t->project_id ?? 0));
 
-        $attachTasksToProject = function (Project $project) use ($todayTasksByProject, $tasksByProject) {
+        $attachTasksToProject = function (Project $project) use ($tasksByProject) {
             $projId = (int) $project->id;
             $projAllTasksModels = $tasksByProject->get($projId, collect());
 
@@ -837,11 +835,6 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
 
             $project->setAttribute('team_members_count', count($teamMembers));
             $project->setAttribute('team_members', $teamMembers);
-            $project->setAttribute('today_tasks', $projTodayTasks);
-            $project->setAttribute('today_task', $projTodayTasks);
-            $project->setAttribute('tasks', $projLast20Tasks);
-            $project->setAttribute('task', $projLast20Tasks);
-            $project->setAttribute('today_tasks_count', count($projTodayTasks));
             $project->setAttribute('tasks_count', $projAllTasksModels->count());
         };
 
@@ -867,12 +860,7 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             'check_in_card' => $checkInCard,
             'todays_summary' => $todaysSummaryCard,
             'current_project' => $currentProjectCard,
-            'todays_tasks' => $todaysTasksList,
-            'today_tasks' => $todaysTasksList,
-            'today_task' => $todaysTasksList,
-            'tasks' => $last20TasksFormatted,
-            'task' => $last20TasksFormatted,
-            'all_tasks' => $last20TasksFormatted,
+            'tasks' => $dashboardTasks,
             'quick_actions' => $quickActionsList,
             'field_activity' => $fieldActivityCard,
             'performance' => $performanceCard,
