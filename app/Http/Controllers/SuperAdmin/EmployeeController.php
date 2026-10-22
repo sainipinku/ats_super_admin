@@ -825,7 +825,7 @@ class EmployeeController extends Controller
             $activeRoleIds = [1];
         }
 
-        if ($member) {
+       if ($member) {
             $member->forceFill(['roles' => $activeRoleIds])->save();
         }
     }
