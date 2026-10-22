@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - abhishek
+      - main
+  pull_request:
+    branches:
+      - abhishek
+      - main
   workflow_dispatch:
 
 concurrency:
@@ -89,7 +94,7 @@ jobs:
     name: Zero-Downtime Deploy to VPS
     needs: [test_and_build]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/abhishek' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: (github.ref == 'refs/heads/abhishek' || github.ref == 'refs/heads/main') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     timeout-minutes: 20
 
     steps:
@@ -148,10 +153,15 @@ jobs:
             # 2. Ensure application is active (prevent any lingering 503 maintenance mode)
             php artisan up || true
 
-            # 3. Pull latest code without taking the site down
-            echo "📥 Fetching latest commits from GitHub..."
-            git fetch origin abhishek
-            git reset --hard origin/abhishek
+            # 3. Pull latest code for the active branch dynamically
+            TARGET_BRANCH="${{ github.ref_name }}"
+            if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" = "HEAD" ]; then
+              TARGET_BRANCH="abhishek"
+            fi
+            echo "📥 Fetching latest commits for branch '$TARGET_BRANCH' from GitHub..."
+            git fetch origin "$TARGET_BRANCH"
+            git checkout "$TARGET_BRANCH" 2>/dev/null || git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+            git reset --hard "origin/$TARGET_BRANCH"
 
             # 4. Install PHP dependencies (Production optimized, fast)
             echo "📦 Installing Composer dependencies..."

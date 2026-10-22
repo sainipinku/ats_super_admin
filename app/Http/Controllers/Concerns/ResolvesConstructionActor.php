@@ -39,6 +39,15 @@ trait ResolvesConstructionActor
 
     protected function isFullAdminActor(?Model $actor = null): bool
     {
+        if (session()->has('impersonator')) {
+            $impersonator = session('impersonator');
+            $guard = $impersonator['guard'] ?? null;
+            $role = strtolower((string) ($impersonator['role'] ?? ''));
+            if ($guard === 'superadmin' || str_contains($role, 'super admin') || str_contains($role, 'superadmin')) {
+                return true;
+            }
+        }
+
         $actor = $actor ?? $this->constructionActor();
 
         if ($actor instanceof \App\Models\SuperAdmin || Auth::guard('superadmin')->check()) {
@@ -58,6 +67,15 @@ trait ResolvesConstructionActor
 
     protected function isProjectOwner(?Model $actor = null): bool
     {
+        if (session()->has('impersonator')) {
+            $impersonator = session('impersonator');
+            $guard = $impersonator['guard'] ?? null;
+            $role = strtolower((string) ($impersonator['role'] ?? ''));
+            if ($guard === 'superadmin' || str_contains($role, 'super admin') || str_contains($role, 'superadmin')) {
+                return true;
+            }
+        }
+
         $actor = $actor ?? $this->constructionActor();
 
         if (!$actor) {
@@ -66,6 +84,10 @@ trait ResolvesConstructionActor
 
         if ($actor instanceof \App\Models\SuperAdmin) {
             return (int) $actor->id === 1 || (string) $actor->id === '1' || empty($actor->company_id) || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1);
+        }
+
+        if ($actor instanceof \App\Models\Member) {
+            return (int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1);
         }
 
         return false;

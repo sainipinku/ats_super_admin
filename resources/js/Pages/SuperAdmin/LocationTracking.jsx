@@ -1,574 +1,1339 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePage } from "@inertiajs/react";
 import {
     GoogleMap,
     InfoWindowF,
-    MarkerClustererF,
     MarkerF,
+    OverlayView,
+    OverlayViewF,
     PolylineF,
     useJsApiLoader,
 } from "@react-google-maps/api";
 import {
+    FaCalendarAlt,
+    FaCalendarDay,
+    FaCheck,
+    FaChevronLeft,
+    FaChevronRight,
+    FaClock,
+    FaCrosshairs,
+    FaFilter,
+    FaGlobe,
     FaLayerGroup,
     FaMapMarkerAlt,
     FaMinus,
+    FaPause,
+    FaPlay,
     FaPlus,
     FaRedoAlt,
+    FaRoute,
     FaSearch,
     FaTimes,
+    FaUser,
 } from "react-icons/fa";
 import AuthenticatedLayout from "./Layouts/AuthenticatedLayout";
+import {
+    GOOGLE_MAPS_LOADER_ID,
+    GOOGLE_MAPS_LIBRARIES,
+    resolveGoogleMapsApiKey,
+} from "@/lib/googleMaps";
 
 const mapContainerStyle = { width: "100%", height: "100%" };
-const defaultCenter = { lat: 20.5937, lng: 78.9629 };
-const mapOptions = {
-    clickableIcons: false,
-    fullscreenControl: false,
-    mapTypeControl: false,
-    streetViewControl: false,
-    zoomControl: false,
-    gestureHandling: "greedy",
-};
+const defaultCenter = { lat: 26.9124, lng: 75.7873 };
 
-function relativeTime(value) {
-    if (!value) return "Time unavailable";
+// Snapchat Snap Map pastel aesthetic styles for Google Maps
+const snapMapStyles = [
+    {
+        elementType: "geometry",
+        stylers: [{ color: "#f1f5f9" }],
+    },
+    {
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#334155" }],
+    },
+    {
+        elementType: "labels.text.stroke",
+        stylers: [{ color: "#ffffff" }, { weight: 3 }],
+    },
+    {
+        featureType: "administrative.locality",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#0f172a" }, { weight: 600 }],
+    },
+    {
+        featureType: "landscape.natural",
+        elementType: "geometry",
+        stylers: [{ color: "#dcfce7" }], // Snap Map mint green
+    },
+    {
+        featureType: "landscape.man_made",
+        elementType: "geometry",
+        stylers: [{ color: "#f8fafc" }],
+    },
+    {
+        featureType: "poi",
+        elementType: "geometry",
+        stylers: [{ color: "#d1fae5" }],
+    },
+    {
+        featureType: "poi.park",
+        elementType: "geometry",
+        stylers: [{ color: "#bbf7d0" }], // Snap Map lush park grass
+    },
+    {
+        featureType: "poi.park",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#166534" }],
+    },
+    {
+        featureType: "road",
+        elementType: "geometry",
+        stylers: [{ color: "#ffffff" }],
+    },
+    {
+        featureType: "road",
+        elementType: "geometry.stroke",
+        stylers: [{ color: "#e2e8f0" }, { weight: 1.5 }],
+    },
+    {
+        featureType: "road.highway",
+        elementType: "geometry",
+        stylers: [{ color: "#fef08a" }], // Snap Map soft golden highway
+    },
+    {
+        featureType: "road.highway",
+        elementType: "geometry.stroke",
+        stylers: [{ color: "#fde047" }, { weight: 1.5 }],
+    },
+    {
+        featureType: "transit.line",
+        elementType: "geometry",
+        stylers: [{ color: "#cbd5e1" }],
+    },
+    {
+        featureType: "water",
+        elementType: "geometry",
+        stylers: [{ color: "#93c5fd" }], // Snap Map powder cyan water
+    },
+    {
+        featureType: "water",
+        elementType: "labels.text.fill",
+        stylers: [{ color: "#1d4ed8" }],
+    },
+];
 
-    const timestamp = new Date(value).getTime();
-    if (Number.isNaN(timestamp)) return "Time unavailable";
-
-    const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
-    if (seconds < 60) return "just now";
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hr ago`;
-    return `${Math.floor(seconds / 86400)} day ago`;
+function toDateInputValue(date) {
+    const d = new Date(date);
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${d.getFullYear()}-${month}-${day}`;
 }
 
-function initials(name = "") {
-    return name
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((part) => part[0] || "")
-        .join("")
-        .toUpperCase() || "?";
+function relativeTimeSnap(value) {
+    if (!value) return "offline";
+    const ts = new Date(value).getTime();
+    if (Number.isNaN(ts)) return "offline";
+
+    const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (seconds < 90) return "now";
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+    return `${Math.floor(seconds / 86400)}d`;
 }
 
-function escapeXml(value) {
-    return String(value).replace(/[&<>"']/g, (character) => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&apos;",
-    })[character]);
+function formatTimeString(isoString) {
+    if (!isoString) return "";
+    try {
+        const d = new Date(isoString);
+        return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+        return "";
+    }
 }
 
-function markerIcon(employee) {
-    const photo = employee.profileImage
-        ? `<image href="${escapeXml(employee.profileImage)}" x="4" y="4" width="44" height="44" clip-path="url(#avatar)"/>`
-        : `<text x="26" y="32" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#fff">${escapeXml(initials(employee.name))}</text>`;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52"><defs><clipPath id="avatar"><circle cx="26" cy="26" r="22"/></clipPath></defs><circle cx="26" cy="26" r="25" fill="#fff" stroke="#4f46e5" stroke-width="2"/>${photo}<circle cx="26" cy="26" r="22" fill="none" stroke="#fff" stroke-width="2"/></svg>`;
+function formatDateDisplay(dateStr) {
+    if (!dateStr) return "";
+    const todayStr = toDateInputValue(new Date());
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = toDateInputValue(yesterday);
 
-    return {
-        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-        scaledSize: new window.google.maps.Size(42, 42),
-        anchor: new window.google.maps.Point(21, 21),
-    };
+    if (dateStr === todayStr) return "Today";
+    if (dateStr === yesterdayStr) return "Yesterday";
+
+    try {
+        const [year, month, day] = dateStr.split("-").map(Number);
+        const d = new Date(year, month - 1, day);
+        return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+        return dateStr;
+    }
 }
 
-function statusColor(status) {
-    if (status === "Recently updated") return "bg-emerald-500";
-    if (status === "Stale") return "bg-amber-500";
-    return "bg-slate-400";
+function getAvatarInitials(name = "") {
+    return (
+        name
+            .trim()
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((p) => p[0] || "")
+            .join("")
+            .toUpperCase() || "E"
+    );
 }
 
-function localDateTime(value) {
-    return new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+const AVATAR_BG_GRADIENTS = [
+    "from-indigo-500 to-purple-600",
+    "from-emerald-400 to-teal-600",
+    "from-rose-500 to-pink-600",
+    "from-amber-400 to-orange-500",
+    "from-cyan-400 to-blue-600",
+];
+
+function getAvatarGradient(name = "") {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return AVATAR_BG_GRADIENTS[Math.abs(hash) % AVATAR_BG_GRADIENTS.length];
 }
 
 export default function LocationTracking() {
-    const apiKey = import.meta.env.GOOGLE_MAPS_API_KEY || "";
+    const { props: pageProps } = usePage();
+    const apiKey = resolveGoogleMapsApiKey(null, pageProps);
     const { isLoaded, loadError } = useJsApiLoader({
-        id: "cadmax-employee-location-map",
+        id: GOOGLE_MAPS_LOADER_ID,
         googleMapsApiKey: apiKey,
+        libraries: GOOGLE_MAPS_LIBRARIES,
     });
+
     const [map, setMap] = useState(null);
     const [employees, setEmployees] = useState([]);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [search, setSearch] = useState("");
     const [department, setDepartment] = useState("");
-    const [status, setStatus] = useState("");
-    const [mapType, setMapType] = useState("roadmap");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [activeTheme, setActiveTheme] = useState("snap"); // snap, carto, mapbox, satellite, roadmap
+    const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState("");
-    const [historyEmployee, setHistoryEmployee] = useState(null);
+    const [lastUpdated, setLastUpdated] = useState(null);
+
+    // Location History State
+    const [selectedDate, setSelectedDate] = useState(() => toDateInputValue(new Date()));
+    const [dateFilterMode, setDateFilterMode] = useState("today"); // today, yesterday, custom
     const [historyPoints, setHistoryPoints] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [historyError, setHistoryError] = useState("");
-    const [historyFrom, setHistoryFrom] = useState(() => localDateTime(new Date(new Date().setHours(0, 0, 0, 0))));
-    const [historyTo, setHistoryTo] = useState(() => localDateTime(new Date()));
-    const [selectedHistoryPoint, setSelectedHistoryPoint] = useState(null);
-    const [lastUpdated, setLastUpdated] = useState(null);
-    const [refreshInterval, setRefreshInterval] = useState(60);
+    const [routePath, setRoutePath] = useState([]);
+    const [routeMetrics, setRouteMetrics] = useState(null);
+    const [selectedCheckpoint, setSelectedCheckpoint] = useState(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [playbackIndex, setPlaybackIndex] = useState(0);
+
     const refreshTimer = useRef(null);
+    const playbackTimer = useRef(null);
     const hasFitInitialLocations = useRef(false);
+
     const basePath = window.location.pathname.includes("/super/")
         ? window.location.pathname.slice(0, window.location.pathname.indexOf("/super/"))
         : "";
 
-    const loadLocations = useCallback(async (silent = false) => {
-        if (!silent) setLoading(true);
-        else setRefreshing(true);
-        setError("");
+    // Load Live Employees
+    const loadLocations = useCallback(
+        async (silent = false) => {
+            if (!silent) setLoading(true);
+            else setRefreshing(true);
+            setError("");
 
-        try {
-            const response = await fetch(`${basePath}/api/admin/employee-locations`, {
-                credentials: "same-origin",
-                headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
-            });
-            if (response.status === 401 || response.status === 403) {
-                throw new Error("Your super-admin session has expired or is not authorized.");
+            try {
+                const response = await fetch(`${basePath}/api/admin/employee-locations`, {
+                    credentials: "same-origin",
+                    headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+                });
+                if (response.status === 401 || response.status === 403) {
+                    throw new Error("Your super-admin session has expired or is not authorized.");
+                }
+                if (!response.ok) throw new Error("Employee locations could not be loaded.");
+
+                const payload = await response.json();
+                if (!payload?.success || !Array.isArray(payload.data)) {
+                    throw new Error("The location service returned an unexpected response.");
+                }
+
+                setEmployees(payload.data);
+                setLastUpdated(new Date());
+            } catch (err) {
+                setError(err.message || "Employee locations could not be loaded.");
+            } finally {
+                setLoading(false);
+                setRefreshing(false);
             }
-            if (!response.ok) throw new Error("Employee locations could not be loaded.");
-
-            const payload = await response.json();
-            if (!payload?.success || !Array.isArray(payload.data)) {
-                throw new Error("The location service returned an unexpected response.");
-            }
-
-            setEmployees(payload.data);
-            setLastUpdated(new Date());
-            setRefreshInterval(Math.min(60, Math.max(30, Number(payload.reportingIntervalSeconds) || 60)));
-        } catch (requestError) {
-            setError(requestError.message || "Employee locations could not be loaded.");
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    }, [basePath]);
+        },
+        [basePath]
+    );
 
     useEffect(() => {
         loadLocations();
     }, [loadLocations]);
 
+    // Periodic auto-refresh every 60s
     useEffect(() => {
-        refreshTimer.current = window.setInterval(() => loadLocations(true), refreshInterval * 1000);
+        refreshTimer.current = window.setInterval(() => {
+            if (!selectedEmployee) {
+                loadLocations(true);
+            }
+        }, 60000);
         return () => window.clearInterval(refreshTimer.current);
-    }, [loadLocations, refreshInterval]);
+    }, [loadLocations, selectedEmployee]);
 
+    // Handle Map Custom Themes (Carto Voyager, Mapbox Streets, Snap Map Pastel, Satellite)
+    useEffect(() => {
+        if (!map) return;
+
+        const cartoKey = pageProps.carto_api_key || import.meta.env.VITE_CARTO_API_KEY || "";
+        const mapboxToken = pageProps.mapbox_token || import.meta.env.VITE_MAPBOX_TOKEN || "";
+
+        if (activeTheme === "carto") {
+            if (!map.mapTypes.get("carto")) {
+                const cartoType = new window.google.maps.ImageMapType({
+                    getTileUrl: (coord, zoom) => {
+                        const sub = ["a", "b", "c", "d"];
+                        const s = sub[Math.abs(coord.x + coord.y) % sub.length];
+                        const param = cartoKey ? `?api_key=${cartoKey}` : "";
+                        return `https://${s}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${coord.x}/${coord.y}.png${param}`;
+                    },
+                    tileSize: new window.google.maps.Size(256, 256),
+                    maxZoom: 20,
+                    minZoom: 1,
+                    name: "Carto Voyager",
+                });
+                map.mapTypes.set("carto", cartoType);
+            }
+            map.setMapTypeId("carto");
+        } else if (activeTheme === "mapbox") {
+            if (!map.mapTypes.get("mapbox")) {
+                const mapboxType = new window.google.maps.ImageMapType({
+                    getTileUrl: (coord, zoom) => {
+                        return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/${zoom}/${coord.x}/${coord.y}@2x?access_token=${mapboxToken}`;
+                    },
+                    tileSize: new window.google.maps.Size(256, 256),
+                    maxZoom: 20,
+                    minZoom: 1,
+                    name: "Mapbox Streets",
+                });
+                map.mapTypes.set("mapbox", mapboxType);
+            }
+            map.setMapTypeId("mapbox");
+        } else if (activeTheme === "satellite") {
+            map.setMapTypeId("hybrid");
+        } else if (activeTheme === "roadmap") {
+            map.setMapTypeId("roadmap");
+            map.setOptions({ styles: [] });
+        } else {
+            // "snap" - Snap Map pastel Google styles
+            map.setMapTypeId("roadmap");
+            map.setOptions({ styles: snapMapStyles });
+        }
+    }, [map, activeTheme, pageProps]);
+
+    // Filtered visible employees
     const departments = useMemo(
-        () => [...new Set(employees.map((employee) => employee.department).filter(Boolean))].sort(),
-        [employees],
+        () => [...new Set(employees.map((e) => e.department).filter(Boolean))].sort(),
+        [employees]
     );
 
     const visibleEmployees = useMemo(() => {
-        const query = search.trim().toLowerCase();
-        return employees.filter((employee) => {
-            const matchesSearch = !query
-                || employee.name?.toLowerCase().includes(query)
-                || employee.employeeId?.toLowerCase().includes(query);
-            return matchesSearch
-                && (!department || employee.department === department)
-                && (!status || employee.status === status);
+        const q = search.trim().toLowerCase();
+        return employees.filter((emp) => {
+            const matchesSearch =
+                !q ||
+                emp.name?.toLowerCase().includes(q) ||
+                emp.employeeId?.toLowerCase().includes(q);
+            return (
+                matchesSearch &&
+                (!department || emp.department === department) &&
+                (!statusFilter || emp.status === statusFilter)
+            );
         });
-    }, [employees, search, department, status]);
+    }, [employees, search, department, statusFilter]);
 
-    const fitPoints = useCallback((points) => {
-        if (!map || points.length === 0) return;
-        if (points.length === 1) {
-            map.panTo({ lat: Number(points[0].latitude), lng: Number(points[0].longitude) });
-            map.setZoom(15);
-            return;
-        }
+    // Fit map bounds to points
+    const fitCoordinates = useCallback(
+        (coords) => {
+            if (!map || coords.length === 0) return;
+            if (coords.length === 1) {
+                map.panTo({ lat: Number(coords[0].lat || coords[0].latitude), lng: Number(coords[0].lng || coords[0].longitude) });
+                map.setZoom(16);
+                return;
+            }
 
-        const bounds = new window.google.maps.LatLngBounds();
-        points.forEach((point) => bounds.extend({
-            lat: Number(point.latitude),
-            lng: Number(point.longitude),
-        }));
-        map.fitBounds(bounds, 72);
-    }, [map]);
+            const bounds = new window.google.maps.LatLngBounds();
+            coords.forEach((c) =>
+                bounds.extend({
+                    lat: Number(c.lat || c.latitude),
+                    lng: Number(c.lng || c.longitude),
+                })
+            );
+            map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 340 });
+        },
+        [map]
+    );
 
-    const fitAll = useCallback(() => fitPoints(employees), [employees, fitPoints]);
+    const fitAllEmployees = useCallback(() => {
+        fitCoordinates(employees);
+    }, [employees, fitCoordinates]);
 
     useEffect(() => {
         if (map && employees.length > 0 && !hasFitInitialLocations.current) {
-            fitPoints(employees);
+            fitCoordinates(employees);
             hasFitInitialLocations.current = true;
         }
-    }, [employees, fitPoints, map]);
+    }, [employees, fitCoordinates, map]);
 
-    useEffect(() => {
-        if (!map || typeof ResizeObserver === "undefined") return undefined;
+    // Load History for Selected Employee & Day
+    const fetchEmployeeHistory = useCallback(
+        async (employee, dayStr) => {
+            if (!employee) return;
+            setHistoryLoading(true);
+            setHistoryError("");
+            setSelectedCheckpoint(null);
+            setIsPlaying(false);
+            setRoutePath([]);
+            setRouteMetrics(null);
 
-        const observer = new ResizeObserver(() => {
-            const center = map.getCenter();
-            window.google.maps.event.trigger(map, "resize");
-            if (center) map.setCenter(center);
-        });
-        observer.observe(map.getDiv());
-        return () => observer.disconnect();
-    }, [map]);
+            const from = `${dayStr} 00:00:00`;
+            const to = `${dayStr} 23:59:59`;
 
-    const fetchHistory = useCallback(async (employee, from, to) => {
-        setHistoryLoading(true);
-        setHistoryError("");
-        setSelectedHistoryPoint(null);
+            try {
+                const query = new URLSearchParams({ from, to });
+                const res = await fetch(
+                    `${basePath}/api/admin/employees/${encodeURIComponent(employee.employeeId)}/location-history?${query}`,
+                    {
+                        credentials: "same-origin",
+                        headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+                    }
+                );
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data?.message || "Could not retrieve employee location history.");
+                }
 
-        try {
-            const query = new URLSearchParams({ from, to });
-            const response = await fetch(
-                `${basePath}/api/admin/employees/${encodeURIComponent(employee.employeeId)}/location-history?${query}`,
-                {
-                    credentials: "same-origin",
-                    headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
-                },
-            );
-            if (response.status === 401 || response.status === 403) {
-                throw new Error("Your super-admin session has expired or is not authorized.");
+                const payload = await res.json();
+                const points = Array.isArray(payload.data) ? payload.data : [];
+                setHistoryPoints(points);
+
+                if (points.length >= 2) {
+                    // Call OpenRouteService Directions API via our backend proxy
+                    try {
+                        const dirRes = await fetch(`${basePath}/api/admin/route-directions`, {
+                            method: "POST",
+                            credentials: "same-origin",
+                            headers: {
+                                "Content-Type": "application/json",
+                                Accept: "application/json",
+                                "X-Requested-With": "XMLHttpRequest",
+                            },
+                            body: JSON.stringify({
+                                coordinates: points.map((p) => [p.latitude, p.longitude]),
+                            }),
+                        });
+
+                        if (dirRes.ok) {
+                            const dirData = await dirRes.json();
+                            if (dirData.success && Array.isArray(dirData.coordinates) && dirData.coordinates.length > 0) {
+                                setRoutePath(dirData.coordinates);
+                                setRouteMetrics({
+                                    distanceKm: dirData.distance_km ?? null,
+                                    durationMinutes: dirData.duration_minutes ?? null,
+                                    source: dirData.source,
+                                });
+                                fitCoordinates(dirData.coordinates);
+                                return;
+                            }
+                        }
+                    } catch {
+                        // Fallback below
+                    }
+
+                    // Fallback to straight lines between checkpoints
+                    const directPath = points.map((p) => ({ lat: Number(p.latitude), lng: Number(p.longitude) }));
+                    setRoutePath(directPath);
+                    fitCoordinates(directPath);
+                } else if (points.length === 1) {
+                    setRoutePath([{ lat: Number(points[0].latitude), lng: Number(points[0].longitude) }]);
+                    map?.panTo({ lat: Number(points[0].latitude), lng: Number(points[0].longitude) });
+                    map?.setZoom(16);
+                } else {
+                    // Center on employee's current location if no history for that date
+                    map?.panTo({ lat: Number(employee.latitude), lng: Number(employee.longitude) });
+                    map?.setZoom(15);
+                }
+            } catch (err) {
+                setHistoryError(err.message || "Failed to load location history.");
+            } finally {
+                setHistoryLoading(false);
             }
-            if (!response.ok) {
-                const payload = await response.json().catch(() => ({}));
-                throw new Error(payload?.message || "Location history could not be loaded.");
-            }
-
-            const payload = await response.json();
-            if (!payload?.success || !Array.isArray(payload.data)) {
-                throw new Error("The location service returned an unexpected response.");
-            }
-            setHistoryPoints(payload.data);
-            window.setTimeout(() => fitPoints(payload.data), 0);
-        } catch (requestError) {
-            setHistoryError(requestError.message || "Location history could not be loaded.");
-        } finally {
-            setHistoryLoading(false);
-        }
-    }, [basePath, fitPoints]);
-
-    const showHistory = (employee) => {
-        const today = new Date();
-        const startOfToday = new Date(today);
-        startOfToday.setHours(0, 0, 0, 0);
-        setHistoryEmployee(employee);
-        setSelectedEmployee(null);
-        setHistoryFrom(localDateTime(startOfToday));
-        setHistoryTo(localDateTime(today));
-        fetchHistory(employee, localDateTime(startOfToday), localDateTime(today));
-    };
-
-    const clearHistory = () => {
-        setHistoryEmployee(null);
-        setHistoryPoints([]);
-        setSelectedHistoryPoint(null);
-        setHistoryError("");
-        window.setTimeout(() => fitPoints(employees), 0);
-    };
-
-    const historyCoordinates = useMemo(
-        () => historyPoints.map((point) => ({
-            lat: Number(point.latitude),
-            lng: Number(point.longitude),
-        })),
-        [historyPoints],
+        },
+        [basePath, fitCoordinates, map]
     );
+
+    // Click on an Employee Avatar
+    const handleEmployeeSelect = (employee) => {
+        setSelectedEmployee(employee);
+        const todayStr = toDateInputValue(new Date());
+        setSelectedDate(todayStr);
+        setDateFilterMode("today");
+        fetchEmployeeHistory(employee, todayStr);
+    };
+
+    // Day Filter Buttons: Today, Yesterday, Custom Date
+    const handleSetDayFilter = (mode, customDate = null) => {
+        if (!selectedEmployee) return;
+        setDateFilterMode(mode);
+
+        let targetDay = selectedDate;
+        if (mode === "today") {
+            targetDay = toDateInputValue(new Date());
+        } else if (mode === "yesterday") {
+            const y = new Date();
+            y.setDate(y.getDate() - 1);
+            targetDay = toDateInputValue(y);
+        } else if (customDate) {
+            targetDay = customDate;
+        }
+
+        setSelectedDate(targetDay);
+        fetchEmployeeHistory(selectedEmployee, targetDay);
+    };
+
+    // Close History view and return to full map
+    const handleCloseHistory = () => {
+        setSelectedEmployee(null);
+        setHistoryPoints([]);
+        setRoutePath([]);
+        setRouteMetrics(null);
+        setSelectedCheckpoint(null);
+        setIsPlaying(false);
+        fitAllEmployees();
+    };
+
+    // Playback Route Animation
+    useEffect(() => {
+        if (!isPlaying || historyPoints.length === 0) return;
+
+        playbackTimer.current = window.setInterval(() => {
+            setPlaybackIndex((prev) => {
+                const next = (prev + 1) % historyPoints.length;
+                const point = historyPoints[next];
+                if (point && map) {
+                    map.panTo({ lat: Number(point.latitude), lng: Number(point.longitude) });
+                }
+                setSelectedCheckpoint(point);
+                return next;
+            });
+        }, 1800);
+
+        return () => window.clearInterval(playbackTimer.current);
+    }, [isPlaying, historyPoints, map]);
 
     return (
         <AuthenticatedLayout>
-            <section className="relative h-full min-h-0 w-full overflow-hidden bg-slate-100">
+            <section className="relative h-full min-h-0 w-full overflow-hidden bg-slate-100 font-sans">
+                {/* Google Map Viewport */}
                 {isLoaded && (
                     <GoogleMap
                         mapContainerStyle={mapContainerStyle}
                         center={defaultCenter}
-                        zoom={5}
-                        options={{ ...mapOptions, mapTypeId: mapType }}
+                        zoom={6}
+                        options={{
+                            clickableIcons: false,
+                            fullscreenControl: false,
+                            mapTypeControl: false,
+                            streetViewControl: false,
+                            zoomControl: false,
+                            gestureHandling: "greedy",
+                            styles: activeTheme === "snap" ? snapMapStyles : undefined,
+                        }}
                         onLoad={setMap}
                         onUnmount={() => setMap(null)}
                     >
-                        {!historyEmployee && (
-                            <MarkerClustererF options={{ gridSize: 48, minimumClusterSize: 2 }}>
-                                {(clusterer) => (
-                                    <>
-                                        {visibleEmployees.map((employee) => {
-                                            const position = {
-                                                lat: Number(employee.latitude),
-                                                lng: Number(employee.longitude),
-                                            };
-                                            return (
-                                                <MarkerF
-                                                    key={employee.employeeId}
-                                                    position={position}
-                                                    clusterer={clusterer}
-                                                    icon={markerIcon(employee)}
-                                                    title={employee.name}
-                                                    label={{
-                                                        text: `${employee.name} · ${relativeTime(employee.capturedAt)}`,
-                                                        className: "employee-location-label",
-                                                    }}
-                                                    onClick={() => setSelectedEmployee(employee)}
-                                                />
-                                            );
-                                        })}
-                                    </>
-                                )}
-                            </MarkerClustererF>
-                        )}
+                        {/* 1. Snap Map Avatar Markers (When in Live Map mode or unselected) */}
+                        {!selectedEmployee &&
+                            visibleEmployees.map((emp) => {
+                                const isNow = relativeTimeSnap(emp.capturedAt) === "now";
+                                const isOnline = emp.status === "Recently updated";
+                                const timeBadge = relativeTimeSnap(emp.capturedAt);
+                                const firstName = (emp.name || "Employee").split(" ")[0];
 
-                        {historyEmployee && historyPoints.length > 1 && (
+                                return (
+                                    <OverlayViewF
+                                        key={emp.employeeId}
+                                        position={{ lat: Number(emp.latitude), lng: Number(emp.longitude) }}
+                                        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                                        getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -h })}
+                                    >
+                                        <div
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleEmployeeSelect(emp);
+                                            }}
+                                            className="group relative flex flex-col items-center cursor-pointer select-none transition-all duration-200 hover:scale-110 hover:z-30 active:scale-95"
+                                            style={{ transformOrigin: "bottom center" }}
+                                            title={`${emp.name} (${emp.employeeId}) - Click for Location History`}
+                                        >
+                                            {/* Snapchat Avatar Circle with Bitmoji glow */}
+                                            <div className="relative">
+                                                <div className="relative h-13 w-13 rounded-full p-0.5 bg-white shadow-xl ring-2 ring-white/95 group-hover:ring-4 group-hover:ring-indigo-400 transition-all duration-200">
+                                                    {emp.profileImage ? (
+                                                        <img
+                                                            src={emp.profileImage}
+                                                            alt={emp.name}
+                                                            className="h-full w-full rounded-full object-cover bg-slate-100"
+                                                            onError={(e) => {
+                                                                e.currentTarget.onerror = null;
+                                                                e.currentTarget.src = "/images/profileimg.png";
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <div
+                                                            className={`h-full w-full rounded-full flex items-center justify-center font-bold text-white text-sm bg-gradient-to-tr ${getAvatarGradient(
+                                                                emp.name
+                                                            )}`}
+                                                        >
+                                                            {getAvatarInitials(emp.name)}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Live Status Pulse */}
+                                                {isOnline && (
+                                                    <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                        <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white"></span>
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Snapchat Snap Map Pill Badge: Name & relative time */}
+                                            <div className="mt-1 flex items-center gap-1.5 px-3 py-1 bg-white/95 backdrop-blur-md rounded-full shadow-lg border border-slate-200/90 text-xs text-slate-800 whitespace-nowrap group-hover:border-indigo-400 group-hover:shadow-indigo-100 transition-all duration-150">
+                                                <span className="font-bold text-slate-900 tracking-tight">{firstName}</span>
+                                                <span
+                                                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
+                                                        isNow
+                                                            ? "bg-emerald-50 text-emerald-600"
+                                                            : "bg-slate-100 text-slate-500"
+                                                    }`}
+                                                >
+                                                    {timeBadge}
+                                                </span>
+                                            </div>
+
+                                            {/* Pointer Tick */}
+                                            <div className="w-2 h-2 bg-white rotate-45 -mt-1 shadow-sm border-r border-b border-slate-200/80"></div>
+                                        </div>
+                                    </OverlayViewF>
+                                );
+                            })}
+
+                        {/* 2. Route Polyline (Road Path via OpenRouteService) */}
+                        {selectedEmployee && routePath.length > 1 && (
                             <PolylineF
-                                path={historyCoordinates}
+                                path={routePath}
                                 options={{
                                     geodesic: true,
                                     strokeColor: "#4f46e5",
-                                    strokeOpacity: 0.85,
-                                    strokeWeight: 4,
+                                    strokeOpacity: 0.9,
+                                    strokeWeight: 5,
+                                    icons: [
+                                        {
+                                            icon: {
+                                                path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                                                scale: 2.5,
+                                                fillColor: "#ffffff",
+                                                fillOpacity: 1,
+                                                strokeColor: "#312e81",
+                                                strokeWeight: 1.5,
+                                            },
+                                            offset: "50%",
+                                            repeat: "120px",
+                                        },
+                                    ],
                                 }}
                             />
                         )}
 
-                        {historyEmployee && historyPoints.map((point, index) => (
+                        {/* 3. Start Point Marker */}
+                        {selectedEmployee && historyPoints.length > 0 && (
                             <MarkerF
-                                key={`${point.capturedAt}-${index}`}
-                                position={{ lat: Number(point.latitude), lng: Number(point.longitude) }}
-                                label={{ text: String(index + 1), color: "#fff", fontWeight: "700" }}
+                                position={{
+                                    lat: Number(historyPoints[0].latitude),
+                                    lng: Number(historyPoints[0].longitude),
+                                }}
+                                title={`Start: ${formatTimeString(historyPoints[0].capturedAt)}`}
+                                label={{
+                                    text: "START",
+                                    color: "#ffffff",
+                                    fontWeight: "800",
+                                    fontSize: "10px",
+                                    className: "snap-marker-label",
+                                }}
                                 icon={{
                                     path: window.google.maps.SymbolPath.CIRCLE,
-                                    scale: 13,
-                                    fillColor: "#4f46e5",
+                                    scale: 14,
+                                    fillColor: "#10b981",
                                     fillOpacity: 1,
-                                    strokeColor: "#fff",
-                                    strokeWeight: 2,
+                                    strokeColor: "#ffffff",
+                                    strokeWeight: 3,
                                 }}
-                                onClick={() => setSelectedHistoryPoint(point)}
+                                onClick={() => setSelectedCheckpoint(historyPoints[0])}
                             />
-                        ))}
+                        )}
 
-                        {selectedEmployee && !historyEmployee && (
-                            <InfoWindowF
-                                position={{ lat: Number(selectedEmployee.latitude), lng: Number(selectedEmployee.longitude) }}
-                                onCloseClick={() => setSelectedEmployee(null)}
+                        {/* 4. Intermediate Checkpoint Markers */}
+                        {selectedEmployee &&
+                            historyPoints.slice(1, -1).map((point, idx) => (
+                                <MarkerF
+                                    key={`${point.capturedAt}-${idx}`}
+                                    position={{ lat: Number(point.latitude), lng: Number(point.longitude) }}
+                                    label={{
+                                        text: String(idx + 2),
+                                        color: "#ffffff",
+                                        fontWeight: "700",
+                                        fontSize: "11px",
+                                    }}
+                                    icon={{
+                                        path: window.google.maps.SymbolPath.CIRCLE,
+                                        scale: 10,
+                                        fillColor: "#6366f1",
+                                        fillOpacity: 0.95,
+                                        strokeColor: "#ffffff",
+                                        strokeWeight: 2,
+                                    }}
+                                    onClick={() => setSelectedCheckpoint(point)}
+                                />
+                            ))}
+
+                        {/* 5. End / Current Position Avatar Marker for Selected Employee */}
+                        {selectedEmployee && historyPoints.length > 1 && (
+                            <OverlayViewF
+                                position={{
+                                    lat: Number(historyPoints[historyPoints.length - 1].latitude),
+                                    lng: Number(historyPoints[historyPoints.length - 1].longitude),
+                                }}
+                                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                                getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -h })}
                             >
-                                <div className="w-[260px] p-1 text-slate-800">
-                                    <div className="flex items-center gap-3">
+                                <div
+                                    className="flex flex-col items-center cursor-pointer select-none"
+                                    onClick={() => setSelectedCheckpoint(historyPoints[historyPoints.length - 1])}
+                                >
+                                    <div className="relative h-12 w-12 rounded-full p-0.5 bg-white shadow-xl ring-4 ring-rose-500">
                                         <img
                                             src={selectedEmployee.profileImage || "/images/profileimg.png"}
                                             alt=""
-                                            className="h-11 w-11 rounded-full border border-slate-200 object-cover"
-                                            onError={(event) => { event.currentTarget.src = "/images/profileimg.png"; }}
+                                            className="h-full w-full rounded-full object-cover"
+                                            onError={(e) => {
+                                                e.currentTarget.src = "/images/profileimg.png";
+                                            }}
                                         />
-                                        <div className="min-w-0">
-                                            <p className="truncate text-sm font-bold">{selectedEmployee.name}</p>
-                                            <p className="text-xs text-slate-500">{selectedEmployee.employeeId}</p>
-                                        </div>
                                     </div>
-                                    <div className="mt-3 space-y-1.5 text-xs">
-                                        <p><span className="font-semibold">Designation:</span> {selectedEmployee.designation || "Not specified"}</p>
-                                        <p><span className="font-semibold">Department:</span> {selectedEmployee.department || "Not specified"}</p>
-                                        <p><span className="font-semibold">Coordinates:</span> {Number(selectedEmployee.latitude).toFixed(6)}, {Number(selectedEmployee.longitude).toFixed(6)}</p>
-                                        <p><span className="font-semibold">Updated:</span> {new Date(selectedEmployee.capturedAt).toLocaleString()}</p>
-                                        <p><span className="font-semibold">Accuracy:</span> {selectedEmployee.accuracy == null ? "Not reported" : `${selectedEmployee.accuracy} m`}</p>
-                                        <p className="flex items-center gap-1.5">
-                                            <span className={`h-2 w-2 rounded-full ${statusColor(selectedEmployee.status)}`} />
-                                            {selectedEmployee.status}
-                                        </p>
+                                    <div className="mt-1 px-2.5 py-0.5 bg-rose-600 text-white rounded-full text-[10px] font-bold shadow-md">
+                                        LATEST STOP · {formatTimeString(historyPoints[historyPoints.length - 1].capturedAt)}
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => showHistory(selectedEmployee)}
-                                        className="mt-3 w-full rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
-                                    >
-                                        View location history
-                                    </button>
                                 </div>
-                            </InfoWindowF>
+                            </OverlayViewF>
                         )}
 
-                        {selectedHistoryPoint && historyEmployee && (
+                        {/* Checkpoint Detail InfoWindow */}
+                        {selectedCheckpoint && (
                             <InfoWindowF
                                 position={{
-                                    lat: Number(selectedHistoryPoint.latitude),
-                                    lng: Number(selectedHistoryPoint.longitude),
+                                    lat: Number(selectedCheckpoint.latitude),
+                                    lng: Number(selectedCheckpoint.longitude),
                                 }}
-                                onCloseClick={() => setSelectedHistoryPoint(null)}
+                                onCloseClick={() => setSelectedCheckpoint(null)}
                             >
-                                <div className="p-1 text-sm text-slate-800">
-                                    <p className="font-semibold">{historyEmployee.name}</p>
-                                    <p className="mt-1 text-xs">{new Date(selectedHistoryPoint.capturedAt).toLocaleString()}</p>
-                                    <p className="mt-1 text-xs">
-                                        {Number(selectedHistoryPoint.latitude).toFixed(6)}, {Number(selectedHistoryPoint.longitude).toFixed(6)}
+                                <div className="p-1 min-w-[190px] text-slate-800 font-sans">
+                                    <p className="font-bold text-xs text-indigo-700 flex items-center gap-1.5">
+                                        <FaMapMarkerAlt /> Checkpoint Pin
                                     </p>
+                                    <p className="mt-1 text-xs font-semibold text-slate-900">
+                                        Time: {new Date(selectedCheckpoint.capturedAt).toLocaleTimeString()}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500">
+                                        GPS: {Number(selectedCheckpoint.latitude).toFixed(6)},{" "}
+                                        {Number(selectedCheckpoint.longitude).toFixed(6)}
+                                    </p>
+                                    {selectedCheckpoint.accuracy != null && (
+                                        <p className="text-[11px] text-slate-500">
+                                            Accuracy: ±{Math.round(selectedCheckpoint.accuracy)}m
+                                        </p>
+                                    )}
                                 </div>
                             </InfoWindowF>
                         )}
                     </GoogleMap>
                 )}
 
+                {/* Map Loading / Error Fallback */}
                 {(!isLoaded || loadError || !apiKey) && (
                     <div className="absolute inset-0 flex items-center justify-center bg-slate-100 px-6 text-center">
-                        <div className="max-w-md rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg">
-                            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                        <div className="max-w-md rounded-3xl border border-slate-200 bg-white/95 p-8 shadow-2xl backdrop-blur">
+                            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 text-xl">
                                 <FaLayerGroup />
                             </div>
-                            <h2 className="text-sm font-bold text-slate-900">Map unavailable</h2>
+                            <h2 className="text-base font-bold text-slate-900">Snap Map Initializing</h2>
                             <p className="mt-2 text-sm text-slate-600">
                                 {!apiKey
-                                    ? "Configure VITE_GOOGLE_MAPS_API_KEY with a restricted browser key to display the employee map."
+                                    ? "Please ensure VITE_GOOGLE_MAPS_API_KEY is configured in .env."
                                     : loadError
-                                        ? "Google Maps could not be loaded. Check the map key and network connection."
-                                        : "Loading map…"}
+                                    ? "Google Maps connection error. Check key restrictions or internet connection."
+                                    : "Loading map engine…"}
                             </p>
                         </div>
                     </div>
                 )}
 
-                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-wrap items-start justify-between gap-3 p-3 sm:p-4">
-                    <div className="pointer-events-auto w-full max-w-[min(100%,420px)] rounded-xl border border-slate-200 bg-white/95 p-2 shadow-lg backdrop-blur sm:w-auto">
-                        {historyEmployee ? (
-                            <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={clearHistory}
-                                    className="flex h-9 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                                >
-                                    <FaTimes className="text-xs" /> Latest locations
-                                </button>
-                                <span className="hidden h-6 border-l border-slate-200 sm:block" />
-                                <span className="max-w-[140px] truncate text-xs font-semibold text-slate-700">{historyEmployee.name}</span>
-                                <input
-                                    aria-label="History start date"
-                                    type="datetime-local"
-                                    value={historyFrom}
-                                    max={historyTo}
-                                    onChange={(event) => setHistoryFrom(event.target.value)}
-                                    className="h-9 rounded-lg border-slate-200 py-1 text-xs"
-                                />
-                                <input
-                                    aria-label="History end date"
-                                    type="datetime-local"
-                                    value={historyTo}
-                                    min={historyFrom}
-                                    onChange={(event) => setHistoryTo(event.target.value)}
-                                    className="h-9 rounded-lg border-slate-200 py-1 text-xs"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => fetchHistory(historyEmployee, historyFrom, historyTo)}
-                                    className="h-9 rounded-lg bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-700"
-                                >
-                                    Show
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-2">
-                                <FaSearch className="ml-1 shrink-0 text-slate-400" />
+                {/* TOP BAR CONTROLS */}
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-wrap items-start justify-between gap-3 p-3 sm:p-4">
+                    {/* Search & Filter Pills */}
+                    {!selectedEmployee && (
+                        <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
+                            <div className="flex items-center gap-2 px-2.5">
+                                <FaSearch className="text-slate-400 text-xs" />
                                 <input
                                     type="search"
                                     value={search}
-                                    onChange={(event) => setSearch(event.target.value)}
-                                    placeholder="Search employee or ID"
-                                    aria-label="Search employee or employee ID"
-                                    className="h-9 min-w-0 flex-1 border-0 bg-transparent px-1 text-sm outline-none ring-0 placeholder:text-slate-400 focus:ring-0 sm:w-48"
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search employee..."
+                                    className="h-8 w-36 sm:w-48 border-0 bg-transparent p-0 text-xs font-medium outline-none placeholder:text-slate-400 focus:ring-0"
                                 />
+                            </div>
+
+                            {departments.length > 0 && (
                                 <select
                                     value={department}
-                                    onChange={(event) => setDepartment(event.target.value)}
-                                    aria-label="Filter by department"
-                                    className="h-9 max-w-32 rounded-lg border-slate-200 py-1 text-xs text-slate-600"
+                                    onChange={(e) => setDepartment(e.target.value)}
+                                    className="h-8 rounded-xl border-slate-200/80 bg-slate-50/80 px-2.5 py-0 text-xs font-medium text-slate-700 outline-none hover:bg-slate-100"
                                 >
-                                    <option value="">All departments</option>
-                                    {departments.map((name) => <option key={name} value={name}>{name}</option>)}
+                                    <option value="">All Departments</option>
+                                    {departments.map((d) => (
+                                        <option key={d} value={d}>
+                                            {d}
+                                        </option>
+                                    ))}
                                 </select>
-                                <select
-                                    value={status}
-                                    onChange={(event) => setStatus(event.target.value)}
-                                    aria-label="Filter by reporting status"
-                                    className="hidden h-9 max-w-36 rounded-lg border-slate-200 py-1 text-xs text-slate-600 sm:block"
-                                >
-                                    <option value="">All statuses</option>
-                                    <option>Recently updated</option>
-                                    <option>Stale</option>
-                                    <option>Offline / not reporting</option>
-                                </select>
-                            </div>
-                        )}
-                    </div>
+                            )}
 
-                    <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-1.5 rounded-xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur">
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="hidden sm:block h-8 rounded-xl border-slate-200/80 bg-slate-50/80 px-2.5 py-0 text-xs font-medium text-slate-700 outline-none hover:bg-slate-100"
+                            >
+                                <option value="">All Statuses</option>
+                                <option value="Recently updated">Live Now</option>
+                                <option value="Stale">Stale</option>
+                                <option value="Offline / not reporting">Offline</option>
+                            </select>
+                        </div>
+                    )}
+
+                    {/* Active Employee Selected Indicator (Header in History mode) */}
+                    {selectedEmployee && (
+                        <div className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-indigo-200 bg-white/95 px-3 py-1.5 shadow-xl backdrop-blur-md">
+                            <button
+                                type="button"
+                                onClick={handleCloseHistory}
+                                className="flex h-8 items-center gap-1.5 rounded-xl bg-slate-100 px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition"
+                            >
+                                <FaChevronLeft className="text-[10px]" /> Exit History
+                            </button>
+                            <span className="h-4 border-l border-slate-200"></span>
+                            <span className="text-xs font-bold text-indigo-900 truncate max-w-[150px]">
+                                {selectedEmployee.name}
+                            </span>
+                            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600">
+                                {formatDateDisplay(selectedDate)}
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Right Tools: Fit All, Refresh, Zoom, Basemap Themes */}
+                    <div className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-xl backdrop-blur-md">
                         <button
                             type="button"
-                            aria-label="Fit all employees"
-                            title="Fit all employees"
-                            onClick={historyEmployee ? () => fitPoints(historyPoints) : fitAll}
-                            className="flex h-9 items-center gap-2 rounded-lg px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            title="Fit all on screen"
+                            onClick={selectedEmployee ? () => fitCoordinates(routePath) : fitAllEmployees}
+                            className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition"
                         >
-                            <FaMapMarkerAlt /> <span className="hidden sm:inline">Fit all</span>
+                            <FaCrosshairs className="text-xs text-indigo-600" />
+                            <span className="hidden sm:inline">Fit All</span>
                         </button>
+
                         <button
                             type="button"
-                            aria-label="Refresh employee locations"
                             title="Refresh employee locations"
-                            onClick={() => loadLocations(true)}
-                            disabled={refreshing}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                            onClick={() => (selectedEmployee ? fetchEmployeeHistory(selectedEmployee, selectedDate) : loadLocations(true))}
+                            disabled={refreshing || historyLoading}
+                            className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition"
                         >
-                            <FaRedoAlt className={refreshing ? "animate-spin" : ""} />
+                            <FaRedoAlt className={`text-xs ${refreshing || historyLoading ? "animate-spin text-indigo-600" : ""}`} />
                         </button>
-                        <span className="mx-0.5 h-6 border-l border-slate-200" />
-                        <button type="button" aria-label="Zoom in" onClick={() => map?.setZoom((map.getZoom() || 5) + 1)} className="h-9 w-9 rounded-lg text-slate-700 hover:bg-slate-100">
-                            <FaPlus className="mx-auto" />
-                        </button>
-                        <button type="button" aria-label="Zoom out" onClick={() => map?.setZoom((map.getZoom() || 5) - 1)} className="h-9 w-9 rounded-lg text-slate-700 hover:bg-slate-100">
-                            <FaMinus className="mx-auto" />
+
+                        <span className="h-4 border-l border-slate-200"></span>
+
+                        <button
+                            type="button"
+                            title="Zoom In"
+                            onClick={() => map?.setZoom((map.getZoom() || 6) + 1)}
+                            className="h-8 w-8 rounded-xl text-slate-700 hover:bg-slate-100 flex items-center justify-center transition"
+                        >
+                            <FaPlus className="text-xs" />
                         </button>
                         <button
                             type="button"
-                            aria-label="Switch map layer"
-                            title={mapType === "roadmap" ? "Switch to satellite" : "Switch to road map"}
-                            onClick={() => setMapType((current) => current === "roadmap" ? "satellite" : "roadmap")}
-                            className="h-9 w-9 rounded-lg text-slate-700 hover:bg-slate-100"
+                            title="Zoom Out"
+                            onClick={() => map?.setZoom((map.getZoom() || 6) - 1)}
+                            className="h-8 w-8 rounded-xl text-slate-700 hover:bg-slate-100 flex items-center justify-center transition"
                         >
-                            <FaLayerGroup className="mx-auto" />
+                            <FaMinus className="text-xs" />
                         </button>
+
+                        {/* Basemap Switcher Dropdown */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                title="Switch Map Theme (Snap Map, Carto, Mapbox, Satellite)"
+                                onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+                                className={`h-8 px-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${
+                                    activeTheme === "snap"
+                                        ? "bg-amber-100 text-amber-800"
+                                        : activeTheme === "carto"
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : activeTheme === "mapbox"
+                                        ? "bg-blue-100 text-blue-800"
+                                        : "bg-slate-100 text-slate-800"
+                                }`}
+                            >
+                                <FaLayerGroup className="text-xs" />
+                                <span className="hidden md:inline capitalize">{activeTheme === "snap" ? "Snap Map" : activeTheme}</span>
+                            </button>
+
+                            {themeMenuOpen && (
+                                <div className="absolute right-0 mt-2 w-48 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl z-50">
+                                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+                                        Map Themes & Basemaps
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveTheme("snap");
+                                            setThemeMenuOpen(false);
+                                        }}
+                                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold ${
+                                            activeTheme === "snap" ? "bg-amber-50 text-amber-900" : "text-slate-700 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        <span>🌟 Snap Map Pastel</span>
+                                        {activeTheme === "snap" && <FaCheck className="text-amber-600 text-xs" />}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveTheme("carto");
+                                            setThemeMenuOpen(false);
+                                        }}
+                                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold ${
+                                            activeTheme === "carto" ? "bg-emerald-50 text-emerald-900" : "text-slate-700 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        <span>🗺️ Carto Voyager</span>
+                                        {activeTheme === "carto" && <FaCheck className="text-emerald-600 text-xs" />}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveTheme("mapbox");
+                                            setThemeMenuOpen(false);
+                                        }}
+                                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold ${
+                                            activeTheme === "mapbox" ? "bg-blue-50 text-blue-900" : "text-slate-700 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        <span>🛣️ Mapbox Streets</span>
+                                        {activeTheme === "mapbox" && <FaCheck className="text-blue-600 text-xs" />}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveTheme("satellite");
+                                            setThemeMenuOpen(false);
+                                        }}
+                                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold ${
+                                            activeTheme === "satellite" ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        <span>🛰️ Satellite Hybrid</span>
+                                        {activeTheme === "satellite" && <FaCheck className="text-slate-700 text-xs" />}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveTheme("roadmap");
+                                            setThemeMenuOpen(false);
+                                        }}
+                                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold ${
+                                            activeTheme === "roadmap" ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        <span>📍 Google Roadmap</span>
+                                        {activeTheme === "roadmap" && <FaCheck className="text-slate-700 text-xs" />}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                <div className="pointer-events-none absolute bottom-4 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-md backdrop-blur sm:left-4">
-                    <span className="font-semibold text-slate-800">
-                        {historyEmployee
-                            ? `${historyPoints.length} history points`
-                            : `${visibleEmployees.length} of ${employees.length} located`}
-                    </span>
-                    {historyLoading && <span className="text-indigo-600">Loading history…</span>}
-                    {loading && !historyEmployee && <span className="text-indigo-600">Loading locations…</span>}
-                    {lastUpdated && !historyEmployee && (
-                        <span className="hidden border-l border-slate-200 pl-2 sm:inline">
-                            Updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                {/* SNAP MAP LOCATION HISTORY DRAWER / SIDEBAR (When employee avatar is clicked) */}
+                {selectedEmployee && (
+                    <div className="absolute top-16 left-3 sm:left-4 bottom-4 z-20 w-[calc(100%-1.5rem)] sm:w-[380px] max-w-full flex flex-col rounded-3xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-xl overflow-hidden animate-in slide-in-from-left-4 duration-200">
+                        {/* Header: Employee Snapshot Card */}
+                        <div className="relative p-4 bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 text-white">
+                            <button
+                                type="button"
+                                onClick={handleCloseHistory}
+                                className="absolute top-3.5 right-3.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition"
+                                title="Close & back to live map"
+                            >
+                                <FaTimes className="text-xs" />
+                            </button>
+
+                            <div className="flex items-center gap-3">
+                                <div className="relative h-14 w-14 rounded-full p-0.5 bg-white shadow-lg">
+                                    {selectedEmployee.profileImage ? (
+                                        <img
+                                            src={selectedEmployee.profileImage}
+                                            alt={selectedEmployee.name}
+                                            className="h-full w-full rounded-full object-cover"
+                                            onError={(e) => {
+                                                e.currentTarget.onerror = null;
+                                                e.currentTarget.src = "/images/profileimg.png";
+                                            }}
+                                        />
+                                    ) : (
+                                        <div
+                                            className={`h-full w-full rounded-full flex items-center justify-center font-bold text-white text-lg bg-gradient-to-tr ${getAvatarGradient(
+                                                selectedEmployee.name
+                                            )}`}
+                                        >
+                                            {getAvatarInitials(selectedEmployee.name)}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-base font-extrabold truncate leading-tight">
+                                        {selectedEmployee.name}
+                                    </h3>
+                                    <p className="text-xs text-indigo-200 font-mono mt-0.5">
+                                        {selectedEmployee.employeeId}
+                                    </p>
+                                    <p className="text-[11px] text-indigo-100 truncate mt-0.5">
+                                        {selectedEmployee.designation !== "Not specified"
+                                            ? selectedEmployee.designation
+                                            : selectedEmployee.department}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* DAY FILTERS: "today", "yesterday", "date fill like that" */}
+                        <div className="p-3 border-b border-slate-100 bg-slate-50/70">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                    <FaCalendarDay className="text-indigo-600 text-xs" /> Location Day Filter
+                                </span>
+                                <span className="text-[11px] font-semibold text-indigo-600">
+                                    {formatDateDisplay(selectedDate)}
+                                </span>
+                            </div>
+
+                            {/* Quick Day Filter Buttons */}
+                            <div className="grid grid-cols-3 gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => handleSetDayFilter("today")}
+                                    className={`py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 ${
+                                        dateFilterMode === "today"
+                                            ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+                                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                                    }`}
+                                >
+                                    <span>☀️</span> Today
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleSetDayFilter("yesterday")}
+                                    className={`py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 ${
+                                        dateFilterMode === "yesterday"
+                                            ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+                                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                                    }`}
+                                >
+                                    <span>⏪</span> Yesterday
+                                </button>
+
+                                {/* Date Input: "date fill like that" */}
+                                <label
+                                    className={`relative py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                                        dateFilterMode === "custom"
+                                            ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+                                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                                    }`}
+                                >
+                                    <span>📅</span> Pick Date
+                                    <input
+                                        type="date"
+                                        value={selectedDate}
+                                        max={toDateInputValue(new Date())}
+                                        onChange={(e) => {
+                                            if (e.target.value) {
+                                                handleSetDayFilter("custom", e.target.value);
+                                            }
+                                        }}
+                                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                    />
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* ROUTE METRICS (Distance, Travel Time, Checkpoints) */}
+                        <div className="p-3 bg-white border-b border-slate-100">
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                                <div className="rounded-2xl bg-indigo-50/70 p-2 border border-indigo-100">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">
+                                        Distance
+                                    </p>
+                                    <p className="text-sm font-extrabold text-indigo-900 mt-0.5">
+                                        {routeMetrics?.distanceKm != null
+                                            ? `${routeMetrics.distanceKm} km`
+                                            : historyPoints.length > 1
+                                            ? "Calculated"
+                                            : "0 km"}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl bg-emerald-50/70 p-2 border border-emerald-100">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                                        Points
+                                    </p>
+                                    <p className="text-sm font-extrabold text-emerald-900 mt-0.5">
+                                        {historyPoints.length}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl bg-amber-50/70 p-2 border border-amber-100">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">
+                                        Duration
+                                    </p>
+                                    <p className="text-sm font-extrabold text-amber-900 mt-0.5">
+                                        {routeMetrics?.durationMinutes != null
+                                            ? `${routeMetrics.durationMinutes} min`
+                                            : historyPoints.length >= 2
+                                            ? `${Math.round(
+                                                  (new Date(historyPoints[historyPoints.length - 1].capturedAt) -
+                                                      new Date(historyPoints[0].capturedAt)) /
+                                                      60000
+                                              )} min`
+                                            : "0 min"}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Playback & Step Controls */}
+                            {historyPoints.length > 1 && (
+                                <div className="mt-2.5 flex items-center justify-between gap-2 rounded-2xl bg-slate-50 p-1.5 border border-slate-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsPlaying(!isPlaying)}
+                                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1 text-xs font-bold transition ${
+                                            isPlaying
+                                                ? "bg-amber-500 text-white shadow-sm"
+                                                : "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
+                                        }`}
+                                    >
+                                        {isPlaying ? <FaPause className="text-[10px]" /> : <FaPlay className="text-[10px]" />}
+                                        <span>{isPlaying ? "Pause" : "Play Route"}</span>
+                                    </button>
+
+                                    <span className="text-[11px] font-semibold text-slate-500">
+                                        Step {playbackIndex + 1} of {historyPoints.length}
+                                    </span>
+
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            disabled={playbackIndex <= 0}
+                                            onClick={() => {
+                                                const prev = Math.max(0, playbackIndex - 1);
+                                                setPlaybackIndex(prev);
+                                                setSelectedCheckpoint(historyPoints[prev]);
+                                                map?.panTo({
+                                                    lat: Number(historyPoints[prev].latitude),
+                                                    lng: Number(historyPoints[prev].longitude),
+                                                });
+                                            }}
+                                            className="h-7 w-7 rounded-lg bg-white border border-slate-200 text-slate-700 disabled:opacity-40 flex items-center justify-center hover:bg-slate-100"
+                                        >
+                                            <FaChevronLeft className="text-[10px]" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={playbackIndex >= historyPoints.length - 1}
+                                            onClick={() => {
+                                                const next = Math.min(historyPoints.length - 1, playbackIndex + 1);
+                                                setPlaybackIndex(next);
+                                                setSelectedCheckpoint(historyPoints[next]);
+                                                map?.panTo({
+                                                    lat: Number(historyPoints[next].latitude),
+                                                    lng: Number(historyPoints[next].longitude),
+                                                });
+                                            }}
+                                            className="h-7 w-7 rounded-lg bg-white border border-slate-200 text-slate-700 disabled:opacity-40 flex items-center justify-center hover:bg-slate-100"
+                                        >
+                                            <FaChevronRight className="text-[10px]" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Checkpoints Timeline List */}
+                        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+                            {historyLoading && (
+                                <div className="py-12 text-center">
+                                    <FaRedoAlt className="animate-spin mx-auto text-xl text-indigo-600 mb-2" />
+                                    <p className="text-xs font-semibold text-slate-600">Loading location history…</p>
+                                </div>
+                            )}
+
+                            {!historyLoading && historyPoints.length === 0 && (
+                                <div className="py-12 text-center px-4">
+                                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                                        <FaRoute />
+                                    </div>
+                                    <p className="text-xs font-bold text-slate-800">No recorded movements</p>
+                                    <p className="mt-1 text-[11px] text-slate-500">
+                                        No GPS location points were recorded for {formatDateDisplay(selectedDate)}. Try selecting another date above.
+                                    </p>
+                                </div>
+                            )}
+
+                            {!historyLoading &&
+                                historyPoints.map((point, index) => {
+                                    const isStart = index === 0;
+                                    const isEnd = index === historyPoints.length - 1 && historyPoints.length > 1;
+                                    const isSelected = selectedCheckpoint === point;
+
+                                    return (
+                                        <div
+                                            key={`${point.capturedAt}-${index}`}
+                                            onClick={() => {
+                                                setSelectedCheckpoint(point);
+                                                setPlaybackIndex(index);
+                                                map?.panTo({
+                                                    lat: Number(point.latitude),
+                                                    lng: Number(point.longitude),
+                                                });
+                                                map?.setZoom(16);
+                                            }}
+                                            className={`group flex items-center justify-between p-2.5 rounded-2xl cursor-pointer border transition-all duration-150 ${
+                                                isSelected
+                                                    ? "bg-indigo-50/90 border-indigo-400 shadow-sm"
+                                                    : "bg-white hover:bg-slate-50 border-slate-200/80"
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <div
+                                                    className={`h-7 w-7 rounded-xl flex items-center justify-center text-xs font-extrabold ${
+                                                        isStart
+                                                            ? "bg-emerald-500 text-white"
+                                                            : isEnd
+                                                            ? "bg-rose-500 text-white"
+                                                            : "bg-indigo-100 text-indigo-700"
+                                                    }`}
+                                                >
+                                                    {isStart ? "S" : isEnd ? "E" : index + 1}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs font-bold text-slate-800 truncate">
+                                                        {formatTimeString(point.capturedAt)}
+                                                        {isStart && (
+                                                            <span className="ml-1.5 text-[10px] text-emerald-600 font-semibold">
+                                                                · Start Point
+                                                            </span>
+                                                        )}
+                                                        {isEnd && (
+                                                            <span className="ml-1.5 text-[10px] text-rose-600 font-semibold">
+                                                                · Latest Stop
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-400 font-mono truncate">
+                                                        {Number(point.latitude).toFixed(4)}, {Number(point.longitude).toFixed(4)}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="text-right shrink-0">
+                                                <span className="text-[10px] font-semibold text-slate-400 group-hover:text-indigo-600 transition">
+                                                    Focus →
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                        </div>
+
+                        {/* Footer Status */}
+                        <div className="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                            <span>OpenRouteService · Mapbox</span>
+                            <button
+                                type="button"
+                                onClick={handleCloseHistory}
+                                className="font-bold text-indigo-600 hover:text-indigo-800"
+                            >
+                                Back to All Employees
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* BOTTOM STATUS BAR (When in Live Map mode) */}
+                {!selectedEmployee && (
+                    <div className="pointer-events-none absolute bottom-4 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-full border border-slate-200/90 bg-white/95 px-3.5 py-2 text-xs text-slate-600 shadow-xl backdrop-blur-md sm:left-4">
+                        <span className="font-bold text-slate-900">
+                            {visibleEmployees.length} of {employees.length} Located
                         </span>
-                    )}
-                    {employees.length === 0 && !loading && !error && !historyEmployee && (
-                        <span>No employee locations have been reported.</span>
-                    )}
-                    {historyEmployee && historyPoints.length === 0 && !historyLoading && !historyError && (
-                        <span>No recorded points for this date range.</span>
-                    )}
-                    {(error || historyError) && <span className="text-rose-600">{error || historyError}</span>}
-                </div>
-                <style>{`
-                .employee-location-label {
-                    display: inline-block;
-                    max-width: 150px;
-                    overflow: hidden;
-                    padding: 3px 7px;
-                    border: 1px solid rgba(226, 232, 240, .95);
-                    border-radius: 9999px;
-                    background: rgba(255, 255, 255, .96);
-                    color: #334155;
-                    font: 600 10px/1.4 Arial, sans-serif;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                    transform: translateY(23px);
-                    box-shadow: 0 1px 4px rgba(15, 23, 42, .16);
-                }
-            `}</style>
+                        {loading && <span className="text-indigo-600 font-semibold">Syncing GPS…</span>}
+                        {lastUpdated && (
+                            <span className="hidden sm:inline border-l border-slate-200 pl-2">
+                                Auto-refreshed at{" "}
+                                {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                        )}
+                        {employees.length === 0 && !loading && !error && (
+                            <span className="text-slate-500">No active employee GPS pings reported yet.</span>
+                        )}
+                        {error && <span className="text-rose-600 font-semibold">{error}</span>}
+                    </div>
+                )}
             </section>
         </AuthenticatedLayout>
     );

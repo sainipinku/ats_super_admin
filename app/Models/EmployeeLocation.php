@@ -31,9 +31,18 @@ class EmployeeLocation extends Model
         mixed $accuracy = null,
         mixed $capturedAt = null
     ): ?self {
+        $employee = $member->employee;
+        if (!$employee && class_exists(Employee::class)) {
+            $employee = Employee::firstOrCreate(
+                ['member_id' => $member->getKey()],
+                ['uuid' => (string) \Illuminate\Support\Str::uuid()]
+            );
+            $member->setRelation('employee', $employee);
+        }
+
         if (
             (int) $member->status !== Member::STATUS_ACTIVE
-            || !$member->employee
+            || !$employee
             || !is_numeric($latitude)
             || !is_numeric($longitude)
             || $latitude < -90

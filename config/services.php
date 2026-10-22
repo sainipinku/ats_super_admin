@@ -50,4 +50,20 @@ return [
         'region' => env('REGION'),
     ],
 
+    'google' => [
+        'maps_api_key' => env('GOOGLE_MAPS_API_KEY', env('VITE_GOOGLE_MAPS_API_KEY')),
+    ],
+
+    'mapbox' => [
+        'token' => env('MAPBOX_TOKEN', env('VITE_MAPBOX_TOKEN')),
+    ],
+
+    'openrouteservice' => [
+        'api_key' => env('OPENROUTESERVICE_API_KEY', env('VITE_OPENROUTESERVICE_API_KEY')),
+    ],
+
+    'carto' => [
+        'api_key' => env('CARTO_API_KEY', env('VITE_CARTO_API_KEY')),
+    ],
+
 ];

@@ -9,6 +9,8 @@ use App\Models\Company;
 use App\Models\ConstructionVehicle;
 use App\Models\DailyProgressReport;
 use App\Models\DraftingJob;
+use App\Models\Employee;
+use App\Models\EmployeeLocation;
 use App\Models\EquipmentAllocation;
 use App\Models\ExecutionTask;
 use App\Models\ExecutionTaskAssignee;
@@ -37,6 +39,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 
 
@@ -806,11 +810,18 @@ $pendingSurveyPlans = SurveyPlan::whereHas(
             ->values()
             ->all();
 
+        $last20TasksFormatted = $dashboardTasks;
+
+        $todayTasksByProject = collect($todaysTasksList)->groupBy('project_id');
+
         $tasksByProject = $tasks->groupBy(fn ($t) => (int) ($t->project_id ?? 0));
 
         $attachTasksToProject = function (Project $project) use ($tasksByProject) {
             $projId = (int) $project->id;
+            $projTodayTasks = $todayTasksByProject->get($projId, collect())->values()->all();
+
             $projAllTasksModels = $tasksByProject->get($projId, collect());
+            $projLast20Tasks = $projAllTasksModels->take(20)->map(fn ($t) => $this->formatTaskItem($t))->values()->all();
 
             $teamMembers = $project->teamMembers
                 ? $project->teamMembers
@@ -2990,6 +3001,130 @@ $completed = SurveyPlan::whereHas(
             'success' => true,
             'data' => $this->getNotifications($member),
         ]);
+    }
+
+    /**
+     * Record Member GPS Location Ping (Every 20 minutes)
+     *
+     * Periodically tracks and updates the authenticated member's location coordinates.
+     * Supports single ping (latitude, longitude, accuracy, captured_at) or batch sync.
+     *
+     * @tags Member Dashboard & Attendance
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function recordLocation(Request $request): JsonResponse
+    {
+        $member = $request->user();
+        if (!$member instanceof Member || (int) $member->status !== Member::STATUS_ACTIVE) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An active member account is required to report location.',
+            ], 403);
+        }
+
+        $employee = $member->employee;
+        if (!$employee && class_exists(Employee::class)) {
+            $employee = Employee::firstOrCreate(
+                ['member_id' => $member->getKey()],
+                ['uuid' => (string) Str::uuid()]
+            );
+            $member->setRelation('employee', $employee);
+        }
+
+        // Handle batch sync (e.g. mobile app coming back online after collecting periodic points)
+        if ($request->has('locations') && is_array($request->input('locations'))) {
+            $locations = $request->input('locations');
+            $recordedCount = 0;
+            $lastRecord = null;
+
+            foreach ($locations as $loc) {
+                if (!is_array($loc)) continue;
+                $lat = $loc['latitude'] ?? $loc['lat'] ?? null;
+                $long = $loc['longitude'] ?? $loc['lng'] ?? $loc['long'] ?? $loc['lon'] ?? null;
+                $accuracy = $loc['accuracy'] ?? $loc['gps_accuracy_meters'] ?? $loc['gps_accuracy'] ?? null;
+                $time = $loc['captured_at'] ?? $loc['capturedAt'] ?? $loc['timestamp'] ?? $loc['time'] ?? now();
+
+                if (is_numeric($lat) && is_numeric($long) && $lat >= -90 && $lat <= 90 && $long >= -180 && $long <= 180) {
+                    $saved = EmployeeLocation::recordIfValid($member, $lat, $long, $accuracy, $time);
+                    if ($saved) {
+                        $recordedCount++;
+                        $lastRecord = $saved;
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully recorded {$recordedCount} location points.",
+                'data' => [
+                    'member_id' => $member->id,
+                    'employee_id' => $employee?->employee_id,
+                    'count' => $recordedCount,
+                    'latest_latitude' => $lastRecord ? (float) $lastRecord->latitude : null,
+                    'latest_longitude' => $lastRecord ? (float) $lastRecord->longitude : null,
+                    'latest_accuracy' => $lastRecord && $lastRecord->accuracy !== null ? (float) $lastRecord->accuracy : null,
+                    'latest_captured_at' => $lastRecord ? $lastRecord->captured_at?->toIso8601String() : null,
+                    'sync_interval_minutes' => 20,
+                ],
+            ]);
+        }
+
+        // Handle single location ping
+        $lat = $request->input('latitude', $request->input('lat'));
+        $long = $request->input('longitude', $request->input('lng', $request->input('long', $request->input('lon'))));
+        $accuracy = $request->input('accuracy', $request->input('gps_accuracy_meters', $request->input('gps_accuracy')));
+        $rawCapturedAt = $request->input('captured_at', $request->input('capturedAt', $request->input('timestamp', $request->input('time'))));
+
+        if (!is_numeric($lat) || !is_numeric($long) || $lat < -90 || $lat > 90 || $long < -180 || $long > 180) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Valid latitude (-90 to 90) and longitude (-180 to 180) are required.',
+                'errors' => [
+                    'latitude' => ['The latitude field must be a valid coordinate between -90 and 90.'],
+                    'longitude' => ['The longitude field must be a valid coordinate between -180 and 180.'],
+                ],
+            ], 422);
+        }
+
+        try {
+            $capturedAt = $rawCapturedAt ? Carbon::parse($rawCapturedAt) : now();
+        } catch (\Throwable $e) {
+            $capturedAt = now();
+        }
+
+        if ($capturedAt->greaterThan(now()->addMinutes(10))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The location capture time cannot be more than 10 minutes in the future.',
+                'errors' => [
+                    'captured_at' => ['The capture time cannot be in the future.'],
+                ],
+            ], 422);
+        }
+
+        $record = EmployeeLocation::recordIfValid(
+            $member,
+            $lat,
+            $long,
+            $accuracy,
+            $capturedAt
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Member location recorded successfully.',
+            'data' => [
+                'id' => $record?->id,
+                'member_id' => $member->id,
+                'employee_id' => $employee?->employee_id,
+                'latitude' => (float) $lat,
+                'longitude' => (float) $long,
+                'accuracy' => is_numeric($accuracy) ? (float) $accuracy : null,
+                'captured_at' => $capturedAt->toIso8601String(),
+                'sync_interval_minutes' => 20,
+            ],
+        ], 201);
     }
 
     protected function getHeaderInfo($member)
