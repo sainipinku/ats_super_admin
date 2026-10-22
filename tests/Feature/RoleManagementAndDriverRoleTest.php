@@ -151,4 +151,44 @@ class RoleManagementAndDriverRoleTest extends TestCase
         $response->assertJsonPath('roles', [6]);
         $response->assertJsonPath('designation_names', 'Driver');
     }
+
+    public function test_employee_role_options_and_syncing_driver_role(): void
+    {
+        Role::firstOrCreate(['id' => 1, 'slug' => 'member'], ['name' => 'Member', 'is_default' => 1, 'created_by' => 1]);
+        Role::firstOrCreate(['id' => 6, 'slug' => 'vehicle_driver'], ['name' => 'Vehicle Driver', 'is_default' => 1, 'created_by' => 1]);
+
+        $superAdmin = $this->createSuperAdmin('sa_opts@example.com');
+
+        // Check getRoleOptions
+        $roleOpts = \App\Http\Controllers\SuperAdmin\EmployeeController::getRoleOptions();
+        $this->assertEquals([['id' => 1, 'name' => 'Member']], $roleOpts);
+
+        // Check getMemberRoleOptions
+        $memberOpts = \App\Http\Controllers\SuperAdmin\EmployeeController::getMemberRoleOptions($superAdmin);
+        $driverOpt = collect($memberOpts)->firstWhere('slug', 'vehicle_driver');
+        $this->assertNotNull($driverOpt);
+        $this->assertEquals(6, $driverOpt['id']);
+        $this->assertEquals('Driver', $driverOpt['name']);
+
+        $member = Member::create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'Driver Test',
+            'username' => 'drivertest',
+            'slug' => 'driver-test-' . Str::random(4),
+            'email' => 'drivertest@example.com',
+            'phone' => '9887987599',
+            'status' => Member::STATUS_ACTIVE,
+            'departments' => ['Operations'],
+            'designation' => ['Driver'],
+            'roles' => [1],
+            'company_name' => 'Test Company',
+            'created_by' => $superAdmin->id,
+            'password' => 'password',
+        ]);
+
+        $controller = app(\App\Http\Controllers\SuperAdmin\EmployeeController::class);
+        $controller->syncMemberRoles($member->id, ['Driver']);
+
+        $this->assertEquals([6], $member->fresh()->roles);
+    }
 }

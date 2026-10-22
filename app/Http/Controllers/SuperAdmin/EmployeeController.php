@@ -105,11 +105,11 @@ class EmployeeController extends Controller
     public static function getRoleOptions(): array
     {
         return [
-            ['id' => 3, 'name' => 'Member'],
+            ['id' => 1, 'name' => 'Member'],
         ];
     }
 
-    public static function getMemberRoleOptions(?mixed $currentUser = null): array
+    public static function getMemberRoleOptions(mixed $currentUser = null): array
     {
         try {
             if (!$currentUser) {
@@ -123,11 +123,12 @@ class EmployeeController extends Controller
                 ->where('status', 1)
                 ->whereNotIn('slug', ['super_admin', 'superadmin', 'admin', 'project_admin', 'project-admin', 'member'])
                 ->orderBy('name')
-                ->get(['slug', 'name']);
+                ->get(['id', 'slug', 'name']);
 
             if ($roles->isNotEmpty()) {
                 return $roles->filter(fn($r) => !in_array(strtolower(trim($r->name)), ['super admin', 'admin', 'project admin'], true))
                     ->map(fn($r) => [
+                        'id' => (int) $r->id,
                         'slug' => $r->slug,
                         'name' => match ($r->slug) {
                             'surveyor' => 'Survey Man',
@@ -142,9 +143,9 @@ class EmployeeController extends Controller
         }
 
         return [
-            ['slug' => 'surveyor', 'name' => 'Survey Man'],
-            ['slug' => 'vehicle_driver', 'name' => 'Driver'],
-            ['slug' => 'draft_person', 'name' => 'Draft Man'],
+            ['id' => 4, 'slug' => 'surveyor', 'name' => 'Survey Man'],
+            ['id' => 6, 'slug' => 'vehicle_driver', 'name' => 'Driver'],
+            ['id' => 5, 'slug' => 'draft_person', 'name' => 'Draft Man'],
         ];
     }
 
@@ -469,15 +470,31 @@ class EmployeeController extends Controller
                 }
                 $selectedRoles = (array) $selectedRoles;
 
+                // Normalize selected role slugs
+                $normalizedRoles = [];
+                foreach ($selectedRoles as $r) {
+                    $rLower = strtolower(trim((string) $r));
+                    if ($rLower === 'driver' || $rLower === 'vehicle driver' || $rLower === 'vehicle_driver' || $rLower === '6') {
+                        $normalizedRoles[] = 'vehicle_driver';
+                    } elseif ($rLower === 'surveyor' || $rLower === 'survey man' || $rLower === '4') {
+                        $normalizedRoles[] = 'surveyor';
+                    } elseif (in_array($rLower, ['draftsman', 'draft person', 'draft_person', 'draft man', '5'], true)) {
+                        $normalizedRoles[] = 'draft_person';
+                    } else {
+                        $normalizedRoles[] = $r;
+                    }
+                }
+                $selectedRoles = array_values(array_unique(array_filter($normalizedRoles)));
+
                 // Auto-resolve role from designation or single role if empty
                 if (empty($selectedRoles)) {
                     $desig = strtolower(trim($validated['designation'] ?? ''));
                     $singleRole = strtolower(trim($request->input('role', '') ?: ''));
-                    if ($desig === 'driver' || $singleRole === 'driver' || $singleRole === 'vehicle_driver') {
+                    if (str_contains($desig, 'driver') || str_contains($singleRole, 'driver') || str_contains($singleRole, 'vehicle_driver')) {
                         $selectedRoles = ['vehicle_driver'];
-                    } elseif ($desig === 'surveyor' || $singleRole === 'surveyor') {
+                    } elseif (str_contains($desig, 'surveyor') || str_contains($singleRole, 'surveyor')) {
                         $selectedRoles = ['surveyor'];
-                    } elseif (in_array($desig, ['draftsman', 'draft person', 'draft man'], true) || in_array($singleRole, ['draft_person', 'draftsman'], true)) {
+                    } elseif (str_contains($desig, 'draft') || str_contains($singleRole, 'draft')) {
                         $selectedRoles = ['draft_person'];
                     }
                 }
@@ -485,8 +502,16 @@ class EmployeeController extends Controller
                 // Resolve initial Role IDs for member record
                 $initialRoleIds = [];
                 if (!empty($selectedRoles)) {
-                    $initialRoleIds = \App\Models\Role::whereIn('slug', $selectedRoles)->pluck('id')->toArray();
+                    $initialRoleIds = \App\Models\Role::where(function ($q) use ($selectedRoles) {
+                        $q->whereIn('slug', $selectedRoles)
+                            ->orWhereIn('id', array_filter($selectedRoles, 'is_numeric'));
+                    })->pluck('id')->map(fn($id) => (int)$id)->toArray();
                 }
+
+                if (in_array('vehicle_driver', $selectedRoles, true) && !in_array(6, $initialRoleIds, true)) {
+                    $initialRoleIds[] = 6;
+                }
+
                 if (empty($initialRoleIds)) {
                     $initialRoleIds = [1];
                 }
@@ -561,12 +586,64 @@ class EmployeeController extends Controller
                 $departmentArray = [$validated['department']];
                 $designationArray = [$validated['designation']];
 
+                $selectedRoles = $request->input('roles', []);
+                if (is_string($selectedRoles)) {
+                    $selectedRoles = json_decode($selectedRoles, true) ?? [$selectedRoles];
+                }
+                $selectedRoles = (array) $selectedRoles;
+
+                // Normalize selected role slugs
+                $normalizedRoles = [];
+                foreach ($selectedRoles as $r) {
+                    $rLower = strtolower(trim((string) $r));
+                    if ($rLower === 'driver' || $rLower === 'vehicle driver' || $rLower === 'vehicle_driver' || $rLower === '6') {
+                        $normalizedRoles[] = 'vehicle_driver';
+                    } elseif ($rLower === 'surveyor' || $rLower === 'survey man' || $rLower === '4') {
+                        $normalizedRoles[] = 'surveyor';
+                    } elseif (in_array($rLower, ['draftsman', 'draft person', 'draft_person', 'draft man', '5'], true)) {
+                        $normalizedRoles[] = 'draft_person';
+                    } else {
+                        $normalizedRoles[] = $r;
+                    }
+                }
+                $selectedRoles = array_values(array_unique(array_filter($normalizedRoles)));
+
+                // Auto-resolve role from designation if empty
+                if (empty($selectedRoles)) {
+                    $desig = strtolower(trim($validated['designation'] ?? ''));
+                    $singleRole = strtolower(trim($request->input('role', '') ?: ''));
+                    if (str_contains($desig, 'driver') || str_contains($singleRole, 'driver') || str_contains($singleRole, 'vehicle_driver')) {
+                        $selectedRoles = ['vehicle_driver'];
+                    } elseif (str_contains($desig, 'surveyor') || str_contains($singleRole, 'surveyor')) {
+                        $selectedRoles = ['surveyor'];
+                    } elseif (str_contains($desig, 'draft') || str_contains($singleRole, 'draft')) {
+                        $selectedRoles = ['draft_person'];
+                    }
+                }
+
+                // Resolve Role IDs for member record
+                $initialRoleIds = [];
+                if (!empty($selectedRoles)) {
+                    $initialRoleIds = \App\Models\Role::where(function ($q) use ($selectedRoles) {
+                        $q->whereIn('slug', $selectedRoles)
+                            ->orWhereIn('id', array_filter($selectedRoles, 'is_numeric'));
+                    })->pluck('id')->map(fn($id) => (int)$id)->toArray();
+                }
+
+                if (in_array('vehicle_driver', $selectedRoles, true) && !in_array(6, $initialRoleIds, true)) {
+                    $initialRoleIds[] = 6;
+                }
+
+                if (empty($initialRoleIds)) {
+                    $initialRoleIds = [1];
+                }
+
                 $memberData = [
                     'name' => $validated['full_name'],
                     'email' => $validated['email'],
                     'phone' => $validated['phone'],
                     'password' => $validated['password'] ?? null,
-                    'roles' => $roleArray,
+                    'roles' => $initialRoleIds,
                     'departments' => $departmentArray,
                     'designations' => $designationArray,
                     'gender' => $validated['gender'] ?? null,
@@ -595,11 +672,7 @@ class EmployeeController extends Controller
 
                 $employee->update($employeeData);
 
-                $selectedRoles = $request->input('roles', []);
-                if (is_string($selectedRoles)) {
-                    $selectedRoles = json_decode($selectedRoles, true) ?? [$selectedRoles];
-                }
-                $this->syncMemberRoles($employee->member_id, (array)$selectedRoles);
+                $this->syncMemberRoles($employee->member_id, $selectedRoles);
             });
 
             return redirect()->back()->with('success', 'Employee updated successfully!');
@@ -663,6 +736,37 @@ class EmployeeController extends Controller
 
     public function syncMemberRoles(int $memberId, array $selectedRoleSlugs): void
     {
+        $member = Member::find($memberId);
+
+        // Normalize slugs
+        $normalizedSlugs = [];
+        foreach ($selectedRoleSlugs as $slug) {
+            $lower = strtolower(trim((string) $slug));
+            if ($lower === 'driver' || $lower === 'vehicle driver' || $lower === 'vehicle_driver' || $lower === '6') {
+                $normalizedSlugs[] = 'vehicle_driver';
+            } elseif ($lower === 'surveyor' || $lower === 'survey man' || $lower === '4') {
+                $normalizedSlugs[] = 'surveyor';
+            } elseif (in_array($lower, ['draftsman', 'draft person', 'draft_person', 'draft man', '5'], true)) {
+                $normalizedSlugs[] = 'draft_person';
+            } else {
+                $normalizedSlugs[] = $slug;
+            }
+        }
+        $selectedRoleSlugs = array_values(array_unique(array_filter($normalizedSlugs)));
+
+        // If empty, auto-resolve from member designation
+        if (empty($selectedRoleSlugs) && $member) {
+            $desig = is_array($member->designation) ? ($member->designation[0] ?? '') : (string) $member->designation;
+            $desigLower = strtolower(trim($desig));
+            if (str_contains($desigLower, 'driver')) {
+                $selectedRoleSlugs = ['vehicle_driver'];
+            } elseif (str_contains($desigLower, 'surveyor')) {
+                $selectedRoleSlugs = ['surveyor'];
+            } elseif (str_contains($desigLower, 'draft')) {
+                $selectedRoleSlugs = ['draft_person'];
+            }
+        }
+
         $allRoles = ConstructionRole::where('status', 'active')
             ->whereNotIn('slug', ['super_admin', 'superadmin', 'admin', 'project_admin', 'project-admin'])
             ->get();
@@ -711,12 +815,16 @@ class EmployeeController extends Controller
             }
         }
 
+        // If vehicle_driver was selected, ensure role ID 6 is active
+        if (in_array('vehicle_driver', $selectedRoleSlugs, true)) {
+            $activeRoleIds[] = 6;
+        }
+
         $activeRoleIds = array_values(array_unique(array_filter($activeRoleIds)));
         if (empty($activeRoleIds)) {
             $activeRoleIds = [1];
         }
 
-        $member = Member::find($memberId);
         if ($member) {
             $member->forceFill(['roles' => $activeRoleIds])->save();
         }
