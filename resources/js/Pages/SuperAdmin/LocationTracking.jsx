@@ -196,6 +196,44 @@ function getAvatarGradient(name = "") {
     return AVATAR_BG_GRADIENTS[Math.abs(hash) % AVATAR_BG_GRADIENTS.length];
 }
 
+function getStandingAvatar(employee) {
+    if (!employee) return "/images/avatars/male_standing.png";
+    const meta = `${employee.designation || ""} ${employee.department || ""}`.toLowerCase();
+
+    // Field / site / engineer / technician / worker / supervisor
+    if (
+        meta.includes("engineer") ||
+        meta.includes("site") ||
+        meta.includes("survey") ||
+        meta.includes("construct") ||
+        meta.includes("field") ||
+        meta.includes("worker") ||
+        meta.includes("technician") ||
+        meta.includes("supervisor") ||
+        meta.includes("civil")
+    ) {
+        return "/images/avatars/worker_standing.png";
+    }
+
+    const name = (employee.name || "").toLowerCase().trim();
+    const femaleNames = [
+        "taniya", "tamanna", "priya", "pooja", "shreya", "neha",
+        "anjali", "sneha", "divya", "kavita", "sunita", "rekha",
+        "anita", "monika", "unnuun", "swati", "jyoti", "ritu",
+        "megha", "preeti", "khushi", "simran", "isha", "aarti",
+    ];
+    if (femaleNames.some((fn) => name.includes(fn))) {
+        return "/images/avatars/female_standing.png";
+    }
+
+    let hash = 0;
+    const str = employee.employeeId || employee.name || "";
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    return Math.abs(hash) % 2 === 1
+        ? "/images/avatars/female_standing.png"
+        : "/images/avatars/male_standing.png";
+}
+
 export default function LocationTracking() {
     const { props: pageProps } = usePage();
     const apiKey = resolveGoogleMapsApiKey(null, pageProps);
@@ -558,13 +596,14 @@ export default function LocationTracking() {
                         onLoad={setMap}
                         onUnmount={() => setMap(null)}
                     >
-                        {/* 1. Snap Map Avatar Markers (When in Live Map mode or unselected) */}
+                        {/* 1. Snap Map Standing Person Avatar Markers */}
                         {!selectedEmployee &&
                             visibleEmployees.map((emp) => {
                                 const isNow = relativeTimeSnap(emp.capturedAt) === "now";
                                 const isOnline = emp.status === "Recently updated";
                                 const timeBadge = relativeTimeSnap(emp.capturedAt);
                                 const firstName = (emp.name || "Employee").split(" ")[0];
+                                const standingAvatar = getStandingAvatar(emp);
 
                                 return (
                                     <OverlayViewF
@@ -578,48 +617,53 @@ export default function LocationTracking() {
                                                 e.stopPropagation();
                                                 handleEmployeeSelect(emp);
                                             }}
-                                            className="group relative flex flex-col items-center cursor-pointer select-none transition-all duration-200 hover:scale-110 hover:z-30 active:scale-95"
+                                            className="group relative flex flex-col items-center cursor-pointer select-none transition-all duration-200 hover:scale-115 hover:z-40 active:scale-95"
                                             style={{ transformOrigin: "bottom center" }}
                                             title={`${emp.name} (${emp.employeeId}) - Click for Location History`}
                                         >
-                                            {/* Snapchat Avatar Circle with Bitmoji glow */}
-                                            <div className="relative">
-                                                <div className="relative h-13 w-13 rounded-full p-0.5 bg-white shadow-xl ring-2 ring-white/95 group-hover:ring-4 group-hover:ring-indigo-400 transition-all duration-200">
-                                                    {emp.profileImage ? (
+                                            {/* Floating Snapchat Selfie / Story Bubble (if user has profile image) */}
+                                            {emp.profileImage && (
+                                                <div className="relative -mb-1.5 z-20 transition-transform duration-200 group-hover:-translate-y-1">
+                                                    <div className="relative h-7 w-7 rounded-full p-0.5 bg-white shadow-md ring-2 ring-indigo-400">
                                                         <img
                                                             src={emp.profileImage}
                                                             alt={emp.name}
-                                                            className="h-full w-full rounded-full object-cover bg-slate-100"
+                                                            className="h-full w-full rounded-full object-cover"
                                                             onError={(e) => {
-                                                                e.currentTarget.onerror = null;
-                                                                e.currentTarget.src = "/images/profileimg.png";
+                                                                e.currentTarget.parentElement.parentElement.style.display = "none";
                                                             }}
                                                         />
-                                                    ) : (
-                                                        <div
-                                                            className={`h-full w-full rounded-full flex items-center justify-center font-bold text-white text-sm bg-gradient-to-tr ${getAvatarGradient(
-                                                                emp.name
-                                                            )}`}
-                                                        >
-                                                            {getAvatarInitials(emp.name)}
-                                                        </div>
-                                                    )}
+                                                    </div>
+                                                    <div className="mx-auto w-1 h-1 bg-white rotate-45 -mt-0.5 shadow-xs border-r border-b border-indigo-200"></div>
                                                 </div>
+                                            )}
+
+                                            {/* 3D Standing Bitmoji Avatar Character */}
+                                            <div className="relative h-24 w-14 flex items-end justify-center filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.35)] transition-transform duration-200 group-hover:scale-105">
+                                                <img
+                                                    src={standingAvatar}
+                                                    alt={emp.name}
+                                                    className="h-full w-auto max-w-none object-contain select-none pointer-events-none"
+                                                    draggable={false}
+                                                />
 
                                                 {/* Live Status Pulse */}
                                                 {isOnline && (
-                                                    <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5">
+                                                    <span className="absolute top-2 right-0 flex h-3 w-3">
                                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                                        <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white"></span>
+                                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-white shadow-xs"></span>
                                                     </span>
                                                 )}
                                             </div>
 
+                                            {/* Ground Shadow under shoes */}
+                                            <div className="w-10 h-1.5 bg-black/25 rounded-[100%] blur-[1.2px] -mt-1 mx-auto transition-all duration-200 group-hover:w-12 group-hover:bg-black/40"></div>
+
                                             {/* Snapchat Snap Map Pill Badge: Name & relative time */}
-                                            <div className="mt-1 flex items-center gap-1.5 px-3 py-1 bg-white/95 backdrop-blur-md rounded-full shadow-lg border border-slate-200/90 text-xs text-slate-800 whitespace-nowrap group-hover:border-indigo-400 group-hover:shadow-indigo-100 transition-all duration-150">
-                                                <span className="font-bold text-slate-900 tracking-tight">{firstName}</span>
+                                            <div className="mt-1 flex items-center gap-1.5 px-3 py-1 bg-white/95 backdrop-blur-md rounded-full shadow-lg border border-slate-200/90 text-xs text-slate-800 whitespace-nowrap group-hover:border-indigo-400 group-hover:shadow-indigo-200 transition-all duration-150">
+                                                <span className="font-extrabold text-slate-900 tracking-tight">{firstName}</span>
                                                 <span
-                                                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
+                                                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
                                                         isNow
                                                             ? "bg-emerald-50 text-emerald-600"
                                                             : "bg-slate-100 text-slate-500"
@@ -629,8 +673,8 @@ export default function LocationTracking() {
                                                 </span>
                                             </div>
 
-                                            {/* Pointer Tick */}
-                                            <div className="w-2 h-2 bg-white rotate-45 -mt-1 shadow-sm border-r border-b border-slate-200/80"></div>
+                                            {/* Pointer Tick touching coordinates */}
+                                            <div className="w-1.5 h-1.5 bg-white rotate-45 -mt-1 shadow-sm border-r border-b border-slate-200/80"></div>
                                         </div>
                                     </OverlayViewF>
                                 );
@@ -714,7 +758,7 @@ export default function LocationTracking() {
                                 />
                             ))}
 
-                        {/* 5. End / Current Position Avatar Marker for Selected Employee */}
+                        {/* 5. End / Current Position Standing Avatar Marker for Selected Employee */}
                         {selectedEmployee && historyPoints.length > 1 && (
                             <OverlayViewF
                                 position={{
@@ -725,22 +769,23 @@ export default function LocationTracking() {
                                 getPixelPositionOffset={(w, h) => ({ x: -(w / 2), y: -h })}
                             >
                                 <div
-                                    className="flex flex-col items-center cursor-pointer select-none"
+                                    className="group flex flex-col items-center cursor-pointer select-none"
                                     onClick={() => setSelectedCheckpoint(historyPoints[historyPoints.length - 1])}
                                 >
-                                    <div className="relative h-12 w-12 rounded-full p-0.5 bg-white shadow-xl ring-4 ring-rose-500">
+                                    {/* 3D Standing Bitmoji Avatar */}
+                                    <div className="relative h-24 w-14 flex items-end justify-center filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.35)]">
                                         <img
-                                            src={selectedEmployee.profileImage || "/images/profileimg.png"}
-                                            alt=""
-                                            className="h-full w-full rounded-full object-cover"
-                                            onError={(e) => {
-                                                e.currentTarget.src = "/images/profileimg.png";
-                                            }}
+                                            src={getStandingAvatar(selectedEmployee)}
+                                            alt={selectedEmployee.name}
+                                            className="h-full w-auto max-w-none object-contain select-none pointer-events-none"
+                                            draggable={false}
                                         />
                                     </div>
-                                    <div className="mt-1 px-2.5 py-0.5 bg-rose-600 text-white rounded-full text-[10px] font-bold shadow-md">
+                                    <div className="w-10 h-1.5 bg-black/25 rounded-[100%] blur-[1.2px] -mt-1 mx-auto"></div>
+                                    <div className="mt-1 px-3 py-1 bg-rose-600 text-white rounded-full text-[11px] font-bold shadow-lg border border-white/80 whitespace-nowrap">
                                         LATEST STOP · {formatTimeString(historyPoints[historyPoints.length - 1].capturedAt)}
                                     </div>
+                                    <div className="w-1.5 h-1.5 bg-rose-600 rotate-45 -mt-1"></div>
                                 </div>
                             </OverlayViewF>
                         )}
@@ -1014,40 +1059,50 @@ export default function LocationTracking() {
                                 <FaTimes className="text-xs" />
                             </button>
 
-                            <div className="flex items-center gap-3">
-                                <div className="relative h-14 w-14 rounded-full p-0.5 bg-white shadow-lg">
-                                    {selectedEmployee.profileImage ? (
-                                        <img
-                                            src={selectedEmployee.profileImage}
-                                            alt={selectedEmployee.name}
-                                            className="h-full w-full rounded-full object-cover"
-                                            onError={(e) => {
-                                                e.currentTarget.onerror = null;
-                                                e.currentTarget.src = "/images/profileimg.png";
-                                            }}
-                                        />
-                                    ) : (
-                                        <div
-                                            className={`h-full w-full rounded-full flex items-center justify-center font-bold text-white text-lg bg-gradient-to-tr ${getAvatarGradient(
-                                                selectedEmployee.name
-                                            )}`}
-                                        >
-                                            {getAvatarInitials(selectedEmployee.name)}
-                                        </div>
-                                    )}
+                            <div className="flex items-center justify-between gap-3 relative pr-8">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="relative h-13 w-13 rounded-full p-0.5 bg-white shadow-lg shrink-0">
+                                        {selectedEmployee.profileImage ? (
+                                            <img
+                                                src={selectedEmployee.profileImage}
+                                                alt={selectedEmployee.name}
+                                                className="h-full w-full rounded-full object-cover"
+                                                onError={(e) => {
+                                                    e.currentTarget.onerror = null;
+                                                    e.currentTarget.src = "/images/profileimg.png";
+                                                }}
+                                            />
+                                        ) : (
+                                            <div
+                                                className={`h-full w-full rounded-full flex items-center justify-center font-bold text-white text-base bg-gradient-to-tr ${getAvatarGradient(
+                                                    selectedEmployee.name
+                                                )}`}
+                                            >
+                                                {getAvatarInitials(selectedEmployee.name)}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h3 className="text-base font-extrabold truncate leading-tight">
+                                            {selectedEmployee.name}
+                                        </h3>
+                                        <p className="text-xs text-indigo-200 font-mono mt-0.5">
+                                            {selectedEmployee.employeeId}
+                                        </p>
+                                        <p className="text-[11px] text-indigo-100 truncate mt-0.5">
+                                            {selectedEmployee.designation !== "Not specified"
+                                                ? selectedEmployee.designation
+                                                : selectedEmployee.department}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="min-w-0 flex-1">
-                                    <h3 className="text-base font-extrabold truncate leading-tight">
-                                        {selectedEmployee.name}
-                                    </h3>
-                                    <p className="text-xs text-indigo-200 font-mono mt-0.5">
-                                        {selectedEmployee.employeeId}
-                                    </p>
-                                    <p className="text-[11px] text-indigo-100 truncate mt-0.5">
-                                        {selectedEmployee.designation !== "Not specified"
-                                            ? selectedEmployee.designation
-                                            : selectedEmployee.department}
-                                    </p>
+                                {/* Standing 3D Character in Header */}
+                                <div className="h-20 w-12 shrink-0 filter drop-shadow-md select-none pointer-events-none">
+                                    <img
+                                        src={getStandingAvatar(selectedEmployee)}
+                                        alt=""
+                                        className="h-full w-auto object-contain"
+                                    />
                                 </div>
                             </div>
                         </div>
