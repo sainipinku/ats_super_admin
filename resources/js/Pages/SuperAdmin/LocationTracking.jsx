@@ -621,27 +621,10 @@ export default function LocationTracking() {
                                             style={{ transformOrigin: "bottom center" }}
                                             title={`${emp.name} (${emp.employeeId}) - Click for Location History`}
                                         >
-                                            {/* Floating Snapchat Selfie / Story Bubble (if user has profile image) */}
-                                            {emp.profileImage && (
-                                                <div className="relative -mb-1.5 z-20 transition-transform duration-200 group-hover:-translate-y-1">
-                                                    <div className="relative h-7 w-7 rounded-full p-0.5 bg-white shadow-md ring-2 ring-indigo-400">
-                                                        <img
-                                                            src={emp.profileImage}
-                                                            alt={emp.name}
-                                                            className="h-full w-full rounded-full object-cover"
-                                                            onError={(e) => {
-                                                                e.currentTarget.parentElement.parentElement.style.display = "none";
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <div className="mx-auto w-1 h-1 bg-white rotate-45 -mt-0.5 shadow-xs border-r border-b border-indigo-200"></div>
-                                                </div>
-                                            )}
-
                                             {/* 3D Standing Bitmoji Avatar Character */}
-                                            <div className="relative h-24 w-14 flex items-end justify-center filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.35)] transition-transform duration-200 group-hover:scale-105">
+                                            <div className="relative h-26 w-16 flex items-end justify-center filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.35)] transition-transform duration-200 group-hover:scale-110">
                                                 <img
-                                                    src={standingAvatar}
+                                                    src={`${basePath}${standingAvatar}`}
                                                     alt={emp.name}
                                                     className="h-full w-auto max-w-none object-contain select-none pointer-events-none"
                                                     draggable={false}
@@ -649,7 +632,7 @@ export default function LocationTracking() {
 
                                                 {/* Live Status Pulse */}
                                                 {isOnline && (
-                                                    <span className="absolute top-2 right-0 flex h-3 w-3">
+                                                    <span className="absolute top-1 right-1 flex h-3 w-3">
                                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                                         <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-white shadow-xs"></span>
                                                     </span>
@@ -657,7 +640,7 @@ export default function LocationTracking() {
                                             </div>
 
                                             {/* Ground Shadow under shoes */}
-                                            <div className="w-10 h-1.5 bg-black/25 rounded-[100%] blur-[1.2px] -mt-1 mx-auto transition-all duration-200 group-hover:w-12 group-hover:bg-black/40"></div>
+                                            <div className="w-11 h-2 bg-black/30 rounded-[100%] blur-[1.5px] -mt-1 mx-auto transition-all duration-200 group-hover:w-13 group-hover:bg-black/45"></div>
 
                                             {/* Snapchat Snap Map Pill Badge: Name & relative time */}
                                             <div className="mt-1 flex items-center gap-1.5 px-3 py-1 bg-white/95 backdrop-blur-md rounded-full shadow-lg border border-slate-200/90 text-xs text-slate-800 whitespace-nowrap group-hover:border-indigo-400 group-hover:shadow-indigo-200 transition-all duration-150">
@@ -773,15 +756,15 @@ export default function LocationTracking() {
                                     onClick={() => setSelectedCheckpoint(historyPoints[historyPoints.length - 1])}
                                 >
                                     {/* 3D Standing Bitmoji Avatar */}
-                                    <div className="relative h-24 w-14 flex items-end justify-center filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.35)]">
+                                    <div className="relative h-26 w-16 flex items-end justify-center filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.35)]">
                                         <img
-                                            src={getStandingAvatar(selectedEmployee)}
+                                            src={`${basePath}${getStandingAvatar(selectedEmployee)}`}
                                             alt={selectedEmployee.name}
                                             className="h-full w-auto max-w-none object-contain select-none pointer-events-none"
                                             draggable={false}
                                         />
                                     </div>
-                                    <div className="w-10 h-1.5 bg-black/25 rounded-[100%] blur-[1.2px] -mt-1 mx-auto"></div>
+                                    <div className="w-11 h-2 bg-black/30 rounded-[100%] blur-[1.5px] -mt-1 mx-auto"></div>
                                     <div className="mt-1 px-3 py-1 bg-rose-600 text-white rounded-full text-[11px] font-bold shadow-lg border border-white/80 whitespace-nowrap">
                                         LATEST STOP · {formatTimeString(historyPoints[historyPoints.length - 1].capturedAt)}
                                     </div>
@@ -1099,7 +1082,7 @@ export default function LocationTracking() {
                                 {/* Standing 3D Character in Header */}
                                 <div className="h-20 w-12 shrink-0 filter drop-shadow-md select-none pointer-events-none">
                                     <img
-                                        src={getStandingAvatar(selectedEmployee)}
+                                        src={`${basePath}${getStandingAvatar(selectedEmployee)}`}
                                         alt=""
                                         className="h-full w-auto object-contain"
                                     />
