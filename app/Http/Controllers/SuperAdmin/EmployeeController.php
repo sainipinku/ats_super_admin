@@ -109,11 +109,19 @@ class EmployeeController extends Controller
         ];
     }
 
-    public static function getMemberRoleOptions(): array
+    public static function getMemberRoleOptions(?mixed $currentUser = null): array
     {
         try {
-            $roles = ConstructionRole::where('status', 'active')
-                ->whereNotIn('slug', ['super_admin', 'superadmin', 'admin', 'project_admin', 'project-admin'])
+            if (!$currentUser) {
+                $currentUser = Auth::guard('superadmin')->user()
+                    ?? Auth::guard('admin')->user()
+                    ?? Auth::guard('member')->user()
+                    ?? Auth::user();
+            }
+
+            $roles = Role::accessibleFor($currentUser)
+                ->where('status', 1)
+                ->whereNotIn('slug', ['super_admin', 'superadmin', 'admin', 'project_admin', 'project-admin', 'member'])
                 ->orderBy('name')
                 ->get(['slug', 'name']);
 
@@ -409,7 +417,7 @@ class EmployeeController extends Controller
             'designationOptions' => static::getDesignationOptions(),
             'departmentDesignationMap' => static::getDepartmentDesignationsMap(),
             'roleOptions' => static::getRoleOptions(),
-            'memberRoleOptions' => static::getMemberRoleOptions(),
+            'memberRoleOptions' => static::getMemberRoleOptions($currentUser),
             'isProjectOwner' => $isProjectOwner,
             'companies' => $isProjectOwner
                 ? Company::where('status', 'active')->orderBy('name')->get(['id', 'name'])
@@ -455,12 +463,40 @@ class EmployeeController extends Controller
                 $departmentArray = [$validated['department']];
                 $designationArray = [$validated['designation']];
 
+                $selectedRoles = $request->input('roles', []);
+                if (is_string($selectedRoles)) {
+                    $selectedRoles = json_decode($selectedRoles, true) ?? [$selectedRoles];
+                }
+                $selectedRoles = (array) $selectedRoles;
+
+                // Auto-resolve role from designation or single role if empty
+                if (empty($selectedRoles)) {
+                    $desig = strtolower(trim($validated['designation'] ?? ''));
+                    $singleRole = strtolower(trim($request->input('role', '') ?: ''));
+                    if ($desig === 'driver' || $singleRole === 'driver' || $singleRole === 'vehicle_driver') {
+                        $selectedRoles = ['vehicle_driver'];
+                    } elseif ($desig === 'surveyor' || $singleRole === 'surveyor') {
+                        $selectedRoles = ['surveyor'];
+                    } elseif (in_array($desig, ['draftsman', 'draft person', 'draft man'], true) || in_array($singleRole, ['draft_person', 'draftsman'], true)) {
+                        $selectedRoles = ['draft_person'];
+                    }
+                }
+
+                // Resolve initial Role IDs for member record
+                $initialRoleIds = [];
+                if (!empty($selectedRoles)) {
+                    $initialRoleIds = \App\Models\Role::whereIn('slug', $selectedRoles)->pluck('id')->toArray();
+                }
+                if (empty($initialRoleIds)) {
+                    $initialRoleIds = [1];
+                }
+
                 $memberData = [
                     'name' => $validated['full_name'],
                     'email' => $validated['email'],
                     'phone' => $validated['phone'],
                     'password' => $validated['password'] ?? null,
-                    'roles' => $roleArray,
+                    'roles' => $initialRoleIds,
                     'departments' => $departmentArray,
                     'designations' => $designationArray,
                     'gender' => $validated['gender'] ?? null,
@@ -494,11 +530,7 @@ class EmployeeController extends Controller
                     ]);
                 }
 
-                $selectedRoles = $request->input('roles', []);
-                if (is_string($selectedRoles)) {
-                    $selectedRoles = json_decode($selectedRoles, true) ?? [$selectedRoles];
-                }
-                $this->syncMemberRoles($member->id, (array)$selectedRoles);
+                $this->syncMemberRoles($member->id, $selectedRoles);
             });
 
             return redirect()->back()->with('success', 'Employee created successfully! The employee can now login using the provided email and password.');
@@ -635,22 +667,58 @@ class EmployeeController extends Controller
             ->whereNotIn('slug', ['super_admin', 'superadmin', 'admin', 'project_admin', 'project-admin'])
             ->get();
 
+        $activeRoleIds = [];
+
         foreach ($allRoles as $role) {
             if (in_array(strtolower(trim($role->name)), ['super admin', 'admin', 'project admin'], true)) {
                 continue;
             }
-            $isSelected = in_array($role->slug, $selectedRoleSlugs, true);
+            $isSelected = in_array($role->slug, $selectedRoleSlugs, true)
+                || in_array(strtolower($role->name), array_map('strtolower', $selectedRoleSlugs), true)
+                || in_array((string) $role->id, $selectedRoleSlugs, true);
 
             if ($isSelected) {
                 MemberRoleAssignment::updateOrCreate(
                     ['member_id' => $memberId, 'role_id' => $role->id],
                     ['status' => 1]
                 );
+
+                $dbRole = Role::where('slug', $role->slug)->first();
+                if ($dbRole) {
+                    $activeRoleIds[] = (int) $dbRole->id;
+                }
             } else {
                 MemberRoleAssignment::where('member_id', $memberId)
                     ->where('role_id', $role->id)
                     ->update(['status' => 0]);
             }
+        }
+
+        // Also check any roles directly from roles table (custom roles created by super admin)
+        foreach ($selectedRoleSlugs as $slugOrId) {
+            $customRole = Role::where('slug', $slugOrId)->orWhere('id', $slugOrId)->first();
+            if ($customRole && !in_array($customRole->slug, ['super_admin', 'superadmin', 'admin', 'project_admin', 'member'], true)) {
+                $activeRoleIds[] = (int) $customRole->id;
+
+                $cRole = ConstructionRole::firstOrCreate(
+                    ['slug' => $customRole->slug],
+                    ['name' => $customRole->name, 'status' => 'active', 'is_system_role' => false]
+                );
+                MemberRoleAssignment::updateOrCreate(
+                    ['member_id' => $memberId, 'role_id' => $cRole->id],
+                    ['status' => 1]
+                );
+            }
+        }
+
+        $activeRoleIds = array_values(array_unique(array_filter($activeRoleIds)));
+        if (empty($activeRoleIds)) {
+            $activeRoleIds = [1];
+        }
+
+        $member = Member::find($memberId);
+        if ($member) {
+            $member->forceFill(['roles' => $activeRoleIds])->save();
         }
     }
 
