@@ -93,6 +93,7 @@ class TaskCreationAndRolePermissionTest extends TestCase
         MemberRoleAssignment::create([
             'member_id' => $this->draftPerson->id,
             'role_id' => $this->draftRole->id,
+            'project_id' => $this->project->id,
             'status' => 1,
         ]);
 
