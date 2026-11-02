@@ -53,10 +53,20 @@ class ConstructionAuthorizationService
         }
 
         if ($actor instanceof SuperAdmin) {
+            $activeRoleSlug = session('active_role') ?? request()?->query('role');
+            if ($activeRoleSlug && !in_array($activeRoleSlug, ['super_admin', 'superadmin'])) {
+                return false;
+            }
+
             return (int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1);
         }
 
         if ($actor instanceof Member) {
+            $activeRoleSlug = session('active_role') ?? request()?->query('role');
+            if ($activeRoleSlug && !in_array($activeRoleSlug, ['super_admin', 'superadmin', 'admin', 'project_admin'])) {
+                return false;
+            }
+
             return isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1;
         }
 
@@ -65,18 +75,7 @@ class ConstructionAuthorizationService
 
     public function isProjectOwnerOrSuperAdminEmulating(?Model $actor = null): bool
     {
-        // 1. Direct project owner or super admin check on actor model
-        if ($actor instanceof SuperAdmin) {
-            return true;
-        }
-
-        if ($actor instanceof Member) {
-            if (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1) {
-                return true;
-            }
-        }
-
-        // 2. Check if a Super Admin / Project Owner is emulating any account
+        // 1. Check if an impersonator is present
         if (session()->has('impersonator')) {
             $impersonator = session('impersonator');
             $guard = $impersonator['guard'] ?? null;
@@ -91,6 +90,27 @@ class ConstructionAuthorizationService
                 if ($superAdmin) {
                     return true;
                 }
+            }
+        }
+
+        // 2. Direct project owner check on actor model
+        if ($actor instanceof SuperAdmin) {
+            $activeRoleSlug = session('active_role') ?? request()?->query('role');
+            if ($activeRoleSlug && !in_array($activeRoleSlug, ['super_admin', 'superadmin'])) {
+                return false;
+            }
+
+            return (int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1);
+        }
+
+        if ($actor instanceof Member) {
+            $activeRoleSlug = session('active_role') ?? request()?->query('role');
+            if ($activeRoleSlug && !in_array($activeRoleSlug, ['super_admin', 'superadmin', 'admin', 'project_admin'])) {
+                return false;
+            }
+
+            if (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1) {
+                return true;
             }
         }
 
@@ -114,13 +134,72 @@ class ConstructionAuthorizationService
             return [];
         }
 
-        if ($actor instanceof SuperAdmin) {
-            return Permission::query()
-                ->orderBy('slug')
-                ->pluck('slug')
-                ->all();
+        // 1. Check if an active role is set in session or request query
+        $activeRoleSlug = session('active_role') ?? request()?->query('role');
+        if ($activeRoleSlug) {
+            $activeRoleSlug = strtolower(trim($activeRoleSlug));
+            $activeCRole = ConstructionRole::where('slug', $activeRoleSlug)->orWhere('name', $activeRoleSlug)->first();
+            if ($activeCRole) {
+                return Permission::query()
+                    ->join('construction_role_permissions', 'construction_role_permissions.permission_id', '=', 'construction_permissions.id')
+                    ->where('construction_role_permissions.role_id', $activeCRole->id)
+                    ->distinct()
+                    ->orderBy('construction_permissions.slug')
+                    ->pluck('construction_permissions.slug')
+                    ->all();
+            }
         }
 
+        // 2. SuperAdmin checks
+        if ($actor instanceof SuperAdmin) {
+            $isRoot = (int) $actor->id === 1 || (string) $actor->id === '1' || (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1);
+
+            // If root project owner without an active restricted role, return all permissions
+            if ($isRoot && (empty($actor->roles) || in_array('super_admin', (array)$actor->roles) || in_array('crm_super_admin', (array)$actor->roles) || in_array('admin', (array)$actor->roles))) {
+                return Permission::query()
+                    ->orderBy('slug')
+                    ->pluck('slug')
+                    ->all();
+            }
+
+            // Otherwise, resolve role from actor->roles
+            $roleSlugs = [];
+            if (!empty($actor->roles) && is_array($actor->roles)) {
+                foreach ($actor->roles as $r) {
+                    if (is_string($r)) {
+                        $roleSlugs[] = strtolower(trim($r));
+                    }
+                }
+            }
+
+            if (!empty($roleSlugs)) {
+                $roleIds = ConstructionRole::whereIn('slug', $roleSlugs)
+                    ->orWhereIn('name', $roleSlugs)
+                    ->pluck('id')
+                    ->toArray();
+
+                if (!empty($roleIds)) {
+                    return Permission::query()
+                        ->join('construction_role_permissions', 'construction_role_permissions.permission_id', '=', 'construction_permissions.id')
+                        ->whereIn('construction_role_permissions.role_id', $roleIds)
+                        ->distinct()
+                        ->orderBy('construction_permissions.slug')
+                        ->pluck('construction_permissions.slug')
+                        ->all();
+                }
+            }
+
+            if ($isRoot) {
+                return Permission::query()
+                    ->orderBy('slug')
+                    ->pluck('slug')
+                    ->all();
+            }
+
+            return [];
+        }
+
+        // 3. Member checks
         if ($actor instanceof Member) {
             if (isset($actor->is_project_owner) && (int) $actor->is_project_owner === 1) {
                 return Permission::query()
@@ -237,7 +316,7 @@ class ConstructionAuthorizationService
         array $permissions,
         ?int $projectId = null
     ): bool {
-        if ($this->isProjectOwner($actor) || $actor instanceof SuperAdmin) {
+        if ($this->isProjectOwner($actor)) {
             return true;
         }
 
