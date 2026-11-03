@@ -41,14 +41,31 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
     const pageProps = usePage().props;
     const { auth } = pageProps;
     const isImpersonating = Boolean(pageProps.is_impersonating || auth?.is_impersonating);
-    const isRootSuperAdmin = !isImpersonating && Boolean(
-        ((auth?.user?.id === 1 || auth?.user?.id === "1") || auth?.user?.is_project_owner === 1 || auth?.user?.is_project_owner === true) &&
-        !auth?.user?.company_id &&
-        !auth?.active_role?.slug
+    const activeRole = auth?.active_role;
+    const activeRoleSlug = String(activeRole?.slug || activeRole || "").toLowerCase();
+    const isRestrictedRole = Boolean(
+        activeRoleSlug && 
+        !['super_admin', 'superadmin', 'crm_super_admin', 'admin', 'project_admin'].includes(activeRoleSlug)
     );
+
+    const isProjectOwner = !isImpersonating && !isRestrictedRole && Boolean(
+        auth?.user?.is_project_owner == 1 ||
+        auth?.user?.is_project_owner === true ||
+        auth?.user?.id == 1 ||
+        auth?.user?.id === '1' ||
+        (!auth?.user?.company_id && auth?.guard === "superadmin")
+    );
+
+    const isSuperAdmin = !isImpersonating && !isRestrictedRole && (
+        isProjectOwner ||
+        auth?.guard === "superadmin" ||
+        (Array.isArray(auth?.user?.roles) && (auth?.user?.roles.includes("super_admin") || auth?.user?.roles.includes("superadmin")))
+    );
+
+    const isRootSuperAdmin = isProjectOwner || isSuperAdmin;
     const userPermissions = auth?.permissions || auth?.construction_permissions || pageProps?.permissions || [];
     const hasPerm = (target) => {
-        if (isRootSuperAdmin) return true;
+        if (isProjectOwner || isSuperAdmin) return true;
         if (!target) return true;
         const targets = Array.isArray(target) ? target : [target];
         return targets.some((slug) => userPermissions.includes(slug) || userPermissions.includes('*'));
