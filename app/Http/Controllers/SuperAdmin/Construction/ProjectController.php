@@ -322,7 +322,7 @@ class ProjectController extends Controller
             }
         }
 
-        $members = $this->getProjectMembers($project);
+        $members = $this->getProjectMembers($project, $actor);
 
         $companyId = $project->company_id ?: $this->getAccessibleCompanyId($actor);
         $rolesQuery = ConstructionRole::where('status', 'active')
@@ -784,12 +784,14 @@ class ProjectController extends Controller
         ConstructionTeamAssignmentService $teamAssignmentService
     ) {
         $actor = $this->constructionActor();
+        $accessibleMemberIds = $this->getProjectMembers($project, $actor)->pluck('id')->toArray();
 
         $validated = $request->validate([
             'member_id' => [
                 'required',
                 'integer',
                 'exists:members,id',
+                Rule::in($accessibleMemberIds),
             ],
             'role_id' => [
                 'nullable',
@@ -822,6 +824,8 @@ class ProjectController extends Controller
                 'Please select a team member.',
             'member_id.exists' =>
                 'The selected member does not exist.',
+            'member_id.in' =>
+                'The selected member is not authorized for this company project.',
             'role_id.exists' =>
                 'The selected role does not exist.',
             'assigned_to.after_or_equal' =>
@@ -2377,12 +2381,15 @@ class ProjectController extends Controller
      * - Company Employees/Members (created by company Super Admin/Admin or matching company name)
      * - Project Team Members assigned to this project
      */
-    protected function getProjectMembers(Project $project)
+    protected function getProjectMembers(Project $project, ?\Illuminate\Database\Eloquent\Model $actor = null)
     {
         // 1. Determine company ID
         $companyId = $project->company_id;
         if (!$companyId && in_array($project->created_by_type, [SuperAdmin::class, 'App\Models\SuperAdmin', '\\App\\Models\\SuperAdmin'], true)) {
             $companyId = SuperAdmin::where('id', $project->created_by_id)->value('company_id');
+        }
+        if (!$companyId && $actor) {
+            $companyId = $this->getAccessibleCompanyId($actor);
         }
 
         $company = $project->company ?: ($companyId ? Company::find($companyId) : null);
@@ -2414,7 +2421,31 @@ class ProjectController extends Controller
         if ($companyId) {
             $companySuperAdmins = SuperAdmin::where('company_id', $companyId)->get();
         }
+        if ($actor instanceof SuperAdmin) {
+            if ($companyId && (int) $actor->company_id === (int) $companyId) {
+                if (!$companySuperAdmins->contains('id', $actor->id)) {
+                    $companySuperAdmins->push($actor);
+                }
+            } elseif (!$companyId) {
+                $companySuperAdmins->push($actor);
+            }
+        }
         $companySuperAdminIds = $companySuperAdmins->pluck('id')->filter()->toArray();
+
+        // Emails of SuperAdmins belonging to OTHER companies (must never leak)
+        $otherCompanySuperAdminEmails = SuperAdmin::query()
+            ->when($companyId, function ($q) use ($companyId) {
+                $q->where(function ($sub) use ($companyId) {
+                    $sub->where('company_id', '!=', $companyId)
+                        ->orWhereNull('company_id');
+                });
+            })
+            ->when($actor instanceof SuperAdmin, function ($q) use ($actor) {
+                $q->where('id', '!=', $actor->id);
+            })
+            ->pluck('email')
+            ->filter()
+            ->toArray();
 
         // 3. Ensure each company SuperAdmin has a corresponding Member record so they can be assigned / selected as supervisor
         $companySuperAdminMemberIds = [];
@@ -2506,6 +2537,10 @@ class ProjectController extends Controller
             }
         });
 
+        if (!empty($otherCompanySuperAdminEmails)) {
+            $adminQuery->whereNotIn('email', $otherCompanySuperAdminEmails);
+        }
+
         $companyAdminMemberIds = $adminQuery->pluck('id')->toArray();
 
         // 5. Resolve all Company Employees / Members
@@ -2552,15 +2587,23 @@ class ProjectController extends Controller
 
         // Ensure we do NOT include members whose company_name belongs to a DIFFERENT company
         if (!empty($companyNames)) {
-            $companyMembersQuery->where(function ($q) use ($companyNames, $assignedProjectMemberIds) {
-                $q->whereNull('company_name')
-                  ->orWhere('company_name', '')
-                  ->orWhereIn('company_name', $companyNames);
-
+            $companyMembersQuery->where(function ($q) use ($companyNames, $companySuperAdminIds, $assignedProjectMemberIds) {
+                $q->whereIn('company_name', $companyNames);
+                if (!empty($companySuperAdminIds)) {
+                    $q->orWhere(function ($sq) use ($companySuperAdminIds) {
+                        $sq->where(function ($n) {
+                            $n->whereNull('company_name')->orWhere('company_name', '');
+                        })->whereIn('created_by', $companySuperAdminIds);
+                    });
+                }
                 if (!empty($assignedProjectMemberIds)) {
                     $q->orWhereIn('id', $assignedProjectMemberIds);
                 }
             });
+        }
+
+        if (!empty($otherCompanySuperAdminEmails)) {
+            $companyMembersQuery->whereNotIn('email', $otherCompanySuperAdminEmails);
         }
 
         // Exclude global platform Super Admin (ID 1) unless the project belongs to company 1
@@ -2586,12 +2629,19 @@ class ProjectController extends Controller
 
         $members = Member::whereIn('id', $allTargetMemberIds)
             ->where('status', 1)
-            ->when(!empty($companyNames), function ($q) use ($companyNames, $assignedProjectMemberIds) {
-                $q->where(function ($sq) use ($companyNames, $assignedProjectMemberIds) {
-                    $sq->whereNull('company_name')
-                      ->orWhere('company_name', '')
-                      ->orWhereIn('company_name', $companyNames);
-
+            ->when(!empty($otherCompanySuperAdminEmails), function ($q) use ($otherCompanySuperAdminEmails) {
+                $q->whereNotIn('email', $otherCompanySuperAdminEmails);
+            })
+            ->when(!empty($companyNames), function ($q) use ($companyNames, $companySuperAdminIds, $assignedProjectMemberIds) {
+                $q->where(function ($sq) use ($companyNames, $companySuperAdminIds, $assignedProjectMemberIds) {
+                    $sq->whereIn('company_name', $companyNames);
+                    if (!empty($companySuperAdminIds)) {
+                        $sq->orWhere(function ($inner) use ($companySuperAdminIds) {
+                            $inner->where(function ($n) {
+                                $n->whereNull('company_name')->orWhere('company_name', '');
+                            })->whereIn('created_by', $companySuperAdminIds);
+                        });
+                    }
                     if (!empty($assignedProjectMemberIds)) {
                         $sq->orWhereIn('id', $assignedProjectMemberIds);
                     }
