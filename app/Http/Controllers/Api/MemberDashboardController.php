@@ -7217,9 +7217,16 @@ $completed = SurveyPlan::whereHas(
      * Retrieves all vehicles assigned to or used by the authenticated token-holding member,
      * including assignment periods, project details, and statuses.
      *
+     * @tag Member Fleet & Vehicles
+     * @tags Member Fleet & Vehicles
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
+    #[QueryParameter('status', description: 'Filter vehicle history by status: "active", "completed", "returned", or "inactive".', type: 'string', example: 'active')]
+    #[QueryParameter('project_id', description: 'Filter vehicle history by construction project ID.', type: 'integer', example: 1)]
+    #[QueryParameter('from_date', description: 'Filter vehicle history assigned on or after this date (YYYY-MM-DD).', type: 'string', example: '2026-11-01')]
+    #[QueryParameter('to_date', description: 'Filter vehicle history assigned on or before this date (YYYY-MM-DD).', type: 'string', example: '2026-11-30')]
+    #[QueryParameter('search', description: 'Search vehicle history by vehicle code, plate number, make, model, or project name.', type: 'string', example: 'RJ14')]
     public function vehicleHistory(Request $request)
     {
         $member = $request->user();
@@ -7381,9 +7388,16 @@ $completed = SurveyPlan::whereHas(
      * Retrieves all equipment allocated to or used by the authenticated token-holding member,
      * including allocation periods, hours used, equipment details, and return statuses.
      *
+     * @tag Member Equipment & Assets
+     * @tags Member Equipment & Assets
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
+    #[QueryParameter('status', description: 'Filter equipment history by status: "active", "returned", "transferred", or "maintenance".', type: 'string', example: 'active')]
+    #[QueryParameter('project_id', description: 'Filter equipment history by construction project ID.', type: 'integer', example: 1)]
+    #[QueryParameter('from_date', description: 'Filter equipment history allocated on or after this date (YYYY-MM-DD).', type: 'string', example: '2026-11-01')]
+    #[QueryParameter('to_date', description: 'Filter equipment history allocated on or before this date (YYYY-MM-DD).', type: 'string', example: '2026-11-30')]
+    #[QueryParameter('search', description: 'Search equipment history by equipment code, serial number, make, model, name, or project name.', type: 'string', example: 'Total Station')]
     public function equipmentHistory(Request $request)
     {
         $member = $request->user();
