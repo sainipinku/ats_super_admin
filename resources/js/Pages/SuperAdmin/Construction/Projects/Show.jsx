@@ -1886,15 +1886,60 @@ function TaskRow({
 
     const taskVisits = useMemo(() => {
         const list = [...(task.survey_visits || task.surveyVisits || [])];
-        if (list.length === 0 && Array.isArray(project.survey_visits)) {
+        if (Array.isArray(project.survey_visits)) {
             project.survey_visits.forEach((v) => {
-                if (Number(v.task_id) === Number(task.id)) {
+                const matches =
+                    Number(v.task_id) === Number(task.id) ||
+                    Number(v.execution_task_id) === Number(task.id) ||
+                    (task.execution_task_id && Number(v.execution_task_id) === Number(task.execution_task_id)) ||
+                    (task.unified_task_id && Number(v.task_id) === Number(task.unified_task_id)) ||
+                    (task.legacy_task_id && (Number(v.execution_task_id) === Number(task.legacy_task_id) || Number(v.task_id) === Number(task.legacy_task_id)));
+                if (matches && !list.some((existing) => Number(existing.id) === Number(v.id))) {
                     list.push(v);
                 }
             });
         }
         return list;
     }, [task, project]);
+
+    const isDriverTask = useMemo(() => {
+        const sup = task.supervisor;
+        if (sup?.is_driver) return true;
+        const roleText = [
+            task.title,
+            sup?.role_badge,
+            sup?.designation,
+            sup?.role_names,
+            sup?.role_name,
+            sup?.assigned_role_names,
+        ].flat().filter(Boolean).join(" ").toLowerCase();
+        if (/driver|vehicle/i.test(roleText)) return true;
+        const assignees = task.assignees || task.task_assignments || task.assignments || [];
+        return assignees.some((a) => {
+            const aRole = a.assignment_role || a.project_role || a.role?.name || a.role?.slug || "";
+            const m = a.member || {};
+            return /driver|vehicle/i.test(aRole) || m.is_driver || /driver|vehicle/i.test(m.designation || "");
+        });
+    }, [task]);
+
+    const isSurveyorTask = useMemo(() => {
+        const sup = task.supervisor;
+        const roleText = [
+            task.title,
+            sup?.role_badge,
+            sup?.designation,
+            sup?.role_names,
+            sup?.role_name,
+            sup?.assigned_role_names,
+        ].flat().filter(Boolean).join(" ").toLowerCase();
+        if (/survey/i.test(roleText)) return true;
+        const assignees = task.assignees || task.task_assignments || task.assignments || [];
+        return assignees.some((a) => {
+            const aRole = a.assignment_role || a.project_role || a.role?.name || a.role?.slug || "";
+            const m = a.member || {};
+            return /survey/i.test(aRole) || /survey/i.test(m.designation || "");
+        });
+    }, [task]);
 
     const projectTeamMembers = useMemo(() => {
         const list = project.team_members || project.teamMembers || [];
@@ -1973,7 +2018,7 @@ function TaskRow({
     }, [project.drafting_jobs, project.draftingJobs, task, taskVisits]);
 
     const isSurveyApproved = useMemo(() => {
-        if (task.status === "survey_approved" || task.status === "drafting_in_progress" || task.status === "completed") {
+        if (task.status === "survey_approved" || task.status === "drafting_in_progress") {
             return true;
         }
         if (taskDraftingJob) return true;
@@ -1981,13 +2026,13 @@ function TaskRow({
             const sub = v.submission;
             return v.status === 2 || v.status === "approved" || (sub && (sub.status === 2 || sub.status_key === "approved"));
         });
-        if (hasApprovedVisit) return true;
+        if (hasApprovedVisit && isSurveyorTask) return true;
         const submissions = project.survey_submissions || project.surveySubmissions || [];
         return submissions.some((s) => {
             const matches = Number(s.task_id) === Number(task.id) || Number(s.execution_task_id) === Number(task.id) || taskVisits.some((v) => Number(v.id) === Number(s.survey_visit_id));
-            return matches && (s.status === 2 || s.status_key === "approved");
+            return matches && (s.status === 2 || s.status_key === "approved") && isSurveyorTask;
         });
-    }, [task.status, taskDraftingJob, taskVisits, project.survey_submissions, project.surveySubmissions, task.id]);
+    }, [task.status, taskDraftingJob, taskVisits, project.survey_submissions, project.surveySubmissions, task.id, isSurveyorTask]);
 
     const isDraftingAssigned = useMemo(() => {
         if (Boolean(taskDraftingJob)) return true;
@@ -2189,12 +2234,15 @@ function TaskRow({
                     setShowDetailsModal(false);
                     setShowRevisionInput(false);
                     setRevisionRemarks("");
-                    toast.success(decision === "approved" ? "Survey task approved!" : "Revision requested from surveyor.");
+                    const successMsg = decision === "approved"
+                        ? (isDriverTask || !isSurveyorTask ? "Task approved and marked as completed!" : "Survey task approved!")
+                        : (isDriverTask ? "Revision requested from driver." : (isSurveyorTask ? "Revision requested from surveyor." : "Revision requested."));
+                    toast.success(successMsg);
                 },
                 onError: (errors) => {
                     const firstError = Object.values(errors)[0];
                     if (firstError) toast.error(firstError);
-                    else toast.error("Failed to update survey review.");
+                    else toast.error("Failed to update task review.");
                 },
             }
         );
@@ -2929,7 +2977,7 @@ function TaskRow({
                                         {task.task_code}
                                     </span>
                                     <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                                        Survey Task Submission Details
+                                        {isDriverTask ? "Driver Task Submission Details" : (isSurveyorTask ? "Survey Task Submission Details" : "Task Submission Details")}
                                     </h3>
                                     <StatusBadge value={task.status} />
                                     <StatusBadge value={task.priority} />
@@ -2995,7 +3043,7 @@ function TaskRow({
                                     <div className="flex items-center justify-between">
                                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
                                             <span>📋</span>
-                                            <span>Submitted Day Data & Field Reports ({taskVisits.length})</span>
+                                            <span>{isDriverTask ? `Submitted Trip & Field Reports (${taskVisits.length})` : (isSurveyorTask ? `Submitted Survey Data & Field Reports (${taskVisits.length})` : `Submitted Day Data & Field Reports (${taskVisits.length})`)}</span>
                                         </h4>
                                         <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
                                             Latest: Day {taskVisits[0]?.day_number || 1}
@@ -3011,16 +3059,16 @@ function TaskRow({
                                             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-slate-800">
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 font-bold text-sm">
-                                                        {(v.checked_in_by?.name || "S").charAt(0).toUpperCase()}
+                                                        {(v.checked_in_by?.name || (isDriverTask ? "D" : isSurveyorTask ? "S" : "M")).charAt(0).toUpperCase()}
                                                     </div>
                                                     <div>
                                                         <div className="flex items-center gap-2">
                                                             <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                                                                Day {v.day_number || 1} Survey Update
+                                                                Day {v.day_number || 1} {isDriverTask ? "Driver Trip Update" : (isSurveyorTask ? "Survey Update" : "Task Update")}
                                                             </span>
                                                         </div>
                                                         <p className="text-xs text-slate-500">
-                                                            Submitted by <span className="font-semibold text-slate-700 dark:text-slate-300">{v.checked_in_by?.name || "Field Surveyor"}</span> • {formatDateTime(v.updated_at || v.created_at) || "N/A"}
+                                                            Submitted by <span className="font-semibold text-slate-700 dark:text-slate-300">{v.checked_in_by?.name || (isDriverTask ? "Driver" : isSurveyorTask ? "Field Surveyor" : "Team Member")}</span> • {formatDateTime(v.updated_at || v.created_at) || "N/A"}
                                                             {v.checked_in_by?.phone ? ` • Tel: ${v.checked_in_by.phone}` : ""}
                                                         </p>
                                                     </div>
@@ -3093,7 +3141,9 @@ function TaskRow({
                                                 <div className="mt-4 space-y-2.5">
                                                     {v.remarks && (
                                                         <div className="rounded-xl bg-amber-50/70 p-3 text-xs dark:bg-amber-950/20">
-                                                            <p className="font-semibold text-amber-900 dark:text-amber-200">Survey Remarks</p>
+                                                            <p className="font-semibold text-amber-900 dark:text-amber-200">
+                                                                {isDriverTask ? "Driver / Trip Remarks" : (isSurveyorTask ? "Survey Remarks" : "Task Remarks")}
+                                                            </p>
                                                             <p className="mt-1 text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{v.remarks}</p>
                                                         </div>
                                                     )}
@@ -3106,12 +3156,14 @@ function TaskRow({
                                             {/* Attached Files */}
                                             {v.file_path && (
                                                 <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Attached Survey Files & Reports</p>
+                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                                        {isDriverTask ? "Attached Trip & Vehicle Documents" : (isSurveyorTask ? "Attached Survey Files & Reports" : "Attached Task Files & Reports")}
+                                                    </p>
                                                     <div className="mt-2 flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-lg">📄</span>
                                                             <span className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate max-w-sm">
-                                                                {v.file_path.split("/").pop() || "Survey Data Report"}
+                                                                {v.file_path.split("/").pop() || (isDriverTask ? "Driver Trip Report" : "Survey Data Report")}
                                                             </span>
                                                         </div>
                                                         <a
@@ -3131,7 +3183,7 @@ function TaskRow({
                                             {Array.isArray(v.photos) && v.photos.length > 0 && (
                                                 <div className="mt-4">
                                                     <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                                        Site Proof Photos ({v.photos.length})
+                                                        {isDriverTask ? "Driver Trip & Delivery Proof Photos" : (isSurveyorTask ? "Site Survey Proof Photos" : "Task Proof Photos")} ({v.photos.length})
                                                     </p>
                                                     <div className="mt-2 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                                                         {v.photos.map((photoUrl, pIdx) => (
@@ -3163,10 +3215,14 @@ function TaskRow({
                                         📋
                                     </span>
                                     <h4 className="mt-3 text-sm font-bold text-slate-900 dark:text-white">
-                                        No Survey Submissions Yet
+                                        {isDriverTask ? "No Driver Submissions Yet" : (isSurveyorTask ? "No Survey Submissions Yet" : "No Task Submissions Yet")}
                                     </h4>
                                     <p className="mt-1 max-w-md mx-auto text-xs text-slate-500">
-                                        The survey team has not submitted field data for this task yet. When they complete day work and submit from the mobile app, full metrics, points, RAW/PDF files, and photos will appear here.
+                                        {isDriverTask
+                                            ? "The driver has not submitted trip data or proof photos for this task yet. When they complete day work and submit from the mobile app, details and photos will appear here."
+                                            : (isSurveyorTask
+                                                ? "The survey team has not submitted field data for this task yet. When they complete day work and submit from the mobile app, full metrics, points, RAW/PDF files, and photos will appear here."
+                                                : "The assigned member has not submitted updates or proof photos for this task yet. When they submit from the mobile app, details and photos will appear here.")}
                                     </p>
                                 </div>
                             )}
@@ -3234,7 +3290,7 @@ function TaskRow({
                             )}
 
                             {/* Drafting & CAD Drawing Phase Section */}
-                            {(isSurveyApproved || isDraftingAssigned || isCurrentUserDraftPerson || drawingRevisions.length > 0) && (
+                            {((isSurveyorTask && isSurveyApproved) || isDraftingAssigned || isCurrentUserDraftPerson || drawingRevisions.length > 0) && (
                                 <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-4.5 dark:border-indigo-900/60 dark:bg-indigo-950/20">
                                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 pb-3 dark:border-indigo-900/60">
                                         <div className="flex items-center gap-2">
@@ -3659,7 +3715,23 @@ function TaskRow({
                                 ) : (
                                     <>
                                         {/* Admin / Owner / Supervisor Actions */}
-                                        {isSurveyApproved || isDraftingAssigned ? (
+                                        {task.status === "completed" ? (
+                                            <>
+                                                <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                                    ✓ Task Completed
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowDetailsModal(false);
+                                                        setShowTransferModal(true);
+                                                    }}
+                                                    className="rounded-xl border border-violet-300 bg-violet-50 px-3.5 py-2 text-xs font-semibold text-violet-800 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200"
+                                                >
+                                                    Re-assign / Transfer Task
+                                                </button>
+                                            </>
+                                        ) : (isSurveyApproved || isDraftingAssigned) ? (
                                             <>
                                                 <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
                                                     ✓ Survey Approved
@@ -3697,7 +3769,7 @@ function TaskRow({
                                                     onClick={() => handleReviewSurvey("approved")}
                                                     className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-emerald-500 disabled:opacity-60"
                                                 >
-                                                    Approve Survey
+                                                    {isDriverTask || !isSurveyorTask ? "Complete Task" : "Approve Survey"}
                                                 </button>
                                             </>
                                         )}
@@ -4418,27 +4490,30 @@ function mergedTasksForExecutionList(project) {
             item_title: item.item_title ?? item.title ?? "",
         }));
 
-        // Cross-match if checklists were attached to the other table representation
-        let fallbackChecklists = [];
-        if (sourceTag === "unified" && legacyChecklists.length === 0 && unifiedChecklists.length === 0) {
-            const match = legacyTasks.find((et) =>
+        // Find matching counterpart in other table
+        const partnerMatch = sourceTag === "unified"
+            ? legacyTasks.find((et) =>
                 et.id === task.id ||
                 (et.task_code && task.task_code && et.task_code === task.task_code) ||
                 (et.title && task.title && et.title.trim().toLowerCase() === task.title.trim().toLowerCase())
-            );
-            if (match && Array.isArray(match.checklists)) {
-                fallbackChecklists = match.checklists;
-            }
-        } else if (sourceTag === "legacy" && legacyChecklists.length === 0 && unifiedChecklists.length === 0) {
-            const match = unifiedTasks.find((ut) =>
+            )
+            : unifiedTasks.find((ut) =>
                 ut.id === task.id ||
                 (ut.task_code && task.task_code && ut.task_code === task.task_code) ||
                 (ut.title && task.title && ut.title.trim().toLowerCase() === task.title.trim().toLowerCase())
             );
-            if (match) {
-                const rawUt = Array.isArray(match.checklist_items)
-                    ? match.checklist_items
-                    : (Array.isArray(match.checklistItems) ? match.checklistItems : []);
+
+        // Cross-match if checklists were attached to the other table representation
+        let fallbackChecklists = [];
+        if (sourceTag === "unified" && legacyChecklists.length === 0 && unifiedChecklists.length === 0) {
+            if (partnerMatch && Array.isArray(partnerMatch.checklists)) {
+                fallbackChecklists = partnerMatch.checklists;
+            }
+        } else if (sourceTag === "legacy" && legacyChecklists.length === 0 && unifiedChecklists.length === 0) {
+            if (partnerMatch) {
+                const rawUt = Array.isArray(partnerMatch.checklist_items)
+                    ? partnerMatch.checklist_items
+                    : (Array.isArray(partnerMatch.checklistItems) ? partnerMatch.checklistItems : []);
                 fallbackChecklists = rawUt.map((item) => ({
                     ...item,
                     is_completed: item.is_completed ?? item.completed_at ?? false,
@@ -4455,6 +4530,19 @@ function mergedTasksForExecutionList(project) {
             if (!seenChecklist.has(key)) {
                 seenChecklist.add(key);
                 mergedChecklists.push(it);
+            }
+        }
+
+        // Cross-merge survey visits across legacy and unified mirrors
+        const selfVisits = Array.isArray(task.survey_visits) ? task.survey_visits : (Array.isArray(task.surveyVisits) ? task.surveyVisits : []);
+        const partnerVisits = partnerMatch ? (Array.isArray(partnerMatch.survey_visits) ? partnerMatch.survey_visits : (Array.isArray(partnerMatch.surveyVisits) ? partnerMatch.surveyVisits : [])) : [];
+        const combinedVisits = [...selfVisits, ...partnerVisits];
+        const seenVisitIds = new Set();
+        const mergedVisits = [];
+        for (const v of combinedVisits) {
+            if (v && v.id && !seenVisitIds.has(v.id)) {
+                seenVisitIds.add(v.id);
+                mergedVisits.push(v);
             }
         }
         const fallbackCode = `${sourceTag.toUpperCase()}-${task.id}`;
@@ -4494,6 +4582,9 @@ function mergedTasksForExecutionList(project) {
         return {
             ...pick(Object.keys(task)),
             checklists: mergedChecklists,
+            survey_visits: mergedVisits,
+            legacy_task_id: sourceTag === "unified" ? partnerMatch?.id : (task.legacy_task_id || task.id),
+            unified_task_id: sourceTag === "legacy" ? partnerMatch?.id : (task.unified_task_id || task.id),
             task_code: task.task_code || fallbackCode,
             status: task.status || task.status_key || "pending",
             priority: task.priority || "medium",

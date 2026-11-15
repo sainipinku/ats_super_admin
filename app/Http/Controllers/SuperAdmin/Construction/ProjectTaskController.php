@@ -820,14 +820,82 @@ class ProjectTaskController extends Controller implements HasMiddleware
         }
 
         if ($decision === 'approved') {
+            $isDriverTask = false;
+            $isSurveyorTask = false;
+
+            // Check legacy task supervisor & role
             if ($legacyTask) {
-                $legacyTask->status = 'survey_approved';
-                $legacyTask->save();
+                $supervisor = $legacyTask->supervisor;
+                $supRoles = strtolower(implode(' ', array_filter([
+                    $supervisor?->name,
+                    $supervisor?->designation,
+                    is_array($supervisor?->role_names) ? implode(' ', $supervisor->role_names) : $supervisor?->role_names,
+                    $legacyTask->title,
+                ])));
+                if ($supervisor?->is_driver || str_contains($supRoles, 'driver') || str_contains($supRoles, 'vehicle')) {
+                    $isDriverTask = true;
+                }
+                if (str_contains($supRoles, 'survey')) {
+                    $isSurveyorTask = true;
+                }
             }
+
+            // Check unified task supervisor & assignments
             if ($unifiedTask) {
-                $unifiedTask->status = 'review';
-                $unifiedTask->client_review_status = 'approved';
-                $unifiedTask->save();
+                $supervisor = $unifiedTask->supervisor;
+                $supRoles = strtolower(implode(' ', array_filter([
+                    $supervisor?->name,
+                    $supervisor?->designation,
+                    is_array($supervisor?->role_names) ? implode(' ', $supervisor->role_names) : $supervisor?->role_names,
+                    $unifiedTask->title,
+                ])));
+                if ($supervisor?->is_driver || str_contains($supRoles, 'driver') || str_contains($supRoles, 'vehicle')) {
+                    $isDriverTask = true;
+                }
+                if (str_contains($supRoles, 'survey')) {
+                    $isSurveyorTask = true;
+                }
+
+                if ($unifiedTask->relationLoaded('assignments') || method_exists($unifiedTask, 'assignments')) {
+                    foreach ($unifiedTask->assignments ?? [] as $asg) {
+                        $roleName = strtolower($asg->assignment_role ?? $asg->project_role ?? '');
+                        if (str_contains($roleName, 'driver') || str_contains($roleName, 'vehicle')) {
+                            $isDriverTask = true;
+                        }
+                        if (str_contains($roleName, 'survey')) {
+                            $isSurveyorTask = true;
+                        }
+                    }
+                }
+            }
+
+            if ($isDriverTask || !$isSurveyorTask) {
+                // Directly mark driver / non-survey tasks as completed
+                if ($legacyTask) {
+                    $legacyTask->status = 'completed';
+                    $legacyTask->progress_percent = 100;
+                    $legacyTask->actual_end_date = now();
+                    $legacyTask->save();
+                }
+                if ($unifiedTask) {
+                    $unifiedTask->status = 'completed';
+                    $unifiedTask->progress_percent = 100;
+                    $unifiedTask->actual_end_date = now();
+                    $unifiedTask->is_completed = true;
+                    $unifiedTask->client_review_status = 'approved';
+                    $unifiedTask->save();
+                }
+            } else {
+                // Field surveyor tasks move to survey_approved for draftsman handoff
+                if ($legacyTask) {
+                    $legacyTask->status = 'survey_approved';
+                    $legacyTask->save();
+                }
+                if ($unifiedTask) {
+                    $unifiedTask->status = 'review';
+                    $unifiedTask->client_review_status = 'approved';
+                    $unifiedTask->save();
+                }
             }
 
         } elseif ($decision === 'revision_requested') {

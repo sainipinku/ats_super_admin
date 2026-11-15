@@ -6315,7 +6315,15 @@ $completed = SurveyPlan::whereHas(
 
             $totalDays = $this->surveyData->getTotalSurveyDays($plan, $project);
 
-            $existingVisit = SurveyVisit::where('task_id', $legacyTask->id)
+            $existingVisit = SurveyVisit::where(function ($q) use ($legacyTask, $unifiedTask) {
+                if ($unifiedTask) {
+                    $q->where('task_id', $unifiedTask->id);
+                }
+                if ($legacyTask) {
+                    $q->orWhere('execution_task_id', $legacyTask->id)
+                        ->orWhere('task_id', $legacyTask->id);
+                }
+            })
                 ->where(function ($q) use ($member) {
                     $q->where('checked_in_by_member_id', $member->id)
                         ->orWhereNull('checked_in_by_member_id');
@@ -6585,8 +6593,8 @@ $completed = SurveyPlan::whereHas(
 
         if ($existingVisit) {
             $existingVisit->update([
-                'task_id' => $legacyTask->id,
-                'execution_task_id' => $legacyTask->id,
+                'task_id' => $unifiedTask?->id ?? $legacyTask->id,
+                'execution_task_id' => $legacyTask?->id,
                 'project_id' => $project?->id ?? $existingVisit->project_id,
                 'survey_plan_id' => $surveyPlanId ?? $existingVisit->survey_plan_id,
                 'checked_in_by_member_id' => $member->id,
@@ -6605,8 +6613,8 @@ $completed = SurveyPlan::whereHas(
             $visit = $existingVisit;
         } else {
             $visit = SurveyVisit::create([
-                'task_id' => $legacyTask->id,
-                'execution_task_id' => $legacyTask->id,
+                'task_id' => $unifiedTask?->id ?? $legacyTask->id,
+                'execution_task_id' => $legacyTask?->id,
                 'project_id' => $project?->id,
                 'survey_plan_id' => $surveyPlanId,
                 'checked_in_by_member_id' => $member->id,
