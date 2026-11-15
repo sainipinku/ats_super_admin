@@ -52,5 +52,22 @@ class TaskUnassignmentFeatureTest extends TestCase
         $this->assertStringContainsString('ExecutionTaskAssignee::where', $code);
         $this->assertStringContainsString('TaskAssignment::where', $code);
     }
+
+    public function test_drafting_jobs_cleanup_does_not_query_non_existent_columns_on_drafting_jobs_table(): void
+    {
+        $code = file_get_contents(app_path('Http/Controllers/SuperAdmin/Construction/ProjectTaskController.php'));
+
+        // construction_drafting_jobs table does NOT have task_id or execution_task_id columns.
+        // It must NOT do DraftingJob::... ->orWhere('task_id' ...) or ->orWhere('execution_task_id' ...)
+        $this->assertDoesNotMatchRegularExpression(
+            '/DraftingJob::[^;]+(?:where|orWhere)\(\s*[\'"](?:task_id|execution_task_id)[\'"]/i',
+            $code,
+            'DraftingJob must not be queried directly with task_id or execution_task_id because those columns do not exist on construction_drafting_jobs table'
+        );
+
+        // It must cleanly query SurveyVisit and SurveySubmission to resolve drafting jobs
+        $this->assertStringContainsString('SurveyVisit::where(\'project_id\', $project->id)', $code);
+        $this->assertStringContainsString('SurveySubmission::where(\'project_id\', $project->id)', $code);
+    }
 }
 

@@ -577,9 +577,18 @@ class ProjectTaskController extends Controller implements HasMiddleware
             return Redirect::back()->with('error', 'Task not found.');
         }
 
+        if ($legacyTask && (int) $legacyTask->project_id !== (int) $project->id) {
+            abort(403, 'Task does not belong to this project.');
+        }
+        if ($unifiedTask && (int) $unifiedTask->project_id !== (int) $project->id) {
+            abort(403, 'Task does not belong to this project.');
+        }
+
         try {
             DB::transaction(function () use ($project, $legacyTask, $unifiedTask, $taskId, $actor, $request) {
                 $previousSupervisorId = null;
+                $wasDraftingInProgress = ($legacyTask && $legacyTask->status === 'drafting_in_progress')
+                    || ($unifiedTask && $unifiedTask->status === 'drafting_in_progress');
 
                 if ($legacyTask) {
                     $previousSupervisorId = $legacyTask->supervisor_member_id;
@@ -613,17 +622,44 @@ class ProjectTaskController extends Controller implements HasMiddleware
                         ]);
                 }
 
-                DraftingJob::where('project_id', $project->id)
-                    ->where(function ($q) use ($legacyTask, $unifiedTask, $taskId) {
+                $taskIds = array_values(array_filter([
+                    (int) $taskId,
+                    $legacyTask?->id,
+                    $unifiedTask?->id,
+                ]));
+
+                $surveyVisitIds = SurveyVisit::where('project_id', $project->id)
+                    ->where(function ($q) use ($taskIds, $legacyTask, $unifiedTask) {
+                        $q->whereIn('task_id', $taskIds);
                         if ($legacyTask) {
                             $q->orWhere('execution_task_id', $legacyTask->id);
                         }
                         if ($unifiedTask) {
                             $q->orWhere('task_id', $unifiedTask->id);
                         }
-                        $q->orWhere('task_id', $taskId);
                     })
-                    ->delete();
+                    ->pluck('id');
+
+                $submissionIds = collect();
+                if ($surveyVisitIds->isNotEmpty()) {
+                    $submissionIds = SurveySubmission::where('project_id', $project->id)
+                        ->whereIn('survey_visit_id', $surveyVisitIds)
+                        ->pluck('id');
+                }
+
+                if ($submissionIds->isNotEmpty()) {
+                    DraftingJob::where('project_id', $project->id)
+                        ->whereIn('survey_submission_id', $submissionIds)
+                        ->delete();
+                }
+
+                if ($wasDraftingInProgress && $previousSupervisorId) {
+                    DraftingJob::where('project_id', $project->id)
+                        ->where('assigned_to_member_id', $previousSupervisorId)
+                        ->where('status', 'queued')
+                        ->doesntHave('drawingRevisions')
+                        ->delete();
+                }
 
                 try {
                     app(ConstructionActivityService::class)->log(
