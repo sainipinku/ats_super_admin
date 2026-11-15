@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\ProjectBudget;
 use App\Models\ProjectTeamMember;
 use App\Models\ConstructionRole;
+use App\Models\Role;
 use App\Models\AttendanceRecord;
 use App\Models\DailyProgressReport;
 use App\Models\ExecutionTask;
@@ -328,26 +329,39 @@ class ProjectController extends Controller
         $rolesQuery = ConstructionRole::where('status', 'active')
             ->whereNotIn('slug', ['super_admin', 'superadmin']);
 
-        if ($companyId) {
-            $companyRoles = (clone $rolesQuery)
-                ->where('company_id', $companyId)
-                ->orderBy('name')
-                ->get(['id', 'name', 'slug', 'company_id']);
+        // Official roles matching Role Management listing
+        $officialRoles = Role::accessibleFor($actor)
+            ->where(function ($q) {
+                $q->where('status', 1)->orWhere('status', 'active');
+            })
+            ->whereNull('deleted_at')
+            ->orderBy('id')
+            ->get(['id', 'name', 'slug']);
 
-            $roles = $companyRoles->isNotEmpty()
-                ? $companyRoles
-                : (clone $rolesQuery)->whereNull('company_id')->orderBy('name')->get(['id', 'name', 'slug', 'company_id']);
+        if ($officialRoles->isNotEmpty()) {
+            $roles = $officialRoles;
         } else {
-            $roles = $rolesQuery->whereNull('company_id')->orderBy('name')->get(['id', 'name', 'slug', 'company_id']);
-        }
+            if ($companyId) {
+                $companyRoles = (clone $rolesQuery)
+                    ->where('company_id', $companyId)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'slug', 'company_id']);
 
-        if ($roles->isEmpty()) {
-            $roles = ConstructionRole::where('status', 'active')
-                ->whereNotIn('slug', ['super_admin', 'superadmin'])
-                ->orderBy('name')
-                ->get(['id', 'name', 'slug', 'company_id'])
-                ->unique('slug')
-                ->values();
+                $roles = $companyRoles->isNotEmpty()
+                    ? $companyRoles
+                    : (clone $rolesQuery)->whereNull('company_id')->orderBy('name')->get(['id', 'name', 'slug', 'company_id']);
+            } else {
+                $roles = $rolesQuery->whereNull('company_id')->orderBy('name')->get(['id', 'name', 'slug', 'company_id']);
+            }
+
+            if ($roles->isEmpty()) {
+                $roles = ConstructionRole::where('status', 'active')
+                    ->whereNotIn('slug', ['super_admin', 'superadmin'])
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'slug', 'company_id'])
+                    ->unique('slug')
+                    ->values();
+            }
         }
 
         return Inertia::render(

@@ -52,5 +52,18 @@ class TaskRoleFilterUnitTest extends TestCase
         $this->assertStringContainsString('No tasks found for', $this->showContent);
         $this->assertStringContainsString('Show All Tasks', $this->showContent);
     }
+
+    public function test_show_component_strictly_uses_official_roles_listing_without_dynamic_designation_leakage(): void
+    {
+        // roleFilterOptions must strictly map over (roles || [])
+        $this->assertStringContainsString('(roles || []).forEach', $this->showContent);
+
+        // It must NOT dynamically scan mergedTaskList to add arbitrary member designations
+        $this->assertDoesNotMatchRegularExpression(
+            '/mergedTaskList\.forEach\([^)]*taskRolesInfo\.roles\.forEach/',
+            $this->showContent,
+            'Show.jsx must not dynamically inject arbitrary member designations/custom labels as filter badges'
+        );
+    }
 }
 

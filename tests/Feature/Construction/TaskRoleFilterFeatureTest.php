@@ -48,5 +48,15 @@ class TaskRoleFilterFeatureTest extends TestCase
             'Show.jsx must support unassigned filter option'
         );
     }
+
+    public function test_project_controller_loads_official_roles_from_role_management(): void
+    {
+        $controllerPath = app_path('Http/Controllers/SuperAdmin/Construction/ProjectController.php');
+        $this->assertFileExists($controllerPath);
+
+        $code = file_get_contents($controllerPath);
+        $this->assertStringContainsString('Role::accessibleFor', $code);
+        $this->assertStringContainsString('\'roles\' => $roles', $code);
+    }
 }
 

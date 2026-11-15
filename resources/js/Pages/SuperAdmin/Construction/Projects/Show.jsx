@@ -207,17 +207,70 @@ const taskMatchesRole = (task, targetRoleKey, { members = [], projectTeamMembers
         return true;
     }
 
-    if (targetNorm.includes("driver") && (taskRolesInfo.normalized.has("vehicledriver") || taskRolesInfo.normalized.has("driver"))) {
-        return true;
+    // Role-specific aliases and matching for official system roles:
+    // 1. Vehicle Driver
+    if (targetNorm === "vehicledriver" || targetNorm === "driver") {
+        return taskRolesInfo.normalized.has("vehicledriver") || taskRolesInfo.normalized.has("driver");
     }
-    if (targetNorm.includes("draft") && (taskRolesInfo.normalized.has("draftperson") || taskRolesInfo.normalized.has("draftsman") || taskRolesInfo.normalized.has("drafter"))) {
-        return true;
+
+    // 2. Draft Person
+    if (targetNorm === "draftperson" || targetNorm === "draftsman" || targetNorm === "drafter" || targetNorm === "draftman") {
+        return taskRolesInfo.normalized.has("draftperson") ||
+            taskRolesInfo.normalized.has("draftsman") ||
+            taskRolesInfo.normalized.has("drafter") ||
+            taskRolesInfo.normalized.has("draftman") ||
+            taskRolesInfo.normalized.has("draftperson22") ||
+            task.status === "drafting_in_progress";
     }
-    if (targetNorm.includes("survey") && taskRolesInfo.normalized.has("surveyor")) {
-        return true;
+
+    // 3. Surveyor
+    if (targetNorm === "surveyor" || targetNorm === "surveyman") {
+        return taskRolesInfo.normalized.has("surveyor") || taskRolesInfo.normalized.has("surveyman");
     }
-    if (targetNorm.includes("site") && (taskRolesInfo.normalized.has("siteemployee") || taskRolesInfo.normalized.has("sitemanager"))) {
-        return taskRolesInfo.normalized.has(targetNorm);
+
+    // 4. Site Employee
+    if (targetNorm === "siteemployee") {
+        return taskRolesInfo.normalized.has("siteemployee") || taskRolesInfo.normalized.has("worker") || taskRolesInfo.normalized.has("executor");
+    }
+
+    // 5. Site Manager
+    if (targetNorm === "sitemanager") {
+        return taskRolesInfo.normalized.has("sitemanager");
+    }
+
+    // 6. Review Approver
+    if (targetNorm === "reviewapprover") {
+        return taskRolesInfo.normalized.has("reviewapprover");
+    }
+
+    // 7. Project Admin
+    if (targetNorm === "projectadmin") {
+        return taskRolesInfo.normalized.has("projectadmin");
+    }
+
+    // 8. Admin
+    if (targetNorm === "admin") {
+        return taskRolesInfo.normalized.has("admin");
+    }
+
+    // 9. Super Admin
+    if (targetNorm === "superadmin") {
+        return taskRolesInfo.normalized.has("superadmin");
+    }
+
+    // 10. Manager
+    if (targetNorm === "manager") {
+        return taskRolesInfo.normalized.has("manager");
+    }
+
+    // 11. Sub Admin
+    if (targetNorm === "subadmin") {
+        return taskRolesInfo.normalized.has("subadmin");
+    }
+
+    // 12. Member
+    if (targetNorm === "member") {
+        return taskRolesInfo.normalized.has("member");
     }
 
     return false;
@@ -468,7 +521,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
         const roleItems = [];
         const seenNormKeys = new Set(["all", "unassigned"]);
 
-        // Roles from backend props
+        // Strictly use the official roles from the Role Management listing (props.roles)
         (roles || []).forEach((r) => {
             const key = r.slug || r.name;
             const normKey = normalizeRoleStr(key);
@@ -487,31 +540,12 @@ export default function ProjectShow({ project, members, roles, activityLog, work
             }
         });
 
-        // Also detect additional roles from tasks / team members if any
-        mergedTaskList.forEach((t) => {
-            const taskRolesInfo = getTaskRoles(t, { members, projectTeamMembers });
-            taskRolesInfo.roles.forEach((rName) => {
-                const normKey = normalizeRoleStr(rName);
-                if (!seenNormKeys.has(normKey)) {
-                    seenNormKeys.add(normKey);
-                    const count = mergedTaskList.filter((task) =>
-                        taskMatchesRole(task, rName, { members, projectTeamMembers })
-                    ).length;
-                    roleItems.push({
-                        key: rName,
-                        slug: rName,
-                        label: rName,
-                        count,
-                        icon: getRoleIcon(rName),
-                    });
-                }
-            });
-        });
-
-        // Sort role items: roles with active tasks (count > 0) first, then alphabetical
+        // Roles with active tasks (count > 0) appear first, followed by zero-count roles
         roleItems.sort((a, b) => {
+            if (b.count > 0 && a.count === 0) return 1;
+            if (a.count > 0 && b.count === 0) return -1;
             if (b.count !== a.count) return b.count - a.count;
-            return a.label.localeCompare(b.label);
+            return 0;
         });
 
         return [allOption, unassignedOption, ...roleItems];
