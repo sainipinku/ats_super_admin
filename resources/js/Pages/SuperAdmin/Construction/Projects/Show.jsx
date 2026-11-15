@@ -1939,7 +1939,7 @@ function TaskRow({
 
                     <div className="flex flex-col min-w-0">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                            {isDraftingAssigned ? "Draft Person" : "Supervisor"}
+                            {isDraftingAssigned ? "Draft Person" : "Assigned Member"}
                         </span>
                         <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
                             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
@@ -2495,7 +2495,7 @@ function TaskRow({
                                 </div>
                                 <div className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
                                     <div>
-                                        <p className="text-slate-400">Supervisor</p>
+                                        <p className="text-slate-400">Assigned Member</p>
                                         <p className="font-semibold text-slate-800 dark:text-slate-200">{task.supervisor?.name || "Unassigned"}</p>
                                     </div>
                                     <div>
@@ -3266,7 +3266,7 @@ function TaskRow({
                         {/* Current Assignee Banner */}
                         <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
                             <div>
-                                <span className="text-slate-400">Current Supervisor / Assignee:</span>{" "}
+                                <span className="text-slate-400">Current Assigned Member:</span>{" "}
                                 <strong className="text-slate-800 dark:text-slate-200">
                                     {task.supervisor?.name || "Unassigned"}
                                 </strong>

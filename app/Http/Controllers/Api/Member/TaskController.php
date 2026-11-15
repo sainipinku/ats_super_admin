@@ -67,7 +67,6 @@ class TaskController extends Controller
         $memberId = $member->getKey();
 
         $accessibleProjectIds = $this->accessibleProjectIds($member);
-        $adminProjectIds = $this->projectAdminIds($member, $accessibleProjectIds);
 
         $query = Task::query()
             ->with([
@@ -79,25 +78,19 @@ class TaskController extends Controller
                         ->withPivot(['uuid', 'assigned_by', 'start_date', 'end_date', 'is_transferred']);
                 },
             ])
-            ->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
-                $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
-                    $direct->whereHas('assignedMembers', function ($sub) use ($memberId) {
-                        $sub->where('assigned_to', $memberId);
-                    });
-                    if ($accessibleProjectIds !== []) {
-                        $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
-                            $scope->whereNull('project_id')
-                                ->orWhereIn('project_id', $accessibleProjectIds);
-                        });
-                    } else {
-                        $direct->whereNull('project_id');
-                    }
+            ->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
+                $direct->where(function (Builder $sub) use ($memberId) {
+                    $sub->whereHas('assignedMembers', function ($m) use ($memberId) {
+                        $m->where('assigned_to', $memberId);
+                    })->orWhere('assigned_supervisor_member_id', $memberId);
                 });
-
-                if ($adminProjectIds !== []) {
-                    $q->orWhere(function (Builder $admin) use ($adminProjectIds) {
-                        $admin->whereIn('project_id', $adminProjectIds);
+                if ($accessibleProjectIds !== []) {
+                    $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
+                        $scope->whereNull('project_id')
+                            ->orWhereIn('project_id', $accessibleProjectIds);
                     });
+                } else {
+                    $direct->whereNull('project_id');
                 }
             });
 

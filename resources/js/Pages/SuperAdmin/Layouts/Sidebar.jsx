@@ -105,13 +105,6 @@ const navigation = [
                 icon: FaProjectDiagram,
             },
             {
-                label: "Survey Planning",
-                permissions: ["survey_plan.manage", "survey.manage", "survey_plan.view", "survey.view"],
-                href: route("super.construction.survey.index"),
-                active: ["super.construction.survey.*"],
-                icon: FaClipboardList,
-            },
-            {
                 label: "Drawing Approval",
                 permissions: ["drawing_approval.manage", "drafting.manage", "drawing_approval.view", "drafting.view"],
                 href: route("super.construction.drafting.index"),
