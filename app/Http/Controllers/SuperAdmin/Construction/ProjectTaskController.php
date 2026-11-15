@@ -545,6 +545,112 @@ class ProjectTaskController extends Controller implements HasMiddleware
         }
     }
 
+    public function unassignTask(Request $request, Project $project, $taskId): RedirectResponse
+    {
+        $actor = $this->constructionActor() ?? $request->user();
+
+        $taskId = (int) $taskId;
+        $legacyTask = ExecutionTask::find($taskId);
+        $unifiedTask = Task::find($taskId);
+
+        if ($legacyTask === null && $unifiedTask !== null) {
+            if (!empty($unifiedTask->task_code)) {
+                $legacyTask = ExecutionTask::where('task_code', $unifiedTask->task_code)->first();
+            }
+            if ($legacyTask === null && !empty($unifiedTask->title) && !empty($unifiedTask->project_id)) {
+                $legacyTask = ExecutionTask::where('project_id', $unifiedTask->project_id)
+                    ->where('title', $unifiedTask->title)
+                    ->first();
+            }
+        } elseif ($unifiedTask === null && $legacyTask !== null) {
+            if (!empty($legacyTask->task_code)) {
+                $unifiedTask = Task::where('task_code', $legacyTask->task_code)->first();
+            }
+            if ($unifiedTask === null && !empty($legacyTask->title) && !empty($legacyTask->project_id)) {
+                $unifiedTask = Task::where('project_id', $legacyTask->project_id)
+                    ->where('title', $legacyTask->title)
+                    ->first();
+            }
+        }
+
+        if (!$legacyTask && !$unifiedTask) {
+            return Redirect::back()->with('error', 'Task not found.');
+        }
+
+        try {
+            DB::transaction(function () use ($project, $legacyTask, $unifiedTask, $taskId, $actor, $request) {
+                $previousSupervisorId = null;
+
+                if ($legacyTask) {
+                    $previousSupervisorId = $legacyTask->supervisor_member_id;
+                    $legacyTask->supervisor_member_id = null;
+                    if (in_array($legacyTask->status, ['in_progress', 'drafting_in_progress', 'draft', 'pending'], true)) {
+                        $legacyTask->status = 'planned';
+                    }
+                    $legacyTask->save();
+
+                    ExecutionTaskAssignee::where('execution_task_id', $legacyTask->id)
+                        ->update(['status' => 'inactive']);
+                }
+
+                if ($unifiedTask) {
+                    if (!$previousSupervisorId) {
+                        $previousSupervisorId = $unifiedTask->assigned_supervisor_member_id ?? $unifiedTask->member_id;
+                    }
+                    $unifiedTask->assigned_supervisor_member_id = null;
+                    $unifiedTask->member_id = null;
+                    if (in_array($unifiedTask->status, ['in_progress', 'drafting_in_progress', 'draft', 'pending'], true)) {
+                        $unifiedTask->status = 'planned';
+                    }
+                    $unifiedTask->save();
+
+                    TaskAssignment::where('task_id', $unifiedTask->id)
+                        ->whereNull('deleted_at')
+                        ->update([
+                            'status' => TaskAssignmentStatus::REVOKED->value,
+                            'is_transferred' => false,
+                            'deleted_at' => now(),
+                        ]);
+                }
+
+                DraftingJob::where('project_id', $project->id)
+                    ->where(function ($q) use ($legacyTask, $unifiedTask, $taskId) {
+                        if ($legacyTask) {
+                            $q->orWhere('execution_task_id', $legacyTask->id);
+                        }
+                        if ($unifiedTask) {
+                            $q->orWhere('task_id', $unifiedTask->id);
+                        }
+                        $q->orWhere('task_id', $taskId);
+                    })
+                    ->delete();
+
+                try {
+                    app(ConstructionActivityService::class)->log(
+                        module: 'execution_task',
+                        action: 'task_unassigned',
+                        actor: $actor,
+                        reference: $legacyTask ?? $unifiedTask,
+                        companyId: $project->company_id,
+                        projectId: $project->id,
+                        meta: [
+                            'task_id' => $taskId,
+                            'previous_member_id' => $previousSupervisorId,
+                        ],
+                        request: $request
+                    );
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            });
+
+            return Redirect::back()->with('success', 'Task unassigned successfully. Member removed.');
+        } catch (\Throwable $e) {
+            report($e);
+            return Redirect::back()->with('error', config('app.debug') ? $e->getMessage() : 'Failed to unassign task.');
+        }
+    }
+
     public function reviewSurvey(Request $request, Project $project, $taskId): RedirectResponse
     {
         $actor = $this->constructionActor() ?? $request->user();

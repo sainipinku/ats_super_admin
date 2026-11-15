@@ -463,6 +463,9 @@ Route::prefix('super/construction')
         Route::post('/projects/{project}/tasks-v2/{taskId}/transfer', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'transferTask'])
             ->middleware('construction.permission:execution.edit')
             ->name('projects.tasks-v2.transfer');
+        Route::post('/projects/{project}/tasks-v2/{taskId}/unassign', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'unassignTask'])
+            ->middleware('construction.permission:execution.edit,execution_task.manage,execution.manage')
+            ->name('projects.tasks-v2.unassign');
         Route::post('/projects/{project}/tasks/assign-draftsman', [App\Http\Controllers\Construction\SurveyorToDraftsmanAssignmentController::class, 'store'])
             ->middleware('construction.permission:execution_task.manage,execution.manage,execution.edit')
             ->name('projects.tasks.assign-draftsman');

@@ -1432,6 +1432,8 @@ function TaskRow({
     const [previewImage, setPreviewImage] = useState(null);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showTransferModal, setShowTransferModal] = useState(false);
+    const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
+    const [isUnassigning, setIsUnassigning] = useState(false);
     const [showRevisionInput, setShowRevisionInput] = useState(false);
     const [revisionRemarks, setRevisionRemarks] = useState("");
     const [isSubmittingReview, setIsSubmittingReview] = useState(false);
@@ -1700,6 +1702,28 @@ function TaskRow({
                 else toast.error("Failed to transfer task.");
             },
         });
+    };
+
+    const handleUnassign = () => {
+        setIsUnassigning(true);
+        router.post(
+            route("super.construction.projects.tasks-v2.unassign", [project.id, task.id]),
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setIsUnassigning(false);
+                    setShowUnassignConfirm(false);
+                    setShowTransferModal(false);
+                    toast.success("Assignment removed. Task is now unassigned.");
+                },
+                onError: (errors) => {
+                    setIsUnassigning(false);
+                    const firstError = Object.values(errors)[0] || "Failed to remove assignment.";
+                    toast.error(firstError);
+                },
+            }
+        );
     };
 
     const handleReviewSurvey = (decision) => {
@@ -3264,15 +3288,42 @@ function TaskRow({
                         </div>
 
                         {/* Current Assignee Banner */}
-                        <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
-                            <div>
-                                <span className="text-slate-400">Current Assigned Member:</span>{" "}
-                                <strong className="text-slate-800 dark:text-slate-200">
-                                    {task.supervisor?.name || "Unassigned"}
-                                </strong>
-                            </div>
-                            <StatusBadge value={task.status} />
-                        </div>
+                        {(() => {
+                            const currentAssignedName = assignedDraftPerson?.name || task.supervisor?.name || null;
+                            const hasAssignedMember = Boolean(
+                                currentAssignedName ||
+                                task.supervisor_member_id ||
+                                task.assigned_supervisor_member_id ||
+                                (task.assignees && task.assignees.some((a) => isActiveAssignment(a)))
+                            );
+
+                            return (
+                                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-slate-400">Current Assigned Member:</span>{" "}
+                                        <strong className="text-slate-800 dark:text-slate-200">
+                                            {currentAssignedName || "Unassigned"}
+                                        </strong>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <StatusBadge value={task.status} />
+                                        {hasAssignedMember && canTransferTask && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowUnassignConfirm(true)}
+                                                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 hover:border-rose-300 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/60 transition shadow-2xs"
+                                                title="Remove current member assignment from this task"
+                                            >
+                                                <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                <span>Remove Assignment</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         <div className="mt-4 space-y-4">
                             {/* Member Dropdown from projectTeamMembers */}
@@ -3392,6 +3443,52 @@ function TaskRow({
                             </button>
                         </div>
                     </form>
+                </Modal>
+            )}
+
+            {/* Remove Assignment Confirmation Modal */}
+            {showUnassignConfirm && (
+                <Modal show={true} onClose={() => !isUnassigning && setShowUnassignConfirm(false)} maxWidth="md">
+                    <div className="p-6">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400">
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                    Remove Task Assignment
+                                </h3>
+                                <p className="text-xs text-slate-500">
+                                    Task: <strong>{task.task_code}</strong>
+                                </p>
+                            </div>
+                        </div>
+
+                        <p className="mb-6 text-xs text-slate-600 dark:text-slate-300">
+                            Are you sure you want to remove <strong>{assignedDraftPerson?.name || task.supervisor?.name || "the assigned member"}</strong> from this task? This task will become <strong>Unassigned</strong> and will no longer appear on the member's task list or mobile dashboard.
+                        </p>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                type="button"
+                                disabled={isUnassigning}
+                                onClick={() => setShowUnassignConfirm(false)}
+                                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isUnassigning}
+                                onClick={handleUnassign}
+                                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-rose-500 disabled:opacity-60"
+                            >
+                                {isUnassigning ? "Removing..." : "Yes, Remove Assignment"}
+                            </button>
+                        </div>
+                    </div>
                 </Modal>
             )}
 
