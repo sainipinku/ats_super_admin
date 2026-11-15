@@ -25,6 +25,204 @@ const isActiveAssignment = (assignment) => {
     return status == null || String(status).toLowerCase() === "active";
 };
 
+const normalizeRoleStr = (val) => {
+    if (!val || typeof val !== "string") return "";
+    return val.toLowerCase().replace(/[\s\-_]+/g, "");
+};
+
+const getRoleIcon = (roleName) => {
+    const norm = (roleName || "").toLowerCase();
+    if (norm.includes("all")) return "📋";
+    if (norm.includes("unassign")) return "⚪";
+    if (norm.includes("driver")) return "🚚";
+    if (norm.includes("draft") || norm.includes("cad")) return "📐";
+    if (norm.includes("survey")) return "🧭";
+    if (norm.includes("site manager")) return "👷‍♂️";
+    if (norm.includes("site") || norm.includes("employee")) return "👷";
+    if (norm.includes("approv")) return "✅";
+    if (norm.includes("admin")) return "🛡️";
+    if (norm.includes("manager")) return "💼";
+    return "👤";
+};
+
+const resolveTaskAssignedMembers = (task, { members = [], projectTeamMembers = [] }) => {
+    const assignedMembers = [];
+    const seenIds = new Set();
+
+    const addMember = (m) => {
+        if (!m) return;
+        const id = m.id ?? m.member_id;
+        if (id && !seenIds.has(Number(id))) {
+            seenIds.add(Number(id));
+            const fullMember = members.find((mem) => Number(mem.id) === Number(id)) || m;
+            assignedMembers.push(fullMember);
+        }
+    };
+
+    if (task.supervisor) {
+        addMember(task.supervisor);
+    }
+    if (task.assigned_supervisor_member) {
+        addMember(task.assigned_supervisor_member);
+    }
+    const supId = task.supervisor_member_id || task.assigned_supervisor_member_id || task.member_id;
+    if (supId) {
+        const found = members.find((m) => Number(m.id) === Number(supId))
+            || projectTeamMembers.find((m) => Number(m.member_id || m.id) === Number(supId));
+        if (found) addMember(found);
+    }
+
+    const assignees = task.assignees || [];
+    if (Array.isArray(assignees)) {
+        assignees.forEach((a) => {
+            if (isActiveAssignment(a)) {
+                if (a.member) addMember(a.member);
+                else if (a.member_id || a.assigned_to) {
+                    const found = members.find((m) => Number(m.id) === Number(a.member_id || a.assigned_to));
+                    if (found) addMember(found);
+                }
+            }
+        });
+    }
+
+    const assignments = task.task_assignments || task.assignments || [];
+    if (Array.isArray(assignments)) {
+        assignments.forEach((a) => {
+            if (isActiveAssignment(a)) {
+                if (a.assignee) addMember(a.assignee);
+                else if (a.assigned_to || a.member_id) {
+                    const found = members.find((m) => Number(m.id) === Number(a.assigned_to || a.member_id));
+                    if (found) addMember(found);
+                }
+            }
+        });
+    }
+
+    return assignedMembers;
+};
+
+const isTaskUnassigned = (task, { members = [], projectTeamMembers = [] }) => {
+    if (task.status === "drafting_in_progress") {
+        return false;
+    }
+    const assignedMembers = resolveTaskAssignedMembers(task, { members, projectTeamMembers });
+    if (assignedMembers.length > 0) {
+        return false;
+    }
+    const supId = task.supervisor_member_id || task.assigned_supervisor_member_id || task.member_id;
+    if (supId) {
+        return false;
+    }
+    if (task.supervisor && task.supervisor.name && task.supervisor.name !== "Unassigned") {
+        return false;
+    }
+    const assignees = task.assignees || [];
+    if (Array.isArray(assignees) && assignees.some((a) => isActiveAssignment(a))) {
+        return false;
+    }
+    const assignments = task.task_assignments || task.assignments || [];
+    if (Array.isArray(assignments) && assignments.some((a) => isActiveAssignment(a))) {
+        return false;
+    }
+    return true;
+};
+
+const getTaskRoles = (task, { members = [], projectTeamMembers = [] }) => {
+    const rolesSet = new Set();
+    const normalizedSet = new Set();
+
+    const addRole = (r) => {
+        if (!r || typeof r !== "string") return;
+        const trimmed = r.trim();
+        if (!trimmed) return;
+        const norm = normalizeRoleStr(trimmed);
+        if (!normalizedSet.has(norm)) {
+            normalizedSet.add(norm);
+            rolesSet.add(trimmed);
+        }
+    };
+
+    if (task.status === "drafting_in_progress" || (task.assignees || []).some((a) => isActiveAssignment(a) && a.assignment_role === "draft_person")) {
+        addRole("Draft Person");
+        addRole("draft_person");
+    }
+
+    const assignees = task.assignees || [];
+    if (Array.isArray(assignees)) {
+        assignees.forEach((a) => {
+            if (isActiveAssignment(a) && a.assignment_role) {
+                addRole(a.assignment_role);
+            }
+        });
+    }
+    const assignments = task.task_assignments || task.assignments || [];
+    if (Array.isArray(assignments)) {
+        assignments.forEach((a) => {
+            if (isActiveAssignment(a) && a.assignment_role) {
+                addRole(a.assignment_role);
+            }
+        });
+    }
+
+    const assignedMembers = resolveTaskAssignedMembers(task, { members, projectTeamMembers });
+    assignedMembers.forEach((member) => {
+        const badges = getMemberRoleBadges(member);
+        badges.forEach((b) => addRole(b));
+
+        if (member.is_driver) {
+            addRole("Vehicle Driver");
+            addRole("vehicle_driver");
+            addRole("driver");
+        }
+        if (member.role?.name) addRole(member.role.name);
+        if (member.role?.slug) addRole(member.role.slug);
+        if (member.role_name) addRole(member.role_name);
+        if (member.designation) addRole(member.designation);
+
+        if (Array.isArray(member.assigned_roles)) {
+            member.assigned_roles.forEach((ar) => addRole(String(ar)));
+        }
+        if (Array.isArray(member.roles)) {
+            member.roles.forEach((r) => {
+                if (typeof r === "string") addRole(r);
+                else if (r?.name) addRole(r.name);
+                else if (r?.slug) addRole(r.slug);
+            });
+        }
+    });
+
+    return { roles: Array.from(rolesSet), normalized: normalizedSet };
+};
+
+const taskMatchesRole = (task, targetRoleKey, { members = [], projectTeamMembers = [] }) => {
+    if (!targetRoleKey || targetRoleKey === "all") return true;
+    if (targetRoleKey === "unassigned") {
+        return isTaskUnassigned(task, { members, projectTeamMembers });
+    }
+
+    const taskRolesInfo = getTaskRoles(task, { members, projectTeamMembers });
+    const targetNorm = normalizeRoleStr(String(targetRoleKey));
+
+    if (taskRolesInfo.normalized.has(targetNorm)) {
+        return true;
+    }
+
+    if (targetNorm.includes("driver") && (taskRolesInfo.normalized.has("vehicledriver") || taskRolesInfo.normalized.has("driver"))) {
+        return true;
+    }
+    if (targetNorm.includes("draft") && (taskRolesInfo.normalized.has("draftperson") || taskRolesInfo.normalized.has("draftsman") || taskRolesInfo.normalized.has("drafter"))) {
+        return true;
+    }
+    if (targetNorm.includes("survey") && taskRolesInfo.normalized.has("surveyor")) {
+        return true;
+    }
+    if (targetNorm.includes("site") && (taskRolesInfo.normalized.has("siteemployee") || taskRolesInfo.normalized.has("sitemanager"))) {
+        return taskRolesInfo.normalized.has(targetNorm);
+    }
+
+    return false;
+};
+
 export default function ProjectShow({ project, members, roles, activityLog, workflowSummary }) {
     const { auth } = usePage().props;
     const currentUser = auth?.user;
@@ -206,6 +404,135 @@ export default function ProjectShow({ project, members, roles, activityLog, work
             return false;
         });
     }, [project, isEmployeeView, currentUser]);
+
+    const [selectedRoleFilter, setSelectedRoleFilter] = useState("all");
+
+    const projectTeamMembers = useMemo(() => {
+        const list = project.team_members || project.teamMembers || [];
+        return list.map((tm) => {
+            const m = tm.member || {};
+            const r = tm.role || {};
+            const roleName = r.name || tm.assignment_scope || tm.project_role || "Team Member";
+            const roleText = [r.slug, roleName, m.role_names, m.assigned_role_names, m.designation]
+                .flat()
+                .join(" ")
+                .toLowerCase()
+                .replace(/[\s-]+/g, "_");
+            const isDraftPerson = /draft_person|draftsman|drafter|draft_man/.test(roleText);
+            const memberBadges = getMemberRoleBadges(m);
+            const combinedBadges = [...new Set([roleName, ...memberBadges].filter(Boolean))];
+            const isDriver = Boolean(
+                m.is_driver ||
+                /driver|vehicle/i.test(roleName) ||
+                /driver|vehicle/i.test(m.designation || "") ||
+                combinedBadges.some((b) => /driver|vehicle/i.test(String(b)))
+            );
+            const status = tm.status == null ? "active" : String(tm.status).toLowerCase();
+            return {
+                id: tm.id,
+                member_id: tm.member_id || m.id,
+                name: m.name || `Member #${tm.member_id}`,
+                email: m.email || "",
+                phone: m.phone || "",
+                role_name: roleName,
+                badges: combinedBadges,
+                is_draft_person: isDraftPerson,
+                is_driver: isDriver,
+                designation: m.designation || "",
+                is_primary: tm.is_primary,
+                status,
+                member: m,
+                role: r,
+            };
+        }).filter((tm) => tm.member_id && tm.status === "active");
+    }, [project]);
+
+    const roleFilterOptions = useMemo(() => {
+        const allOption = {
+            key: "all",
+            label: "All Tasks",
+            count: mergedTaskList.length,
+            icon: "📋",
+        };
+
+        const unassignedCount = mergedTaskList.filter((t) =>
+            isTaskUnassigned(t, { members, projectTeamMembers })
+        ).length;
+        const unassignedOption = {
+            key: "unassigned",
+            label: "Unassigned",
+            count: unassignedCount,
+            icon: "⚪",
+        };
+
+        const roleItems = [];
+        const seenNormKeys = new Set(["all", "unassigned"]);
+
+        // Roles from backend props
+        (roles || []).forEach((r) => {
+            const key = r.slug || r.name;
+            const normKey = normalizeRoleStr(key);
+            if (!seenNormKeys.has(normKey)) {
+                seenNormKeys.add(normKey);
+                const count = mergedTaskList.filter((t) =>
+                    taskMatchesRole(t, key, { members, projectTeamMembers })
+                ).length;
+                roleItems.push({
+                    key,
+                    slug: r.slug,
+                    label: r.name || r.slug,
+                    count,
+                    icon: getRoleIcon(r.name || r.slug),
+                });
+            }
+        });
+
+        // Also detect additional roles from tasks / team members if any
+        mergedTaskList.forEach((t) => {
+            const taskRolesInfo = getTaskRoles(t, { members, projectTeamMembers });
+            taskRolesInfo.roles.forEach((rName) => {
+                const normKey = normalizeRoleStr(rName);
+                if (!seenNormKeys.has(normKey)) {
+                    seenNormKeys.add(normKey);
+                    const count = mergedTaskList.filter((task) =>
+                        taskMatchesRole(task, rName, { members, projectTeamMembers })
+                    ).length;
+                    roleItems.push({
+                        key: rName,
+                        slug: rName,
+                        label: rName,
+                        count,
+                        icon: getRoleIcon(rName),
+                    });
+                }
+            });
+        });
+
+        // Sort role items: roles with active tasks (count > 0) first, then alphabetical
+        roleItems.sort((a, b) => {
+            if (b.count !== a.count) return b.count - a.count;
+            return a.label.localeCompare(b.label);
+        });
+
+        return [allOption, unassignedOption, ...roleItems];
+    }, [mergedTaskList, roles, members, projectTeamMembers]);
+
+    const filteredTaskList = useMemo(() => {
+        if (!selectedRoleFilter || selectedRoleFilter === "all") {
+            return mergedTaskList;
+        }
+        if (selectedRoleFilter === "unassigned") {
+            return mergedTaskList.filter((t) => isTaskUnassigned(t, { members, projectTeamMembers }));
+        }
+        return mergedTaskList.filter((t) => taskMatchesRole(t, selectedRoleFilter, { members, projectTeamMembers }));
+    }, [mergedTaskList, selectedRoleFilter, members, projectTeamMembers]);
+
+    const activeFilterOption = useMemo(() => {
+        return roleFilterOptions.find((o) =>
+            o.key === selectedRoleFilter || normalizeRoleStr(o.key) === normalizeRoleStr(selectedRoleFilter)
+        ) || { key: "all", label: "All Tasks", count: mergedTaskList.length, icon: "📋" };
+    }, [roleFilterOptions, selectedRoleFilter, mergedTaskList.length]);
+
     const [showCreateTask, setShowCreateTask] = useState(false);
     const [showAdvancedTaskFields, setShowAdvancedTaskFields] = useState(false);
 
@@ -1003,7 +1330,11 @@ export default function ProjectShow({ project, members, roles, activityLog, work
 
             <SectionCard
                 title="Execution Tasks"
-                description={`${taskCounts.total} total tasks · ${taskCounts.completed} complete · ${taskCounts.in_progress} in-progress · ${taskCounts.pending} pending`}
+                description={
+                    selectedRoleFilter !== "all"
+                        ? `Filtered by ${activeFilterOption.label}: Showing ${filteredTaskList.length} of ${mergedTaskList.length} tasks`
+                        : `${taskCounts.total} total tasks · ${taskCounts.completed} complete · ${taskCounts.in_progress} in-progress · ${taskCounts.pending} pending`
+                }
                 actions={
                     canCreateTask ? (
                         <button
@@ -1020,6 +1351,66 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                     ) : null
                 }
             >
+                {/* Role Filter Badges Bar */}
+                <div className="mb-5 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 dark:border-slate-800 dark:bg-slate-900/60">
+                    <div className="mb-2.5 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                Filter Tasks By Assigned Role
+                            </span>
+                            {selectedRoleFilter !== "all" && (
+                                <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
+                                    {activeFilterOption.label} ({filteredTaskList.length})
+                                </span>
+                            )}
+                        </div>
+                        {selectedRoleFilter !== "all" && (
+                            <button
+                                type="button"
+                                onClick={() => setSelectedRoleFilter("all")}
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition"
+                            >
+                                <span>Clear filter (Show all {mergedTaskList.length})</span>
+                                <span className="text-[10px]">✕</span>
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {roleFilterOptions.map((option) => {
+                            const isSelected = selectedRoleFilter === option.key || (selectedRoleFilter && normalizeRoleStr(selectedRoleFilter) === normalizeRoleStr(option.key));
+                            const isUnassignedPill = option.key === "unassigned";
+                            return (
+                                <button
+                                    key={option.key}
+                                    type="button"
+                                    onClick={() => setSelectedRoleFilter(option.key)}
+                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all shadow-2xs ${
+                                        isSelected
+                                            ? isUnassignedPill
+                                                ? "bg-amber-500 text-white shadow-amber-500/20 ring-2 ring-amber-400 ring-offset-1 dark:ring-offset-slate-900"
+                                                : "bg-indigo-600 text-white shadow-indigo-600/20 ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-slate-900"
+                                            : "bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/90 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:border-slate-800"
+                                    }`}
+                                >
+                                    <span className="text-sm leading-none">{option.icon}</span>
+                                    <span>{option.label}</span>
+                                    <span
+                                        className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                                            isSelected
+                                                ? "bg-white/25 text-white"
+                                                : option.count > 0
+                                                    ? "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                                                    : "bg-slate-100/60 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500"
+                                        }`}
+                                    >
+                                        {option.count}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
                 {canCreateTask && showCreateTask && (
                     <form
                         onSubmit={(e) => {
@@ -1168,9 +1559,9 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                 )}
 
                 <div>
-                    {mergedTaskList.length ? (
+                    {filteredTaskList.length ? (
                         <div className="space-y-3">
-                            {mergedTaskList.map((task) => (
+                            {filteredTaskList.map((task) => (
                                 <TaskRow
                                     key={task._sourceKey}
                                     task={task}
@@ -1184,6 +1575,25 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                                     onEdit={() => setEditingTask(task)}
                                 />
                             ))}
+                        </div>
+                    ) : mergedTaskList.length > 0 ? (
+                        <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center dark:border-slate-800">
+                            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-2xl text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+                                🔍
+                            </span>
+                            <h3 className="mt-3 text-sm font-bold text-slate-900 dark:text-white">
+                                No tasks found for &ldquo;{activeFilterOption.label}&rdquo;
+                            </h3>
+                            <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
+                                There are currently no execution tasks matching this role filter.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedRoleFilter("all")}
+                                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500"
+                            >
+                                <span>Show All Tasks ({mergedTaskList.length})</span>
+                            </button>
                         </div>
                     ) : (
                         <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center dark:border-slate-800">
