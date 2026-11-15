@@ -26,8 +26,8 @@ import {
 } from "react-icons/fa";
 
 const projectStatusFlow = [
-    { value: "survey", label: "Survey", color: "sky", icon: FaSearch, description: "Site survey & GPS" },
     { value: "planning", label: "Planning", color: "indigo", icon: FaLayerGroup, description: "Setup, budget, team" },
+    { value: "survey", label: "Survey", color: "sky", icon: FaSearch, description: "Site survey & GPS" },
     { value: "finishing", label: "Finishing", color: "fuchsia", icon: FaRulerCombined, description: "Paint, floor, fixtures" },
     { value: "handover", label: "Handover", color: "rose", icon: FaHandshake, description: "Inspection & handover" },
     { value: "completed", label: "Completed", color: "emerald", icon: FaFlagCheckered, description: "Project closed" },

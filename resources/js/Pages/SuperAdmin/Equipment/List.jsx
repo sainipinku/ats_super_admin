@@ -9,13 +9,13 @@ import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/20/solid";
 import Loading from "@/Components/Loading";
 import { FiCamera, FiTrash2 } from "react-icons/fi";
 
-export default function List({ equipments, categories, employees, projects, filters, isProductSuperAdmin, canManageEquipment = !isProductSuperAdmin, canCreateEquipment = false }) {
+export default function List({ equipments, categories, employees, projects, filters, isProductSuperAdmin, canManageEquipment = true, canCreateEquipment = true }) {
     const { auth } = usePage().props;
     const isProjectOwner = auth?.user?.id === 1 || auth?.user?.is_project_owner === 1 || Boolean(isProductSuperAdmin);
     const effectiveCanManageEquipment = canManageEquipment !== undefined
-        ? (Boolean(canManageEquipment) && !isProjectOwner)
-        : !isProjectOwner;
-    const canAddEquipment = effectiveCanManageEquipment || Boolean(canCreateEquipment);
+        ? Boolean(canManageEquipment)
+        : true;
+    const canAddEquipment = true;
 
     const [isOpen, setIsOpen] = useState(false);
     const [isViewOpen, setIsViewOpen] = useState(false);
@@ -758,7 +758,7 @@ export default function List({ equipments, categories, employees, projects, filt
             </Modal>
 
             {/* Add/Edit Modal */}
-            {(effectiveCanManageEquipment || (canCreateEquipment && !currentEquipment)) && <Modal show={isOpen} onClose={handleClose} maxWidth="6xl" topCloseButton={true} handleTopClose={handleClose}>
+            <Modal show={isOpen} onClose={handleClose} maxWidth="6xl" topCloseButton={true} handleTopClose={handleClose}>
                 <div className="p-2 md:p-4 dark:bg-[#080626]">
                     <h2 className="text-xl font-bold mb-6 dark:text-white">
                         {currentEquipment ? "Edit Equipment" : "Add Equipment"}
@@ -909,7 +909,7 @@ export default function List({ equipments, categories, employees, projects, filt
                         </div>
                     </form>
                 </div>
-            </Modal>}
+            </Modal>
 
             {/* Assign / Reassign Modal */}
             <Modal show={isAssignOpen} onClose={handleCloseAssign} maxWidth="lg" topCloseButton={true} handleTopClose={handleCloseAssign}>

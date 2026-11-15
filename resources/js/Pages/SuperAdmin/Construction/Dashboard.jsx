@@ -33,8 +33,8 @@ import {
 import { useState, useMemo, useEffect } from "react";
 
 const projectStatusFlow = [
-    { value: "survey", label: "Survey", color: "sky", icon: FaSearch, description: "Site survey, measurement & GPS verification" },
     { value: "planning", label: "Planning", color: "indigo", icon: FaLayerGroup, description: "Project setup, budgeting, team assignment" },
+    { value: "survey", label: "Survey", color: "sky", icon: FaSearch, description: "Site survey, measurement & GPS verification" },
     { value: "finishing", label: "Finishing", color: "fuchsia", icon: FaRulerCombined, description: "Plaster, paint, flooring, fixtures" },
     { value: "handover", label: "Handover", color: "rose", icon: FaHandshake, description: "Final inspection, documents & handover" },
     { value: "completed", label: "Completed", color: "emerald", icon: FaFlagCheckered, description: "Project closed, handover complete" },
