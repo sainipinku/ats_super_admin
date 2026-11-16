@@ -153,6 +153,16 @@ export default function FieldNotesDisplay({ notes, compact = false, hideRemarks 
                             </span>
                         </span>
                     )}
+
+                    {/* Clean Header Raw JSON Toggle */}
+                    <button
+                        type="button"
+                        onClick={() => setShowRaw(!showRaw)}
+                        className="raw-json-header-toggle inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border border-slate-200/60 dark:border-slate-700/60 transition hover:bg-slate-100 dark:hover:bg-slate-800"
+                        title={showRaw ? "Hide Raw Payload" : "Raw JSON Payload"}
+                    >
+                        <span>{showRaw ? "✕ Hide Raw" : "{ } Raw JSON"}</span>
+                    </button>
                 </div>
             </div>
 
@@ -351,17 +361,6 @@ export default function FieldNotesDisplay({ notes, compact = false, hideRemarks 
                     <p className="mt-1 leading-relaxed whitespace-pre-wrap">{remarks}</p>
                 </div>
             )}
-
-            {/* Toggle Raw JSON Viewer for Admins / Debugging */}
-            <div className="pt-1 flex items-center justify-end">
-                <button
-                    type="button"
-                    onClick={() => setShowRaw(!showRaw)}
-                    className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline"
-                >
-                    {showRaw ? "Hide Raw Data" : "View Raw JSON Data"}
-                </button>
-            </div>
 
             {showRaw && (
                 <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-slate-900 p-2.5 font-mono text-[10px] text-emerald-400">

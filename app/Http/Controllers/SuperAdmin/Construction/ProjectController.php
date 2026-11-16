@@ -550,6 +550,20 @@ class ProjectController extends Controller
                 'string',
                 'max:500',
             ],
+            'khasra_number' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'site_area' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'scope_of_work' => [
+                'nullable',
+                'string',
+            ],
             'latitude' => [
                 'nullable',
                 'numeric',
@@ -710,6 +724,20 @@ class ProjectController extends Controller
                 'nullable',
                 'string',
                 'max:500',
+            ],
+            'khasra_number' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'site_area' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'scope_of_work' => [
+                'nullable',
+                'string',
             ],
             'latitude' => [
                 'nullable',

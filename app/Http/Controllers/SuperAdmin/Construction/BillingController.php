@@ -22,7 +22,7 @@ class BillingController extends Controller
         $projects = Project::with([
             'client:id,client_code,name,company_id,contact_person,email,phone,alternate_phone,gst_number,billing_address,site_address',
             'company:id,name',
-            'surveyPlans:id,project_id,khasra_no,site_area',
+            'draftingJobs:id,project_id,khasra_number,site_area',
             'clientInvoices' => fn ($q) => $q->latest(),
         ])->orderByDesc('id')->get();
 
@@ -47,7 +47,7 @@ class BillingController extends Controller
         $projects = Project::with([
             'client:id,client_code,name,company_id,contact_person,email,phone,alternate_phone,gst_number,billing_address,site_address',
             'company:id,name',
-            'surveyPlans:id,project_id,khasra_no,site_area',
+            'draftingJobs:id,project_id,khasra_number,site_area',
             'clientInvoices' => fn ($q) => $q->latest(),
         ])->orderByDesc('id')->get();
 

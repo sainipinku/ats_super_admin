@@ -521,13 +521,13 @@ class ConstructionBillingService
             $paySum = $paymentsSummary->get($pid);
 
             $khasraNumber = $project->khasra_number;
-            if (empty($khasraNumber) && $project->relationLoaded('surveyPlans')) {
-                $khasraNumber = $project->surveyPlans->pluck('khasra_no')->filter()->unique()->implode(', ');
+            if (empty($khasraNumber) && $project->relationLoaded('draftingJobs')) {
+                $khasraNumber = $project->draftingJobs->pluck('khasra_number')->filter()->unique()->implode(', ');
             }
 
             $siteArea = $project->site_area;
-            if (empty($siteArea) && $project->relationLoaded('surveyPlans')) {
-                $siteArea = $project->surveyPlans->pluck('site_area')->filter()->first();
+            if (empty($siteArea) && $project->relationLoaded('draftingJobs')) {
+                $siteArea = $project->draftingJobs->pluck('site_area')->filter()->first();
             }
 
             return [

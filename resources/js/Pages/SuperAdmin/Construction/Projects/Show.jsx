@@ -2104,6 +2104,18 @@ function TaskRow({
     const isDrawingSubmitted = latestRevision?.status === "submitted" || taskDraftingJob?.status === "submitted";
     const isDrawingRevisionRequested = latestRevision?.status === "revision_requested" || taskDraftingJob?.status === "revision_requested";
 
+    const resolvedKhasraNumber = useMemo(() => {
+        return taskDraftingJob?.khasra_number || project?.khasra_number || task?.khasra_number || "";
+    }, [taskDraftingJob?.khasra_number, project?.khasra_number, task?.khasra_number]);
+
+    const resolvedSiteArea = useMemo(() => {
+        return taskDraftingJob?.site_area || project?.site_area || task?.site_area || "";
+    }, [taskDraftingJob?.site_area, project?.site_area, task?.site_area]);
+
+    const resolvedScopeOfWork = useMemo(() => {
+        return taskDraftingJob?.scope_of_work || project?.scope_of_work || task?.scope_of_work || "";
+    }, [taskDraftingJob?.scope_of_work, project?.scope_of_work, task?.scope_of_work]);
+
     // Form for CAD Drawing Submissions
     const draftUploadForm = useForm({
         drafting_job_id: taskDraftingJob?.id || "",
@@ -2111,9 +2123,9 @@ function TaskRow({
         drawing_no: `DWG-${task.task_code || task.id}`,
         drawing_type: "topographic",
         revision_no: drawingRevisions.length + 1,
-        khasra_number: taskDraftingJob?.khasra_number || project?.khasra_number || "",
-        site_area: taskDraftingJob?.site_area || project?.site_area || "",
-        scope_of_work: taskDraftingJob?.scope_of_work || project?.scope_of_work || "",
+        khasra_number: resolvedKhasraNumber,
+        site_area: resolvedSiteArea,
+        scope_of_work: resolvedScopeOfWork,
         changes_made: "",
         notes: "",
         dwg_file: null,
@@ -2121,17 +2133,15 @@ function TaskRow({
     });
 
     useEffect(() => {
-        if (taskDraftingJob?.id) {
-            draftUploadForm.setData({
-                ...draftUploadForm.data,
-                drafting_job_id: taskDraftingJob.id,
-                revision_no: drawingRevisions.length + 1,
-                khasra_number: taskDraftingJob.khasra_number || project?.khasra_number || draftUploadForm.data.khasra_number,
-                site_area: taskDraftingJob.site_area || project?.site_area || draftUploadForm.data.site_area,
-                scope_of_work: taskDraftingJob.scope_of_work || project?.scope_of_work || draftUploadForm.data.scope_of_work,
-            });
-        }
-    }, [taskDraftingJob?.id, drawingRevisions.length]);
+        draftUploadForm.setData((prev) => ({
+            ...prev,
+            drafting_job_id: taskDraftingJob?.id || prev.drafting_job_id || "",
+            revision_no: drawingRevisions.length + 1,
+            khasra_number: prev.khasra_number || resolvedKhasraNumber,
+            site_area: prev.site_area || resolvedSiteArea,
+            scope_of_work: prev.scope_of_work || resolvedScopeOfWork,
+        }));
+    }, [taskDraftingJob?.id, resolvedKhasraNumber, resolvedSiteArea, resolvedScopeOfWork, drawingRevisions.length]);
 
     const handleDraftSubmit = (e) => {
         e.preventDefault();
@@ -3001,20 +3011,22 @@ function TaskRow({
                     <div className="flex max-h-[88vh] flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between border-b border-slate-200/80 px-6 py-4 dark:border-slate-800">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-                                        {task.task_code}
-                                    </span>
-                                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                                        {isDriverTask ? "Driver Task Submission Details" : (isSurveyorTask ? "Survey Task Submission Details" : "Task Submission Details")}
-                                    </h3>
-                                    <StatusBadge value={task.status} />
-                                    <StatusBadge value={task.priority} />
+                            <div className="flex items-center gap-3">
+                                <span className="rounded-lg bg-indigo-50 px-2.5 py-1 font-mono text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                    {task.task_code}
+                                </span>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                            {task.title}
+                                        </h3>
+                                        <StatusBadge value={task.status} />
+                                        <StatusBadge value={task.priority} />
+                                    </div>
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                        {isDriverTask ? "Driver Task Submission Details" : (isSurveyorTask ? "Survey Task Submission Details" : "Task Submission Details")} • Planned: {formatDate(task.planned_start_date) || "TBD"} → {formatDate(task.planned_end_date) || "TBD"}
+                                    </p>
                                 </div>
-                                <p className="mt-0.5 text-xs text-slate-500">
-                                    {task.title} • Planned: {formatDate(task.planned_start_date) || "TBD"} → {formatDate(task.planned_end_date) || "TBD"}
-                                </p>
                             </div>
                             <button
                                 type="button"
@@ -3026,41 +3038,45 @@ function TaskRow({
                         </div>
 
                         {/* Modal Body - Scrollable */}
-                        <div className="flex-1 space-y-6 overflow-y-auto p-6">
+                        <div className="flex-1 space-y-6 overflow-y-auto p-6 pb-14">
                             {/* Task Details Overview Card */}
-                            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-indigo-50/20 p-4.5 shadow-2xs dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
-                                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 pb-3 dark:border-slate-800">
-                                    <div>
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Task Overview</span>
-                                        <h4 className="text-base font-bold text-slate-900 dark:text-white">{task.title}</h4>
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900/60">
+                                <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+                                    <div className="rounded-xl border border-slate-200/60 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                        <p className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                                            <span>👤</span> Assigned Member
+                                        </p>
+                                        <p className="mt-1 font-semibold text-slate-800 dark:text-slate-200 truncate">
+                                            {task.supervisor?.name || "Unassigned"}
+                                        </p>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <StatusBadge value={task.status} />
-                                        <StatusBadge value={task.priority} />
-                                    </div>
-                                </div>
-                                <div className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-                                    <div>
-                                        <p className="text-slate-400">Assigned Member</p>
-                                        <p className="font-semibold text-slate-800 dark:text-slate-200">{task.supervisor?.name || "Unassigned"}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-400">Planned Schedule</p>
-                                        <p className="font-semibold text-slate-800 dark:text-slate-200">
+                                    <div className="rounded-xl border border-slate-200/60 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                        <p className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                                            <span>📅</span> Planned Schedule
+                                        </p>
+                                        <p className="mt-1 font-semibold text-slate-800 dark:text-slate-200">
                                             {formatDate(task.planned_start_date) || "TBD"} → {formatDate(task.planned_end_date) || "TBD"}
                                         </p>
                                     </div>
-                                    <div>
-                                        <p className="text-slate-400">Progress</p>
-                                        <p className="font-semibold text-slate-800 dark:text-slate-200">{progress}%</p>
+                                    <div className="rounded-xl border border-slate-200/60 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                        <p className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                                            <span>📈</span> Progress
+                                        </p>
+                                        <p className="mt-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                                            {progress}%
+                                        </p>
                                     </div>
-                                    <div>
-                                        <p className="text-slate-400">Checklists</p>
-                                        <p className="font-semibold text-slate-800 dark:text-slate-200">{completedChecklists} of {taskChecklists.length} done</p>
+                                    <div className="rounded-xl border border-slate-200/60 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                        <p className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                                            <span>☑️</span> Checklists
+                                        </p>
+                                        <p className="mt-1 font-semibold text-indigo-600 dark:text-indigo-400">
+                                            {completedChecklists} of {taskChecklists.length} done
+                                        </p>
                                     </div>
                                 </div>
                                 {task.description && (
-                                    <div className="mt-3 rounded-xl bg-slate-100/70 p-3 text-xs text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                                    <div className="mt-3 rounded-xl bg-white p-3 text-xs text-slate-700 dark:bg-slate-900 dark:text-slate-300 border border-slate-200/60 dark:border-slate-800">
                                         <span className="font-semibold text-slate-900 dark:text-white">Description: </span>
                                         {task.description}
                                     </div>
@@ -3121,47 +3137,75 @@ function TaskRow({
                                             </div>
 
                                             {/* Metrics Grid */}
-                                            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                                <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                                                    <p className="text-[11px] font-medium text-slate-400">Elevation</p>
-                                                    <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
-                                                        {v.elevation_m != null ? `${v.elevation_m} m` : "—"}
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                                                    <p className="text-[11px] font-medium text-slate-400">Distance Covered</p>
-                                                    <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
-                                                        {v.distance_covered_m != null ? `${v.distance_covered_m} m` : "—"}
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                                                    <p className="text-[11px] font-medium text-slate-400">Points Captured</p>
-                                                    <p className="mt-1 text-base font-bold text-indigo-600 dark:text-indigo-400">
-                                                        {v.total_points_captured != null ? v.total_points_captured : "—"}
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                                                    <p className="text-[11px] font-medium text-slate-400">Day Scheduled</p>
-                                                    <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
-                                                        Day {v.day_number || 1}
-                                                    </p>
-                                                </div>
-                                            </div>
+                                            {(() => {
+                                                const hasElevation = v.elevation_m != null;
+                                                const hasDistance = v.distance_covered_m != null;
+                                                const hasPoints = v.total_points_captured != null;
+                                                const hasSurveyData = hasElevation || hasDistance || hasPoints;
+
+                                                return (
+                                                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                                            <p className="text-[11px] font-medium text-slate-400">Day Scheduled</p>
+                                                            <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                                                                Day {v.day_number || 1}
+                                                            </p>
+                                                        </div>
+                                                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                                            <p className="text-[11px] font-medium text-slate-400">
+                                                                {hasSurveyData ? "Elevation" : "Review Status"}
+                                                            </p>
+                                                            <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                                                                {hasSurveyData
+                                                                    ? (hasElevation ? `${v.elevation_m} m` : "—")
+                                                                    : (v.status_label || (Number(v.status) === 2 ? "Approved" : "Submitted"))
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                                            <p className="text-[11px] font-medium text-slate-400">
+                                                                {hasSurveyData ? "Distance Covered" : "GPS Status"}
+                                                            </p>
+                                                            <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                                                                {hasSurveyData
+                                                                    ? (hasDistance ? `${v.distance_covered_m} m` : "—")
+                                                                    : (v.gps_verified ? "📍 GPS Verified" : (v.check_in_latitude ? "Recorded" : "Not Logged"))
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                                            <p className="text-[11px] font-medium text-slate-400">
+                                                                {hasSurveyData ? "Points Captured" : "Submission Time"}
+                                                            </p>
+                                                            <p className="mt-1 text-base font-bold text-indigo-600 dark:text-indigo-400 truncate">
+                                                                {hasSurveyData
+                                                                    ? (hasPoints ? v.total_points_captured : "—")
+                                                                    : (v.updated_at || v.created_at ? formatDateTime(v.updated_at || v.created_at) : "Today")
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
 
                                             {/* GPS Coordinates */}
                                             {(v.check_in_latitude || v.check_in_longitude) && (
-                                                <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-                                                    <span>📍 Coords:</span>
-                                                    <span className="font-mono text-slate-700 dark:text-slate-300">
-                                                        {Number(v.check_in_latitude).toFixed(6)}, {Number(v.check_in_longitude).toFixed(6)}
-                                                    </span>
+                                                <div className="task-submission-coords mt-3.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+                                                    <div className="flex items-center gap-2 text-xs">
+                                                        <span className="text-sm">📍</span>
+                                                        <span className="font-semibold text-slate-700 dark:text-slate-300">GPS Coordinates:</span>
+                                                        <span className="font-mono text-slate-800 dark:text-slate-200 font-medium">
+                                                            {Number(v.check_in_latitude).toFixed(6)}, {Number(v.check_in_longitude).toFixed(6)}
+                                                        </span>
+                                                    </div>
                                                     <a
                                                         href={`https://www.google.com/maps?q=${v.check_in_latitude},${v.check_in_longitude}`}
                                                         target="_blank"
                                                         rel="noreferrer"
-                                                        className="text-indigo-600 hover:underline dark:text-indigo-400"
+                                                        className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300"
                                                     >
-                                                        (Open in Google Maps ↗)
+                                                        <span>Open in Google Maps</span>
+                                                        <span>↗</span>
                                                     </a>
                                                 </div>
                                             )}
@@ -3212,16 +3256,17 @@ function TaskRow({
                                             {/* Site Proof Photos */}
                                             {Array.isArray(v.photos) && v.photos.length > 0 && (
                                                 <div className="mt-4">
-                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                                        {isDriverTask ? "Driver Trip & Delivery Proof Photos" : (isSurveyorTask ? "Site Survey Proof Photos" : "Task Proof Photos")} ({v.photos.length})
+                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                                        <span>📸</span>
+                                                        <span>{isDriverTask ? "Driver Trip & Delivery Proof Photos" : (isSurveyorTask ? "Site Survey Proof Photos" : "Task Proof Photos")} ({v.photos.length})</span>
                                                     </p>
-                                                    <div className="mt-2 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                                                    <div className="proof-photos-container mt-2.5 flex flex-wrap gap-3">
                                                         {v.photos.map((photoUrl, pIdx) => (
                                                             <button
                                                                 key={pIdx}
                                                                 type="button"
                                                                 onClick={() => setPreviewImage(photoUrl)}
-                                                                className="group relative aspect-video w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-2xs transition hover:scale-[1.02] hover:border-indigo-400 dark:border-slate-700 dark:bg-slate-900"
+                                                                className="group relative h-28 w-44 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-2xs transition hover:scale-[1.02] hover:border-indigo-400 dark:border-slate-700 dark:bg-slate-900"
                                                             >
                                                                 <img
                                                                     src={photoUrl}
@@ -3321,7 +3366,7 @@ function TaskRow({
 
                             {/* Drafting & CAD Drawing Phase Section */}
                             {((isSurveyorTask && isSurveyApproved) || isDraftingAssigned || isCurrentUserDraftPerson || drawingRevisions.length > 0) && (
-                                <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-4.5 dark:border-indigo-900/60 dark:bg-indigo-950/20">
+                                <div id="drafting-cad-workspace-card" className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-4.5 dark:border-indigo-900/60 dark:bg-indigo-950/20 mt-6 shadow-sm">
                                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 pb-3 dark:border-indigo-900/60">
                                         <div className="flex items-center gap-2">
                                             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600 text-base text-white shadow-xs">
@@ -3730,7 +3775,17 @@ function TaskRow({
                                         {!isDrawingApproved && (
                                             <button
                                                 type="button"
-                                                onClick={() => setShowDraftUploadSection((prev) => !prev)}
+                                                onClick={() => {
+                                                    setShowDraftUploadSection((prev) => {
+                                                        const next = !prev;
+                                                        if (next) {
+                                                            setTimeout(() => {
+                                                                document.getElementById('drafting-cad-workspace-card')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                                            }, 100);
+                                                        }
+                                                        return next;
+                                                    });
+                                                }}
                                                 className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:from-emerald-500 hover:to-teal-500"
                                             >
                                                 {showDraftUploadSection ? "Hide CAD Form" : "Upload & Submit CAD Drawing ➔"}
