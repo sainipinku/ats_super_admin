@@ -29,6 +29,9 @@ export default function DeleteActionButton({
     const hasDeletePerm = () => {
         if (isSuperAdmin) return true;
         const resType = String(resourceType).toLowerCase();
+        if (resType === 'project') {
+            return false;
+        }
         return (
             permissions.includes(`${resType}.delete`) ||
             permissions.includes(`${resType}.manage`) ||

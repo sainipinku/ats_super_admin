@@ -33,15 +33,9 @@ export function getMemberRoleBadges(memberOrItem) {
         }
     }
 
-    // 4. Comma-separated role_badge or designation_text
+    // 4. Comma-separated role_badge (roles only, strictly exclude designations)
     if (typeof member.role_badge === "string" && member.role_badge.trim() !== "") {
         member.role_badge.split(",").forEach((s) => badges.push(s.trim()));
-    }
-    if (typeof member.designation_text === "string" && member.designation_text.trim() !== "") {
-        member.designation_text.split(",").forEach((s) => badges.push(s.trim()));
-    }
-    if (typeof member.designation === "string" && member.designation.trim() !== "") {
-        member.designation.split(",").forEach((s) => badges.push(s.trim()));
     }
 
     // 5. If member has roles array of objects { name: '...' }
@@ -60,18 +54,27 @@ export function getMemberRoleBadges(memberOrItem) {
         badges.unshift("Admin");
     }
 
-    // Deduplicate case-insensitively & filter out empty or generic "Member"
-    const uniqueBadges = [];
+    // Deduplicate case-insensitively & filter out empty or generic "Member" / "Team Member"
+    let uniqueBadges = [];
     const seen = new Set();
     for (const b of badges) {
         if (!b || typeof b !== "string") continue;
         const cleaned = b.trim();
-        if (!cleaned || cleaned.toLowerCase() === "member") continue;
+        if (!cleaned || cleaned.toLowerCase() === "member" || cleaned.toLowerCase() === "team member") continue;
         const norm = cleaned.toLowerCase().replace(/[^a-z0-9]/g, "");
         if (!seen.has(norm)) {
             seen.add(norm);
             uniqueBadges.push(cleaned);
         }
+    }
+
+    // Deduplicate aliases: if Vehicle Driver exists, remove generic Driver
+    if (uniqueBadges.some((b) => /vehicle driver/i.test(b))) {
+        uniqueBadges = uniqueBadges.filter((b) => !/^driver$/i.test(b.trim()));
+    }
+    // If Surveyor exists, remove Survey Man
+    if (uniqueBadges.some((b) => /^surveyor$/i.test(b.trim()))) {
+        uniqueBadges = uniqueBadges.filter((b) => !/survey man/i.test(b));
     }
 
     return uniqueBadges;

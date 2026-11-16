@@ -819,19 +819,66 @@ class ProjectTaskController extends Controller implements HasMiddleware
             }
         }
 
-        if ($decision === 'approved') {
-            $isDriverTask = false;
-            $isSurveyorTask = false;
+        $isDriverTask = false;
+        $isSurveyorTask = false;
 
+        $extractSupervisorText = function ($supervisor, ?string $title): string {
+            $parts = [];
+            if (!empty($title)) {
+                $parts[] = (string) $title;
+            }
+            if ($supervisor) {
+                if (!empty($supervisor->name) && is_scalar($supervisor->name)) {
+                    $parts[] = (string) $supervisor->name;
+                }
+                if (!empty($supervisor->designation)) {
+                    if (is_array($supervisor->designation)) {
+                        foreach ($supervisor->designation as $d) {
+                            if (is_scalar($d)) {
+                                $parts[] = (string) $d;
+                            }
+                        }
+                    } elseif (is_scalar($supervisor->designation)) {
+                        $parts[] = (string) $supervisor->designation;
+                    }
+                }
+                if (!empty($supervisor->designation_names) && is_scalar($supervisor->designation_names)) {
+                    $parts[] = (string) $supervisor->designation_names;
+                }
+                if (!empty($supervisor->role_names)) {
+                    if (is_array($supervisor->role_names)) {
+                        foreach ($supervisor->role_names as $r) {
+                            if (is_scalar($r)) {
+                                $parts[] = (string) $r;
+                            }
+                        }
+                    } elseif (is_scalar($supervisor->role_names)) {
+                        $parts[] = (string) $supervisor->role_names;
+                    }
+                }
+                if (!empty($supervisor->role_badges) && is_array($supervisor->role_badges)) {
+                    foreach ($supervisor->role_badges as $b) {
+                        if (is_scalar($b)) {
+                            $parts[] = (string) $b;
+                        }
+                    }
+                }
+                if (!empty($supervisor->roles) && is_array($supervisor->roles)) {
+                    foreach ($supervisor->roles as $r) {
+                        if (is_scalar($r)) {
+                            $parts[] = (string) $r;
+                        }
+                    }
+                }
+            }
+            return strtolower(implode(' ', array_filter($parts)));
+        };
+
+        if ($decision === 'approved') {
             // Check legacy task supervisor & role
             if ($legacyTask) {
                 $supervisor = $legacyTask->supervisor;
-                $supRoles = strtolower(implode(' ', array_filter([
-                    $supervisor?->name,
-                    $supervisor?->designation,
-                    is_array($supervisor?->role_names) ? implode(' ', $supervisor->role_names) : $supervisor?->role_names,
-                    $legacyTask->title,
-                ])));
+                $supRoles = $extractSupervisorText($supervisor, $legacyTask->title);
                 if ($supervisor?->is_driver || str_contains($supRoles, 'driver') || str_contains($supRoles, 'vehicle')) {
                     $isDriverTask = true;
                 }
@@ -842,13 +889,8 @@ class ProjectTaskController extends Controller implements HasMiddleware
 
             // Check unified task supervisor & assignments
             if ($unifiedTask) {
-                $supervisor = $unifiedTask->supervisor;
-                $supRoles = strtolower(implode(' ', array_filter([
-                    $supervisor?->name,
-                    $supervisor?->designation,
-                    is_array($supervisor?->role_names) ? implode(' ', $supervisor->role_names) : $supervisor?->role_names,
-                    $unifiedTask->title,
-                ])));
+                $supervisor = $unifiedTask->supervisor ?? $unifiedTask->member;
+                $supRoles = $extractSupervisorText($supervisor, $unifiedTask->title);
                 if ($supervisor?->is_driver || str_contains($supRoles, 'driver') || str_contains($supRoles, 'vehicle')) {
                     $isDriverTask = true;
                 }
@@ -858,7 +900,7 @@ class ProjectTaskController extends Controller implements HasMiddleware
 
                 if ($unifiedTask->relationLoaded('assignments') || method_exists($unifiedTask, 'assignments')) {
                     foreach ($unifiedTask->assignments ?? [] as $asg) {
-                        $roleName = strtolower($asg->assignment_role ?? $asg->project_role ?? '');
+                        $roleName = strtolower((string) ($asg->assignment_role ?? $asg->project_role ?? ''));
                         if (str_contains($roleName, 'driver') || str_contains($roleName, 'vehicle')) {
                             $isDriverTask = true;
                         }
@@ -935,7 +977,7 @@ class ProjectTaskController extends Controller implements HasMiddleware
         }
 
         $msg = match ($decision) {
-            'approved' => 'Survey report approved successfully.',
+            'approved' => ($isDriverTask || !$isSurveyorTask) ? 'Task marked as completed successfully.' : 'Survey report approved successfully.',
             'revision_requested' => 'Survey sent back for revision with your remarks.',
             'rejected' => 'Survey report marked as rejected.',
         };

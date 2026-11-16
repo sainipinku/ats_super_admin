@@ -473,11 +473,26 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                 .replace(/[\s-]+/g, "_");
             const isDraftPerson = /draft_person|draftsman|drafter|draft_man/.test(roleText);
             const memberBadges = getMemberRoleBadges(m);
-            const combinedBadges = [...new Set([roleName, ...memberBadges].filter(Boolean))];
+            const rawBadges = [roleName, ...memberBadges].filter(Boolean);
+            let combinedBadges = [];
+            const seenKeys = new Set();
+            for (const b of rawBadges) {
+                const norm = b.trim();
+                const key = norm.toLowerCase().replace(/[^a-z0-9]/g, "");
+                if (!seenKeys.has(key) && norm.toLowerCase() !== "member" && norm.toLowerCase() !== "team member") {
+                    seenKeys.add(key);
+                    combinedBadges.push(norm);
+                }
+            }
+            if (combinedBadges.some((b) => /vehicle driver/i.test(b))) {
+                combinedBadges = combinedBadges.filter((b) => !/^driver$/i.test(b.trim()));
+            }
+            if (combinedBadges.some((b) => /^surveyor$/i.test(b.trim()))) {
+                combinedBadges = combinedBadges.filter((b) => !/survey man/i.test(b));
+            }
             const isDriver = Boolean(
                 m.is_driver ||
                 /driver|vehicle/i.test(roleName) ||
-                /driver|vehicle/i.test(m.designation || "") ||
                 combinedBadges.some((b) => /driver|vehicle/i.test(String(b)))
             );
             const status = tm.status == null ? "active" : String(tm.status).toLowerCase();
@@ -1954,11 +1969,26 @@ function TaskRow({
                 .replace(/[\s-]+/g, "_");
             const isDraftPerson = /draft_person|draftsman|drafter|draft_man/.test(roleText);
             const memberBadges = getMemberRoleBadges(m);
-            const combinedBadges = [...new Set([roleName, ...memberBadges].filter(Boolean))];
+            const rawBadges = [roleName, ...memberBadges].filter(Boolean);
+            let combinedBadges = [];
+            const seenKeys = new Set();
+            for (const b of rawBadges) {
+                const norm = b.trim();
+                const key = norm.toLowerCase().replace(/[^a-z0-9]/g, "");
+                if (!seenKeys.has(key) && norm.toLowerCase() !== "member" && norm.toLowerCase() !== "team member") {
+                    seenKeys.add(key);
+                    combinedBadges.push(norm);
+                }
+            }
+            if (combinedBadges.some((b) => /vehicle driver/i.test(b))) {
+                combinedBadges = combinedBadges.filter((b) => !/^driver$/i.test(b.trim()));
+            }
+            if (combinedBadges.some((b) => /^surveyor$/i.test(b.trim()))) {
+                combinedBadges = combinedBadges.filter((b) => !/survey man/i.test(b));
+            }
             const isDriver = Boolean(
                 m.is_driver ||
                 /driver|vehicle/i.test(roleName) ||
-                /driver|vehicle/i.test(m.designation || "") ||
                 combinedBadges.some((b) => /driver|vehicle/i.test(String(b)))
             );
             const status = tm.status == null ? "active" : String(tm.status).toLowerCase();
@@ -3876,7 +3906,7 @@ function TaskRow({
                                             const badgeStr = badges.length > 0 ? ` [${badges.join("] [")}]` : "";
                                             return (
                                                 <option key={tm.id} value={tm.member_id}>
-                                                    {tm.name}{badgeStr} {tm.is_draft_person ? "⭐ (Draft Person)" : ""} {tm.is_driver ? "🚗 (Driver)" : ""}
+                                                    {tm.name}{badgeStr}
                                                 </option>
                                             );
                                         })}

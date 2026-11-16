@@ -59,6 +59,10 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
         (Array.isArray(auth?.user?.roles) && (auth?.user?.roles.includes("super_admin") || auth?.user?.roles.includes("superadmin")))
     );
 
+    const isCompanyAdmin = auth?.guard === "admin" || isProjectAdmin || activeRoleSlug === "admin" || (!isSuperAdmin && !isProjectOwner);
+    const effectiveCompanyId = user_company_id ?? auth?.user?.company_id ?? null;
+    const isCompanyLocked = Boolean(effectiveCompanyId);
+
     const isRootSuperAdmin = isProjectOwner || isSuperAdmin;
     const userPermissions = auth?.permissions || auth?.construction_permissions || pageProps?.permissions || [];
     const hasPerm = (target) => {
@@ -69,12 +73,31 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
     };
 
     const canCreateProject = isProjectAdmin || hasPerm("project.create");
-    const canEditProject = hasPerm("project.edit");
-    const canDeleteProject = hasPerm("project.delete");
     const canViewProject = hasPerm(["project.view", "project.manage"]);
 
-    const effectiveCompanyId = user_company_id ?? auth?.user?.company_id ?? null;
-    const isCompanyLocked = Boolean(effectiveCompanyId);
+    // Scoped project permissions:
+    // 1. Company Admin: Strictly CANNOT edit or delete projects. Only sees View Details.
+    // 2. Company Super Admin: Can edit/delete ONLY their own company's projects.
+    // 3. Project Owner: Can edit/delete ANY project across all companies.
+    const canEditProjectFor = (project) => {
+        if (isCompanyAdmin) return false;
+        if (isProjectOwner) return true;
+        if (isSuperAdmin) {
+            if (!effectiveCompanyId) return true;
+            return !project?.company_id || Number(project.company_id) === Number(effectiveCompanyId);
+        }
+        return false;
+    };
+
+    const canDeleteProjectFor = (project) => {
+        if (isCompanyAdmin) return false;
+        if (isProjectOwner) return true;
+        if (isSuperAdmin) {
+            if (!effectiveCompanyId) return true;
+            return !project?.company_id || Number(project.company_id) === Number(effectiveCompanyId);
+        }
+        return false;
+    };
 
     const [nextCode, setNextCode] = useState(next_project_code || "PRJ-00001");
     const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
@@ -263,6 +286,7 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
     }, [form.data.name, nextCode, isCodeManuallyEdited, createModalOpen]);
 
     const openEditModal = (project) => {
+        if (!canEditProjectFor(project)) return;
         editForm.clearErrors();
         editForm.setData({
             company_id: isCompanyLocked ? String(effectiveCompanyId) : (project.company_id ? String(project.company_id) : ""),
@@ -723,56 +747,62 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
                                                             View Details
                                                         </Link>
                                                     )}
-                                                    {(canEditProject || canDeleteProject) && (
-                                                        <div className="relative inline-block text-left" data-project-dropdown>
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => openProjectDropdown(e, project.id)}
-                                                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
-                                                            title="Actions"
-                                                        >
-                                                            <FaEllipsisV size={14} />
-                                                        </button>
-                                                        {openDropdownId === project.id && (
-                                                            <div
-                                                                className="fixed w-44 rounded-xl border border-slate-200 bg-white py-1 shadow-xl z-50 dark:border-slate-700 dark:bg-slate-900"
-                                                                style={{ top: dropdownPos.top, left: dropdownPos.left }}
+                                                    {(() => {
+                                                        const rowCanEdit = canEditProjectFor(project);
+                                                        const rowCanDelete = canDeleteProjectFor(project);
+                                                        if (!rowCanEdit && !rowCanDelete) return null;
+
+                                                        return (
+                                                            <div className="relative inline-block text-left" data-project-dropdown>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => openProjectDropdown(e, project.id)}
+                                                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+                                                                title="Actions"
                                                             >
-                                                                {canEditProject && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => { setOpenDropdownId(null); openEditModal(project); }}
-                                                                        className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors text-left"
-                                                                    >
-                                                                        <FaEdit size={13} className="text-sky-500" />
-                                                                        Edit
-                                                                    </button>
-                                                                )}
-                                                                {canDeleteProject && (
-                                                                    <DeleteActionButton
-                                                                        resourceType="project"
-                                                                        resourceId={project.id}
-                                                                        resourceName={project.name}
-                                                                        onDelete={() => {
-                                                                            setOpenDropdownId(null);
-                                                                            if (confirm(`Delete project "${project.name}"? All survey, execution, material, billing and handover data tied to this project will be removed and cannot be restored.`)) {
-                                                                                router.delete(route("super.construction.projects.destroy", project.id), {
-                                                                                    preserveScroll: true,
-                                                                                    onError: (errs) => {
-                                                                                        if (typeof window !== "undefined" && typeof window.alert === "function") {
-                                                                                            window.alert(Object.values(errs).find(Boolean) || "Failed to delete project.");
-                                                                                        }
-                                                                                    },
-                                                                                });
-                                                                            }
-                                                                        }}
-                                                                        className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/60 transition-colors text-left"
-                                                                    />
-                                                                )}
+                                                                <FaEllipsisV size={14} />
+                                                            </button>
+                                                            {openDropdownId === project.id && (
+                                                                <div
+                                                                    className="fixed w-44 rounded-xl border border-slate-200 bg-white py-1 shadow-xl z-50 dark:border-slate-700 dark:bg-slate-900"
+                                                                    style={{ top: dropdownPos.top, left: dropdownPos.left }}
+                                                                >
+                                                                    {rowCanEdit && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => { setOpenDropdownId(null); openEditModal(project); }}
+                                                                            className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors text-left"
+                                                                        >
+                                                                            <FaEdit size={13} className="text-sky-500" />
+                                                                            Edit
+                                                                        </button>
+                                                                    )}
+                                                                    {rowCanDelete && (
+                                                                        <DeleteActionButton
+                                                                            resourceType="project"
+                                                                            resourceId={project.id}
+                                                                            resourceName={project.name}
+                                                                            onDelete={() => {
+                                                                                setOpenDropdownId(null);
+                                                                                if (confirm(`Delete project "${project.name}"? All survey, execution, material, billing and handover data tied to this project will be removed and cannot be restored.`)) {
+                                                                                    router.delete(route("super.construction.projects.destroy", project.id), {
+                                                                                        preserveScroll: true,
+                                                                                        onError: (errs) => {
+                                                                                            if (typeof window !== "undefined" && typeof window.alert === "function") {
+                                                                                                window.alert(Object.values(errs).find(Boolean) || "Failed to delete project.");
+                                                                                            }
+                                                                                        },
+                                                                                    });
+                                                                                }
+                                                                            }}
+                                                                            className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/60 transition-colors text-left"
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                             </div>
-                                                        )}
-                                                        </div>
-                                                    )}
+                                                        );
+                                                    })()}
                                                 </div>
                                             </td>
                                         </tr>
