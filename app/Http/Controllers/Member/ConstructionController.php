@@ -425,16 +425,16 @@ class ConstructionController extends Controller
             ->where('member_id', $member->getKey())
             ->where('status', 'active');
 
-        if ($roleSlug === 'surveyor') {
+        if (in_array($roleSlug, ['surveyor', 'survey_man', 'survey-man', 'survey', 'survey_person', 'surveyman'], true)) {
             return $query->whereHas('assignees', $assignments);
         }
 
-        if (in_array($roleSlug, ['draft_person', 'draftsman', 'drafter', 'draft_man'], true)) {
+        if (in_array($roleSlug, ['draft_person', 'draftsman', 'drafter', 'draft_man', 'draftperson'], true)) {
             return $query->whereHas('assignees', fn ($assignmentQuery) => $assignments($assignmentQuery)
                 ->whereIn('assignment_role', ['draft_person', 'draftsman', 'drafter', 'draft_man']));
         }
 
-        if (in_array($roleSlug, ['driver', 'vehicle_driver'], true)) {
+        if (in_array($roleSlug, ['driver', 'vehicle_driver', 'car_driver', 'truck_driver'], true)) {
             return $query
                 ->whereHas('assignees', $assignments)
                 ->whereDoesntHave('assignees', fn ($assignmentQuery) => $assignmentQuery
@@ -442,7 +442,11 @@ class ConstructionController extends Controller
                     ->whereIn('assignment_role', ['draft_person', 'draftsman', 'drafter', 'draft_man']));
         }
 
-        return $query;
+        // For all other roles: strictly require active assignment or supervision. Unassigned tasks are never shown.
+        return $query->where(function ($q) use ($assignments, $member) {
+            $q->whereHas('assignees', $assignments)
+                ->orWhere('supervisor_member_id', $member->getKey());
+        });
     }
 
     private function ensureTaskAccess(ExecutionTask $task, ?Member $actor): void

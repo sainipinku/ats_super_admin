@@ -59,8 +59,6 @@ class DashboardController extends Controller
             'ready_for_construction',
             'planning',
             'survey',
-            'foundation',
-            'structure',
             'finishing',
             'handover',
         ];
@@ -87,31 +85,6 @@ class DashboardController extends Controller
         $totalClients = Client::count();
         $companyClients = Client::where('client_type', 'company')->count();
         $govtClients = Client::where('client_type', 'government')->count();
-
-        $revenue = ClientPayment::whereIn('project_id', $projectIds)->whereBetween('created_at', [$monthStart, $now])->sum('amount');
-        $totalRevenue = ClientPayment::whereIn('project_id', $projectIds)->sum('amount');
-
-        $invoiceAmountThisMonth = ClientInvoice::whereIn('project_id', $projectIds)->whereBetween('created_at', [$monthStart, $now])->sum('total_amount');
-
-        $materialPurchaseExpense = PurchaseOrder::whereIn('project_id', $projectIds)
-            ->whereBetween('po_date', [$monthStart->toDateString(), $today])
-            ->whereIn('status', ['approved', 'issued', 'partially_received', 'received', 'closed'])
-            ->sum('total_amount');
-
-        $materialReceiptExpense = MaterialReceiptItem::whereHas('receipt', function ($query) use ($monthStart, $today, $projectIds) {
-            $query->whereIn('project_id', $projectIds)->whereBetween('created_at', [$monthStart, Carbon::parse($today)->endOfDay()]);
-        })->sum('line_total');
-
-        $labourDaysThisMonth = AttendanceRecord::whereIn('project_id', $projectIds)
-            ->whereBetween('attendance_date', [$monthStart->toDateString(), $today])
-            ->whereIn('status', ['approved', 'present'])
-            ->count();
-        $standardDailyRate = 1200.00;
-        $labourExpense = $labourDaysThisMonth * $standardDailyRate;
-
-        $monthlyExpenses = (float) $materialPurchaseExpense
-            + (float) $materialReceiptExpense
-            + (float) $labourExpense;
 
         $todayAttendance = AttendanceRecord::whereIn('project_id', $projectIds)->where('attendance_date', $today)->count();
         $presentToday = AttendanceRecord::whereIn('project_id', $projectIds)->where('attendance_date', $today)->where('status', 'approved')->count();
@@ -158,19 +131,6 @@ class DashboardController extends Controller
                     'company' => $companyClients,
                     'government' => $govtClients,
                 ],
-                'finance' => [
-                    'monthlyRevenue' => (float)$revenue,
-                    'monthlyExpenses' => $monthlyExpenses,
-                    'totalRevenue' => (float)$totalRevenue,
-                    'monthlyInvoiced' => (float)$invoiceAmountThisMonth,
-                    'breakdown' => [
-                        'materialPurchase' => (float)$materialPurchaseExpense,
-                        'materialReceipt' => (float)$materialReceiptExpense,
-                        'labour' => (float)$labourExpense,
-                        'labourDays' => $labourDaysThisMonth,
-                        'standardDailyRate' => $standardDailyRate,
-                    ],
-                ],
                 'attendance' => [
                     'today' => $todayAttendance,
                     'presentToday' => $presentToday,
@@ -205,8 +165,6 @@ class DashboardController extends Controller
             'projectStatusOptions' => [
                 ['value' => 'planning', 'label' => 'Planning'],
                 ['value' => 'survey', 'label' => 'Survey'],
-                ['value' => 'foundation', 'label' => 'Foundation'],
-                ['value' => 'structure', 'label' => 'Structure'],
                 ['value' => 'finishing', 'label' => 'Finishing'],
                 ['value' => 'handover', 'label' => 'Handover'],
                 ['value' => 'completed', 'label' => 'Completed'],

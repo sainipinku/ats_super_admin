@@ -105,13 +105,6 @@ const navigation = [
                 icon: FaProjectDiagram,
             },
             {
-                label: "Survey Planning",
-                permissions: ["survey_plan.manage", "survey.manage", "survey_plan.view", "survey.view"],
-                getHref: () => safeRoute("admin.construction.survey.index", safeRoute("super.construction.survey.index")),
-                active: ["admin.construction.survey.*", "super.construction.survey.*"],
-                icon: FaClipboardList,
-            },
-            {
                 label: "Drawing Approval",
                 permissions: ["drawing_approval.manage", "drafting.manage", "drawing_approval.view", "drafting.view"],
                 getHref: () => safeRoute("admin.construction.drafting.index", safeRoute("super.construction.drafting.index")),

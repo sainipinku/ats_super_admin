@@ -216,9 +216,6 @@ class Member extends Authenticatable
                     return true;
                 }
                 if (is_numeric($r)) {
-                    if ((int) $r === 6) {
-                        return true;
-                    }
                     try {
                         $rName = \App\Models\ConstructionRole::where('id', $r)->value('name')
                             ?? \App\Models\Role::where('id', $r)->value('name');
@@ -815,40 +812,22 @@ class Member extends Authenticatable
 
         // 4. Mapped from roles array if numeric
         if (is_array($this->roles) && !empty($this->roles)) {
-            $roleMap = [
-                2 => 'Super Admin',
-                9 => 'Admin',
-                3 => 'Project Admin',
-                4 => 'Surveyor',
-                5 => 'Draft Person',
-                6 => 'Driver',
-                7 => 'Review Approver',
-                8 => 'Site Employee',
-            ];
-            foreach ($this->roles as $r) {
-                if (is_numeric($r) && isset($roleMap[(int) $r])) {
-                    $badges[] = $roleMap[(int) $r];
+            $numericIds = array_values(array_filter($this->roles, 'is_numeric'));
+            if (!empty($numericIds)) {
+                try {
+                    $systemRoleNames = Role::whereIn('id', $numericIds)->pluck('name')->toArray();
+                    $badges = array_merge($badges, $systemRoleNames);
+                } catch (\Throwable) {
                 }
             }
         }
 
-        // 5. Designation names
-        $desigStr = $this->designation_names;
-        if (!empty($desigStr)) {
-            foreach (explode(',', $desigStr) as $part) {
-                $trimmed = trim($part);
-                if ($trimmed !== '') {
-                    $badges[] = $trimmed;
-                }
-            }
-        }
-
-        // Clean & Deduplicate
+        // Clean & Deduplicate (strictly roles only; no designations or duplicate aliases)
         $unique = [];
         $seen = [];
         foreach ($badges as $b) {
             $cleaned = trim((string) $b);
-            if ($cleaned === '' || strcasecmp($cleaned, 'Member') === 0) {
+            if ($cleaned === '' || strcasecmp($cleaned, 'Member') === 0 || strcasecmp($cleaned, 'Team Member') === 0) {
                 continue;
             }
             $norm = strtolower(preg_replace('/[^a-z0-9]/', '', $cleaned));
@@ -856,6 +835,18 @@ class Member extends Authenticatable
                 $seen[$norm] = true;
                 $unique[] = $cleaned;
             }
+        }
+
+        // Deduplicate driver alias if Vehicle Driver is present
+        $hasVehicleDriver = false;
+        foreach ($unique as $u) {
+            if (strcasecmp($u, 'Vehicle Driver') === 0) {
+                $hasVehicleDriver = true;
+                break;
+            }
+        }
+        if ($hasVehicleDriver) {
+            $unique = array_values(array_filter($unique, fn ($u) => strcasecmp($u, 'Driver') !== 0));
         }
 
         return $unique;

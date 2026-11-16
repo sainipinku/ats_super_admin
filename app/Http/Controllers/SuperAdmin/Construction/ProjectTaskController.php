@@ -545,6 +545,148 @@ class ProjectTaskController extends Controller implements HasMiddleware
         }
     }
 
+    public function unassignTask(Request $request, Project $project, $taskId): RedirectResponse
+    {
+        $actor = $this->constructionActor() ?? $request->user();
+
+        $taskId = (int) $taskId;
+        $legacyTask = ExecutionTask::find($taskId);
+        $unifiedTask = Task::find($taskId);
+
+        if ($legacyTask === null && $unifiedTask !== null) {
+            if (!empty($unifiedTask->task_code)) {
+                $legacyTask = ExecutionTask::where('task_code', $unifiedTask->task_code)->first();
+            }
+            if ($legacyTask === null && !empty($unifiedTask->title) && !empty($unifiedTask->project_id)) {
+                $legacyTask = ExecutionTask::where('project_id', $unifiedTask->project_id)
+                    ->where('title', $unifiedTask->title)
+                    ->first();
+            }
+        } elseif ($unifiedTask === null && $legacyTask !== null) {
+            if (!empty($legacyTask->task_code)) {
+                $unifiedTask = Task::where('task_code', $legacyTask->task_code)->first();
+            }
+            if ($unifiedTask === null && !empty($legacyTask->title) && !empty($legacyTask->project_id)) {
+                $unifiedTask = Task::where('project_id', $legacyTask->project_id)
+                    ->where('title', $legacyTask->title)
+                    ->first();
+            }
+        }
+
+        if (!$legacyTask && !$unifiedTask) {
+            return Redirect::back()->with('error', 'Task not found.');
+        }
+
+        if ($legacyTask && (int) $legacyTask->project_id !== (int) $project->id) {
+            abort(403, 'Task does not belong to this project.');
+        }
+        if ($unifiedTask && (int) $unifiedTask->project_id !== (int) $project->id) {
+            abort(403, 'Task does not belong to this project.');
+        }
+
+        try {
+            DB::transaction(function () use ($project, $legacyTask, $unifiedTask, $taskId, $actor, $request) {
+                $previousSupervisorId = null;
+                $wasDraftingInProgress = ($legacyTask && $legacyTask->status === 'drafting_in_progress')
+                    || ($unifiedTask && $unifiedTask->status === 'drafting_in_progress');
+
+                if ($legacyTask) {
+                    $previousSupervisorId = $legacyTask->supervisor_member_id;
+                    $legacyTask->supervisor_member_id = null;
+                    if (in_array($legacyTask->status, ['in_progress', 'drafting_in_progress', 'draft', 'pending'], true)) {
+                        $legacyTask->status = 'planned';
+                    }
+                    $legacyTask->save();
+
+                    ExecutionTaskAssignee::where('execution_task_id', $legacyTask->id)
+                        ->update(['status' => 'inactive']);
+                }
+
+                if ($unifiedTask) {
+                    if (!$previousSupervisorId) {
+                        $previousSupervisorId = $unifiedTask->assigned_supervisor_member_id ?? $unifiedTask->member_id;
+                    }
+                    $unifiedTask->assigned_supervisor_member_id = null;
+                    $unifiedTask->member_id = null;
+                    if (in_array($unifiedTask->status, ['in_progress', 'drafting_in_progress', 'draft', 'pending'], true)) {
+                        $unifiedTask->status = 'planned';
+                    }
+                    $unifiedTask->save();
+
+                    TaskAssignment::where('task_id', $unifiedTask->id)
+                        ->whereNull('deleted_at')
+                        ->update([
+                            'status' => TaskAssignmentStatus::REVOKED->value,
+                            'is_transferred' => false,
+                            'deleted_at' => now(),
+                        ]);
+                }
+
+                $taskIds = array_values(array_filter([
+                    (int) $taskId,
+                    $legacyTask?->id,
+                    $unifiedTask?->id,
+                ]));
+
+                $surveyVisitIds = SurveyVisit::where('project_id', $project->id)
+                    ->where(function ($q) use ($taskIds, $legacyTask, $unifiedTask) {
+                        $q->whereIn('task_id', $taskIds);
+                        if ($legacyTask) {
+                            $q->orWhere('execution_task_id', $legacyTask->id);
+                        }
+                        if ($unifiedTask) {
+                            $q->orWhere('task_id', $unifiedTask->id);
+                        }
+                    })
+                    ->pluck('id');
+
+                $submissionIds = collect();
+                if ($surveyVisitIds->isNotEmpty()) {
+                    $submissionIds = SurveySubmission::where('project_id', $project->id)
+                        ->whereIn('survey_visit_id', $surveyVisitIds)
+                        ->pluck('id');
+                }
+
+                if ($submissionIds->isNotEmpty()) {
+                    DraftingJob::where('project_id', $project->id)
+                        ->whereIn('survey_submission_id', $submissionIds)
+                        ->delete();
+                }
+
+                if ($wasDraftingInProgress && $previousSupervisorId) {
+                    DraftingJob::where('project_id', $project->id)
+                        ->where('assigned_to_member_id', $previousSupervisorId)
+                        ->where('status', 'queued')
+                        ->doesntHave('drawingRevisions')
+                        ->delete();
+                }
+
+                try {
+                    app(ConstructionActivityService::class)->log(
+                        module: 'execution_task',
+                        action: 'task_unassigned',
+                        actor: $actor,
+                        reference: $legacyTask ?? $unifiedTask,
+                        companyId: $project->company_id,
+                        projectId: $project->id,
+                        meta: [
+                            'task_id' => $taskId,
+                            'previous_member_id' => $previousSupervisorId,
+                        ],
+                        request: $request
+                    );
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            });
+
+            return Redirect::back()->with('success', 'Task unassigned successfully. Member removed.');
+        } catch (\Throwable $e) {
+            report($e);
+            return Redirect::back()->with('error', config('app.debug') ? $e->getMessage() : 'Failed to unassign task.');
+        }
+    }
+
     public function reviewSurvey(Request $request, Project $project, $taskId): RedirectResponse
     {
         $actor = $this->constructionActor() ?? $request->user();
@@ -677,15 +819,125 @@ class ProjectTaskController extends Controller implements HasMiddleware
             }
         }
 
-        if ($decision === 'approved') {
-            if ($legacyTask) {
-                $legacyTask->status = 'survey_approved';
-                $legacyTask->save();
+        $isDriverTask = false;
+        $isSurveyorTask = false;
+
+        $extractSupervisorText = function ($supervisor, ?string $title): string {
+            $parts = [];
+            if (!empty($title)) {
+                $parts[] = (string) $title;
             }
+            if ($supervisor) {
+                if (!empty($supervisor->name) && is_scalar($supervisor->name)) {
+                    $parts[] = (string) $supervisor->name;
+                }
+                if (!empty($supervisor->designation)) {
+                    if (is_array($supervisor->designation)) {
+                        foreach ($supervisor->designation as $d) {
+                            if (is_scalar($d)) {
+                                $parts[] = (string) $d;
+                            }
+                        }
+                    } elseif (is_scalar($supervisor->designation)) {
+                        $parts[] = (string) $supervisor->designation;
+                    }
+                }
+                if (!empty($supervisor->designation_names) && is_scalar($supervisor->designation_names)) {
+                    $parts[] = (string) $supervisor->designation_names;
+                }
+                if (!empty($supervisor->role_names)) {
+                    if (is_array($supervisor->role_names)) {
+                        foreach ($supervisor->role_names as $r) {
+                            if (is_scalar($r)) {
+                                $parts[] = (string) $r;
+                            }
+                        }
+                    } elseif (is_scalar($supervisor->role_names)) {
+                        $parts[] = (string) $supervisor->role_names;
+                    }
+                }
+                if (!empty($supervisor->role_badges) && is_array($supervisor->role_badges)) {
+                    foreach ($supervisor->role_badges as $b) {
+                        if (is_scalar($b)) {
+                            $parts[] = (string) $b;
+                        }
+                    }
+                }
+                if (!empty($supervisor->roles) && is_array($supervisor->roles)) {
+                    foreach ($supervisor->roles as $r) {
+                        if (is_scalar($r)) {
+                            $parts[] = (string) $r;
+                        }
+                    }
+                }
+            }
+            return strtolower(implode(' ', array_filter($parts)));
+        };
+
+        if ($decision === 'approved') {
+            // Check legacy task supervisor & role
+            if ($legacyTask) {
+                $supervisor = $legacyTask->supervisor;
+                $supRoles = $extractSupervisorText($supervisor, $legacyTask->title);
+                if ($supervisor?->is_driver || str_contains($supRoles, 'driver') || str_contains($supRoles, 'vehicle')) {
+                    $isDriverTask = true;
+                }
+                if (str_contains($supRoles, 'survey')) {
+                    $isSurveyorTask = true;
+                }
+            }
+
+            // Check unified task supervisor & assignments
             if ($unifiedTask) {
-                $unifiedTask->status = 'review';
-                $unifiedTask->client_review_status = 'approved';
-                $unifiedTask->save();
+                $supervisor = $unifiedTask->supervisor ?? $unifiedTask->member;
+                $supRoles = $extractSupervisorText($supervisor, $unifiedTask->title);
+                if ($supervisor?->is_driver || str_contains($supRoles, 'driver') || str_contains($supRoles, 'vehicle')) {
+                    $isDriverTask = true;
+                }
+                if (str_contains($supRoles, 'survey')) {
+                    $isSurveyorTask = true;
+                }
+
+                if ($unifiedTask->relationLoaded('assignments') || method_exists($unifiedTask, 'assignments')) {
+                    foreach ($unifiedTask->assignments ?? [] as $asg) {
+                        $roleName = strtolower((string) ($asg->assignment_role ?? $asg->project_role ?? ''));
+                        if (str_contains($roleName, 'driver') || str_contains($roleName, 'vehicle')) {
+                            $isDriverTask = true;
+                        }
+                        if (str_contains($roleName, 'survey')) {
+                            $isSurveyorTask = true;
+                        }
+                    }
+                }
+            }
+
+            if ($isDriverTask || !$isSurveyorTask) {
+                // Directly mark driver / non-survey tasks as completed
+                if ($legacyTask) {
+                    $legacyTask->status = 'completed';
+                    $legacyTask->progress_percent = 100;
+                    $legacyTask->actual_end_date = now();
+                    $legacyTask->save();
+                }
+                if ($unifiedTask) {
+                    $unifiedTask->status = 'completed';
+                    $unifiedTask->progress_percent = 100;
+                    $unifiedTask->actual_end_date = now();
+                    $unifiedTask->is_completed = true;
+                    $unifiedTask->client_review_status = 'approved';
+                    $unifiedTask->save();
+                }
+            } else {
+                // Field surveyor tasks move to survey_approved for draftsman handoff
+                if ($legacyTask) {
+                    $legacyTask->status = 'survey_approved';
+                    $legacyTask->save();
+                }
+                if ($unifiedTask) {
+                    $unifiedTask->status = 'review';
+                    $unifiedTask->client_review_status = 'approved';
+                    $unifiedTask->save();
+                }
             }
 
         } elseif ($decision === 'revision_requested') {
@@ -725,7 +977,7 @@ class ProjectTaskController extends Controller implements HasMiddleware
         }
 
         $msg = match ($decision) {
-            'approved' => 'Survey report approved successfully.',
+            'approved' => ($isDriverTask || !$isSurveyorTask) ? 'Task marked as completed successfully.' : 'Survey report approved successfully.',
             'revision_requested' => 'Survey sent back for revision with your remarks.',
             'rejected' => 'Survey report marked as rejected.',
         };

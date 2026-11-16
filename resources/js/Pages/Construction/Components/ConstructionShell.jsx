@@ -10,7 +10,6 @@ const variantConfig = {
             { label: "Control Tower", href: route("super.construction.dashboard"), active: "super.construction.dashboard", permissions: ["dashboard.view"] },
             { label: "Client Registration", href: route("super.construction.clients.index"), active: "super.construction.clients.*", permissions: ["client.manage", "client.view"] },
             { label: "Projects & Budget", href: route("super.construction.projects.index"), active: "super.construction.projects.*", permissions: ["project.manage", "project.view"] },
-            { label: "Survey Planning", href: route("super.construction.survey.index"), active: "super.construction.survey.*", permissions: ["survey_plan.manage", "survey.manage", "survey_submission.review", "survey_plan.view", "survey.view"] },
             { label: "Drawing Approval", href: route("super.construction.drafting.index"), active: "super.construction.drafting.*", permissions: ["drafting.manage", "drawing_approval.manage", "drafting.view", "drawing_approval.view"] },
             { label: "Site Execution", href: route("super.construction.execution.index"), active: "super.construction.execution.*", permissions: ["execution.manage", "execution_task.manage", "execution.view", "dpr.review", "attendance.review"] },
             { label: "Attendance Logs", href: route("super.construction.attendance.index"), active: "super.construction.attendance.*", permissions: ["attendance.view", "attendance.review", "attendance.details"] },
@@ -26,7 +25,6 @@ const variantConfig = {
         items: [
             { label: "Project Dashboard", href: route("admin.construction.dashboard"), active: "admin.construction.dashboard", permissions: ["dashboard.view"] },
             { label: "Assigned Projects", href: route("admin.construction.projects.index"), active: "admin.construction.projects.*", permissions: ["project.manage", "project.view"] },
-            { label: "Survey Workflow", href: route("admin.construction.survey.index"), active: "admin.construction.survey.*", permissions: ["survey_plan.manage", "survey.manage", "survey_submission.review", "survey_plan.view", "survey.view"] },
             { label: "Drawing Approval", href: route("admin.construction.drafting.index"), active: "admin.construction.drafting.*", permissions: ["drafting.manage", "drawing_approval.manage", "drafting.view", "drawing_approval.view"] },
             { label: "Site Execution", href: route("admin.construction.execution.index"), active: "admin.construction.execution.*", permissions: ["execution.manage", "execution_task.manage", "execution.view", "dpr.review", "attendance.review"] },
             { label: "Attendance Logs", href: route("admin.construction.attendance.index"), active: "admin.construction.attendance.*", permissions: ["attendance.view", "attendance.review", "attendance.details"] },

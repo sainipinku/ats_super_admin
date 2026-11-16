@@ -25,6 +25,257 @@ const isActiveAssignment = (assignment) => {
     return status == null || String(status).toLowerCase() === "active";
 };
 
+const normalizeRoleStr = (val) => {
+    if (!val || typeof val !== "string") return "";
+    return val.toLowerCase().replace(/[\s\-_]+/g, "");
+};
+
+const getRoleIcon = (roleName) => {
+    const norm = (roleName || "").toLowerCase();
+    if (norm.includes("all")) return "📋";
+    if (norm.includes("unassign")) return "⚪";
+    if (norm.includes("driver")) return "🚚";
+    if (norm.includes("draft") || norm.includes("cad")) return "📐";
+    if (norm.includes("survey")) return "🧭";
+    if (norm.includes("site manager")) return "👷‍♂️";
+    if (norm.includes("site") || norm.includes("employee")) return "👷";
+    if (norm.includes("approv")) return "✅";
+    if (norm.includes("admin")) return "🛡️";
+    if (norm.includes("manager")) return "💼";
+    return "👤";
+};
+
+const resolveTaskAssignedMembers = (task, { members = [], projectTeamMembers = [] }) => {
+    const assignedMembers = [];
+    const seenIds = new Set();
+
+    const addMember = (m) => {
+        if (!m) return;
+        const id = m.id ?? m.member_id;
+        if (id && !seenIds.has(Number(id))) {
+            seenIds.add(Number(id));
+            const fullMember = members.find((mem) => Number(mem.id) === Number(id)) || m;
+            assignedMembers.push(fullMember);
+        }
+    };
+
+    if (task.supervisor) {
+        addMember(task.supervisor);
+    }
+    if (task.assigned_supervisor_member) {
+        addMember(task.assigned_supervisor_member);
+    }
+    const supId = task.supervisor_member_id || task.assigned_supervisor_member_id || task.member_id;
+    if (supId) {
+        const found = members.find((m) => Number(m.id) === Number(supId))
+            || projectTeamMembers.find((m) => Number(m.member_id || m.id) === Number(supId));
+        if (found) addMember(found);
+    }
+
+    const assignees = task.assignees || [];
+    if (Array.isArray(assignees)) {
+        assignees.forEach((a) => {
+            if (isActiveAssignment(a)) {
+                if (a.member) addMember(a.member);
+                else if (a.member_id || a.assigned_to) {
+                    const found = members.find((m) => Number(m.id) === Number(a.member_id || a.assigned_to));
+                    if (found) addMember(found);
+                }
+            }
+        });
+    }
+
+    const assignments = task.task_assignments || task.assignments || [];
+    if (Array.isArray(assignments)) {
+        assignments.forEach((a) => {
+            if (isActiveAssignment(a)) {
+                if (a.assignee) addMember(a.assignee);
+                else if (a.assigned_to || a.member_id) {
+                    const found = members.find((m) => Number(m.id) === Number(a.assigned_to || a.member_id));
+                    if (found) addMember(found);
+                }
+            }
+        });
+    }
+
+    return assignedMembers;
+};
+
+const isTaskUnassigned = (task, { members = [], projectTeamMembers = [] }) => {
+    if (task.status === "drafting_in_progress") {
+        return false;
+    }
+    const assignedMembers = resolveTaskAssignedMembers(task, { members, projectTeamMembers });
+    if (assignedMembers.length > 0) {
+        return false;
+    }
+    const supId = task.supervisor_member_id || task.assigned_supervisor_member_id || task.member_id;
+    if (supId) {
+        return false;
+    }
+    if (task.supervisor && task.supervisor.name && task.supervisor.name !== "Unassigned") {
+        return false;
+    }
+    const assignees = task.assignees || [];
+    if (Array.isArray(assignees) && assignees.some((a) => isActiveAssignment(a))) {
+        return false;
+    }
+    const assignments = task.task_assignments || task.assignments || [];
+    if (Array.isArray(assignments) && assignments.some((a) => isActiveAssignment(a))) {
+        return false;
+    }
+    return true;
+};
+
+const getTaskRoles = (task, { members = [], projectTeamMembers = [] }) => {
+    const rolesSet = new Set();
+    const normalizedSet = new Set();
+
+    const addRole = (r) => {
+        if (!r || typeof r !== "string") return;
+        const trimmed = r.trim();
+        if (!trimmed) return;
+        const norm = normalizeRoleStr(trimmed);
+        if (!normalizedSet.has(norm)) {
+            normalizedSet.add(norm);
+            rolesSet.add(trimmed);
+        }
+    };
+
+    if (task.status === "drafting_in_progress" || (task.assignees || []).some((a) => isActiveAssignment(a) && a.assignment_role === "draft_person")) {
+        addRole("Draft Person");
+        addRole("draft_person");
+    }
+
+    const assignees = task.assignees || [];
+    if (Array.isArray(assignees)) {
+        assignees.forEach((a) => {
+            if (isActiveAssignment(a) && a.assignment_role) {
+                addRole(a.assignment_role);
+            }
+        });
+    }
+    const assignments = task.task_assignments || task.assignments || [];
+    if (Array.isArray(assignments)) {
+        assignments.forEach((a) => {
+            if (isActiveAssignment(a) && a.assignment_role) {
+                addRole(a.assignment_role);
+            }
+        });
+    }
+
+    const assignedMembers = resolveTaskAssignedMembers(task, { members, projectTeamMembers });
+    assignedMembers.forEach((member) => {
+        const badges = getMemberRoleBadges(member);
+        badges.forEach((b) => addRole(b));
+
+        if (member.is_driver) {
+            addRole("Vehicle Driver");
+            addRole("vehicle_driver");
+            addRole("driver");
+        }
+        if (member.role?.name) addRole(member.role.name);
+        if (member.role?.slug) addRole(member.role.slug);
+        if (member.role_name) addRole(member.role_name);
+        if (member.designation) addRole(member.designation);
+
+        if (Array.isArray(member.assigned_roles)) {
+            member.assigned_roles.forEach((ar) => addRole(String(ar)));
+        }
+        if (Array.isArray(member.roles)) {
+            member.roles.forEach((r) => {
+                if (typeof r === "string") addRole(r);
+                else if (r?.name) addRole(r.name);
+                else if (r?.slug) addRole(r.slug);
+            });
+        }
+    });
+
+    return { roles: Array.from(rolesSet), normalized: normalizedSet };
+};
+
+const taskMatchesRole = (task, targetRoleKey, { members = [], projectTeamMembers = [] }) => {
+    if (!targetRoleKey || targetRoleKey === "all") return true;
+    if (targetRoleKey === "unassigned") {
+        return isTaskUnassigned(task, { members, projectTeamMembers });
+    }
+
+    const taskRolesInfo = getTaskRoles(task, { members, projectTeamMembers });
+    const targetNorm = normalizeRoleStr(String(targetRoleKey));
+
+    if (taskRolesInfo.normalized.has(targetNorm)) {
+        return true;
+    }
+
+    // Role-specific aliases and matching for official system roles:
+    // 1. Vehicle Driver
+    if (targetNorm === "vehicledriver" || targetNorm === "driver") {
+        return taskRolesInfo.normalized.has("vehicledriver") || taskRolesInfo.normalized.has("driver");
+    }
+
+    // 2. Draft Person
+    if (targetNorm === "draftperson" || targetNorm === "draftsman" || targetNorm === "drafter" || targetNorm === "draftman") {
+        return taskRolesInfo.normalized.has("draftperson") ||
+            taskRolesInfo.normalized.has("draftsman") ||
+            taskRolesInfo.normalized.has("drafter") ||
+            taskRolesInfo.normalized.has("draftman") ||
+            taskRolesInfo.normalized.has("draftperson22") ||
+            task.status === "drafting_in_progress";
+    }
+
+    // 3. Surveyor
+    if (targetNorm === "surveyor" || targetNorm === "surveyman") {
+        return taskRolesInfo.normalized.has("surveyor") || taskRolesInfo.normalized.has("surveyman");
+    }
+
+    // 4. Site Employee
+    if (targetNorm === "siteemployee") {
+        return taskRolesInfo.normalized.has("siteemployee") || taskRolesInfo.normalized.has("worker") || taskRolesInfo.normalized.has("executor");
+    }
+
+    // 5. Site Manager
+    if (targetNorm === "sitemanager") {
+        return taskRolesInfo.normalized.has("sitemanager");
+    }
+
+    // 6. Review Approver
+    if (targetNorm === "reviewapprover") {
+        return taskRolesInfo.normalized.has("reviewapprover");
+    }
+
+    // 7. Project Admin
+    if (targetNorm === "projectadmin") {
+        return taskRolesInfo.normalized.has("projectadmin");
+    }
+
+    // 8. Admin
+    if (targetNorm === "admin") {
+        return taskRolesInfo.normalized.has("admin");
+    }
+
+    // 9. Super Admin
+    if (targetNorm === "superadmin") {
+        return taskRolesInfo.normalized.has("superadmin");
+    }
+
+    // 10. Manager
+    if (targetNorm === "manager") {
+        return taskRolesInfo.normalized.has("manager");
+    }
+
+    // 11. Sub Admin
+    if (targetNorm === "subadmin") {
+        return taskRolesInfo.normalized.has("subadmin");
+    }
+
+    // 12. Member
+    if (targetNorm === "member") {
+        return taskRolesInfo.normalized.has("member");
+    }
+
+    return false;
+};
+
 export default function ProjectShow({ project, members, roles, activityLog, workflowSummary }) {
     const { auth } = usePage().props;
     const currentUser = auth?.user;
@@ -206,6 +457,131 @@ export default function ProjectShow({ project, members, roles, activityLog, work
             return false;
         });
     }, [project, isEmployeeView, currentUser]);
+
+    const [selectedRoleFilter, setSelectedRoleFilter] = useState("all");
+
+    const projectTeamMembers = useMemo(() => {
+        const list = project.team_members || project.teamMembers || [];
+        return list.map((tm) => {
+            const m = tm.member || {};
+            const r = tm.role || {};
+            const roleName = r.name || tm.assignment_scope || tm.project_role || "Team Member";
+            const roleText = [r.slug, roleName, m.role_names, m.assigned_role_names, m.designation]
+                .flat()
+                .join(" ")
+                .toLowerCase()
+                .replace(/[\s-]+/g, "_");
+            const isDraftPerson = /draft_person|draftsman|drafter|draft_man/.test(roleText);
+            const memberBadges = getMemberRoleBadges(m);
+            const rawBadges = [roleName, ...memberBadges].filter(Boolean);
+            let combinedBadges = [];
+            const seenKeys = new Set();
+            for (const b of rawBadges) {
+                const norm = b.trim();
+                const key = norm.toLowerCase().replace(/[^a-z0-9]/g, "");
+                if (!seenKeys.has(key) && norm.toLowerCase() !== "member" && norm.toLowerCase() !== "team member") {
+                    seenKeys.add(key);
+                    combinedBadges.push(norm);
+                }
+            }
+            if (combinedBadges.some((b) => /vehicle driver/i.test(b))) {
+                combinedBadges = combinedBadges.filter((b) => !/^driver$/i.test(b.trim()));
+            }
+            if (combinedBadges.some((b) => /^surveyor$/i.test(b.trim()))) {
+                combinedBadges = combinedBadges.filter((b) => !/survey man/i.test(b));
+            }
+            const isDriver = Boolean(
+                m.is_driver ||
+                /driver|vehicle/i.test(roleName) ||
+                combinedBadges.some((b) => /driver|vehicle/i.test(String(b)))
+            );
+            const status = tm.status == null ? "active" : String(tm.status).toLowerCase();
+            return {
+                id: tm.id,
+                member_id: tm.member_id || m.id,
+                name: m.name || `Member #${tm.member_id}`,
+                email: m.email || "",
+                phone: m.phone || "",
+                role_name: roleName,
+                badges: combinedBadges,
+                is_draft_person: isDraftPerson,
+                is_driver: isDriver,
+                designation: m.designation || "",
+                is_primary: tm.is_primary,
+                status,
+                member: m,
+                role: r,
+            };
+        }).filter((tm) => tm.member_id && tm.status === "active");
+    }, [project]);
+
+    const roleFilterOptions = useMemo(() => {
+        const allOption = {
+            key: "all",
+            label: "All Tasks",
+            count: mergedTaskList.length,
+            icon: "📋",
+        };
+
+        const unassignedCount = mergedTaskList.filter((t) =>
+            isTaskUnassigned(t, { members, projectTeamMembers })
+        ).length;
+        const unassignedOption = {
+            key: "unassigned",
+            label: "Unassigned",
+            count: unassignedCount,
+            icon: "⚪",
+        };
+
+        const roleItems = [];
+        const seenNormKeys = new Set(["all", "unassigned"]);
+
+        // Strictly use the official roles from the Role Management listing (props.roles)
+        (roles || []).forEach((r) => {
+            const key = r.slug || r.name;
+            const normKey = normalizeRoleStr(key);
+            if (!seenNormKeys.has(normKey)) {
+                seenNormKeys.add(normKey);
+                const count = mergedTaskList.filter((t) =>
+                    taskMatchesRole(t, key, { members, projectTeamMembers })
+                ).length;
+                roleItems.push({
+                    key,
+                    slug: r.slug,
+                    label: r.name || r.slug,
+                    count,
+                    icon: getRoleIcon(r.name || r.slug),
+                });
+            }
+        });
+
+        // Roles with active tasks (count > 0) appear first, followed by zero-count roles
+        roleItems.sort((a, b) => {
+            if (b.count > 0 && a.count === 0) return 1;
+            if (a.count > 0 && b.count === 0) return -1;
+            if (b.count !== a.count) return b.count - a.count;
+            return 0;
+        });
+
+        return [allOption, unassignedOption, ...roleItems];
+    }, [mergedTaskList, roles, members, projectTeamMembers]);
+
+    const filteredTaskList = useMemo(() => {
+        if (!selectedRoleFilter || selectedRoleFilter === "all") {
+            return mergedTaskList;
+        }
+        if (selectedRoleFilter === "unassigned") {
+            return mergedTaskList.filter((t) => isTaskUnassigned(t, { members, projectTeamMembers }));
+        }
+        return mergedTaskList.filter((t) => taskMatchesRole(t, selectedRoleFilter, { members, projectTeamMembers }));
+    }, [mergedTaskList, selectedRoleFilter, members, projectTeamMembers]);
+
+    const activeFilterOption = useMemo(() => {
+        return roleFilterOptions.find((o) =>
+            o.key === selectedRoleFilter || normalizeRoleStr(o.key) === normalizeRoleStr(selectedRoleFilter)
+        ) || { key: "all", label: "All Tasks", count: mergedTaskList.length, icon: "📋" };
+    }, [roleFilterOptions, selectedRoleFilter, mergedTaskList.length]);
+
     const [showCreateTask, setShowCreateTask] = useState(false);
     const [showAdvancedTaskFields, setShowAdvancedTaskFields] = useState(false);
 
@@ -1003,7 +1379,11 @@ export default function ProjectShow({ project, members, roles, activityLog, work
 
             <SectionCard
                 title="Execution Tasks"
-                description={`${taskCounts.total} total tasks · ${taskCounts.completed} complete · ${taskCounts.in_progress} in-progress · ${taskCounts.pending} pending`}
+                description={
+                    selectedRoleFilter !== "all"
+                        ? `Filtered by ${activeFilterOption.label}: Showing ${filteredTaskList.length} of ${mergedTaskList.length} tasks`
+                        : `${taskCounts.total} total tasks · ${taskCounts.completed} complete · ${taskCounts.in_progress} in-progress · ${taskCounts.pending} pending`
+                }
                 actions={
                     canCreateTask ? (
                         <button
@@ -1020,6 +1400,66 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                     ) : null
                 }
             >
+                {/* Role Filter Badges Bar */}
+                <div className="mb-5 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 dark:border-slate-800 dark:bg-slate-900/60">
+                    <div className="mb-2.5 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                Filter Tasks By Assigned Role
+                            </span>
+                            {selectedRoleFilter !== "all" && (
+                                <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
+                                    {activeFilterOption.label} ({filteredTaskList.length})
+                                </span>
+                            )}
+                        </div>
+                        {selectedRoleFilter !== "all" && (
+                            <button
+                                type="button"
+                                onClick={() => setSelectedRoleFilter("all")}
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition"
+                            >
+                                <span>Clear filter (Show all {mergedTaskList.length})</span>
+                                <span className="text-[10px]">✕</span>
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {roleFilterOptions.map((option) => {
+                            const isSelected = selectedRoleFilter === option.key || (selectedRoleFilter && normalizeRoleStr(selectedRoleFilter) === normalizeRoleStr(option.key));
+                            const isUnassignedPill = option.key === "unassigned";
+                            return (
+                                <button
+                                    key={option.key}
+                                    type="button"
+                                    onClick={() => setSelectedRoleFilter(option.key)}
+                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all shadow-2xs ${
+                                        isSelected
+                                            ? isUnassignedPill
+                                                ? "bg-amber-500 text-white shadow-amber-500/20 ring-2 ring-amber-400 ring-offset-1 dark:ring-offset-slate-900"
+                                                : "bg-indigo-600 text-white shadow-indigo-600/20 ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-slate-900"
+                                            : "bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/90 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:border-slate-800"
+                                    }`}
+                                >
+                                    <span className="text-sm leading-none">{option.icon}</span>
+                                    <span>{option.label}</span>
+                                    <span
+                                        className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                                            isSelected
+                                                ? "bg-white/25 text-white"
+                                                : option.count > 0
+                                                    ? "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                                                    : "bg-slate-100/60 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500"
+                                        }`}
+                                    >
+                                        {option.count}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
                 {canCreateTask && showCreateTask && (
                     <form
                         onSubmit={(e) => {
@@ -1168,9 +1608,9 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                 )}
 
                 <div>
-                    {mergedTaskList.length ? (
+                    {filteredTaskList.length ? (
                         <div className="space-y-3">
-                            {mergedTaskList.map((task) => (
+                            {filteredTaskList.map((task) => (
                                 <TaskRow
                                     key={task._sourceKey}
                                     task={task}
@@ -1184,6 +1624,25 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                                     onEdit={() => setEditingTask(task)}
                                 />
                             ))}
+                        </div>
+                    ) : mergedTaskList.length > 0 ? (
+                        <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center dark:border-slate-800">
+                            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-2xl text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+                                🔍
+                            </span>
+                            <h3 className="mt-3 text-sm font-bold text-slate-900 dark:text-white">
+                                No tasks found for &ldquo;{activeFilterOption.label}&rdquo;
+                            </h3>
+                            <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
+                                There are currently no execution tasks matching this role filter.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedRoleFilter("all")}
+                                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500"
+                            >
+                                <span>Show All Tasks ({mergedTaskList.length})</span>
+                            </button>
                         </div>
                     ) : (
                         <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center dark:border-slate-800">
@@ -1432,6 +1891,8 @@ function TaskRow({
     const [previewImage, setPreviewImage] = useState(null);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showTransferModal, setShowTransferModal] = useState(false);
+    const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
+    const [isUnassigning, setIsUnassigning] = useState(false);
     const [showRevisionInput, setShowRevisionInput] = useState(false);
     const [revisionRemarks, setRevisionRemarks] = useState("");
     const [isSubmittingReview, setIsSubmittingReview] = useState(false);
@@ -1440,15 +1901,60 @@ function TaskRow({
 
     const taskVisits = useMemo(() => {
         const list = [...(task.survey_visits || task.surveyVisits || [])];
-        if (list.length === 0 && Array.isArray(project.survey_visits)) {
+        if (Array.isArray(project.survey_visits)) {
             project.survey_visits.forEach((v) => {
-                if (Number(v.task_id) === Number(task.id)) {
+                const matches =
+                    Number(v.task_id) === Number(task.id) ||
+                    Number(v.execution_task_id) === Number(task.id) ||
+                    (task.execution_task_id && Number(v.execution_task_id) === Number(task.execution_task_id)) ||
+                    (task.unified_task_id && Number(v.task_id) === Number(task.unified_task_id)) ||
+                    (task.legacy_task_id && (Number(v.execution_task_id) === Number(task.legacy_task_id) || Number(v.task_id) === Number(task.legacy_task_id)));
+                if (matches && !list.some((existing) => Number(existing.id) === Number(v.id))) {
                     list.push(v);
                 }
             });
         }
         return list;
     }, [task, project]);
+
+    const isDriverTask = useMemo(() => {
+        const sup = task.supervisor;
+        if (sup?.is_driver) return true;
+        const roleText = [
+            task.title,
+            sup?.role_badge,
+            sup?.designation,
+            sup?.role_names,
+            sup?.role_name,
+            sup?.assigned_role_names,
+        ].flat().filter(Boolean).join(" ").toLowerCase();
+        if (/driver|vehicle/i.test(roleText)) return true;
+        const assignees = task.assignees || task.task_assignments || task.assignments || [];
+        return assignees.some((a) => {
+            const aRole = a.assignment_role || a.project_role || a.role?.name || a.role?.slug || "";
+            const m = a.member || {};
+            return /driver|vehicle/i.test(aRole) || m.is_driver || /driver|vehicle/i.test(m.designation || "");
+        });
+    }, [task]);
+
+    const isSurveyorTask = useMemo(() => {
+        const sup = task.supervisor;
+        const roleText = [
+            task.title,
+            sup?.role_badge,
+            sup?.designation,
+            sup?.role_names,
+            sup?.role_name,
+            sup?.assigned_role_names,
+        ].flat().filter(Boolean).join(" ").toLowerCase();
+        if (/survey/i.test(roleText)) return true;
+        const assignees = task.assignees || task.task_assignments || task.assignments || [];
+        return assignees.some((a) => {
+            const aRole = a.assignment_role || a.project_role || a.role?.name || a.role?.slug || "";
+            const m = a.member || {};
+            return /survey/i.test(aRole) || /survey/i.test(m.designation || "");
+        });
+    }, [task]);
 
     const projectTeamMembers = useMemo(() => {
         const list = project.team_members || project.teamMembers || [];
@@ -1463,11 +1969,26 @@ function TaskRow({
                 .replace(/[\s-]+/g, "_");
             const isDraftPerson = /draft_person|draftsman|drafter|draft_man/.test(roleText);
             const memberBadges = getMemberRoleBadges(m);
-            const combinedBadges = [...new Set([roleName, ...memberBadges].filter(Boolean))];
+            const rawBadges = [roleName, ...memberBadges].filter(Boolean);
+            let combinedBadges = [];
+            const seenKeys = new Set();
+            for (const b of rawBadges) {
+                const norm = b.trim();
+                const key = norm.toLowerCase().replace(/[^a-z0-9]/g, "");
+                if (!seenKeys.has(key) && norm.toLowerCase() !== "member" && norm.toLowerCase() !== "team member") {
+                    seenKeys.add(key);
+                    combinedBadges.push(norm);
+                }
+            }
+            if (combinedBadges.some((b) => /vehicle driver/i.test(b))) {
+                combinedBadges = combinedBadges.filter((b) => !/^driver$/i.test(b.trim()));
+            }
+            if (combinedBadges.some((b) => /^surveyor$/i.test(b.trim()))) {
+                combinedBadges = combinedBadges.filter((b) => !/survey man/i.test(b));
+            }
             const isDriver = Boolean(
                 m.is_driver ||
                 /driver|vehicle/i.test(roleName) ||
-                /driver|vehicle/i.test(m.designation || "") ||
                 combinedBadges.some((b) => /driver|vehicle/i.test(String(b)))
             );
             const status = tm.status == null ? "active" : String(tm.status).toLowerCase();
@@ -1527,7 +2048,7 @@ function TaskRow({
     }, [project.drafting_jobs, project.draftingJobs, task, taskVisits]);
 
     const isSurveyApproved = useMemo(() => {
-        if (task.status === "survey_approved" || task.status === "drafting_in_progress" || task.status === "completed") {
+        if (task.status === "survey_approved" || task.status === "drafting_in_progress") {
             return true;
         }
         if (taskDraftingJob) return true;
@@ -1535,13 +2056,13 @@ function TaskRow({
             const sub = v.submission;
             return v.status === 2 || v.status === "approved" || (sub && (sub.status === 2 || sub.status_key === "approved"));
         });
-        if (hasApprovedVisit) return true;
+        if (hasApprovedVisit && isSurveyorTask) return true;
         const submissions = project.survey_submissions || project.surveySubmissions || [];
         return submissions.some((s) => {
             const matches = Number(s.task_id) === Number(task.id) || Number(s.execution_task_id) === Number(task.id) || taskVisits.some((v) => Number(v.id) === Number(s.survey_visit_id));
-            return matches && (s.status === 2 || s.status_key === "approved");
+            return matches && (s.status === 2 || s.status_key === "approved") && isSurveyorTask;
         });
-    }, [task.status, taskDraftingJob, taskVisits, project.survey_submissions, project.surveySubmissions, task.id]);
+    }, [task.status, taskDraftingJob, taskVisits, project.survey_submissions, project.surveySubmissions, task.id, isSurveyorTask]);
 
     const isDraftingAssigned = useMemo(() => {
         if (Boolean(taskDraftingJob)) return true;
@@ -1702,6 +2223,28 @@ function TaskRow({
         });
     };
 
+    const handleUnassign = () => {
+        setIsUnassigning(true);
+        router.post(
+            route("super.construction.projects.tasks-v2.unassign", [project.id, task.id]),
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setIsUnassigning(false);
+                    setShowUnassignConfirm(false);
+                    setShowTransferModal(false);
+                    toast.success("Assignment removed. Task is now unassigned.");
+                },
+                onError: (errors) => {
+                    setIsUnassigning(false);
+                    const firstError = Object.values(errors)[0] || "Failed to remove assignment.";
+                    toast.error(firstError);
+                },
+            }
+        );
+    };
+
     const handleReviewSurvey = (decision) => {
         if (decision === "revision_requested" && !revisionRemarks.trim()) {
             toast.error("Please provide revision remarks describing what needs to be updated.");
@@ -1721,12 +2264,15 @@ function TaskRow({
                     setShowDetailsModal(false);
                     setShowRevisionInput(false);
                     setRevisionRemarks("");
-                    toast.success(decision === "approved" ? "Survey task approved!" : "Revision requested from surveyor.");
+                    const successMsg = decision === "approved"
+                        ? (isDriverTask || !isSurveyorTask ? "Task approved and marked as completed!" : "Survey task approved!")
+                        : (isDriverTask ? "Revision requested from driver." : (isSurveyorTask ? "Revision requested from surveyor." : "Revision requested."));
+                    toast.success(successMsg);
                 },
                 onError: (errors) => {
                     const firstError = Object.values(errors)[0];
                     if (firstError) toast.error(firstError);
-                    else toast.error("Failed to update survey review.");
+                    else toast.error("Failed to update task review.");
                 },
             }
         );
@@ -1939,7 +2485,7 @@ function TaskRow({
 
                     <div className="flex flex-col min-w-0">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                            {isDraftingAssigned ? "Draft Person" : "Supervisor"}
+                            {isDraftingAssigned ? "Draft Person" : "Assigned Member"}
                         </span>
                         <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
                             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
@@ -2461,7 +3007,7 @@ function TaskRow({
                                         {task.task_code}
                                     </span>
                                     <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                                        Survey Task Submission Details
+                                        {isDriverTask ? "Driver Task Submission Details" : (isSurveyorTask ? "Survey Task Submission Details" : "Task Submission Details")}
                                     </h3>
                                     <StatusBadge value={task.status} />
                                     <StatusBadge value={task.priority} />
@@ -2495,7 +3041,7 @@ function TaskRow({
                                 </div>
                                 <div className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
                                     <div>
-                                        <p className="text-slate-400">Supervisor</p>
+                                        <p className="text-slate-400">Assigned Member</p>
                                         <p className="font-semibold text-slate-800 dark:text-slate-200">{task.supervisor?.name || "Unassigned"}</p>
                                     </div>
                                     <div>
@@ -2527,7 +3073,7 @@ function TaskRow({
                                     <div className="flex items-center justify-between">
                                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
                                             <span>📋</span>
-                                            <span>Submitted Day Data & Field Reports ({taskVisits.length})</span>
+                                            <span>{isDriverTask ? `Submitted Trip & Field Reports (${taskVisits.length})` : (isSurveyorTask ? `Submitted Survey Data & Field Reports (${taskVisits.length})` : `Submitted Day Data & Field Reports (${taskVisits.length})`)}</span>
                                         </h4>
                                         <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
                                             Latest: Day {taskVisits[0]?.day_number || 1}
@@ -2543,16 +3089,16 @@ function TaskRow({
                                             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-slate-800">
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 font-bold text-sm">
-                                                        {(v.checked_in_by?.name || "S").charAt(0).toUpperCase()}
+                                                        {(v.checked_in_by?.name || (isDriverTask ? "D" : isSurveyorTask ? "S" : "M")).charAt(0).toUpperCase()}
                                                     </div>
                                                     <div>
                                                         <div className="flex items-center gap-2">
                                                             <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                                                                Day {v.day_number || 1} Survey Update
+                                                                Day {v.day_number || 1} {isDriverTask ? "Driver Trip Update" : (isSurveyorTask ? "Survey Update" : "Task Update")}
                                                             </span>
                                                         </div>
                                                         <p className="text-xs text-slate-500">
-                                                            Submitted by <span className="font-semibold text-slate-700 dark:text-slate-300">{v.checked_in_by?.name || "Field Surveyor"}</span> • {formatDateTime(v.updated_at || v.created_at) || "N/A"}
+                                                            Submitted by <span className="font-semibold text-slate-700 dark:text-slate-300">{v.checked_in_by?.name || (isDriverTask ? "Driver" : isSurveyorTask ? "Field Surveyor" : "Team Member")}</span> • {formatDateTime(v.updated_at || v.created_at) || "N/A"}
                                                             {v.checked_in_by?.phone ? ` • Tel: ${v.checked_in_by.phone}` : ""}
                                                         </p>
                                                     </div>
@@ -2625,7 +3171,9 @@ function TaskRow({
                                                 <div className="mt-4 space-y-2.5">
                                                     {v.remarks && (
                                                         <div className="rounded-xl bg-amber-50/70 p-3 text-xs dark:bg-amber-950/20">
-                                                            <p className="font-semibold text-amber-900 dark:text-amber-200">Survey Remarks</p>
+                                                            <p className="font-semibold text-amber-900 dark:text-amber-200">
+                                                                {isDriverTask ? "Driver / Trip Remarks" : (isSurveyorTask ? "Survey Remarks" : "Task Remarks")}
+                                                            </p>
                                                             <p className="mt-1 text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{v.remarks}</p>
                                                         </div>
                                                     )}
@@ -2638,12 +3186,14 @@ function TaskRow({
                                             {/* Attached Files */}
                                             {v.file_path && (
                                                 <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Attached Survey Files & Reports</p>
+                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                                        {isDriverTask ? "Attached Trip & Vehicle Documents" : (isSurveyorTask ? "Attached Survey Files & Reports" : "Attached Task Files & Reports")}
+                                                    </p>
                                                     <div className="mt-2 flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-lg">📄</span>
                                                             <span className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate max-w-sm">
-                                                                {v.file_path.split("/").pop() || "Survey Data Report"}
+                                                                {v.file_path.split("/").pop() || (isDriverTask ? "Driver Trip Report" : "Survey Data Report")}
                                                             </span>
                                                         </div>
                                                         <a
@@ -2663,7 +3213,7 @@ function TaskRow({
                                             {Array.isArray(v.photos) && v.photos.length > 0 && (
                                                 <div className="mt-4">
                                                     <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                                        Site Proof Photos ({v.photos.length})
+                                                        {isDriverTask ? "Driver Trip & Delivery Proof Photos" : (isSurveyorTask ? "Site Survey Proof Photos" : "Task Proof Photos")} ({v.photos.length})
                                                     </p>
                                                     <div className="mt-2 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                                                         {v.photos.map((photoUrl, pIdx) => (
@@ -2695,10 +3245,14 @@ function TaskRow({
                                         📋
                                     </span>
                                     <h4 className="mt-3 text-sm font-bold text-slate-900 dark:text-white">
-                                        No Survey Submissions Yet
+                                        {isDriverTask ? "No Driver Submissions Yet" : (isSurveyorTask ? "No Survey Submissions Yet" : "No Task Submissions Yet")}
                                     </h4>
                                     <p className="mt-1 max-w-md mx-auto text-xs text-slate-500">
-                                        The survey team has not submitted field data for this task yet. When they complete day work and submit from the mobile app, full metrics, points, RAW/PDF files, and photos will appear here.
+                                        {isDriverTask
+                                            ? "The driver has not submitted trip data or proof photos for this task yet. When they complete day work and submit from the mobile app, details and photos will appear here."
+                                            : (isSurveyorTask
+                                                ? "The survey team has not submitted field data for this task yet. When they complete day work and submit from the mobile app, full metrics, points, RAW/PDF files, and photos will appear here."
+                                                : "The assigned member has not submitted updates or proof photos for this task yet. When they submit from the mobile app, details and photos will appear here.")}
                                     </p>
                                 </div>
                             )}
@@ -2766,7 +3320,7 @@ function TaskRow({
                             )}
 
                             {/* Drafting & CAD Drawing Phase Section */}
-                            {(isSurveyApproved || isDraftingAssigned || isCurrentUserDraftPerson || drawingRevisions.length > 0) && (
+                            {((isSurveyorTask && isSurveyApproved) || isDraftingAssigned || isCurrentUserDraftPerson || drawingRevisions.length > 0) && (
                                 <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-4.5 dark:border-indigo-900/60 dark:bg-indigo-950/20">
                                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 pb-3 dark:border-indigo-900/60">
                                         <div className="flex items-center gap-2">
@@ -3191,7 +3745,23 @@ function TaskRow({
                                 ) : (
                                     <>
                                         {/* Admin / Owner / Supervisor Actions */}
-                                        {isSurveyApproved || isDraftingAssigned ? (
+                                        {task.status === "completed" ? (
+                                            <>
+                                                <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                                    ✓ Task Completed
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowDetailsModal(false);
+                                                        setShowTransferModal(true);
+                                                    }}
+                                                    className="rounded-xl border border-violet-300 bg-violet-50 px-3.5 py-2 text-xs font-semibold text-violet-800 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200"
+                                                >
+                                                    Re-assign / Transfer Task
+                                                </button>
+                                            </>
+                                        ) : (isSurveyApproved || isDraftingAssigned) ? (
                                             <>
                                                 <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
                                                     ✓ Survey Approved
@@ -3229,7 +3799,7 @@ function TaskRow({
                                                     onClick={() => handleReviewSurvey("approved")}
                                                     className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-emerald-500 disabled:opacity-60"
                                                 >
-                                                    Approve Survey
+                                                    {isDriverTask || !isSurveyorTask ? "Complete Task" : "Approve Survey"}
                                                 </button>
                                             </>
                                         )}
@@ -3264,15 +3834,42 @@ function TaskRow({
                         </div>
 
                         {/* Current Assignee Banner */}
-                        <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
-                            <div>
-                                <span className="text-slate-400">Current Supervisor / Assignee:</span>{" "}
-                                <strong className="text-slate-800 dark:text-slate-200">
-                                    {task.supervisor?.name || "Unassigned"}
-                                </strong>
-                            </div>
-                            <StatusBadge value={task.status} />
-                        </div>
+                        {(() => {
+                            const currentAssignedName = assignedDraftPerson?.name || task.supervisor?.name || null;
+                            const hasAssignedMember = Boolean(
+                                currentAssignedName ||
+                                task.supervisor_member_id ||
+                                task.assigned_supervisor_member_id ||
+                                (task.assignees && task.assignees.some((a) => isActiveAssignment(a)))
+                            );
+
+                            return (
+                                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-slate-400">Current Assigned Member:</span>{" "}
+                                        <strong className="text-slate-800 dark:text-slate-200">
+                                            {currentAssignedName || "Unassigned"}
+                                        </strong>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <StatusBadge value={task.status} />
+                                        {hasAssignedMember && canTransferTask && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowUnassignConfirm(true)}
+                                                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 hover:border-rose-300 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/60 transition shadow-2xs"
+                                                title="Remove current member assignment from this task"
+                                            >
+                                                <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                <span>Remove Assignment</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         <div className="mt-4 space-y-4">
                             {/* Member Dropdown from projectTeamMembers */}
@@ -3309,7 +3906,7 @@ function TaskRow({
                                             const badgeStr = badges.length > 0 ? ` [${badges.join("] [")}]` : "";
                                             return (
                                                 <option key={tm.id} value={tm.member_id}>
-                                                    {tm.name}{badgeStr} {tm.is_draft_person ? "⭐ (Draft Person)" : ""} {tm.is_driver ? "🚗 (Driver)" : ""}
+                                                    {tm.name}{badgeStr}
                                                 </option>
                                             );
                                         })}
@@ -3392,6 +3989,52 @@ function TaskRow({
                             </button>
                         </div>
                     </form>
+                </Modal>
+            )}
+
+            {/* Remove Assignment Confirmation Modal */}
+            {showUnassignConfirm && (
+                <Modal show={true} onClose={() => !isUnassigning && setShowUnassignConfirm(false)} maxWidth="md">
+                    <div className="p-6">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400">
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                    Remove Task Assignment
+                                </h3>
+                                <p className="text-xs text-slate-500">
+                                    Task: <strong>{task.task_code}</strong>
+                                </p>
+                            </div>
+                        </div>
+
+                        <p className="mb-6 text-xs text-slate-600 dark:text-slate-300">
+                            Are you sure you want to remove <strong>{assignedDraftPerson?.name || task.supervisor?.name || "the assigned member"}</strong> from this task? This task will become <strong>Unassigned</strong> and will no longer appear on the member's task list or mobile dashboard.
+                        </p>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                type="button"
+                                disabled={isUnassigning}
+                                onClick={() => setShowUnassignConfirm(false)}
+                                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isUnassigning}
+                                onClick={handleUnassign}
+                                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-rose-500 disabled:opacity-60"
+                            >
+                                {isUnassigning ? "Removing..." : "Yes, Remove Assignment"}
+                            </button>
+                        </div>
+                    </div>
                 </Modal>
             )}
 
@@ -3877,27 +4520,30 @@ function mergedTasksForExecutionList(project) {
             item_title: item.item_title ?? item.title ?? "",
         }));
 
-        // Cross-match if checklists were attached to the other table representation
-        let fallbackChecklists = [];
-        if (sourceTag === "unified" && legacyChecklists.length === 0 && unifiedChecklists.length === 0) {
-            const match = legacyTasks.find((et) =>
+        // Find matching counterpart in other table
+        const partnerMatch = sourceTag === "unified"
+            ? legacyTasks.find((et) =>
                 et.id === task.id ||
                 (et.task_code && task.task_code && et.task_code === task.task_code) ||
                 (et.title && task.title && et.title.trim().toLowerCase() === task.title.trim().toLowerCase())
-            );
-            if (match && Array.isArray(match.checklists)) {
-                fallbackChecklists = match.checklists;
-            }
-        } else if (sourceTag === "legacy" && legacyChecklists.length === 0 && unifiedChecklists.length === 0) {
-            const match = unifiedTasks.find((ut) =>
+            )
+            : unifiedTasks.find((ut) =>
                 ut.id === task.id ||
                 (ut.task_code && task.task_code && ut.task_code === task.task_code) ||
                 (ut.title && task.title && ut.title.trim().toLowerCase() === task.title.trim().toLowerCase())
             );
-            if (match) {
-                const rawUt = Array.isArray(match.checklist_items)
-                    ? match.checklist_items
-                    : (Array.isArray(match.checklistItems) ? match.checklistItems : []);
+
+        // Cross-match if checklists were attached to the other table representation
+        let fallbackChecklists = [];
+        if (sourceTag === "unified" && legacyChecklists.length === 0 && unifiedChecklists.length === 0) {
+            if (partnerMatch && Array.isArray(partnerMatch.checklists)) {
+                fallbackChecklists = partnerMatch.checklists;
+            }
+        } else if (sourceTag === "legacy" && legacyChecklists.length === 0 && unifiedChecklists.length === 0) {
+            if (partnerMatch) {
+                const rawUt = Array.isArray(partnerMatch.checklist_items)
+                    ? partnerMatch.checklist_items
+                    : (Array.isArray(partnerMatch.checklistItems) ? partnerMatch.checklistItems : []);
                 fallbackChecklists = rawUt.map((item) => ({
                     ...item,
                     is_completed: item.is_completed ?? item.completed_at ?? false,
@@ -3914,6 +4560,19 @@ function mergedTasksForExecutionList(project) {
             if (!seenChecklist.has(key)) {
                 seenChecklist.add(key);
                 mergedChecklists.push(it);
+            }
+        }
+
+        // Cross-merge survey visits across legacy and unified mirrors
+        const selfVisits = Array.isArray(task.survey_visits) ? task.survey_visits : (Array.isArray(task.surveyVisits) ? task.surveyVisits : []);
+        const partnerVisits = partnerMatch ? (Array.isArray(partnerMatch.survey_visits) ? partnerMatch.survey_visits : (Array.isArray(partnerMatch.surveyVisits) ? partnerMatch.surveyVisits : [])) : [];
+        const combinedVisits = [...selfVisits, ...partnerVisits];
+        const seenVisitIds = new Set();
+        const mergedVisits = [];
+        for (const v of combinedVisits) {
+            if (v && v.id && !seenVisitIds.has(v.id)) {
+                seenVisitIds.add(v.id);
+                mergedVisits.push(v);
             }
         }
         const fallbackCode = `${sourceTag.toUpperCase()}-${task.id}`;
@@ -3953,6 +4612,9 @@ function mergedTasksForExecutionList(project) {
         return {
             ...pick(Object.keys(task)),
             checklists: mergedChecklists,
+            survey_visits: mergedVisits,
+            legacy_task_id: sourceTag === "unified" ? partnerMatch?.id : (task.legacy_task_id || task.id),
+            unified_task_id: sourceTag === "legacy" ? partnerMatch?.id : (task.unified_task_id || task.id),
             task_code: task.task_code || fallbackCode,
             status: task.status || task.status_key || "pending",
             priority: task.priority || "medium",

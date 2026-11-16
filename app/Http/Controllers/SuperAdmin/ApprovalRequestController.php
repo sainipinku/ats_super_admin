@@ -138,6 +138,14 @@ class ApprovalRequestController extends Controller
         $resourceType = strtolower($request->resource_type);
         $resourceId = (string) $request->resource_id;
 
+        if ($resourceType === 'project') {
+            $isSuperAdmin = Auth::guard('superadmin')->check()
+                || ($user instanceof \App\Models\SuperAdmin);
+            if (!$isSuperAdmin) {
+                return back()->with('error', 'Company admins are not permitted to delete or request deletion of projects.');
+            }
+        }
+
         $existing = ActionApprovalRequest::where('action', 'delete')
             ->where('resource_type', $resourceType)
             ->where('resource_id', $resourceId)

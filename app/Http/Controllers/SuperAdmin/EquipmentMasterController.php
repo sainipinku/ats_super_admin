@@ -188,8 +188,8 @@ class EquipmentMasterController extends Controller
             'employees' => $employees,
             'projects' => $projects,
             'isProductSuperAdmin' => $isProductSuperAdmin,
-            'canManageEquipment' => !$isProductSuperAdmin,
-            'canCreateEquipment' => $isProductSuperAdmin,
+            'canManageEquipment' => true,
+            'canCreateEquipment' => true,
             'filters' => (object) $request->only(['search', 'category_id', 'status', 'sort', 'per_page']),
         ]);
     }

@@ -648,9 +648,8 @@ class MemberDashboardController extends Controller
         $tasks = collect([]);
         try {
             $accessibleProjectIds = $this->accessibleProjectIds($member);
-            $adminProjectIds = $this->adminTaskProjectIds($member, $accessibleProjectIds);
 
-            $legacyScope = function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
+            $legacyScope = function (Builder $q) use ($memberId, $accessibleProjectIds) {
                 $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
                     $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
                         $assignmentOrSupervisor->whereHas('assignees', function (Builder $sub) use ($memberId) {
@@ -666,15 +665,9 @@ class MemberDashboardController extends Controller
                         $direct->whereNull('project_id');
                     }
                 });
-
-                if ($adminProjectIds !== []) {
-                    $q->orWhere(function (Builder $admin) use ($adminProjectIds) {
-                        $admin->whereIn('project_id', $adminProjectIds);
-                    });
-                }
             };
 
-            $unifiedScope = function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
+            $unifiedScope = function (Builder $q) use ($memberId, $accessibleProjectIds) {
                 $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
                     $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
                         $assignmentOrSupervisor->whereHas('assignments', function (Builder $sub) use ($memberId) {
@@ -695,12 +688,6 @@ class MemberDashboardController extends Controller
                         $direct->whereNull('project_id');
                     }
                 });
-
-                if ($adminProjectIds !== []) {
-                    $q->orWhere(function (Builder $admin) use ($adminProjectIds) {
-                        $admin->whereIn('project_id', $adminProjectIds);
-                    });
-                }
             };
 
             $requestedProjectId = $request->filled('project_id') ? (int) $request->input('project_id') : null;
@@ -1615,7 +1602,6 @@ $completed = SurveyPlan::whereHas(
         $memberId = $member->getKey();
 
         $accessibleProjectIds = $this->accessibleProjectIds($member);
-        $adminProjectIds = $this->adminTaskProjectIds($member, $accessibleProjectIds);
 
         if ($request->filled('project_id')) {
             $requested = (int) $request->input('project_id');
@@ -1655,31 +1641,23 @@ $completed = SurveyPlan::whereHas(
             'supervisor',
             'checklists',
             'surveyVisits.submission.reviewedBy',
-        ])->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
-            $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
-                $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
-                    $assignmentOrSupervisor->whereHas('assignees', function (Builder $sub) use ($memberId) {
-                        $sub->where('member_id', $memberId)->where('status', 'active');
-                    })
-                    ->orWhere('supervisor_member_id', $memberId)
-                    ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
-                        $sub->where('assigned_to_member_id', $memberId);
-                    });
+        ])->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
+            $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
+                $assignmentOrSupervisor->whereHas('assignees', function (Builder $sub) use ($memberId) {
+                    $sub->where('member_id', $memberId)->where('status', 'active');
+                })
+                ->orWhere('supervisor_member_id', $memberId)
+                ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
+                    $sub->where('assigned_to_member_id', $memberId);
                 });
-                if ($accessibleProjectIds !== []) {
-                    $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
-                        $scope->whereNull('project_id')
-                            ->orWhereIn('project_id', $accessibleProjectIds);
-                    });
-                } else {
-                    $direct->whereNull('project_id');
-                }
             });
-
-            if ($adminProjectIds !== []) {
-                $q->orWhere(function (Builder $admin) use ($adminProjectIds) {
-                    $admin->whereIn('project_id', $adminProjectIds);
+            if ($accessibleProjectIds !== []) {
+                $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
+                    $scope->whereNull('project_id')
+                        ->orWhereIn('project_id', $accessibleProjectIds);
                 });
+            } else {
+                $direct->whereNull('project_id');
             }
         });
 
@@ -1691,35 +1669,27 @@ $completed = SurveyPlan::whereHas(
             'supervisor',
             'checklistItems',
             'surveyVisits.submission.reviewedBy',
-        ])->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
-            $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
-                $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
-                    $assignmentOrSupervisor->whereHas('assignments', function (Builder $sub) use ($memberId) {
-                        $sub->where('assigned_to', $memberId);
-                    })
-                    ->orWhereHas('assignedMembers', function (Builder $sub) use ($memberId) {
-                        $sub->where('members.id', $memberId);
-                    })
-                    ->orWhere('assigned_supervisor_member_id', $memberId)
-                    ->orWhere('member_id', $memberId)
-                    ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
-                        $sub->where('assigned_to_member_id', $memberId);
-                    });
+        ])->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
+            $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
+                $assignmentOrSupervisor->whereHas('assignments', function (Builder $sub) use ($memberId) {
+                    $sub->where('assigned_to', $memberId);
+                })
+                ->orWhereHas('assignedMembers', function (Builder $sub) use ($memberId) {
+                    $sub->where('members.id', $memberId);
+                })
+                ->orWhere('assigned_supervisor_member_id', $memberId)
+                ->orWhere('member_id', $memberId)
+                ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
+                    $sub->where('assigned_to_member_id', $memberId);
                 });
-                if ($accessibleProjectIds !== []) {
-                    $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
-                        $scope->whereNull('project_id')
-                            ->orWhereIn('project_id', $accessibleProjectIds);
-                    });
-                } else {
-                    $direct->whereNull('project_id');
-                }
             });
-
-            if ($adminProjectIds !== []) {
-                $q->orWhere(function (Builder $admin) use ($adminProjectIds) {
-                    $admin->whereIn('project_id', $adminProjectIds);
+            if ($accessibleProjectIds !== []) {
+                $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
+                    $scope->whereNull('project_id')
+                        ->orWhereIn('project_id', $accessibleProjectIds);
                 });
+            } else {
+                $direct->whereNull('project_id');
             }
         });
 
@@ -2006,7 +1976,6 @@ $completed = SurveyPlan::whereHas(
         $memberId = $member->getKey();
 
         $accessibleProjectIds = $this->accessibleProjectIds($member);
-        $adminProjectIds = $this->adminTaskProjectIds($member, $accessibleProjectIds);
 
         $requestedProjectId = null;
         if ($request->filled('project_id')) {
@@ -2025,30 +1994,22 @@ $completed = SurveyPlan::whereHas(
             'project.client',
             'executionPlan',
             'supervisor',
-        ])->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
-            $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
-                $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
-                    $assignmentOrSupervisor->whereHas('assignees', function (Builder $sub) use ($memberId) {
-                        $sub->where('member_id', $memberId)->where('status', 'active');
-                    })->orWhere('supervisor_member_id', $memberId)
-                    ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
-                        $sub->where('assigned_to_member_id', $memberId);
-                    });
+        ])->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
+            $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
+                $assignmentOrSupervisor->whereHas('assignees', function (Builder $sub) use ($memberId) {
+                    $sub->where('member_id', $memberId)->where('status', 'active');
+                })->orWhere('supervisor_member_id', $memberId)
+                ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
+                    $sub->where('assigned_to_member_id', $memberId);
                 });
-                if ($accessibleProjectIds !== []) {
-                    $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
-                        $scope->whereNull('project_id')
-                            ->orWhereIn('project_id', $accessibleProjectIds);
-                    });
-                } else {
-                    $direct->whereNull('project_id');
-                }
             });
-
-            if ($adminProjectIds !== []) {
-                $q->orWhere(function (Builder $admin) use ($adminProjectIds) {
-                    $admin->whereIn('project_id', $adminProjectIds);
+            if ($accessibleProjectIds !== []) {
+                $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
+                    $scope->whereNull('project_id')
+                        ->orWhereIn('project_id', $accessibleProjectIds);
                 });
+            } else {
+                $direct->whereNull('project_id');
             }
         });
 
@@ -2058,35 +2019,27 @@ $completed = SurveyPlan::whereHas(
             'executionPlan',
             'assignedSupervisor',
             'supervisor',
-        ])->where(function (Builder $q) use ($memberId, $accessibleProjectIds, $adminProjectIds) {
-            $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
-                $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
-                    $assignmentOrSupervisor->whereHas('assignments', function (Builder $sub) use ($memberId) {
-                        $sub->where('assigned_to', $memberId);
-                    })
-                    ->orWhereHas('assignedMembers', function (Builder $sub) use ($memberId) {
-                        $sub->where('members.id', $memberId);
-                    })
-                    ->orWhere('assigned_supervisor_member_id', $memberId)
-                    ->orWhere('member_id', $memberId)
-                    ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
-                        $sub->where('assigned_to_member_id', $memberId);
-                    });
+        ])->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
+            $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
+                $assignmentOrSupervisor->whereHas('assignments', function (Builder $sub) use ($memberId) {
+                    $sub->where('assigned_to', $memberId);
+                })
+                ->orWhereHas('assignedMembers', function (Builder $sub) use ($memberId) {
+                    $sub->where('members.id', $memberId);
+                })
+                ->orWhere('assigned_supervisor_member_id', $memberId)
+                ->orWhere('member_id', $memberId)
+                ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
+                    $sub->where('assigned_to_member_id', $memberId);
                 });
-                if ($accessibleProjectIds !== []) {
-                    $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
-                        $scope->whereNull('project_id')
-                            ->orWhereIn('project_id', $accessibleProjectIds);
-                    });
-                } else {
-                    $direct->whereNull('project_id');
-                }
             });
-
-            if ($adminProjectIds !== []) {
-                $q->orWhere(function (Builder $admin) use ($adminProjectIds) {
-                    $admin->whereIn('project_id', $adminProjectIds);
+            if ($accessibleProjectIds !== []) {
+                $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
+                    $scope->whereNull('project_id')
+                        ->orWhereIn('project_id', $accessibleProjectIds);
                 });
+            } else {
+                $direct->whereNull('project_id');
             }
         });
 
@@ -6362,7 +6315,15 @@ $completed = SurveyPlan::whereHas(
 
             $totalDays = $this->surveyData->getTotalSurveyDays($plan, $project);
 
-            $existingVisit = SurveyVisit::where('task_id', $legacyTask->id)
+            $existingVisit = SurveyVisit::where(function ($q) use ($legacyTask, $unifiedTask) {
+                if ($unifiedTask) {
+                    $q->where('task_id', $unifiedTask->id);
+                }
+                if ($legacyTask) {
+                    $q->orWhere('execution_task_id', $legacyTask->id)
+                        ->orWhere('task_id', $legacyTask->id);
+                }
+            })
                 ->where(function ($q) use ($member) {
                     $q->where('checked_in_by_member_id', $member->id)
                         ->orWhereNull('checked_in_by_member_id');
@@ -6632,8 +6593,8 @@ $completed = SurveyPlan::whereHas(
 
         if ($existingVisit) {
             $existingVisit->update([
-                'task_id' => $legacyTask->id,
-                'execution_task_id' => $legacyTask->id,
+                'task_id' => $unifiedTask?->id ?? $legacyTask->id,
+                'execution_task_id' => $legacyTask?->id,
                 'project_id' => $project?->id ?? $existingVisit->project_id,
                 'survey_plan_id' => $surveyPlanId ?? $existingVisit->survey_plan_id,
                 'checked_in_by_member_id' => $member->id,
@@ -6652,8 +6613,8 @@ $completed = SurveyPlan::whereHas(
             $visit = $existingVisit;
         } else {
             $visit = SurveyVisit::create([
-                'task_id' => $legacyTask->id,
-                'execution_task_id' => $legacyTask->id,
+                'task_id' => $unifiedTask?->id ?? $legacyTask->id,
+                'execution_task_id' => $legacyTask?->id,
                 'project_id' => $project?->id,
                 'survey_plan_id' => $surveyPlanId,
                 'checked_in_by_member_id' => $member->id,

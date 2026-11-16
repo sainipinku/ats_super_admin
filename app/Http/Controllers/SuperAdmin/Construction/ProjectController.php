@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\ProjectBudget;
 use App\Models\ProjectTeamMember;
 use App\Models\ConstructionRole;
+use App\Models\Role;
 use App\Models\AttendanceRecord;
 use App\Models\DailyProgressReport;
 use App\Models\ExecutionTask;
@@ -328,26 +329,39 @@ class ProjectController extends Controller
         $rolesQuery = ConstructionRole::where('status', 'active')
             ->whereNotIn('slug', ['super_admin', 'superadmin']);
 
-        if ($companyId) {
-            $companyRoles = (clone $rolesQuery)
-                ->where('company_id', $companyId)
-                ->orderBy('name')
-                ->get(['id', 'name', 'slug', 'company_id']);
+        // Official roles matching Role Management listing
+        $officialRoles = Role::accessibleFor($actor)
+            ->where(function ($q) {
+                $q->where('status', 1)->orWhere('status', 'active');
+            })
+            ->whereNull('deleted_at')
+            ->orderBy('id')
+            ->get(['id', 'name', 'slug']);
 
-            $roles = $companyRoles->isNotEmpty()
-                ? $companyRoles
-                : (clone $rolesQuery)->whereNull('company_id')->orderBy('name')->get(['id', 'name', 'slug', 'company_id']);
+        if ($officialRoles->isNotEmpty()) {
+            $roles = $officialRoles;
         } else {
-            $roles = $rolesQuery->whereNull('company_id')->orderBy('name')->get(['id', 'name', 'slug', 'company_id']);
-        }
+            if ($companyId) {
+                $companyRoles = (clone $rolesQuery)
+                    ->where('company_id', $companyId)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'slug', 'company_id']);
 
-        if ($roles->isEmpty()) {
-            $roles = ConstructionRole::where('status', 'active')
-                ->whereNotIn('slug', ['super_admin', 'superadmin'])
-                ->orderBy('name')
-                ->get(['id', 'name', 'slug', 'company_id'])
-                ->unique('slug')
-                ->values();
+                $roles = $companyRoles->isNotEmpty()
+                    ? $companyRoles
+                    : (clone $rolesQuery)->whereNull('company_id')->orderBy('name')->get(['id', 'name', 'slug', 'company_id']);
+            } else {
+                $roles = $rolesQuery->whereNull('company_id')->orderBy('name')->get(['id', 'name', 'slug', 'company_id']);
+            }
+
+            if ($roles->isEmpty()) {
+                $roles = ConstructionRole::where('status', 'active')
+                    ->whereNotIn('slug', ['super_admin', 'superadmin'])
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'slug', 'company_id'])
+                    ->unique('slug')
+                    ->values();
+            }
         }
 
         return Inertia::render(
@@ -570,6 +584,21 @@ class ProjectController extends Controller
         ConstructionActivityService $activityService
     ) {
         $actor = $this->constructionActor();
+        $isProjectOwner = $this->isProjectOwner($actor);
+        $isGlobalSuperAdmin = ($actor instanceof SuperAdmin && empty($actor->company_id)) || $isProjectOwner;
+        $isCompanySuperAdmin = ($actor instanceof SuperAdmin && !empty($actor->company_id));
+
+        // Company admins are strictly prohibited from updating projects
+        abort_if(!$isGlobalSuperAdmin && !$isCompanySuperAdmin, 403, 'Company admins are not permitted to edit projects.');
+
+        // Company super admins can only update their own company's projects
+        if ($isCompanySuperAdmin) {
+            $actorCompanyId = (int) $actor->company_id;
+            if ($project->company_id && (int) $project->company_id !== $actorCompanyId) {
+                abort(403, 'Unauthorized. You can only edit projects belonging to your company.');
+            }
+        }
+
         $userCompanyId = $this->getAccessibleCompanyId($actor);
 
         if ($userCompanyId) {
@@ -1216,6 +1245,20 @@ class ProjectController extends Controller
         ConstructionActivityService $activityService
     ) {
         $actor = $this->constructionActor();
+        $isProjectOwner = $this->isProjectOwner($actor);
+        $isGlobalSuperAdmin = ($actor instanceof SuperAdmin && empty($actor->company_id)) || $isProjectOwner;
+        $isCompanySuperAdmin = ($actor instanceof SuperAdmin && !empty($actor->company_id));
+
+        // Company admins are strictly prohibited from deleting projects
+        abort_if(!$isGlobalSuperAdmin && !$isCompanySuperAdmin, 403, 'Company admins are not permitted to delete projects.');
+
+        // Company super admins can only delete their own company's projects
+        if ($isCompanySuperAdmin) {
+            $actorCompanyId = (int) $actor->company_id;
+            if ($project->company_id && (int) $project->company_id !== $actorCompanyId) {
+                abort(403, 'Unauthorized. You can only delete projects belonging to your company.');
+            }
+        }
 
         if ($this->requiresSuperAdminApproval('project', $project->id)) {
             return $this->requestDeleteApproval('project', $project->id, $project->name);
@@ -2773,7 +2816,8 @@ class ProjectController extends Controller
                         $roleName = trim($assignment->role->name);
                         $slug = strtolower(trim($assignment->role->slug ?? ''));
                         $formattedRole = match ($slug) {
-                            'vehicle_driver', 'driver' => 'Driver',
+                            'vehicle_driver' => 'Vehicle Driver',
+                            'driver' => 'Driver',
                             'draft_person', 'draftsman' => 'Draft Person',
                             'surveyor' => 'Surveyor',
                             'super_admin', 'superadmin' => 'Super Admin',
@@ -2807,22 +2851,12 @@ class ProjectController extends Controller
                 }
             }
 
-            // Designation parts
-            if (!empty($desigStr)) {
-                foreach (explode(',', $desigStr) as $dp) {
-                    $trimmed = trim($dp);
-                    if ($trimmed !== '') {
-                        $badges[] = $trimmed;
-                    }
-                }
-            }
-
-            // Clean & Deduplicate
+            // Clean & Deduplicate (strictly roles only; no designations or duplicate aliases)
             $uniqueBadges = [];
             $seenKeys = [];
             foreach ($badges as $b) {
                 $cleaned = trim((string) $b);
-                if ($cleaned === '' || strcasecmp($cleaned, 'Member') === 0) {
+                if ($cleaned === '' || strcasecmp($cleaned, 'Member') === 0 || strcasecmp($cleaned, 'Team Member') === 0) {
                     continue;
                 }
                 $norm = strtolower(preg_replace('/[^a-z0-9]/', '', $cleaned));
@@ -2830,6 +2864,18 @@ class ProjectController extends Controller
                     $seenKeys[$norm] = true;
                     $uniqueBadges[] = $cleaned;
                 }
+            }
+
+            // Deduplicate driver alias if Vehicle Driver is present
+            $hasVehicleDriver = false;
+            foreach ($uniqueBadges as $u) {
+                if (strcasecmp($u, 'Vehicle Driver') === 0) {
+                    $hasVehicleDriver = true;
+                    break;
+                }
+            }
+            if ($hasVehicleDriver) {
+                $uniqueBadges = array_values(array_filter($uniqueBadges, fn ($u) => strcasecmp($u, 'Driver') !== 0));
             }
 
             $member->roles_list = $uniqueBadges;
