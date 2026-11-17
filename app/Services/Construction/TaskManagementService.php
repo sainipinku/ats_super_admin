@@ -519,8 +519,6 @@ class TaskManagementService
                 if (Carbon::now()->subDays(90)->greaterThan($item->created_at)) {
                     $item->forceDelete();
                 } else {
-                    $item->sort_order = -1;
-                    $item->saveQuietly();
                     $item->delete();
                 }
                 $this->activity->log(

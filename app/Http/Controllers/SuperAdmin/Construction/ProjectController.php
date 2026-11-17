@@ -202,6 +202,74 @@ class ProjectController extends Controller
         ]);
     }
 
+    public function currentIpLocation(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $ip = $request->header('CF-Connecting-IP')
+            ?? $request->header('X-Forwarded-For')
+            ?? $request->ip();
+
+        if ($ip && str_contains($ip, ',')) {
+            $ip = trim(explode(',', $ip)[0]);
+        }
+
+        $clientIp = ($ip && $ip !== '127.0.0.1' && !str_starts_with($ip, '192.168.') && !str_starts_with($ip, '10.')) ? $ip : '';
+
+        // Provider 1: ip-api.com
+        try {
+            $url = $clientIp ? "http://ip-api.com/json/{$clientIp}" : "http://ip-api.com/json/";
+            $resp = \Illuminate\Support\Facades\Http::timeout(3)->get($url);
+            if ($resp->successful()) {
+                $data = $resp->json();
+                if (($data['status'] ?? '') === 'success' && !empty($data['lat']) && !empty($data['lon'])) {
+                    $parts = array_filter([$data['city'] ?? '', $data['regionName'] ?? '', $data['country'] ?? '']);
+                    return response()->json([
+                        'success' => true,
+                        'latitude' => (float) $data['lat'],
+                        'longitude' => (float) $data['lon'],
+                        'city' => $data['city'] ?? '',
+                        'region' => $data['regionName'] ?? '',
+                        'country' => $data['country'] ?? '',
+                        'postal_code' => $data['zip'] ?? '',
+                        'formatted_address' => implode(', ', $parts),
+                        'source' => 'ip',
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // fallback
+        }
+
+        // Provider 2: freeipapi.com
+        try {
+            $url = $clientIp ? "https://freeipapi.com/api/json/{$clientIp}" : "https://freeipapi.com/api/json";
+            $resp = \Illuminate\Support\Facades\Http::timeout(3)->get($url);
+            if ($resp->successful()) {
+                $data = $resp->json();
+                if (!empty($data['latitude']) && !empty($data['longitude'])) {
+                    $parts = array_filter([$data['cityName'] ?? '', $data['regionName'] ?? '', $data['countryName'] ?? '']);
+                    return response()->json([
+                        'success' => true,
+                        'latitude' => (float) $data['latitude'],
+                        'longitude' => (float) $data['longitude'],
+                        'city' => $data['cityName'] ?? '',
+                        'region' => $data['regionName'] ?? '',
+                        'country' => $data['countryName'] ?? '',
+                        'postal_code' => $data['zipCode'] ?? '',
+                        'formatted_address' => implode(', ', $parts),
+                        'source' => 'ip',
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // fallback
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Unable to resolve network location.',
+        ], 422);
+    }
+
     public function show(Project $project, SurveyDataService $surveyData): Response
     {
         $actor = $this->constructionActor();
@@ -482,6 +550,20 @@ class ProjectController extends Controller
                 'string',
                 'max:500',
             ],
+            'khasra_number' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'site_area' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'scope_of_work' => [
+                'nullable',
+                'string',
+            ],
             'latitude' => [
                 'nullable',
                 'numeric',
@@ -642,6 +724,20 @@ class ProjectController extends Controller
                 'nullable',
                 'string',
                 'max:500',
+            ],
+            'khasra_number' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'site_area' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'scope_of_work' => [
+                'nullable',
+                'string',
             ],
             'latitude' => [
                 'nullable',

@@ -154,21 +154,31 @@ trait ResolvesProjectDynamicTasks
                     $plan = ExecutionPlan::where('project_id', $pId)->first();
                     if (!$plan) {
                         try {
+                            $planCode = 'EXP-' . $pId . '-' . str_pad((string) (ExecutionPlan::where('project_id', $pId)->count() + 1), 4, '0', STR_PAD_LEFT);
                             $plan = ExecutionPlan::create([
                                 'project_id' => $pId,
+                                'plan_code' => $planCode,
                                 'title' => 'Project Execution Plan',
                                 'status' => 'active',
                                 'planned_start_date' => now(),
                                 'planned_end_date' => now()->addYear(),
                             ]);
-                        } catch (\Throwable) {
+                        } catch (\Throwable $e) {
+                            report($e);
                             $plan = ExecutionPlan::where('project_id', $pId)->first();
                         }
                     }
                     $plansByProject[$pId] = $plan?->id;
                 }
 
-                $targetCode = $this->stringifyTaskField($ut->task_code) ?: ('TSK-' . str_pad((string) $ut->id, 5, '0', STR_PAD_LEFT));
+                $baseCode = $this->stringifyTaskField($ut->task_code) ?: ('TSK-' . str_pad((string) $ut->id, 5, '0', STR_PAD_LEFT));
+                $targetCode = $baseCode;
+                $counter = 1;
+                while (ExecutionTask::where('task_code', $targetCode)->exists()) {
+                    $targetCode = $baseCode . '-' . $counter;
+                    $counter++;
+                }
+
                 $priority = $this->normalizeTaskPriority($ut->priority, 'medium');
                 $utStatus = $this->stringifyTaskField($ut->status, 'planned');
 
@@ -193,6 +203,7 @@ trait ResolvesProjectDynamicTasks
                     $execByTitle[$titleKey] = $mirror;
                     $executionTasks->push($mirror);
                 } catch (\Throwable $e) {
+                    report($e);
                     $existing = ExecutionTask::where('project_id', $ut->project_id)
                         ->where(function ($q) use ($targetCode, $ut) {
                             $q->where('task_code', $targetCode)->orWhere('title', $ut->title);
@@ -201,6 +212,29 @@ trait ResolvesProjectDynamicTasks
                         $executionTasks->push($existing);
                     }
                 }
+            }
+        }
+
+        // Failsafe: Ensure EVERY unified task for these projects is included even if mirror creation was bypassed
+        $existingCodes = $executionTasks->map(fn ($t) => $t->project_id . ':' . strtolower(trim((string) ($t->task_code ?? ''))))->filter()->all();
+        $existingTitles = $executionTasks->map(fn ($t) => $t->project_id . ':' . strtolower(trim((string) ($t->title ?? ''))))->filter()->all();
+
+        foreach ($unifiedTasks as $ut) {
+            $codeKey = !empty($ut->task_code) ? ($ut->project_id . ':' . strtolower(trim((string) $ut->task_code))) : null;
+            $titleKey = !empty($ut->title) ? ($ut->project_id . ':' . strtolower(trim((string) $ut->title))) : null;
+
+            $alreadyRepresented = ($codeKey && in_array($codeKey, $existingCodes, true))
+                || ($titleKey && in_array($titleKey, $existingTitles, true));
+
+            if (!$alreadyRepresented) {
+                $executionTasks->push((object) [
+                    'id' => $ut->id,
+                    'project_id' => $ut->project_id,
+                    'task_code' => $this->stringifyTaskField($ut->task_code) ?: ('UTASK#' . $ut->id),
+                    'title' => $this->stringifyTaskField($ut->title),
+                    'status' => $this->stringifyTaskField($ut->status, 'planned'),
+                    'priority' => $this->normalizeTaskPriority($ut->priority, 'medium'),
+                ]);
             }
         }
 
@@ -259,20 +293,30 @@ trait ResolvesProjectDynamicTasks
                 $planId = $plan?->id;
                 if (!$planId) {
                     try {
+                        $planCode = 'EXP-' . $projectId . '-' . str_pad((string) (ExecutionPlan::where('project_id', $projectId)->count() + 1), 4, '0', STR_PAD_LEFT);
                         $plan = ExecutionPlan::create([
                             'project_id' => $projectId,
+                            'plan_code' => $planCode,
                             'title' => 'Project Execution Plan',
                             'status' => 'active',
                             'planned_start_date' => now(),
                             'planned_end_date' => now()->addYear(),
                         ]);
                         $planId = $plan->id;
-                    } catch (\Throwable) {
+                    } catch (\Throwable $e) {
+                        report($e);
                         $planId = ExecutionPlan::where('project_id', $projectId)->value('id');
                     }
                 }
 
-                $targetCode = $this->stringifyTaskField($ut->task_code) ?: ('TSK-' . str_pad((string) $ut->id, 5, '0', STR_PAD_LEFT));
+                $baseCode = $this->stringifyTaskField($ut->task_code) ?: ('TSK-' . str_pad((string) $ut->id, 5, '0', STR_PAD_LEFT));
+                $targetCode = $baseCode;
+                $counter = 1;
+                while (ExecutionTask::where('task_code', $targetCode)->exists()) {
+                    $targetCode = $baseCode . '-' . $counter;
+                    $counter++;
+                }
+
                 $created = ExecutionTask::create([
                     'task_code' => $targetCode,
                     'title' => $this->stringifyTaskField($ut->title),

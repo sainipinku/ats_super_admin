@@ -369,6 +369,8 @@ Route::prefix('super/construction')
             ->name('projects.index');
         Route::get('/projects/next-code', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'nextProjectCode'])
             ->name('projects.next-code');
+        Route::get('/projects/current-ip-location', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'currentIpLocation'])
+            ->name('projects.current-ip-location');
         Route::post('/projects', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'store'])
             ->middleware('construction.permission:project.create')
             ->name('projects.store');
@@ -649,6 +651,9 @@ Route::delete('/survey/plans/{surveyPlan}/documents/{document}', [App\Http\Contr
         Route::get('/billing', [App\Http\Controllers\SuperAdmin\Construction\BillingController::class, 'index'])
             ->middleware('construction.permission:billing_invoice.manage,billing_payment.manage')
             ->name('billing.index');
+        Route::get('/billing/export-csv', [App\Http\Controllers\SuperAdmin\Construction\BillingController::class, 'exportCsv'])
+            ->middleware('construction.permission:billing_invoice.manage,billing_payment.manage')
+            ->name('billing.export-csv');
         Route::post('/billing/invoices', [App\Http\Controllers\SuperAdmin\Construction\BillingController::class, 'storeInvoice'])
             ->middleware('construction.permission:billing_invoice.manage')
             ->name('billing.invoices.store');
@@ -886,6 +891,9 @@ Route::delete('/survey/plans/{surveyPlan}/documents/{document}', [App\Http\Contr
         Route::get('/billing', [App\Http\Controllers\Admin\Construction\BillingController::class, 'index'])
             ->middleware('construction.permission:billing_invoice.manage,billing_payment.manage')
             ->name('billing.index');
+        Route::get('/billing/export-csv', [App\Http\Controllers\Admin\Construction\BillingController::class, 'exportCsv'])
+            ->middleware('construction.permission:billing_invoice.manage,billing_payment.manage')
+            ->name('billing.export-csv');
         Route::post('/billing/invoices', [App\Http\Controllers\Admin\Construction\BillingController::class, 'storeInvoice'])
             ->middleware('construction.permission:billing_invoice.manage')
             ->name('billing.invoices.store');

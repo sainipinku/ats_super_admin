@@ -874,6 +874,45 @@ class ProjectTaskController extends Controller implements HasMiddleware
             return strtolower(implode(' ', array_filter($parts)));
         };
 
+        $extractAssignmentRoleString = static function ($assignment): string {
+            if (!$assignment) {
+                return '';
+            }
+
+            $rawRole = $assignment->assignment_role ?? $assignment->project_role ?? $assignment->role ?? null;
+
+            $roleStr = '';
+            if ($rawRole instanceof \BackedEnum) {
+                $roleStr = (string) $rawRole->value;
+            } elseif ($rawRole instanceof \UnitEnum) {
+                $roleStr = (string) $rawRole->name;
+            } elseif (is_scalar($rawRole)) {
+                $roleStr = (string) $rawRole;
+            } elseif (is_object($rawRole)) {
+                $roleStr = (string) ($rawRole->slug ?? $rawRole->name ?? $rawRole->value ?? '');
+            }
+
+            $member = $assignment->member ?? $assignment->assignee ?? null;
+            $memberText = '';
+            if ($member) {
+                if (!empty($member->is_driver)) {
+                    $memberText .= ' driver';
+                }
+                if (!empty($member->designation) && is_scalar($member->designation)) {
+                    $memberText .= ' ' . $member->designation;
+                }
+                if (!empty($member->role_names)) {
+                    if (is_array($member->role_names)) {
+                        $memberText .= ' ' . implode(' ', array_filter($member->role_names, 'is_scalar'));
+                    } elseif (is_scalar($member->role_names)) {
+                        $memberText .= ' ' . $member->role_names;
+                    }
+                }
+            }
+
+            return strtolower(trim($roleStr . ' ' . $memberText));
+        };
+
         if ($decision === 'approved') {
             // Check legacy task supervisor & role
             if ($legacyTask) {
@@ -884,6 +923,18 @@ class ProjectTaskController extends Controller implements HasMiddleware
                 }
                 if (str_contains($supRoles, 'survey')) {
                     $isSurveyorTask = true;
+                }
+
+                if ($legacyTask->relationLoaded('assignees') || method_exists($legacyTask, 'assignees')) {
+                    foreach ($legacyTask->assignees ?? [] as $asg) {
+                        $roleName = $extractAssignmentRoleString($asg);
+                        if (str_contains($roleName, 'driver') || str_contains($roleName, 'vehicle')) {
+                            $isDriverTask = true;
+                        }
+                        if (str_contains($roleName, 'survey')) {
+                            $isSurveyorTask = true;
+                        }
+                    }
                 }
             }
 
@@ -900,7 +951,7 @@ class ProjectTaskController extends Controller implements HasMiddleware
 
                 if ($unifiedTask->relationLoaded('assignments') || method_exists($unifiedTask, 'assignments')) {
                     foreach ($unifiedTask->assignments ?? [] as $asg) {
-                        $roleName = strtolower((string) ($asg->assignment_role ?? $asg->project_role ?? ''));
+                        $roleName = $extractAssignmentRoleString($asg);
                         if (str_contains($roleName, 'driver') || str_contains($roleName, 'vehicle')) {
                             $isDriverTask = true;
                         }

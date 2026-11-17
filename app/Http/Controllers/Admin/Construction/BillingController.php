@@ -19,14 +19,27 @@ class BillingController extends Controller
 {
     use ResolvesConstructionActor;
 
-    public function index(): Response
+    public function index(ConstructionBillingService $billingService): Response
     {
         /** @var Member|null $actor */
         $actor = $this->constructionActor();
         $projectIds = $this->getAccessibleProjectIds($actor);
 
+        $projects = Project::whereIn('id', $projectIds)
+            ->with([
+                'client:id,client_code,name,company_id,contact_person,email,phone,alternate_phone,gst_number,billing_address,site_address',
+                'company:id,name',
+                'draftingJobs:id,project_id,khasra_number,site_area',
+                'clientInvoices' => fn ($q) => $q->latest(),
+            ])
+            ->orderByDesc('id')
+            ->get();
+
+        $projectsDirectory = $billingService->getProjectsBillingDirectory($projects);
+
         return Inertia::render('Admin/Construction/Billing/Index', [
-            'projects' => Project::whereIn('id', $projectIds)->orderByDesc('id')->get(['id', 'project_code', 'name']),
+            'projects' => $projectsDirectory,
+            'raw_projects' => $projects->map(fn ($p) => ['id' => $p->id, 'project_code' => $p->project_code, 'name' => $p->name])->all(),
             'invoices' => ClientInvoice::with(['project', 'items', 'payments'])
                 ->whereIn('project_id', $projectIds)
                 ->latest()
@@ -38,6 +51,27 @@ class BillingController extends Controller
                 ->take(80)
                 ->get(),
         ]);
+    }
+
+    public function exportCsv(ConstructionBillingService $billingService): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        /** @var Member|null $actor */
+        $actor = $this->constructionActor();
+        $projectIds = $this->getAccessibleProjectIds($actor);
+
+        $projects = Project::whereIn('id', $projectIds)
+            ->with([
+                'client:id,client_code,name,company_id,contact_person,email,phone,alternate_phone,gst_number,billing_address,site_address',
+                'company:id,name',
+                'draftingJobs:id,project_id,khasra_number,site_area',
+                'clientInvoices' => fn ($q) => $q->latest(),
+            ])
+            ->orderByDesc('id')
+            ->get();
+
+        $projectsDirectory = $billingService->getProjectsBillingDirectory($projects);
+
+        return $billingService->exportProjectsBillingCsv($projectsDirectory);
     }
 
     private function ensureProjectAccess(int $projectId, ?Member $actor): void

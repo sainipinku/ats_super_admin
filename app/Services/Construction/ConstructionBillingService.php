@@ -382,5 +382,282 @@ class ConstructionBillingService
             return $payment->load(['invoice']);
         });
     }
+
+    /**
+     * Build rich Project & Client Directory data including tasks counts, checklist counts, khasra numbers, and financial summaries.
+     */
+    public function getProjectsBillingDirectory(iterable $projects): array
+    {
+        $collection = $projects instanceof \Illuminate\Support\Collection ? $projects : collect($projects);
+        $projectIds = $collection->pluck('id')->filter()->all();
+
+        if (empty($projectIds)) {
+            return [];
+        }
+
+        $taskChecklistsByProject = [];
+
+        try {
+            \App\Models\TaskChecklist::query()
+                ->selectRaw('et.project_id as p_id, COUNT(*) as c_total, SUM(CASE WHEN construction_task_checklists.is_completed = 1 THEN 1 ELSE 0 END) as c_completed')
+                ->join('construction_execution_tasks as et', 'et.id', '=', 'construction_task_checklists.execution_task_id')
+                ->whereIn('et.project_id', $projectIds)
+                ->groupBy('et.project_id')
+                ->each(static function ($row) use (&$taskChecklistsByProject) {
+                    $pid = (int) $row->p_id;
+                    $taskChecklistsByProject[$pid] = [
+                        'total' => ($taskChecklistsByProject[$pid]['total'] ?? 0) + (int) $row->c_total,
+                        'completed' => ($taskChecklistsByProject[$pid]['completed'] ?? 0) + (int) $row->c_completed,
+                    ];
+                });
+        } catch (\Throwable) {
+        }
+
+        try {
+            \App\Models\TaskChecklist::query()
+                ->selectRaw('sp.project_id as p_id, COUNT(*) as c_total, SUM(CASE WHEN construction_task_checklists.is_completed = 1 THEN 1 ELSE 0 END) as c_completed')
+                ->join('construction_survey_plans as sp', 'sp.id', '=', 'construction_task_checklists.survey_plan_id')
+                ->whereIn('sp.project_id', $projectIds)
+                ->groupBy('sp.project_id')
+                ->each(static function ($row) use (&$taskChecklistsByProject) {
+                    $pid = (int) $row->p_id;
+                    $taskChecklistsByProject[$pid] = [
+                        'total' => ($taskChecklistsByProject[$pid]['total'] ?? 0) + (int) $row->c_total,
+                        'completed' => ($taskChecklistsByProject[$pid]['completed'] ?? 0) + (int) $row->c_completed,
+                    ];
+                });
+        } catch (\Throwable) {
+        }
+
+        try {
+            \App\Models\TaskChecklistItem::query()
+                ->selectRaw('COALESCE(task_checklist_items.project_id, tasks.project_id) as p_id, COUNT(*) as c_total, SUM(CASE WHEN task_checklist_items.is_completed = 1 THEN 1 ELSE 0 END) as c_completed')
+                ->leftJoin('tasks', 'tasks.id', '=', 'task_checklist_items.task_id')
+                ->where(function ($q) use ($projectIds) {
+                    $q->whereIn('task_checklist_items.project_id', $projectIds)
+                        ->orWhereIn('tasks.project_id', $projectIds);
+                })
+                ->whereNull('task_checklist_items.deleted_at')
+                ->groupBy('p_id')
+                ->each(static function ($row) use (&$taskChecklistsByProject) {
+                    $pid = (int) $row->p_id;
+                    if ($pid > 0) {
+                        $taskChecklistsByProject[$pid] = [
+                            'total' => ($taskChecklistsByProject[$pid]['total'] ?? 0) + (int) $row->c_total,
+                            'completed' => ($taskChecklistsByProject[$pid]['completed'] ?? 0) + (int) $row->c_completed,
+                        ];
+                    }
+                });
+        } catch (\Throwable) {
+        }
+
+        $tasksStatsByProject = collect();
+        try {
+            $tasksStatsByProject = \App\Models\ExecutionTask::query()
+                ->selectRaw('project_id, COUNT(*) as total, SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed, SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as in_progress', ['completed', 'in_progress'])
+                ->whereIn('project_id', $projectIds)
+                ->groupBy('project_id')
+                ->get()
+                ->keyBy('project_id');
+        } catch (\Throwable) {
+        }
+
+        $unifiedTasksStatsByProject = collect();
+        try {
+            $unifiedTasksStatsByProject = \App\Models\Task::query()
+                ->selectRaw('project_id, COUNT(*) as total, SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed, SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as in_progress', ['completed', 'in_progress'])
+                ->whereIn('project_id', $projectIds)
+                ->whereNull('deleted_at')
+                ->groupBy('project_id')
+                ->get()
+                ->keyBy('project_id');
+        } catch (\Throwable) {
+        }
+
+        $invoicesSummary = collect();
+        try {
+            $invoicesSummary = \App\Models\ClientInvoice::query()
+                ->selectRaw('project_id, COUNT(*) as inv_count, SUM(total_amount) as total_billed, SUM(paid_amount) as total_paid, SUM(balance_amount) as outstanding')
+                ->whereIn('project_id', $projectIds)
+                ->groupBy('project_id')
+                ->get()
+                ->keyBy('project_id');
+        } catch (\Throwable) {
+        }
+
+        $paymentsSummary = collect();
+        try {
+            $paymentsSummary = \App\Models\ClientPayment::query()
+                ->selectRaw('project_id, COUNT(*) as pay_count')
+                ->whereIn('project_id', $projectIds)
+                ->groupBy('project_id')
+                ->get()
+                ->keyBy('project_id');
+        } catch (\Throwable) {
+        }
+
+        return $collection->map(function ($project) use (
+            $taskChecklistsByProject,
+            $tasksStatsByProject,
+            $unifiedTasksStatsByProject,
+            $invoicesSummary,
+            $paymentsSummary
+        ) {
+            $pid = (int) $project->id;
+            $execStats = $tasksStatsByProject->get($pid);
+            $uniStats = $unifiedTasksStatsByProject->get($pid);
+
+            $totalTasks = (int) ($execStats?->total ?? 0) + (int) ($uniStats?->total ?? 0);
+            $completedTasks = (int) ($execStats?->completed ?? 0) + (int) ($uniStats?->completed ?? 0);
+            $inProgressTasks = (int) ($execStats?->in_progress ?? 0) + (int) ($uniStats?->in_progress ?? 0);
+            $pendingTasks = max(0, $totalTasks - $completedTasks - $inProgressTasks);
+
+            $chk = $taskChecklistsByProject[$pid] ?? ['total' => 0, 'completed' => 0];
+            $totalChecklists = (int) $chk['total'];
+            $completedChecklists = (int) $chk['completed'];
+            $pendingChecklists = max(0, $totalChecklists - $completedChecklists);
+
+            $invSum = $invoicesSummary->get($pid);
+            $paySum = $paymentsSummary->get($pid);
+
+            $khasraNumber = $project->khasra_number;
+            if (empty($khasraNumber) && $project->relationLoaded('draftingJobs')) {
+                $khasraNumber = $project->draftingJobs->pluck('khasra_number')->filter()->unique()->implode(', ');
+            }
+
+            $siteArea = $project->site_area;
+            if (empty($siteArea) && $project->relationLoaded('draftingJobs')) {
+                $siteArea = $project->draftingJobs->pluck('site_area')->filter()->first();
+            }
+
+            return [
+                'id' => $project->id,
+                'project_code' => $project->project_code,
+                'name' => $project->name,
+                'current_stage' => $project->current_stage ?? 'planning',
+                'status' => $project->status ?? 'active',
+                'priority' => $project->priority ?? 'medium',
+                'start_date' => $project->start_date ? (is_string($project->start_date) ? $project->start_date : $project->start_date->format('Y-m-d')) : null,
+                'expected_end_date' => $project->expected_end_date ? (is_string($project->expected_end_date) ? $project->expected_end_date : $project->expected_end_date->format('Y-m-d')) : null,
+                'project_address' => $project->project_address,
+                'location_name' => $project->location_name,
+                'khasra_number' => $khasraNumber ?: '—',
+                'site_area' => $siteArea ?: '—',
+                'scope_of_work' => $project->scope_of_work,
+                'client' => [
+                    'id' => $project->client?->id,
+                    'client_code' => $project->client?->client_code ?: '—',
+                    'name' => $project->client?->name ?: 'N/A',
+                    'company_name' => $project->company?->name ?: ($project->client?->name ?: 'N/A'),
+                    'contact_person' => $project->client?->contact_person ?: '—',
+                    'email' => $project->client?->email ?: '—',
+                    'phone' => $project->client?->phone ?: '—',
+                    'alternate_phone' => $project->client?->alternate_phone ?: '—',
+                    'gst_number' => $project->client?->gst_number ?: '—',
+                    'billing_address' => $project->client?->billing_address ?: '—',
+                    'site_address' => $project->client?->site_address ?: '—',
+                ],
+                'task_counts' => [
+                    'total' => $totalTasks,
+                    'completed' => $completedTasks,
+                    'in_progress' => $inProgressTasks,
+                    'pending' => $pendingTasks,
+                    'progress_percent' => $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100) : 0,
+                ],
+                'checklist_counts' => [
+                    'total' => $totalChecklists,
+                    'completed' => $completedChecklists,
+                    'pending' => $pendingChecklists,
+                    'progress_percent' => $totalChecklists > 0 ? round(($completedChecklists / $totalChecklists) * 100) : 0,
+                ],
+                'billing_summary' => [
+                    'total_billed' => (float) ($invSum?->total_billed ?? 0),
+                    'total_paid' => (float) ($invSum?->total_paid ?? 0),
+                    'outstanding' => (float) ($invSum?->outstanding ?? 0),
+                    'invoices_count' => (int) ($invSum?->inv_count ?? 0),
+                    'payments_count' => (int) ($paySum?->pay_count ?? 0),
+                ],
+                'invoices' => $project->relationLoaded('clientInvoices') ? $project->clientInvoices->map(fn ($inv) => [
+                    'id' => $inv->id,
+                    'invoice_code' => $inv->invoice_code,
+                    'invoice_date' => $inv->invoice_date,
+                    'due_date' => $inv->due_date,
+                    'total_amount' => (float) $inv->total_amount,
+                    'paid_amount' => (float) $inv->paid_amount,
+                    'balance_amount' => (float) $inv->balance_amount,
+                    'status' => $inv->status,
+                ])->all() : [],
+            ];
+        })->values()->all();
+    }
+
+    /**
+     * Export project and client billing summary as a downloadable CSV.
+     */
+    public function exportProjectsBillingCsv(array $projectsData): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $headers = [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="projects_clients_billing_summary_' . date('Y-m-d_His') . '.csv"',
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        return response()->stream(function () use ($projectsData) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, [
+                'Project Code',
+                'Project Name',
+                'Stage',
+                'Status',
+                'Client Code',
+                'Client Name',
+                'Company Name',
+                'Contact Person',
+                'Client Phone',
+                'Client Email',
+                'Khasra Number',
+                'Site Area',
+                'Total Tasks',
+                'Completed Tasks',
+                'In Progress Tasks',
+                'Pending Tasks',
+                'Total Checklists',
+                'Completed Checklists',
+                'Total Billed (INR)',
+                'Total Paid (INR)',
+                'Balance Outstanding (INR)',
+            ]);
+
+            foreach ($projectsData as $row) {
+                fputcsv($handle, [
+                    $row['project_code'] ?? '',
+                    $row['name'] ?? '',
+                    $row['current_stage'] ?? '',
+                    $row['status'] ?? '',
+                    $row['client']['client_code'] ?? '',
+                    $row['client']['name'] ?? '',
+                    $row['client']['company_name'] ?? '',
+                    $row['client']['contact_person'] ?? '',
+                    $row['client']['phone'] ?? '',
+                    $row['client']['email'] ?? '',
+                    $row['khasra_number'] ?? '',
+                    $row['site_area'] ?? '',
+                    $row['task_counts']['total'] ?? 0,
+                    $row['task_counts']['completed'] ?? 0,
+                    $row['task_counts']['in_progress'] ?? 0,
+                    $row['task_counts']['pending'] ?? 0,
+                    $row['checklist_counts']['total'] ?? 0,
+                    $row['checklist_counts']['completed'] ?? 0,
+                    $row['billing_summary']['total_billed'] ?? 0,
+                    $row['billing_summary']['total_paid'] ?? 0,
+                    $row['billing_summary']['outstanding'] ?? 0,
+                ]);
+            }
+
+            fclose($handle);
+        }, 200, $headers);
+    }
 }
 

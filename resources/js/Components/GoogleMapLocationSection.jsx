@@ -532,7 +532,7 @@ function GoogleMapLocationPickerInner({
         </label>
         <button
           type="button"
-          onClick={handleCurrentLocation}
+          onClick={() => handleCurrentLocation(mapRef.current)}
           className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/60 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-300"
         >
           <span>📍</span>
@@ -749,37 +749,189 @@ export default function GoogleMapLocationSection({
     [onChange, formattedAddress, markerPosition]
   );
 
-  // Fallback geolocation if no map is loaded
-  const handleCurrentLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser.');
-      return;
+  const fetchNetworkLocation = async () => {
+    // 1. Try internal backend route
+    try {
+      const res = await fetch('/super/construction/projects/current-ip-location', {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.success && data.latitude != null && data.longitude != null) {
+          return {
+            lat: Number(data.latitude),
+            lng: Number(data.longitude),
+            city: data.city || '',
+            formattedAddress: data.formatted_address || '',
+            source: 'ip',
+          };
+        }
+      }
+    } catch (e) {
+      // fallback to public endpoints
     }
-    toast.loading('Detecting current GPS location…', { id: 'gps-detect' });
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        toast.dismiss('gps-detect');
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        setMarkerPosition({ lat, lng });
-        setManualCoords({ lat: String(lat), lng: String(lng) });
-        const coordStr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-        setFormattedAddress(coordStr);
+
+    // 2. Try freeipapi.com
+    try {
+      const res = await fetch('https://freeipapi.com/api/json');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.latitude != null && data?.longitude != null) {
+          const parts = [data.cityName, data.regionName, data.countryName].filter(Boolean);
+          return {
+            lat: Number(data.latitude),
+            lng: Number(data.longitude),
+            city: data.cityName || '',
+            formattedAddress: parts.join(', '),
+            source: 'ip',
+          };
+        }
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    // 3. Try ipapi.co
+    try {
+      const res = await fetch('https://ipapi.co/json/');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.latitude != null && data?.longitude != null) {
+          const parts = [data.city, data.region, data.country_name].filter(Boolean);
+          return {
+            lat: Number(data.latitude),
+            lng: Number(data.longitude),
+            city: data.city || '',
+            formattedAddress: parts.join(', '),
+            source: 'ip',
+          };
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    return null;
+  };
+
+  // Safe location detector supporting both hardware GPS and IP network fallback
+  const handleCurrentLocation = useCallback(
+    async (mapInstance = null) => {
+      toast.loading('Detecting location…', { id: 'gps-detect' });
+
+      let locationData = null;
+      let usedNetworkFallback = false;
+      const isInsecureOrigin = typeof window !== 'undefined' && window.isSecureContext === false;
+
+      // Only attempt HTML5 GPS if origin is secure (HTTPS or localhost)
+      if (!isInsecureOrigin && typeof navigator !== 'undefined' && navigator.geolocation) {
+        try {
+          locationData = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                resolve({
+                  lat: pos.coords.latitude,
+                  lng: pos.coords.longitude,
+                  source: 'gps',
+                });
+              },
+              (err) => reject(err),
+              { enableHighAccuracy: true, timeout: 8000 }
+            );
+          });
+        } catch (err) {
+          // If browser blocked it or failed, fallback to network location below
+        }
+      }
+
+      // If browser GPS was unavailable or blocked by insecure origin, fallback seamlessly to network location
+      if (!locationData) {
+        try {
+          const ipLoc = await fetchNetworkLocation();
+          if (ipLoc) {
+            locationData = ipLoc;
+            usedNetworkFallback = true;
+          }
+        } catch (e) {
+          // Both failed
+        }
+      }
+
+      toast.dismiss('gps-detect');
+
+      if (!locationData || locationData.lat == null || locationData.lng == null) {
+        toast.error(
+          'Device GPS requires an HTTPS secure connection. Please type your location in the search box below or drag the map pin.',
+          { duration: 6000 }
+        );
+        return;
+      }
+
+      const { lat, lng } = locationData;
+      setMarkerPosition({ lat, lng });
+      setManualCoords({ lat: String(lat), lng: String(lng) });
+
+      if (mapInstance && typeof mapInstance.panTo === 'function') {
+        mapInstance.panTo({ lat, lng });
+        mapInstance.setZoom(15);
+      }
+
+      const defaultAddr = locationData.formattedAddress || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      setFormattedAddress(defaultAddr);
+
+      // Attempt reverse-geocode if Google Geocoder is available
+      if (typeof window !== 'undefined' && window.google?.maps?.Geocoder) {
+        try {
+          const geocoder = new window.google.maps.Geocoder();
+          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+            if (status === 'OK' && results?.[0]?.formatted_address) {
+              const fullAddr = results[0].formatted_address;
+              setFormattedAddress(fullAddr);
+              emitChange({
+                latitude: lat,
+                longitude: lng,
+                location_name: fullAddr,
+                project_address: fullAddr,
+              });
+            } else {
+              emitChange({
+                latitude: lat,
+                longitude: lng,
+                location_name: defaultAddr,
+                project_address: defaultAddr,
+              });
+            }
+          });
+        } catch (e) {
+          emitChange({
+            latitude: lat,
+            longitude: lng,
+            location_name: defaultAddr,
+            project_address: defaultAddr,
+          });
+        }
+      } else {
         emitChange({
           latitude: lat,
           longitude: lng,
-          location_name: coordStr,
-          project_address: coordStr,
+          location_name: defaultAddr,
+          project_address: defaultAddr,
         });
+      }
+
+      if (usedNetworkFallback) {
+        toast.success(
+          locationData.city
+            ? `Location detected (${locationData.city}) via network! (High-precision GPS requires HTTPS)`
+            : 'Location detected via network IP! (High-precision GPS requires HTTPS)',
+          { duration: 5000 }
+        );
+      } else {
         toast.success('Current location detected!');
-      },
-      (error) => {
-        toast.dismiss('gps-detect');
-        toast.error(error.message || 'Unable to retrieve location.');
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  }, [emitChange]);
+      }
+    },
+    [emitChange]
+  );
 
   const handleManualCoordChange = useCallback(
     (field, rawValue) => {
@@ -832,7 +984,7 @@ export default function GoogleMapLocationSection({
             </label>
             <button
               type="button"
-              onClick={handleCurrentLocation}
+              onClick={() => handleCurrentLocation()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/60 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-300"
             >
               <span>📍</span>

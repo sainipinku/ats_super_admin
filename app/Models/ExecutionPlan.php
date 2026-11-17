@@ -36,6 +36,17 @@ class ExecutionPlan extends Model
         'approved_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function ($plan) {
+            if (empty($plan->plan_code)) {
+                $pid = (int) ($plan->project_id ?? 0);
+                $maxId = (int) (static::max('id') ?? 0) + 1;
+                $plan->plan_code = 'EXP-' . $pid . '-' . str_pad((string) $maxId, 4, '0', STR_PAD_LEFT);
+            }
+        });
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);

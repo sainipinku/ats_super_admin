@@ -119,6 +119,9 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
         description: "",
         project_address: "",
         location_name: "",
+        khasra_number: "",
+        site_area: "",
+        scope_of_work: "",
         latitude: "",
         longitude: "",
         start_date: "",
@@ -142,6 +145,9 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
         description: "",
         project_address: "",
         location_name: "",
+        khasra_number: "",
+        site_area: "",
+        scope_of_work: "",
         latitude: "",
         longitude: "",
         start_date: "",
@@ -297,6 +303,9 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
             description: project.description || "",
             project_address: project.project_address || "",
             location_name: project.location_name || "",
+            khasra_number: project.khasra_number || "",
+            site_area: project.site_area || "",
+            scope_of_work: project.scope_of_work || "",
             latitude: project.latitude ?? "",
             longitude: project.longitude ?? "",
             start_date: project.start_date || "",
@@ -856,6 +865,9 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
                                     "description",
                                     "project_address",
                                     "location_name",
+                                    "khasra_number",
+                                    "site_area",
+                                    "scope_of_work",
                                     "latitude",
                                     "longitude",
                                     "start_date",
@@ -984,6 +996,11 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
                         />
                     </div>
                     <TextAreaField form={form} name="description" label="Description" rows={3} />
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <InputField form={form} name="khasra_number" label="Khasra Number / Land Parcel ID" placeholder="e.g. 142/3, 144/1" />
+                        <InputField form={form} name="site_area" label="Site Area" placeholder="e.g. 2400 sq.ft / 2.5 Acres" />
+                    </div>
+                    <TextAreaField form={form} name="scope_of_work" label="Scope of Work" rows={2} placeholder="Brief description of work scope, surveying & drafting requirements..." />
                     <TextAreaField form={form} name="project_address" label="Project Address" rows={2} />
                     <GoogleMapLocationSection
                         initialLat={form.data.latitude}
@@ -1135,6 +1152,11 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
                         />
                     </div>
                     <TextAreaField form={editForm} name="description" label="Description" rows={3} />
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <InputField form={editForm} name="khasra_number" label="Khasra Number / Land Parcel ID" placeholder="e.g. 142/3, 144/1" />
+                        <InputField form={editForm} name="site_area" label="Site Area" placeholder="e.g. 2400 sq.ft / 2.5 Acres" />
+                    </div>
+                    <TextAreaField form={editForm} name="scope_of_work" label="Scope of Work" rows={2} placeholder="Brief description of work scope, surveying & drafting requirements..." />
                     <TextAreaField form={editForm} name="project_address" label="Project Address" rows={2} />
                     <GoogleMapLocationSection
                         initialLat={editForm.data.latitude}
