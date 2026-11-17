@@ -3043,9 +3043,7 @@ function TaskRow({
                             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900/60">
                                 <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
                                     <div className="rounded-xl border border-slate-200/60 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                                        <p className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
-                                            <span>👤</span> Assigned Member
-                                        </p>
+                                        <p className="text-[11px] font-medium text-slate-400">Assigned Member</p>
                                         <p className="mt-1 font-semibold text-slate-800 dark:text-slate-200 truncate">
                                             {task.supervisor?.name || "Unassigned"}
                                         </p>
