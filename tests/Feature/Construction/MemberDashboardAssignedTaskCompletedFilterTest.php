@@ -12,12 +12,14 @@ use App\Models\Member;
 use App\Models\Project;
 use App\Models\SuperAdmin;
 use App\Models\VehicleAssignment;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class MemberDashboardAssignedTaskCompletedFilterTest extends TestCase
 {
+    use DatabaseTransactions;
     public function test_controller_code_explicitly_filters_out_completed_tasks_from_assigned_vehicles_and_equipment(): void
     {
         $controllerContent = file_get_contents(app_path('Http/Controllers/Api/MemberDashboardController.php'));
@@ -55,7 +57,7 @@ class MemberDashboardAssignedTaskCompletedFilterTest extends TestCase
 
         $completedTask = ExecutionTask::create([
             'project_id' => $project->id,
-            'task_code' => 'TSK-COMPLETED',
+            'task_code' => 'TSK-COMPLETED-' . uniqid(),
             'title' => 'Finished Grading',
             'status' => 'completed',
             'progress_percent' => 100,
@@ -63,23 +65,26 @@ class MemberDashboardAssignedTaskCompletedFilterTest extends TestCase
 
         $inProgressTask = ExecutionTask::create([
             'project_id' => $project->id,
-            'task_code' => 'TSK-ACTIVE',
+            'task_code' => 'TSK-ACTIVE-' . uniqid(),
             'title' => 'Active Excavation',
             'status' => 'in_progress',
             'progress_percent' => 30,
         ]);
 
+        $vCode1 = 'VHC-DONE-' . uniqid();
+        $vCode2 = 'VHC-RUN-' . uniqid();
+
         $vehicle1 = ConstructionVehicle::create([
             'project_id' => $project->id,
-            'vehicle_code' => 'VHC-001',
-            'registration_number' => 'DL01AA0001',
+            'vehicle_code' => $vCode1,
+            'registration_number' => 'DL' . rand(10, 99) . 'AA' . rand(1000, 9999),
             'status' => 'active',
         ]);
 
         $vehicle2 = ConstructionVehicle::create([
             'project_id' => $project->id,
-            'vehicle_code' => 'VHC-002',
-            'registration_number' => 'DL01AA0002',
+            'vehicle_code' => $vCode2,
+            'registration_number' => 'DL' . rand(10, 99) . 'AA' . rand(1000, 9999),
             'status' => 'active',
         ]);
 
@@ -112,8 +117,8 @@ class MemberDashboardAssignedTaskCompletedFilterTest extends TestCase
         $assignedVehicles = collect($response->json('vehicles_assigned') ?? []);
         $assignedVehicleCodes = $assignedVehicles->pluck('vehicle.vehicle_code')->filter()->all();
 
-        $this->assertNotContains('VHC-001', $assignedVehicleCodes, 'Vehicle with completed task must be removed from vehicles_assigned');
-        $this->assertContains('VHC-002', $assignedVehicleCodes, 'Vehicle with active in-progress task must remain in vehicles_assigned');
+        $this->assertNotContains($vCode1, $assignedVehicleCodes, 'Vehicle with completed task must be removed from vehicles_assigned');
+        $this->assertContains($vCode2, $assignedVehicleCodes, 'Vehicle with active in-progress task must remain in vehicles_assigned');
         $this->assertSame(1, $response->json('summary.vehicles_assigned_count'));
     }
 
@@ -131,7 +136,7 @@ class MemberDashboardAssignedTaskCompletedFilterTest extends TestCase
 
         $completedTask = ExecutionTask::create([
             'project_id' => $project->id,
-            'task_code' => 'TSK-EQ-DONE',
+            'task_code' => 'TSK-EQ-DONE-' . uniqid(),
             'title' => 'Finished Foundation',
             'status' => 'completed',
             'progress_percent' => 100,
@@ -139,22 +144,25 @@ class MemberDashboardAssignedTaskCompletedFilterTest extends TestCase
 
         $activeTask = ExecutionTask::create([
             'project_id' => $project->id,
-            'task_code' => 'TSK-EQ-RUN',
+            'task_code' => 'TSK-EQ-RUN-' . uniqid(),
             'title' => 'Ongoing Piling',
             'status' => 'in_progress',
             'progress_percent' => 50,
         ]);
 
+        $eqCode1 = 'EQ-DONE-' . uniqid();
+        $eqCode2 = 'EQ-RUN-' . uniqid();
+
         $equipment1 = ConstructionEquipment::create([
             'project_id' => $project->id,
-            'equipment_code' => 'EQ-DONE-1',
+            'equipment_code' => $eqCode1,
             'name' => 'Concrete Mixer',
             'status' => 'active',
         ]);
 
         $equipment2 = ConstructionEquipment::create([
             'project_id' => $project->id,
-            'equipment_code' => 'EQ-RUN-2',
+            'equipment_code' => $eqCode2,
             'name' => 'Crane 50T',
             'status' => 'active',
         ]);
@@ -190,8 +198,8 @@ class MemberDashboardAssignedTaskCompletedFilterTest extends TestCase
             return $item['equipment']['equipment_code'] ?? ($item['equipment_code'] ?? null);
         })->filter()->all();
 
-        $this->assertNotContains('EQ-DONE-1', $assignedEqCodes, 'Equipment with completed task must be removed from equipment_assigned');
-        $this->assertContains('EQ-RUN-2', $assignedEqCodes, 'Equipment with active task must remain in equipment_assigned');
+        $this->assertNotContains($eqCode1, $assignedEqCodes, 'Equipment with completed task must be removed from equipment_assigned');
+        $this->assertContains($eqCode2, $assignedEqCodes, 'Equipment with active task must remain in equipment_assigned');
         $this->assertSame(1, $response->json('summary.equipment_assigned_count'));
     }
 

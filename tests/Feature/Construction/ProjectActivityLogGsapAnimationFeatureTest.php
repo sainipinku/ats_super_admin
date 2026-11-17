@@ -32,5 +32,13 @@ class ProjectActivityLogGsapAnimationFeatureTest extends TestCase
 
         // Metadata modal / detail inspector
         $this->assertStringContainsString('selectedActivity', $code);
+
+        // View icon button with modal trigger
+        $this->assertStringContainsString('Eye', $code);
+        $this->assertMatchesRegularExpression(
+            '/setSelectedActivity\s*\(\s*(?:item|activity)\s*\)/',
+            $code,
+            'Clicking view button or card must trigger setSelectedActivity'
+        );
     }
 }

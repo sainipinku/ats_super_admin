@@ -31,7 +31,8 @@ import {
     Zap,
     UserMinus,
     ArrowRightLeft,
-    RefreshCw
+    RefreshCw,
+    Eye
 } from "lucide-react";
 
 const MODULE_DEFINITIONS = {
@@ -331,7 +332,7 @@ function renderActionPill(action) {
 export default function ProjectActivityLog({ activityLog = [], className = "" }) {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("all");
-    const [viewMode, setViewMode] = useState("grid"); // "grid" | "timeline"
+    const [viewMode, setViewMode] = useState("list"); // "list" | "grid" | "timeline"
     const [selectedActivity, setSelectedActivity] = useState(null);
     const [showRawJson, setShowRawJson] = useState(false);
 
@@ -535,8 +536,21 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                     <div className="flex items-center rounded-xl border border-slate-200 bg-slate-100/70 p-1 dark:border-slate-800 dark:bg-slate-900">
                         <button
                             type="button"
+                            onClick={() => setViewMode("list")}
+                            title="List View (One item per row)"
+                            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                                viewMode === "list"
+                                    ? "bg-white text-slate-900 shadow-xs dark:bg-slate-800 dark:text-white"
+                                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                            }`}
+                        >
+                            <List className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">List</span>
+                        </button>
+                        <button
+                            type="button"
                             onClick={() => setViewMode("grid")}
-                            title="Grid View"
+                            title="Grid View (2 columns)"
                             className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
                                 viewMode === "grid"
                                     ? "bg-white text-slate-900 shadow-xs dark:bg-slate-800 dark:text-white"
@@ -556,7 +570,7 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                     : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                             }`}
                         >
-                            <List className="h-3.5 w-3.5" />
+                            <Clock className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Timeline</span>
                         </button>
                     </div>
@@ -620,6 +634,149 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                 Reset filters
                             </button>
                         )}
+                    </div>
+                ) : viewMode === "list" ? (
+                    /* Single-Line Listing Layout (One item per row) with GSAP staggered cards */
+                    <div className="max-h-[640px] overflow-y-auto pr-1.5 scrollbar-thin space-y-2.5">
+                        {filteredLogs.map((item) => {
+                            const modMeta = getModuleMeta(item.module);
+                            const ModuleIcon = modMeta.icon;
+                            const actorName = item.actor?.name || item.actor?.email || "System";
+                            const actorPhoto = item.actor?.profile_photo_url || item.actor?.profile_image;
+                            const narrative = getActionNarrative(item);
+                            const meta = item.meta || {};
+                            const isRecent = isActivityRecent(item.created_at);
+
+                            return (
+                                <div
+                                    key={item.id}
+                                    onMouseEnter={handleCardMouseEnter}
+                                    onMouseLeave={handleCardMouseLeave}
+                                    onClick={() => setSelectedActivity(item)}
+                                    className="activity-log-card group relative flex flex-col gap-3 rounded-2xl border border-slate-200/90 bg-white/95 p-3.5 sm:px-5 sm:py-3.5 shadow-2xs transition-all duration-200 hover:border-indigo-400/80 hover:bg-white hover:shadow-md hover:shadow-indigo-500/5 dark:border-slate-800/90 dark:bg-slate-900/80 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900 cursor-pointer lg:flex-row lg:items-center lg:justify-between"
+                                >
+                                    {/* Left & Center: Badges, Actor, Narrative, and Chips */}
+                                    <div className="flex flex-1 flex-col gap-2 min-w-0 sm:flex-row sm:items-center sm:gap-4">
+                                        {/* Actor Avatar */}
+                                        <div className="flex items-center gap-2.5 shrink-0">
+                                            {actorPhoto ? (
+                                                <img
+                                                    src={actorPhoto}
+                                                    alt={actorName}
+                                                    className="h-8 w-8 rounded-full object-cover ring-2 ring-slate-100 dark:ring-slate-800"
+                                                />
+                                            ) : (
+                                                <div
+                                                    className={`flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br text-[11px] font-bold shadow-2xs ring-2 ring-slate-100 dark:ring-slate-800 ${getAvatarColor(
+                                                        actorName
+                                                    )}`}
+                                                >
+                                                    {getInitials(actorName)}
+                                                </div>
+                                            )}
+                                            <div className="block sm:hidden font-semibold text-xs text-slate-800 dark:text-slate-200 truncate">
+                                                {actorName}
+                                            </div>
+                                        </div>
+
+                                        {/* Event Details: Module Pill + Action Pill + Narrative Text */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span
+                                                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-xs font-semibold ${modMeta.colorClass}`}
+                                                >
+                                                    <ModuleIcon className="h-3 w-3 shrink-0" />
+                                                    <span>{modMeta.label}</span>
+                                                </span>
+
+                                                {isRecent && (
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                                        <span className="relative flex h-1.5 w-1.5">
+                                                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                                        </span>
+                                                        LIVE
+                                                    </span>
+                                                )}
+
+                                                <div>{renderActionPill(item.action)}</div>
+
+                                                <div className="hidden sm:inline-block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                                    • <span className="text-slate-500 font-normal">by</span> {actorName}
+                                                </div>
+                                            </div>
+
+                                            {/* Narrative & Context Meta */}
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                                <p className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                    {narrative}
+                                                </p>
+
+                                                {/* Meta Chips */}
+                                                {(meta.day_number || meta.project_code || meta.from || meta.scope || meta.task_code) && (
+                                                    <div className="inline-flex flex-wrap items-center gap-1.5">
+                                                        {meta.day_number && (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                                <Calendar className="h-2.5 w-2.5 text-slate-400" />
+                                                                Day {meta.day_number}
+                                                            </span>
+                                                        )}
+                                                        {(meta.project_code || meta.project_id) && (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.2 text-[10px] font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                                                <Tag className="h-2.5 w-2.5 text-indigo-400" />
+                                                                {meta.project_code || `PRJ-${meta.project_id}`}
+                                                            </span>
+                                                        )}
+                                                        {meta.task_code && (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-1.5 py-0.2 text-[10px] font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                                                                <ListTodo className="h-2.5 w-2.5 text-blue-400" />
+                                                                {meta.task_code}
+                                                            </span>
+                                                        )}
+                                                        {meta.scope && (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                                Scope: {meta.scope}
+                                                            </span>
+                                                        )}
+                                                        {meta.from && meta.to && (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                                <ArrowLeftRight className="h-2.5 w-2.5 text-slate-400" />
+                                                                {meta.from} → {meta.to}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right: Timestamp and View Icon Button */}
+                                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-slate-100 sm:border-0 dark:border-slate-800/80 shrink-0">
+                                        <div
+                                            className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400"
+                                            title={formatFullDate(item.created_at)}
+                                        >
+                                            <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                            <span>{getRelativeTime(item.created_at)}</span>
+                                        </div>
+
+                                        {/* Dedicated View Details Icon Button */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedActivity(item);
+                                            }}
+                                            title="View Activity Details"
+                                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition-all hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600 hover:shadow-xs group-hover:border-indigo-200 dark:border-slate-800 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:border-indigo-600 dark:hover:bg-indigo-950/80 dark:hover:text-indigo-300"
+                                        >
+                                            <Eye className="h-3.5 w-3.5 text-slate-500 group-hover:text-indigo-600 dark:text-slate-400 dark:group-hover:text-indigo-300" />
+                                            <span>View Details</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 ) : viewMode === "grid" ? (
                     /* Responsive 2-Column Grid Layout with GSAP staggered cards */
@@ -716,7 +873,7 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                             )}
                                         </div>
 
-                                        {/* Bottom Row: Actor & Timestamp */}
+                                        {/* Bottom Row: Actor & Timestamp & View Button */}
                                         <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800/80">
                                             <div className="flex items-center gap-2.5 min-w-0">
                                                 {actorPhoto ? (
@@ -751,9 +908,19 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                                         <span>{getRelativeTime(item.created_at)}</span>
                                                     </div>
                                                 </div>
-                                                <span className="text-[10px] font-medium text-indigo-600 opacity-0 transition-opacity group-hover:opacity-100 dark:text-indigo-400">
-                                                    Inspect →
-                                                </span>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedActivity(item);
+                                                    }}
+                                                    title="View Details"
+                                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
+                                                >
+                                                    <Eye className="h-3 w-3" />
+                                                    <span>View</span>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -803,13 +970,29 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                                     )}
                                                     <div>{renderActionPill(item.action)}</div>
                                                 </div>
-                                                <span
-                                                    className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400"
-                                                    title={formatFullDate(item.created_at)}
-                                                >
-                                                    <Clock className="h-3 w-3 text-slate-400" />
-                                                    {getRelativeTime(item.created_at)} • {formatFullDate(item.created_at)}
-                                                </span>
+
+                                                <div className="flex items-center gap-2">
+                                                    <span
+                                                        className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400"
+                                                        title={formatFullDate(item.created_at)}
+                                                    >
+                                                        <Clock className="h-3 w-3 text-slate-400" />
+                                                        {getRelativeTime(item.created_at)}
+                                                    </span>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedActivity(item);
+                                                        }}
+                                                        title="View Details"
+                                                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
+                                                    >
+                                                        <Eye className="h-3 w-3" />
+                                                        <span>View</span>
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             <p className="mt-2.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
