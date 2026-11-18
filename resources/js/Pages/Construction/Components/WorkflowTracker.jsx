@@ -13,7 +13,20 @@ import {
     FaBezierCurve,
 } from "react-icons/fa6";
 
-gsap.registerPlugin(MotionPathPlugin);
+gsap.registerPlugin(MotionPathPlugin, MotionPathHelper);
+
+const prefersReducedMotion = () =>
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const stageGlowColors = {
+    sky: { shadow: "rgba(14, 165, 233, 0.55)", ring: "border-sky-400", sparkle: "text-sky-400" },
+    indigo: { shadow: "rgba(99, 102, 241, 0.58)", ring: "border-indigo-400", sparkle: "text-indigo-400" },
+    amber: { shadow: "rgba(245, 158, 11, 0.55)", ring: "border-amber-400", sparkle: "text-amber-400" },
+    violet: { shadow: "rgba(139, 92, 246, 0.58)", ring: "border-violet-400", sparkle: "text-violet-400" },
+    emerald: { shadow: "rgba(16, 185, 129, 0.58)", ring: "border-emerald-400", sparkle: "text-emerald-400" },
+};
 
 const steps = [
     { key: "survey", label: "Survey Team", icon: FaLocationDot, color: "sky", subtext: "Site Data & Photos" },
@@ -93,9 +106,13 @@ export default function WorkflowTracker({ currentStage, isLocked = false }) {
     const activePathRef = useRef(null);
     const fileRef = useRef(null);
     const helperRef = useRef(null);
+    const editTweenRef = useRef(null);
 
     const [isEditingPath, setIsEditingPath] = useState(false);
+    const [hasArrived, setHasArrived] = useState(false);
     const [svgGeometry, setSvgGeometry] = useState({ width: 0, height: 0, path: "" });
+    const activeStageColor = steps[activeIndex]?.color || "sky";
+    const activeGlow = stageGlowColors[activeStageColor] || stageGlowColors.sky;
 
     // Measure exact pixel centers of all 5 step circles so the curved path aligns 1:1 at every width
     useEffect(() => {
@@ -198,47 +215,216 @@ export default function WorkflowTracker({ currentStage, isLocked = false }) {
         return () => ctx.revert();
     }, [activeIndex, currentStage]);
 
-    // MotionPath animation for gliding Project File icon + curved active progress trace
+    // MotionPath animation: glide Project File along curve to project's active step, dock, then trigger GSAP bling/blinking
     useEffect(() => {
-        if (!svgGeometry.path || !stepperRef.current) return;
+        if (!svgGeometry.path || !trackerRef.current || !stepperRef.current || isEditingPath) return;
+
+        setHasArrived(false);
 
         const ctx = gsap.context(() => {
-            // Animate active curved progress trace along the SVG path
             const activePathEl = activePathRef.current;
+            const pathEl = pathRef.current;
+            const fileEl = fileRef.current;
+            const travelDuration = activeIndex === 0 ? 0.6 : Math.min(2.4, 0.95 + activeIndex * 0.45);
+
+            const startActiveStepBling = () => {
+                setHasArrived(true);
+
+                if (prefersReducedMotion()) return;
+
+                const activeCircle = trackerRef.current?.querySelector(".wf-step-circle-active");
+                const blingRings = trackerRef.current?.querySelectorAll(".wf-bling-ring");
+                const sparkles = trackerRef.current?.querySelectorAll(".wf-bling-sparkle");
+                const activePill = trackerRef.current?.querySelector(".wf-stage-pill-active");
+                const fileAura = fileEl?.querySelector(".wf-file-aura");
+
+                if (activeCircle) {
+                    gsap.fromTo(
+                        activeCircle,
+                        { scale: 1.2 },
+                        {
+                            scale: 1,
+                            duration: 0.38,
+                            ease: "back.out(2.6)",
+                            onComplete: () => {
+                                gsap.to(activeCircle, {
+                                    scale: 1.09,
+                                    boxShadow: `0 0 0 5px ${activeGlow.shadow}, 0 0 20px 3px ${activeGlow.shadow}`,
+                                    duration: 0.85,
+                                    repeat: -1,
+                                    yoyo: true,
+                                    ease: "sine.inOut",
+                                });
+                            },
+                        }
+                    );
+                }
+
+                if (blingRings?.length) {
+                    gsap.set(blingRings, { autoAlpha: 0.85, scale: 1, transformOrigin: "50% 50%" });
+                    gsap.to(blingRings, {
+                        scale: 2.05,
+                        autoAlpha: 0,
+                        duration: 1.4,
+                        stagger: 0.55,
+                        repeat: -1,
+                        ease: "power2.out",
+                    });
+                }
+
+                if (sparkles?.length) {
+                    gsap.set(sparkles, { autoAlpha: 0, scale: 0.25, transformOrigin: "50% 50%" });
+                    gsap.to(sparkles, {
+                        autoAlpha: 1,
+                        scale: 1.25,
+                        rotation: 90,
+                        duration: 0.72,
+                        stagger: 0.18,
+                        repeat: -1,
+                        yoyo: true,
+                        ease: "sine.inOut",
+                    });
+                }
+
+                if (activePill) {
+                    gsap.to(activePill, {
+                        boxShadow: `0 0 0 2px ${activeGlow.shadow}, 0 4px 16px -2px ${activeGlow.shadow}`,
+                        duration: 0.95,
+                        repeat: -1,
+                        yoyo: true,
+                        ease: "sine.inOut",
+                    });
+                }
+
+                if (fileEl) {
+                    gsap.to(fileEl, {
+                        y: "-=2.5",
+                        duration: 0.9,
+                        repeat: -1,
+                        yoyo: true,
+                        ease: "sine.inOut",
+                    });
+                }
+
+                if (fileAura) {
+                    gsap.to(fileAura, {
+                        scale: 1.45,
+                        opacity: 0.55,
+                        transformOrigin: "50% 50%",
+                        duration: 0.85,
+                        repeat: -1,
+                        yoyo: true,
+                        ease: "sine.inOut",
+                    });
+                }
+            };
+
+            const tl = gsap.timeline({ delay: 0.12 });
+
+            // Synchronize curved active progress trace with the gliding file
             if (activePathEl && typeof activePathEl.getTotalLength === "function") {
                 const totalLength = activePathEl.getTotalLength();
                 const targetOffset = totalLength * (1 - progressRatio);
                 gsap.set(activePathEl, {
                     strokeDasharray: totalLength,
-                    strokeDashoffset: totalLength,
+                    strokeDashoffset: prefersReducedMotion() ? targetOffset : totalLength,
                 });
-                gsap.to(activePathEl, {
-                    strokeDashoffset: targetOffset,
-                    duration: 0.75,
-                    delay: 0.1,
-                    ease: "power2.out",
-                });
+                if (!prefersReducedMotion() && activeIndex > 0) {
+                    tl.to(
+                        activePathEl,
+                        {
+                            strokeDashoffset: targetOffset,
+                            duration: travelDuration,
+                            ease: "power2.inOut",
+                        },
+                        0
+                    );
+                }
             }
 
-            // MotionPath gliding file icon along the exact pixel-aligned curved path
-            const pathEl = pathRef.current;
-            const fileEl = fileRef.current;
+            // Glide Project File icon along curved MotionPath and stop right on the active project step
             if (pathEl && fileEl) {
-                gsap.set(fileEl, { scale: 0.95, autoAlpha: 1, transformOrigin: "50% 50%" });
-                gsap.to(fileEl, {
-                    duration: 5.5,
-                    repeat: -1,
-                    ease: "power1.inOut",
-                    immediateRender: true,
-                    motionPath: {
-                        path: pathEl,
-                        align: pathEl,
-                        alignOrigin: [0.5, 0.5],
-                        autoRotate: 0,
-                    },
+                if (prefersReducedMotion()) {
+                    gsap.set(fileEl, {
+                        scale: 0.72,
+                        autoAlpha: 1,
+                        transformOrigin: "50% 50%",
+                        motionPath: {
+                            path: pathEl,
+                            align: pathEl,
+                            alignOrigin: [0.5, 0.5],
+                            autoRotate: 0,
+                            start: progressRatio,
+                            end: progressRatio,
+                        },
+                    });
+                    gsap.set(fileEl, { y: "-=18" });
+                    startActiveStepBling();
+                    return;
+                }
+
+                if (activeIndex === 0) {
+                    gsap.set(fileEl, {
+                        scale: 1.45,
+                        autoAlpha: 0,
+                        transformOrigin: "50% 50%",
+                        motionPath: {
+                            path: pathEl,
+                            align: pathEl,
+                            alignOrigin: [0.5, 0.5],
+                            autoRotate: 0,
+                            start: 0,
+                            end: progressRatio,
+                        },
+                    });
+                    tl.to(
+                        fileEl,
+                        {
+                            scale: 0.95,
+                            autoAlpha: 1,
+                            duration: travelDuration,
+                            ease: "back.out(1.7)",
+                        },
+                        0
+                    );
+                } else {
+                    gsap.set(fileEl, { scale: 0.95, autoAlpha: 1, transformOrigin: "50% 50%" });
+                    tl.to(
+                        fileEl,
+                        {
+                            duration: travelDuration,
+                            ease: "power2.inOut",
+                            immediateRender: true,
+                            motionPath: {
+                                path: pathEl,
+                                align: pathEl,
+                                alignOrigin: [0.5, 0.5],
+                                autoRotate: 0,
+                                start: 0,
+                                end: progressRatio,
+                            },
+                        },
+                        0
+                    );
+                }
+
+                // Arrival pop & tidy dock slightly above the active step circle so both file & step icon shine
+                tl.to(fileEl, {
+                    scale: 1.24,
+                    duration: 0.16,
+                    ease: "power2.out",
                 });
+                tl.to(fileEl, {
+                    scale: 0.72,
+                    y: "-=18",
+                    duration: 0.32,
+                    ease: "back.out(2.2)",
+                    onComplete: startActiveStepBling,
+                });
+            } else {
+                startActiveStepBling();
             }
-        }, stepperRef);
+        }, trackerRef);
 
         return () => {
             if (helperRef.current) {
@@ -247,22 +433,46 @@ export default function WorkflowTracker({ currentStage, isLocked = false }) {
             }
             ctx.revert();
         };
-    }, [svgGeometry.path, progressRatio]);
+    }, [svgGeometry.path, progressRatio, activeIndex, activeGlow.shadow, isEditingPath]);
 
-    // Optional interactive MotionPathHelper editor toggle
+    // Optional interactive MotionPathHelper editor toggle (uses live tween + registered gsap core)
     useEffect(() => {
         if (helperRef.current) {
             helperRef.current.kill();
             helperRef.current = null;
         }
+        if (editTweenRef.current) {
+            editTweenRef.current.kill();
+            editTweenRef.current = null;
+        }
 
         if (isEditingPath && fileRef.current && pathRef.current && svgGeometry.path) {
-            helperRef.current = MotionPathHelper.create(fileRef.current, {
+            gsap.set(fileRef.current, { scale: 0.95, autoAlpha: 1, x: 0, y: 0, transformOrigin: "50% 50%" });
+            const previewTween = gsap.to(fileRef.current, {
+                duration: 3.5,
+                repeat: -1,
+                ease: "power1.inOut",
+                immediateRender: true,
+                motionPath: {
+                    path: pathRef.current,
+                    align: pathRef.current,
+                    alignOrigin: [0.5, 0.5],
+                    autoRotate: 0,
+                    start: 0,
+                    end: progressRatio > 0 ? progressRatio : 1,
+                },
+            });
+            editTweenRef.current = previewTween;
+
+            helperRef.current = MotionPathHelper.create(previewTween, {
+                gsap,
                 path: pathRef.current,
                 pathColor: "#0ae448",
                 pathWidth: 2,
                 selected: true,
             });
+        } else if (pathRef.current) {
+            gsap.set(pathRef.current, { stroke: "none" });
         }
 
         return () => {
@@ -270,8 +480,15 @@ export default function WorkflowTracker({ currentStage, isLocked = false }) {
                 helperRef.current.kill();
                 helperRef.current = null;
             }
+            if (editTweenRef.current) {
+                editTweenRef.current.kill();
+                editTweenRef.current = null;
+            }
+            if (pathRef.current) {
+                gsap.set(pathRef.current, { stroke: "none" });
+            }
         };
-    }, [isEditingPath, svgGeometry.path]);
+    }, [isEditingPath, svgGeometry.path, progressRatio]);
 
     const handlePillHover = (e, lift) => {
         gsap.to(e.currentTarget, {
@@ -338,7 +555,7 @@ export default function WorkflowTracker({ currentStage, isLocked = false }) {
             </div>
 
             {/* Pixel-Aligned Curved GSAP MotionPath + 5-Stage Nodes */}
-            <div ref={stepperRef} className="mt-2 relative pt-3.5 pb-1">
+            <div ref={stepperRef} className="mt-2 relative pt-5 pb-1">
                 {/* Layer 1 (Behind circles): Base dashed curve + Active gradient progress trace */}
                 {svgGeometry.width > 0 && svgGeometry.path && (
                     <svg
@@ -386,26 +603,70 @@ export default function WorkflowTracker({ currentStage, isLocked = false }) {
                         const Icon = step.icon;
                         const isDone = index < activeIndex;
                         const isActive = index === activeIndex;
+                        const stepGlow = stageGlowColors[step.color] || stageGlowColors.sky;
 
                         return (
                             <div key={step.key} className="wf-step-node flex flex-col items-center text-center group">
-                                <div
-                                    className={`wf-step-circle relative z-10 w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                                        isActive
-                                            ? `${colorRing[step.color]} shadow-md ring-2 ring-offset-1 ring-sky-500/30 dark:ring-offset-slate-950`
-                                            : isDone
-                                              ? "border-emerald-500 bg-emerald-500 text-white dark:border-emerald-400 shadow-2xs"
-                                              : "border-slate-200 bg-white text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500"
-                                    }`}
-                                >
+                                <div className="relative flex items-center justify-center">
                                     {isActive && (
-                                        <span className="pointer-events-none absolute inset-0 rounded-full animate-ping bg-sky-400/25" />
+                                        <>
+                                            {/* Dual GSAP-animated expanding bling ripple rings */}
+                                            <span
+                                                className={`wf-bling-ring pointer-events-none absolute inset-0 rounded-full border-2 ${stepGlow.ring} opacity-0`}
+                                            />
+                                            <span
+                                                className={`wf-bling-ring pointer-events-none absolute inset-0 rounded-full border-2 ${stepGlow.ring} opacity-0`}
+                                            />
+                                            {/* Twinkling 4-point GSAP bling sparkles around active step */}
+                                            <svg
+                                                className={`wf-bling-sparkle pointer-events-none absolute -top-2.5 -left-2.5 h-3 w-3 ${stepGlow.sparkle} opacity-0`}
+                                                viewBox="0 0 16 16"
+                                                fill="currentColor"
+                                                aria-hidden="true"
+                                            >
+                                                <path d="M8 0 L9.8 6.2 L16 8 L9.8 9.8 L8 16 L6.2 9.8 L0 8 L6.2 6.2 Z" />
+                                            </svg>
+                                            <svg
+                                                className={`wf-bling-sparkle pointer-events-none absolute -top-2 -right-3 h-2.5 w-2.5 text-emerald-400 opacity-0`}
+                                                viewBox="0 0 16 16"
+                                                fill="currentColor"
+                                                aria-hidden="true"
+                                            >
+                                                <path d="M8 0 L9.8 6.2 L16 8 L9.8 9.8 L8 16 L6.2 9.8 L0 8 L6.2 6.2 Z" />
+                                            </svg>
+                                            <svg
+                                                className={`wf-bling-sparkle pointer-events-none absolute -bottom-2 -right-2.5 h-3 w-3 ${stepGlow.sparkle} opacity-0`}
+                                                viewBox="0 0 16 16"
+                                                fill="currentColor"
+                                                aria-hidden="true"
+                                            >
+                                                <path d="M8 0 L9.8 6.2 L16 8 L9.8 9.8 L8 16 L6.2 9.8 L0 8 L6.2 6.2 Z" />
+                                            </svg>
+                                            <svg
+                                                className={`wf-bling-sparkle pointer-events-none absolute -bottom-1.5 -left-3 h-2.5 w-2.5 text-emerald-400 opacity-0`}
+                                                viewBox="0 0 16 16"
+                                                fill="currentColor"
+                                                aria-hidden="true"
+                                            >
+                                                <path d="M8 0 L9.8 6.2 L16 8 L9.8 9.8 L8 16 L6.2 9.8 L0 8 L6.2 6.2 Z" />
+                                            </svg>
+                                        </>
                                     )}
-                                    {isDone ? (
-                                        <FaCheck size={12} className="text-white" />
-                                    ) : (
-                                        <Icon size={isActive ? 14 : 12} />
-                                    )}
+                                    <div
+                                        className={`wf-step-circle ${isActive ? "wf-step-circle-active" : ""} relative z-10 w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors duration-300 ${
+                                            isActive
+                                                ? `${colorRing[step.color]} shadow-md ring-2 ring-offset-1 ring-sky-500/30 dark:ring-offset-slate-950`
+                                                : isDone
+                                                  ? "border-emerald-500 bg-emerald-500 text-white dark:border-emerald-400 shadow-2xs"
+                                                  : "border-slate-200 bg-white text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500"
+                                        }`}
+                                    >
+                                        {isDone ? (
+                                            <FaCheck size={12} className="text-white" />
+                                        ) : (
+                                            <Icon size={isActive ? 14 : 12} />
+                                        )}
+                                    </div>
                                 </div>
                                 <p
                                     className={`mt-3 text-[10px] font-bold uppercase tracking-wider leading-tight ${
@@ -416,7 +677,7 @@ export default function WorkflowTracker({ currentStage, isLocked = false }) {
                                               : "text-slate-400 dark:text-slate-500"
                                     }`}
                                 >
-                                    {step.label} {isDone ? "✓" : "○"}
+                                    {step.label} {isDone ? "✓" : isActive && hasArrived ? "✦" : "○"}
                                 </p>
                                 <p className="mt-0.5 text-[9.5px] text-slate-500 dark:text-slate-500 truncate max-w-[115px]">
                                     {step.subtext}
@@ -467,11 +728,12 @@ export default function WorkflowTracker({ currentStage, isLocked = false }) {
                         {/* Animated Gliding Project File / Document Icon */}
                         <g ref={fileRef} className="wf-motion-file" style={{ visibility: "hidden" }}>
                             <circle
+                                className="wf-file-aura"
                                 cx="0"
                                 cy="0"
                                 r="14"
                                 fill={`url(#macha-${uid})`}
-                                opacity="0.18"
+                                opacity="0.22"
                                 filter={`url(#macha-glow-${uid})`}
                             />
                             <path
@@ -501,7 +763,7 @@ export default function WorkflowTracker({ currentStage, isLocked = false }) {
                             key={step.key}
                             onMouseEnter={(e) => handlePillHover(e, true)}
                             onMouseLeave={(e) => handlePillHover(e, false)}
-                            className={`wf-stage-pill flex-1 rounded-xl border px-2.5 py-1.5 transition-colors ${
+                            className={`wf-stage-pill ${isActive ? "wf-stage-pill-active" : ""} flex-1 rounded-xl border px-2.5 py-1.5 transition-colors ${
                                 isActive
                                     ? `${colorRing[step.color]} shadow-2xs`
                                     : isDone
