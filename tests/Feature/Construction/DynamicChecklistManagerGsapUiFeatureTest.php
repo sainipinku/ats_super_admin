@@ -78,4 +78,13 @@ class DynamicChecklistManagerGsapUiFeatureTest extends TestCase
         $this->assertStringContainsString('.checklists.destroy', $source);
         $this->assertStringContainsString('prefers-reduced-motion', $source);
     }
+
+    public function test_dynamic_checklist_manager_resets_pagination_on_filter_or_mode_change_and_supports_show_less(): void
+    {
+        $source = file_get_contents(resource_path('js/Pages/Construction/Components/DynamicChecklistManager.jsx'));
+
+        $this->assertStringContainsString('setVisibleCount(GROUPS_PER_PAGE)', $source);
+        $this->assertStringContainsString('Show Less', $source);
+        $this->assertStringContainsString('remainingGroups', $source);
+    }
 }

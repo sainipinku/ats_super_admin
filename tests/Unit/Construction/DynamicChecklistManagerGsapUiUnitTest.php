@@ -74,4 +74,31 @@ class DynamicChecklistManagerGsapUiUnitTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/\bpy-0\.2\b/', $source);
         $this->assertDoesNotMatchRegularExpression('/\bpx-4\.5\b/', $source);
     }
+
+    public function test_dynamic_checklist_manager_uses_compact_mini_space_two_column_grid_and_ten_per_page_pagination(): void
+    {
+        $source = file_get_contents($this->componentPath);
+
+        // 10 entries per batch, 2 cards per row in compact mini-space grid
+        $this->assertStringContainsString('const GROUPS_PER_PAGE = 10;', $source);
+        $this->assertStringContainsString('grid gap-3 md:grid-cols-2', $source);
+        $this->assertStringContainsString('visibleCount', $source);
+        $this->assertStringContainsString('hasMoreGroups', $source);
+        $this->assertStringContainsString('handleLoadMore', $source);
+        $this->assertStringContainsString('dcm-load-more-btn', $source);
+        $this->assertStringContainsString('Load More', $source);
+    }
+
+    public function test_dynamic_checklist_manager_implements_gsap_loading_animation_for_load_more(): void
+    {
+        $source = file_get_contents($this->componentPath);
+
+        // GSAP loading spinner/dots + incremental reveal for newly appended cards
+        $this->assertStringContainsString('isLoadingMore', $source);
+        $this->assertStringContainsString('dcm-load-more-loader', $source);
+        $this->assertStringContainsString('dcm-loader-dot', $source);
+        $this->assertStringContainsString('dcm-loader-ring', $source);
+        $this->assertStringContainsString('data-dcm-index', $source);
+        $this->assertStringContainsString('repeat: -1', $source);
+    }
 }

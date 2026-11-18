@@ -170,6 +170,7 @@ const buildGroupsFromProject = (project) => {
 };
 
 const DELTA_INTERVAL_MS = 15000;
+const GROUPS_PER_PAGE = 10;
 
 export default function DynamicChecklistManager({
     project,
@@ -193,6 +194,8 @@ export default function DynamicChecklistManager({
     const [showAddForm, setShowAddForm] = useState(false);
     const [editing, setEditing] = useState(null);
     const [previewImage, setPreviewImage] = useState(null);
+    const [visibleCount, setVisibleCount] = useState(GROUPS_PER_PAGE);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
 
     // Form for creating new checklist item under selected task
     const createForm = useForm({
@@ -352,7 +355,16 @@ export default function DynamicChecklistManager({
         );
     }, [activeGroups, filterTaskKey, taskOptions]);
 
-    const slicedGroups = typeof limitGroups === "number" ? filteredGroups.slice(0, limitGroups) : filteredGroups;
+    const baseGroups = useMemo(
+        () => (typeof limitGroups === "number" ? filteredGroups.slice(0, limitGroups) : filteredGroups),
+        [filteredGroups, limitGroups]
+    );
+    const slicedGroups = useMemo(
+        () => (typeof limitGroups === "number" ? baseGroups : baseGroups.slice(0, visibleCount)),
+        [baseGroups, limitGroups, visibleCount]
+    );
+    const remainingGroups = Math.max(0, baseGroups.length - slicedGroups.length);
+    const hasMoreGroups = typeof limitGroups !== "number" && remainingGroups > 0;
     const completionPct = built.totals.total
         ? Math.round((built.totals.completed / built.totals.total) * 100)
         : 0;
@@ -447,8 +459,87 @@ export default function DynamicChecklistManager({
     const progressBarRef = useRef(null);
     const pctRef = useRef(null);
     const addFormRef = useRef(null);
+    const loaderRef = useRef(null);
     const prevPctRef = useRef(0);
+    const prevVisibleCountRef = useRef(0);
+    const loadMoreTimerRef = useRef(null);
     const [isInView, setIsInView] = useState(false);
+
+    // Reset pagination when grouping mode or task filter changes
+    useEffect(() => {
+        if (loadMoreTimerRef.current) {
+            clearTimeout(loadMoreTimerRef.current);
+            loadMoreTimerRef.current = null;
+        }
+        setIsLoadingMore(false);
+        prevVisibleCountRef.current = 0;
+        setVisibleCount(GROUPS_PER_PAGE);
+    }, [groupingMode, filterTaskKey]);
+
+    useEffect(() => {
+        return () => {
+            if (loadMoreTimerRef.current) {
+                clearTimeout(loadMoreTimerRef.current);
+                loadMoreTimerRef.current = null;
+            }
+        };
+    }, []);
+
+    const handleLoadMore = useCallback(() => {
+        if (isLoadingMore || !hasMoreGroups) return;
+        prevVisibleCountRef.current = slicedGroups.length;
+        if (prefersReducedMotion()) {
+            setVisibleCount((prev) => Math.min(prev + GROUPS_PER_PAGE, baseGroups.length));
+            return;
+        }
+        setIsLoadingMore(true);
+        loadMoreTimerRef.current = setTimeout(() => {
+            setVisibleCount((prev) => Math.min(prev + GROUPS_PER_PAGE, baseGroups.length));
+            setIsLoadingMore(false);
+            loadMoreTimerRef.current = null;
+        }, 460);
+    }, [isLoadingMore, hasMoreGroups, slicedGroups.length, baseGroups.length]);
+
+    const handleShowLess = useCallback(() => {
+        if (loadMoreTimerRef.current) {
+            clearTimeout(loadMoreTimerRef.current);
+            loadMoreTimerRef.current = null;
+        }
+        setIsLoadingMore(false);
+        prevVisibleCountRef.current = 0;
+        setVisibleCount(GROUPS_PER_PAGE);
+    }, []);
+
+    // GSAP loading animation while fetching next 10 entries
+    useEffect(() => {
+        if (!isLoadingMore || !loaderRef.current || prefersReducedMotion()) return undefined;
+        const ctx = gsap.context(() => {
+            gsap.fromTo(
+                ".dcm-load-more-loader",
+                { opacity: 0, scale: 0.92 },
+                { opacity: 1, scale: 1, duration: 0.22, ease: "back.out(2)" }
+            );
+            gsap.to(".dcm-loader-ring", {
+                rotation: 360,
+                duration: 0.72,
+                repeat: -1,
+                ease: "none",
+                transformOrigin: "50% 50%",
+            });
+            gsap.to(".dcm-loader-dot", {
+                y: -5,
+                scale: 1.35,
+                opacity: 1,
+                duration: 0.34,
+                stagger: 0.1,
+                repeat: -1,
+                yoyo: true,
+                ease: "sine.inOut",
+            });
+        }, loaderRef);
+
+        return () => ctx.revert();
+    }, [isLoadingMore]);
 
     // Trigger screen zoom-out + inner cascade when section enters viewport
     useEffect(() => {
@@ -566,78 +657,90 @@ export default function DynamicChecklistManager({
         return () => ctx.revert();
     }, [isInView, completionPct]);
 
-    // Inner zoom-out cascade for group cards, titles, progress bars & checklist rows
+    // Inner zoom-out cascade for group cards, titles, progress bars & checklist rows (incremental on Load More)
     useEffect(() => {
-        if (!isInView || !containerRef.current || prefersReducedMotion()) return undefined;
-        const ctx = gsap.context(() => {
-            const cards = containerRef.current.querySelectorAll(".dcm-group-card");
-            if (cards.length) {
-                gsap.fromTo(
-                    cards,
-                    { opacity: 0, scale: 1.04, y: 18 },
-                    {
-                        opacity: 1,
-                        scale: 1,
-                        y: 0,
-                        duration: 0.48,
-                        stagger: 0.075,
-                        ease: "power3.out",
-                        clearProps: "transform,opacity",
-                    }
-                );
-            }
+        if (!isInView || !containerRef.current || prefersReducedMotion()) {
+            prevVisibleCountRef.current = slicedGroups.length;
+            return undefined;
+        }
 
-            const titles = containerRef.current.querySelectorAll(".dcm-group-title");
+        const startIdx = prevVisibleCountRef.current;
+        const allCards = Array.from(containerRef.current.querySelectorAll(".dcm-group-card"));
+        const targetCards = allCards.filter((card) => Number(card.getAttribute("data-dcm-index")) >= startIdx);
+
+        if (!targetCards.length) {
+            prevVisibleCountRef.current = slicedGroups.length;
+            return undefined;
+        }
+
+        const ctx = gsap.context(() => {
+            gsap.fromTo(
+                targetCards,
+                { opacity: 0, scale: 1.04, y: 16 },
+                {
+                    opacity: 1,
+                    scale: 1,
+                    y: 0,
+                    duration: 0.44,
+                    stagger: 0.055,
+                    ease: "power3.out",
+                    clearProps: "transform,opacity",
+                }
+            );
+
+            const titles = targetCards.flatMap((c) => Array.from(c.querySelectorAll(".dcm-group-title")));
             if (titles.length) {
                 gsap.fromTo(
                     titles,
-                    { opacity: 0, x: -10 },
+                    { opacity: 0, x: -8 },
                     {
                         opacity: 1,
                         x: 0,
-                        duration: 0.42,
-                        stagger: 0.06,
-                        delay: 0.08,
+                        duration: 0.36,
+                        stagger: 0.045,
+                        delay: 0.06,
                         ease: "power2.out",
                         clearProps: "transform,opacity",
                     }
                 );
             }
 
-            const rows = containerRef.current.querySelectorAll(".dcm-checklist-row");
+            const rows = targetCards.flatMap((c) => Array.from(c.querySelectorAll(".dcm-checklist-row")));
             if (rows.length) {
                 gsap.fromTo(
                     rows,
-                    { opacity: 0, scale: 1.03, y: 12 },
+                    { opacity: 0, scale: 1.03, y: 10 },
                     {
                         opacity: 1,
                         scale: 1,
                         y: 0,
-                        duration: 0.38,
-                        stagger: 0.04,
-                        delay: 0.12,
+                        duration: 0.34,
+                        stagger: 0.03,
+                        delay: 0.09,
                         ease: "power2.out",
                         clearProps: "transform,opacity",
                     }
                 );
             }
 
-            const groupBars = containerRef.current.querySelectorAll(".dcm-group-progress-fill");
+            const groupBars = targetCards.flatMap((c) => Array.from(c.querySelectorAll(".dcm-group-progress-fill")));
             if (groupBars.length) {
                 gsap.fromTo(
                     groupBars,
                     { scaleX: 0, transformOrigin: "left center" },
                     {
                         scaleX: 1,
-                        duration: 0.65,
-                        stagger: 0.06,
-                        delay: 0.14,
+                        duration: 0.55,
+                        stagger: 0.045,
+                        delay: 0.1,
                         ease: "power3.out",
                         clearProps: "transform",
                     }
                 );
             }
         }, containerRef);
+
+        prevVisibleCountRef.current = slicedGroups.length;
 
         return () => ctx.revert();
     }, [isInView, groupingMode, filterTaskKey, slicedGroups.length]);
@@ -737,25 +840,25 @@ export default function DynamicChecklistManager({
     );
 
     return (
-        <div ref={containerRef} className="dcm-stage w-full space-y-5">
+        <div ref={containerRef} className="dcm-stage w-full space-y-3.5">
             {/* Header & Metrics */}
-            <div className="dcm-header-card relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800/90 dark:bg-slate-900/95">
+            <div className="dcm-header-card relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800/90 dark:bg-slate-900/95">
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-500 opacity-85" />
 
-                <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-3.5">
+                        <div className="flex items-center gap-2.5">
                             <span
                                 onMouseEnter={(e) => handlePopEnter(e, { scale: 1.08, y: -2 })}
                                 onMouseLeave={handlePopLeave}
-                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/15 to-violet-500/15 text-lg text-indigo-700 ring-1 ring-indigo-500/20 dark:from-indigo-500/20 dark:to-violet-500/20 dark:text-indigo-300 dark:ring-indigo-400/25"
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/15 to-violet-500/15 text-base text-indigo-700 ring-1 ring-indigo-500/20 dark:from-indigo-500/20 dark:to-violet-500/20 dark:text-indigo-300 dark:ring-indigo-400/25"
                             >
                                 📋
                             </span>
                             <div className="min-w-0">
                                 <h2
                                     aria-label="Dynamic Checklist Manager"
-                                    className="flex flex-wrap items-center gap-x-1.5 text-lg font-extrabold tracking-tight text-slate-900 dark:text-white"
+                                    className="flex flex-wrap items-center gap-x-1.5 text-base font-extrabold tracking-tight text-slate-900 dark:text-white"
                                 >
                                     {TITLE_WORDS.map((word) => (
                                         <span key={word} className="inline-flex overflow-hidden py-0.5">
@@ -765,21 +868,26 @@ export default function DynamicChecklistManager({
                                         </span>
                                     ))}
                                 </h2>
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
                                     <span>
                                         Total <strong className="font-semibold text-slate-700 dark:text-slate-200">{built.totals.completed}</strong> of{" "}
                                         <strong className="font-semibold text-slate-700 dark:text-slate-200">{built.totals.total}</strong> items completed
                                     </span>
-                                    <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 ring-1 ring-indigo-200/70 dark:bg-indigo-500/15 dark:text-indigo-300 dark:ring-indigo-500/30">
+                                    <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-indigo-200/70 dark:bg-indigo-500/15 dark:text-indigo-300 dark:ring-indigo-500/30">
                                         <span ref={pctRef} className="dcm-pct-value">
                                             {completionPct}%
                                         </span>
                                     </span>
+                                    {baseGroups.length > 0 && (
+                                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                                            • Showing {slicedGroups.length} of {baseGroups.length}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-100 ring-1 ring-inset ring-slate-200/70 dark:bg-slate-800/90 dark:ring-slate-700/60">
+                        <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 ring-1 ring-inset ring-slate-200/70 dark:bg-slate-800/90 dark:ring-slate-700/60">
                             <div
                                 ref={progressBarRef}
                                 className="dcm-progress-fill h-full rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-500"
@@ -788,17 +896,17 @@ export default function DynamicChecklistManager({
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2.5 pt-0.5">
+                    <div className="flex flex-wrap items-center gap-2">
                         {/* Filter by Task */}
                         {taskOptions.length > 0 && (
-                            <div className="dcm-header-control flex items-center gap-2">
-                                <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            <div className="dcm-header-control flex items-center gap-1.5">
+                                <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                                     Filter
                                 </label>
                                 <select
                                     value={filterTaskKey}
                                     onChange={(e) => setFilterTaskKey(e.target.value)}
-                                    className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm transition focus:border-indigo-500 focus:bg-white focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                    className="rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 text-xs font-semibold text-slate-800 shadow-sm transition focus:border-indigo-500 focus:bg-white focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                                 >
                                     <option value="all">All Project Tasks ({taskOptions.length})</option>
                                     {taskOptions.map((opt) => (
@@ -810,11 +918,11 @@ export default function DynamicChecklistManager({
                             </div>
                         )}
 
-                        <div className="dcm-header-control inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-950">
+                        <div className="dcm-header-control inline-flex rounded-xl border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-950">
                             <button
                                 type="button"
                                 onClick={() => setGroupingMode("group")}
-                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
                                     groupingMode === "group"
                                         ? "bg-indigo-600 text-white shadow-sm"
                                         : "text-slate-600 hover:bg-slate-200/80 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -825,7 +933,7 @@ export default function DynamicChecklistManager({
                             <button
                                 type="button"
                                 onClick={() => setGroupingMode("day")}
-                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
                                     groupingMode === "day"
                                         ? "bg-indigo-600 text-white shadow-sm"
                                         : "text-slate-600 hover:bg-slate-200/80 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -841,7 +949,7 @@ export default function DynamicChecklistManager({
                                 onClick={() => setShowAddForm((prev) => !prev)}
                                 onMouseEnter={(e) => handlePopEnter(e, { scale: 1.04, y: -1.5 })}
                                 onMouseLeave={handlePopLeave}
-                                className={`dcm-header-control inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold shadow-sm transition-colors ${
+                                className={`dcm-header-control inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-semibold shadow-sm transition-colors ${
                                     showAddForm
                                         ? "bg-slate-200 text-slate-800 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                                         : "bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-500/20"
@@ -1081,175 +1189,258 @@ export default function DynamicChecklistManager({
                 </div>
             ) : null}
 
-            {/* Checklist Items Display List */}
+            {/* Checklist Items Display List (Compact Mini-Space, 2 per row, 10 per batch) */}
             {!slicedGroups.length ? (
                 <EmptyState
                     title="No checklist items found."
                     description="Select a task above and create checklist items to track execution details."
                 />
             ) : (
-                <div className="grid gap-5 md:grid-cols-2">
-                    {slicedGroups.map((group) => {
-                        const pct = group.total ? Math.round((group.completed / group.total) * 100) : 0;
-                        const anchorGroup = `chk-group-${group.slug || SLUG_SAFE(group.key)}`;
-                        return (
-                            <section
-                                key={group.key}
-                                id={anchorGroup}
-                                onMouseEnter={(e) => handlePopEnter(e, { scale: 1.016, y: -4 })}
-                                onMouseLeave={handlePopLeave}
-                                className="dcm-group-card scroll-mt-24 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm transition-colors hover:border-indigo-300/80 hover:shadow-lg hover:shadow-indigo-500/5 dark:border-slate-800 dark:bg-slate-900/95 dark:hover:border-indigo-500/40"
-                            >
-                                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3.5 dark:border-slate-800">
-                                    <div className="min-w-0 flex-1">
-                                        <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                            {group.kind}
-                                        </span>
-                                        <h3 className="dcm-group-title mt-1.5 truncate text-sm font-bold text-slate-900 dark:text-white">
-                                            {group.heading}
-                                        </h3>
-                                        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                            {group.completed}/{group.total} completed • <span className="font-semibold text-emerald-600 dark:text-emerald-400">{pct}%</span>
-                                        </p>
+                <div className="space-y-3">
+                    <div className="grid gap-3 md:grid-cols-2">
+                        {slicedGroups.map((group, groupIndex) => {
+                            const pct = group.total ? Math.round((group.completed / group.total) * 100) : 0;
+                            const anchorGroup = `chk-group-${group.slug || SLUG_SAFE(group.key)}`;
+                            return (
+                                <section
+                                    key={group.key}
+                                    id={anchorGroup}
+                                    data-dcm-index={groupIndex}
+                                    onMouseEnter={(e) => handlePopEnter(e, { scale: 1.014, y: -3 })}
+                                    onMouseLeave={handlePopLeave}
+                                    className="dcm-group-card scroll-mt-24 rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm transition-colors hover:border-indigo-300/80 hover:shadow-md hover:shadow-indigo-500/5 dark:border-slate-800 dark:bg-slate-900/95 dark:hover:border-indigo-500/40"
+                                >
+                                    <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2 dark:border-slate-800">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="inline-flex shrink-0 items-center rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                    {group.kind}
+                                                </span>
+                                                <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                                                    {group.completed}/{group.total} •{" "}
+                                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">{pct}%</span>
+                                                </span>
+                                            </div>
+                                            <h3 className="dcm-group-title mt-1 truncate text-xs font-bold text-slate-900 dark:text-white">
+                                                {group.heading}
+                                            </h3>
+                                        </div>
+                                        <div className="shrink-0 scale-90 origin-top-right">
+                                            <StatusBadge
+                                                value={
+                                                    group.total === 0
+                                                        ? "planned"
+                                                        : group.completed === group.total
+                                                        ? "completed"
+                                                        : "in_progress"
+                                                }
+                                            />
+                                        </div>
                                     </div>
-                                    <StatusBadge
-                                        value={
-                                            group.total === 0
-                                                ? "planned"
-                                                : group.completed === group.total
-                                                ? "completed"
-                                                : "in_progress"
-                                        }
-                                    />
-                                </div>
 
-                                <div className="mt-3.5 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                                    <div
-                                        className="dcm-group-progress-fill h-full rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-500"
-                                        style={{ width: `${pct}%` }}
-                                    />
-                                </div>
+                                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                                        <div
+                                            className="dcm-group-progress-fill h-full rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-500"
+                                            style={{ width: `${pct}%` }}
+                                        />
+                                    </div>
 
-                                <ul className="mt-4 space-y-3">
-                                    {group.items.map((item) => (
-                                        <li
-                                            key={`${item.source}-${item.id}`}
-                                            onMouseEnter={(e) => handlePopEnter(e, { scale: 1.015, y: -2 })}
-                                            onMouseLeave={handlePopLeave}
-                                            className="dcm-checklist-row rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 transition-colors hover:border-indigo-300/80 hover:bg-white hover:shadow-sm dark:border-slate-800/90 dark:bg-slate-950/70 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900/90"
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
-                                                    <input
-                                                        type="checkbox"
-                                                        disabled={!canManage}
-                                                        checked={!!item.is_completed}
-                                                        onChange={(e) => runToggle(group, item, e.currentTarget)}
-                                                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900"
-                                                    />
-                                                    <div className="min-w-0 flex-1">
-                                                        <p
-                                                            className={`break-words text-xs font-semibold leading-relaxed ${
-                                                                item.is_completed
-                                                                    ? "text-slate-400 line-through dark:text-slate-500"
-                                                                    : "text-slate-900 dark:text-white"
-                                                            }`}
-                                                        >
-                                                            {item.item_title || "(Untitled Item)"}
-                                                        </p>
+                                    <ul className="mt-2.5 space-y-1.5">
+                                        {group.items.map((item) => (
+                                            <li
+                                                key={`${item.source}-${item.id}`}
+                                                onMouseEnter={(e) => handlePopEnter(e, { scale: 1.012, y: -1.5 })}
+                                                onMouseLeave={handlePopLeave}
+                                                className="dcm-checklist-row rounded-lg border border-slate-200/80 bg-slate-50/70 px-2.5 py-2 transition-colors hover:border-indigo-300/80 hover:bg-white hover:shadow-sm dark:border-slate-800/90 dark:bg-slate-950/70 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900/90"
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            disabled={!canManage}
+                                                            checked={!!item.is_completed}
+                                                            onChange={(e) => runToggle(group, item, e.currentTarget)}
+                                                            className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900"
+                                                        />
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                                                                <p
+                                                                    className={`break-words text-[11px] font-semibold leading-snug ${
+                                                                        item.is_completed
+                                                                            ? "text-slate-400 line-through dark:text-slate-500"
+                                                                            : "text-slate-900 dark:text-white"
+                                                                    }`}
+                                                                >
+                                                                    {item.item_title || "(Untitled Item)"}
+                                                                </p>
 
-                                                        {/* Badges for Assign Hours, Status & Day */}
-                                                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                                            {item.assign_hours ? (
-                                                                <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200/70 dark:bg-amber-900/25 dark:text-amber-300 dark:ring-amber-700/30">
-                                                                    ⏱️ {item.assign_hours} hrs
-                                                                </span>
-                                                            ) : null}
-
-                                                            <span
-                                                                className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                                                                    item.is_completed
-                                                                        ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-900/25 dark:text-emerald-300 dark:ring-emerald-700/30"
-                                                                        : item.status === "in_progress"
-                                                                        ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200/70 dark:bg-blue-900/25 dark:text-blue-300 dark:ring-blue-700/30"
-                                                                        : "bg-slate-100 text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
-                                                                }`}
-                                                            >
-                                                                {item.status || (item.is_completed ? "Completed" : "Pending")}
-                                                            </span>
-
-                                                            {item.day_number ? (
-                                                                <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 ring-1 ring-purple-200/70 dark:bg-purple-900/25 dark:text-purple-300 dark:ring-purple-700/30">
-                                                                    Day {item.day_number}
-                                                                </span>
-                                                            ) : null}
-                                                        </div>
-
-                                                        {/* Notes snippet */}
-                                                        {item.notes ? (
-                                                            <p className="mt-2.5 rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-[11px] italic text-slate-600 dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-300">
-                                                                💬 {item.notes}
-                                                            </p>
-                                                        ) : null}
-
-                                                        {/* Images preview thumbnails */}
-                                                        {item.image_url_1 || item.image_url_2 ? (
-                                                            <div className="mt-2.5 flex items-center gap-2">
-                                                                {item.image_url_1 ? (
-                                                                    <img
-                                                                        src={item.image_url_1}
-                                                                        alt="Img 1"
-                                                                        onClick={() => setPreviewImage(item.image_url_1)}
-                                                                        onMouseEnter={(e) => handlePopEnter(e, { scale: 1.08, y: -2 })}
-                                                                        onMouseLeave={handlePopLeave}
-                                                                        className="h-12 w-16 cursor-pointer rounded-lg border border-slate-200 object-cover shadow-sm dark:border-slate-700"
-                                                                    />
+                                                                {item.assign_hours ? (
+                                                                    <span className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 ring-1 ring-amber-200/70 dark:bg-amber-900/25 dark:text-amber-300 dark:ring-amber-700/30">
+                                                                        ⏱️ {item.assign_hours}h
+                                                                    </span>
                                                                 ) : null}
-                                                                {item.image_url_2 ? (
-                                                                    <img
-                                                                        src={item.image_url_2}
-                                                                        alt="Img 2"
-                                                                        onClick={() => setPreviewImage(item.image_url_2)}
-                                                                        onMouseEnter={(e) => handlePopEnter(e, { scale: 1.08, y: -2 })}
-                                                                        onMouseLeave={handlePopLeave}
-                                                                        className="h-12 w-16 cursor-pointer rounded-lg border border-slate-200 object-cover shadow-sm dark:border-slate-700"
-                                                                    />
+
+                                                                <span
+                                                                    className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
+                                                                        item.is_completed
+                                                                            ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-900/25 dark:text-emerald-300 dark:ring-emerald-700/30"
+                                                                            : item.status === "in_progress"
+                                                                            ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200/70 dark:bg-blue-900/25 dark:text-blue-300 dark:ring-blue-700/30"
+                                                                            : "bg-slate-100 text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
+                                                                    }`}
+                                                                >
+                                                                    {item.status || (item.is_completed ? "Completed" : "Pending")}
+                                                                </span>
+
+                                                                {item.day_number ? (
+                                                                    <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[9px] font-semibold text-purple-700 ring-1 ring-purple-200/70 dark:bg-purple-900/25 dark:text-purple-300 dark:ring-purple-700/30">
+                                                                        Day {item.day_number}
+                                                                    </span>
                                                                 ) : null}
                                                             </div>
-                                                        ) : null}
-                                                    </div>
-                                                </label>
 
-                                                {/* Action Buttons */}
-                                                <div className="flex shrink-0 items-center gap-1.5">
-                                                    <button
-                                                        type="button"
-                                                        disabled={!canManage}
-                                                        onClick={() => setEditing({ group, item })}
-                                                        onMouseEnter={(e) => handlePopEnter(e, { scale: 1.07, y: -1 })}
-                                                        onMouseLeave={handlePopLeave}
-                                                        className="rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 disabled:opacity-50 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        disabled={!canManage}
-                                                        onClick={() => runDelete(group, item)}
-                                                        onMouseEnter={(e) => handlePopEnter(e, { scale: 1.07, y: -1 })}
-                                                        onMouseLeave={handlePopLeave}
-                                                        className="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:opacity-50 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50"
-                                                    >
-                                                        Delete
-                                                    </button>
+                                                            {/* Notes snippet */}
+                                                            {item.notes ? (
+                                                                <p className="mt-1.5 rounded border border-slate-100 bg-white px-2 py-1 text-[10px] italic text-slate-600 dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-300">
+                                                                    💬 {item.notes}
+                                                                </p>
+                                                            ) : null}
+
+                                                            {/* Images preview thumbnails */}
+                                                            {item.image_url_1 || item.image_url_2 ? (
+                                                                <div className="mt-1.5 flex items-center gap-1.5">
+                                                                    {item.image_url_1 ? (
+                                                                        <img
+                                                                            src={item.image_url_1}
+                                                                            alt="Img 1"
+                                                                            onClick={() => setPreviewImage(item.image_url_1)}
+                                                                            onMouseEnter={(e) => handlePopEnter(e, { scale: 1.08, y: -2 })}
+                                                                            onMouseLeave={handlePopLeave}
+                                                                            className="h-9 w-12 cursor-pointer rounded border border-slate-200 object-cover shadow-sm dark:border-slate-700"
+                                                                        />
+                                                                    ) : null}
+                                                                    {item.image_url_2 ? (
+                                                                        <img
+                                                                            src={item.image_url_2}
+                                                                            alt="Img 2"
+                                                                            onClick={() => setPreviewImage(item.image_url_2)}
+                                                                            onMouseEnter={(e) => handlePopEnter(e, { scale: 1.08, y: -2 })}
+                                                                            onMouseLeave={handlePopLeave}
+                                                                            className="h-9 w-12 cursor-pointer rounded border border-slate-200 object-cover shadow-sm dark:border-slate-700"
+                                                                        />
+                                                                    ) : null}
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                    </label>
+
+                                                    {/* Action Buttons */}
+                                                    <div className="flex shrink-0 items-center gap-1">
+                                                        <button
+                                                            type="button"
+                                                            disabled={!canManage}
+                                                            onClick={() => setEditing({ group, item })}
+                                                            onMouseEnter={(e) => handlePopEnter(e, { scale: 1.07, y: -1 })}
+                                                            onMouseLeave={handlePopLeave}
+                                                            className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 disabled:opacity-50 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={!canManage}
+                                                            onClick={() => runDelete(group, item)}
+                                                            onMouseEnter={(e) => handlePopEnter(e, { scale: 1.07, y: -1 })}
+                                                            onMouseLeave={handlePopLeave}
+                                                            className="rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:opacity-50 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </section>
-                        );
-                    })}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </section>
+                            );
+                        })}
+                    </div>
+
+                    {/* Load More / Show Less Footer with GSAP Loading Animation */}
+                    {(hasMoreGroups || (typeof limitGroups !== "number" && slicedGroups.length > GROUPS_PER_PAGE)) && (
+                        <div
+                            ref={loaderRef}
+                            className="flex flex-wrap items-center justify-center gap-3 rounded-xl border border-slate-200/80 bg-white/90 px-4 py-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80"
+                        >
+                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Showing <strong className="font-bold text-slate-800 dark:text-slate-200">{slicedGroups.length}</strong> of{" "}
+                                <strong className="font-bold text-slate-800 dark:text-slate-200">{baseGroups.length}</strong> entries
+                            </span>
+
+                            {hasMoreGroups && (
+                                <button
+                                    type="button"
+                                    onClick={handleLoadMore}
+                                    disabled={isLoadingMore}
+                                    onMouseEnter={(e) => handlePopEnter(e, { scale: 1.04, y: -1.5 })}
+                                    onMouseLeave={handlePopLeave}
+                                    className="dcm-load-more-btn inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm shadow-indigo-500/20 transition hover:from-indigo-500 hover:to-violet-500 disabled:cursor-wait disabled:opacity-90"
+                                >
+                                    {isLoadingMore ? (
+                                        <span className="dcm-load-more-loader inline-flex items-center gap-2">
+                                            <svg
+                                                className="dcm-loader-ring h-3.5 w-3.5 text-white"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                            >
+                                                <circle
+                                                    cx="12"
+                                                    cy="12"
+                                                    r="9"
+                                                    stroke="currentColor"
+                                                    strokeOpacity="0.3"
+                                                    strokeWidth="3"
+                                                />
+                                                <path
+                                                    d="M12 3a9 9 0 0 1 9 9"
+                                                    stroke="currentColor"
+                                                    strokeWidth="3"
+                                                    strokeLinecap="round"
+                                                />
+                                            </svg>
+                                            <span>Loading next {Math.min(GROUPS_PER_PAGE, remainingGroups)}</span>
+                                            <span className="inline-flex items-center gap-1">
+                                                <span className="dcm-loader-dot h-1.5 w-1.5 rounded-full bg-white/80" />
+                                                <span className="dcm-loader-dot h-1.5 w-1.5 rounded-full bg-white/80" />
+                                                <span className="dcm-loader-dot h-1.5 w-1.5 rounded-full bg-white/80" />
+                                            </span>
+                                        </span>
+                                    ) : (
+                                        <>
+                                            <span>
+                                                Load More (+{Math.min(GROUPS_PER_PAGE, remainingGroups)} of {remainingGroups} left)
+                                            </span>
+                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </>
+                                    )}
+                                </button>
+                            )}
+
+                            {typeof limitGroups !== "number" && slicedGroups.length > GROUPS_PER_PAGE && !isLoadingMore && (
+                                <button
+                                    type="button"
+                                    onClick={handleShowLess}
+                                    onMouseEnter={(e) => handlePopEnter(e, { scale: 1.04, y: -1 })}
+                                    onMouseLeave={handlePopLeave}
+                                    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                                >
+                                    Show Less
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 
