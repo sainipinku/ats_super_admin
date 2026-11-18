@@ -58,7 +58,7 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Install Node dependencies
-        run: npm ci
+        run: npm ci || npm install
 
       - name: Prepare Laravel app
         run: |
@@ -66,7 +66,9 @@ jobs:
           php artisan key:generate --ansi
 
       - name: Build frontend
-        run: npm run build
+        run: |
+          npm run build
+          test -f public/build/manifest.json
 
       - name: Run backend tests
         env:

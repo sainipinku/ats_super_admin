@@ -13,6 +13,10 @@ export default defineConfig({
         }),
         react(),
     ],
+    build: {
+        outDir: 'public/build',
+        manifest: 'manifest.json',
+    },
     resolve: {
         alias: {
             moment: 'moment',
