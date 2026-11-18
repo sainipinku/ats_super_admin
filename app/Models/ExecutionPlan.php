@@ -44,6 +44,9 @@ class ExecutionPlan extends Model
                 $maxId = (int) (static::max('id') ?? 0) + 1;
                 $plan->plan_code = 'EXP-' . $pid . '-' . str_pad((string) $maxId, 4, '0', STR_PAD_LEFT);
             }
+            if (empty($plan->title)) {
+                $plan->title = 'Default Master Plan';
+            }
         });
     }
 

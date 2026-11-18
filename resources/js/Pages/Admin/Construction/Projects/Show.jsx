@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import gsap from "gsap";
 import { usePage } from "@inertiajs/react";
 import ConstructionShell from "@/Pages/Construction/Components/ConstructionShell";
 import EmptyState from "@/Pages/Construction/Components/EmptyState";
@@ -7,17 +8,12 @@ import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
 import WorkflowTracker from "@/Pages/Construction/Components/WorkflowTracker";
 import DynamicChecklistManager from "@/Pages/Construction/Components/DynamicChecklistManager";
-import SupervisorSingleScreenReview from "@/Pages/Construction/Components/SupervisorSingleScreenReview";
-import DraftingWorkflowPanel from "@/Pages/Construction/Components/DraftingWorkflowPanel";
-import AccountsVerificationPanel from "@/Pages/Construction/Components/AccountsVerificationPanel";
-import SurveySubmissionPanel from "@/Pages/Construction/Components/SurveySubmissionPanel";
-import WorkflowAuditTrail from "@/Pages/Construction/Components/WorkflowAuditTrail";
 import FieldNotesDisplay from "@/Pages/Construction/Components/FieldNotesDisplay";
 import Modal from "@/Components/Modal";
 import ProjectActivityLog from "@/Pages/Construction/Components/ProjectActivityLog";
 import AssignToDraftsmanButton from "@/Pages/Construction/Components/AssignToDraftsmanButton";
 
-export default function ProjectShow({ project, activityLog, workflowSummary }) {
+export default function ProjectShow({ project, activityLog, workflowSummary, companyDraftsmen = [] }) {
     const { auth } = usePage().props;
     const userRole = (auth?.user?.role || "").toLowerCase();
     const activeRole = auth?.active_role;
@@ -50,8 +46,51 @@ export default function ProjectShow({ project, activityLog, workflowSummary }) {
     };
 
     const canManageChecklist = hasPerm("execution.create") || hasPerm("execution.edit");
+    const canAssignDraftsman = isRootSuperAdmin || hasPerm("execution.edit") || hasPerm("execution.manage");
 
-    const [activeWorkflowTab, setActiveWorkflowTab] = useState("supervisor");
+    const projectDraftsmenList = getProjectDraftsmen(project.team_members).map((m) => ({
+        ...m,
+        is_project_member: true,
+    }));
+    const defaultDraftsmanId = projectDraftsmenList[0]?.member_id ? String(projectDraftsmenList[0].member_id) : "";
+    const allAdminDraftsmen = (() => {
+        const map = new Map();
+        projectDraftsmenList.forEach((m) => map.set(String(m.member_id || m.id), m));
+        (Array.isArray(companyDraftsmen) ? companyDraftsmen : []).forEach((m) => {
+            const id = String(m.member_id || m.id || "");
+            if (id && !map.has(id)) {
+                map.set(id, { ...m, is_project_member: Boolean(m.is_project_member) });
+            }
+        });
+        return Array.from(map.values());
+    })();
+
+    const metricsGridRef = useRef(null);
+
+    useEffect(() => {
+        if (!metricsGridRef.current) return;
+
+        const ctx = gsap.context(() => {
+            const cards = metricsGridRef.current.querySelectorAll(".stat-card-item");
+            if (cards.length > 0) {
+                gsap.fromTo(
+                    cards,
+                    { opacity: 0, y: 12, scale: 0.96 },
+                    {
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        duration: 0.34,
+                        stagger: 0.03,
+                        ease: "power2.out",
+                        clearProps: "transform,opacity",
+                    }
+                );
+            }
+        }, metricsGridRef);
+
+        return () => ctx.revert();
+    }, [project.id]);
 
     const checklistCounts = workflowSummary?.checklist_counts ?? { total: 0, completed: 0 };
     const checklistCompletion = checklistCounts.total > 0
@@ -62,113 +101,13 @@ export default function ProjectShow({ project, activityLog, workflowSummary }) {
         <ConstructionShell title={project.name} description={`${project.project_code} • ${project.company?.name || ""}`} variant="admin">
             <WorkflowTracker currentStage={project.current_stage} isLocked={project.is_locked} />
 
-
-
-            {/* Workflow Stage Control Tabs */}
-            {/* <div className="hidden md:block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                        5-Stage Complete Workflow Management
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-semibold">
-                        <button
-                            type="button"
-                            onClick={() => setActiveWorkflowTab("supervisor")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "supervisor"
-                                    ? "bg-indigo-600 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                                }`}
-                        >
-                            Supervisor Single-Screen Review
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveWorkflowTab("survey")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "survey"
-                                    ? "bg-sky-600 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                                }`}
-                        >
-                            Stage 1: Survey
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveWorkflowTab("drafting")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "drafting"
-                                    ? "bg-indigo-600 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                                }`}
-                        >
-                            Stage 2: Drafting
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveWorkflowTab("accounts")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "accounts"
-                                    ? "bg-amber-600 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                                }`}
-                        >
-                            Stage 3: Accounts
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveWorkflowTab("audit")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "audit"
-                                    ? "bg-slate-700 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                                }`}
-                        >
-                            Audit Trail Logs
-                        </button>
-                    </div>
-                </div>
-
-                {activeWorkflowTab === "supervisor" && (
-                    <SupervisorSingleScreenReview
-                        project={project}
-                        submitRoute="admin.construction.projects.workflow.supervisor-review"
-                    />
-                )}
-
-                {activeWorkflowTab === "survey" && (
-                    <SurveySubmissionPanel
-                        project={project}
-                        submitSurveyRoute="admin.construction.projects.workflow.submit-survey"
-                        isSurveyRole={true}
-                    />
-                )}
-
-                {activeWorkflowTab === "drafting" && (
-                    <DraftingWorkflowPanel
-                        project={project}
-                        acceptRoute="admin.construction.projects.workflow.accept-drafting"
-                        submitDraftRoute="admin.construction.projects.workflow.submit-draft"
-                        verifyRoute="admin.construction.projects.workflow.verify-draft"
-                        isDraftRole={true}
-                    />
-                )}
-
-                {activeWorkflowTab === "accounts" && (
-                    <AccountsVerificationPanel
-                        project={project}
-                        submitAccountsRoute="admin.construction.projects.workflow.submit-accounts"
-                        isAccountsRole={true}
-                    />
-                )}
-
-                {activeWorkflowTab === "audit" && (
-                    <WorkflowAuditTrail logs={project.workflow_logs} />
-                )}
-            </div> */}
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-                <StatCard label="Team Members" value={project.team_members?.length || 0} />
-                <StatCard label="Budget Versions" value={project.budgets?.length || 0} />
-                <StatCard label="Survey Plans" value={project.survey_plans?.length || 0} />
-                <StatCard label="Submissions" value={project.survey_submissions?.length || 0} />
-                <StatCard label="Drafting Jobs" value={project.drafting_jobs?.length || 0} />
-                <StatCard label="Approvals" value={project.drawing_approvals?.length || 0} />
+            <div ref={metricsGridRef} className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+                <StatCard compact label="Team Members" value={project.team_members?.length || 0} />
+                <StatCard compact label="Budget Versions" value={project.budgets?.length || 0} />
+                <StatCard compact label="Survey Plans" value={project.survey_plans?.length || 0} />
+                <StatCard compact label="Submissions" value={project.survey_submissions?.length || 0} />
+                <StatCard compact label="Drafting Jobs" value={project.drafting_jobs?.length || 0} />
+                <StatCard compact label="Approvals" value={project.drawing_approvals?.length || 0} />
             </div>
 
             <SectionCard title="Execution Tasks" description="Monitor Surveyor task progress and assign completed Surveyor work to a Draftsman.">
@@ -188,7 +127,8 @@ export default function ProjectShow({ project, activityLog, workflowSummary }) {
                                             projectId={project.id}
                                             taskSource="execution"
                                             routeName="admin.construction.projects.tasks.assign-draftsman"
-                                            draftsmen={getProjectDraftsmen(project.team_members)}
+                                            draftsmen={allAdminDraftsmen}
+                                            defaultDraftsmanId={defaultDraftsmanId}
                                             authorized={canAssignDraftsman}
                                         />
                                     </div>
@@ -367,8 +307,17 @@ export default function ProjectShow({ project, activityLog, workflowSummary }) {
                 </SectionCard>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-2">
-                <SectionCard title="Survey Execution" description="Plan status, submitted GPS/photos/reports, and field activity.">
+            <div className="grid gap-4 xl:grid-cols-2 items-stretch">
+                <SectionCard
+                    title="Survey Execution"
+                    description="Plan status, submitted GPS/photos/reports, and field activity."
+                    className="flex flex-col"
+                    actions={
+                        <span className="inline-flex items-center rounded-full border border-indigo-200/70 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
+                            {project.survey_plans?.length || 0} {(project.survey_plans?.length || 0) === 1 ? "Plan" : "Plans"}
+                        </span>
+                    }
+                >
                     {project.survey_plans?.length ? (
                         <div className="space-y-4">
                             {project.survey_plans.map((plan) => (
@@ -380,7 +329,16 @@ export default function ProjectShow({ project, activityLog, workflowSummary }) {
                     )}
                 </SectionCard>
 
-                <SectionCard title="Survey Submission Queue" description="Submitted field-duty reports pending/approved before drafting.">
+                <SectionCard
+                    title="Survey Submission Queue"
+                    description="Submitted field-duty reports pending/approved before drafting."
+                    className="flex flex-col"
+                    actions={
+                        <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            {project.survey_submissions?.length || 0} {(project.survey_submissions?.length || 0) === 1 ? "Submission" : "Submissions"}
+                        </span>
+                    }
+                >
                     {project.survey_submissions?.length ? (
                         <div className="space-y-3">
                             {project.survey_submissions.map((submission) => (
@@ -426,39 +384,6 @@ export default function ProjectShow({ project, activityLog, workflowSummary }) {
                         <EmptyState title="No survey submissions yet." description="Submitted field-duty reports (from POST /survey-duty/submit-data) appear here with their GPS, photos, remarks, and captured file." />
                     )}
                 </SectionCard>
-
-                <div className="xl:col-span-2">
-                    <SectionCard title="Drafting & Approval" description="Downstream drafting workload and current approval decisions.">
-                        {project.drafting_jobs?.length ? (
-                            <div className="space-y-4">
-                                {project.drafting_jobs.map((job) => (
-                                    <div key={job.id} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <p className="font-semibold text-slate-900 dark:text-white">Drafting Job #{job.id}</p>
-                                                <p className="text-sm text-slate-500">Assigned to {job.assigned_to?.name || "Unassigned"} • Due {formatDate(job.due_date) || "Not set"}</p>
-                                            </div>
-                                            <StatusBadge value={job.status} />
-                                        </div>
-                                        <div className="mt-4 space-y-2">
-                                            {(job.drawing_revisions || []).map((revision) => (
-                                                <div key={revision.id} className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <p className="font-medium text-slate-900 dark:text-white">Revision {revision.revision_no}</p>
-                                                        <StatusBadge value={revision.status} />
-                                                    </div>
-                                                    <p className="mt-1 text-sm text-slate-500">{revision.pdf_document?.original_name || revision.dwg_document?.original_name || "No documents yet"}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <EmptyState title="No drafting jobs yet." description="Approved survey submissions will be moved into drafting next." />
-                        )}
-                    </SectionCard>
-                </div>
             </div>
 
             <DynamicChecklistManager
@@ -712,51 +637,66 @@ function SurveyPlanCard({ plan }) {
     const visits = plan.visits || [];
 
     return (
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-2xs transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900">
+        <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-5 shadow-xs transition-all duration-200 hover:border-indigo-300/80 hover:bg-white hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-500/40">
+            {/* Card Header: Code Badge, Title & Status */}
             <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="inline-flex items-center rounded-lg border border-indigo-200/70 bg-indigo-50 px-2.5 py-1 font-mono text-xs font-bold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
                             {plan.survey_code}
                         </span>
-                        <h4 className="font-bold text-slate-900 dark:text-white">
+                        <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
                             {plan.title}
                         </h4>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                        Planned Date: {formatDate(plan.planned_date) || "No planned date"}
-                        {plan.site_address ? ` • 📍 ${plan.site_address}` : " • No site address recorded."}
-                    </p>
+
+                    {/* Metadata Row: Planned Date & Site Address */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="inline-flex items-center gap-1.5">
+                            <span>📅</span>
+                            <span>Planned Date:</span>
+                            <strong className="font-semibold text-slate-700 dark:text-slate-200">
+                                {formatDate(plan.planned_date) || "Not scheduled"}
+                            </strong>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                            <span>📍</span>
+                            <span className="truncate max-w-md text-slate-600 dark:text-slate-300">
+                                {plan.site_address || "No site address recorded"}
+                            </span>
+                        </span>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="shrink-0 flex items-center gap-2">
                     <StatusBadge value={plan.status_key || plan.status} />
                 </div>
             </div>
 
             {/* Assigned Survey Team Members */}
             {(plan.plan_members || []).length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
+                <div className="mt-4 flex flex-wrap items-center gap-2">
                     {plan.plan_members.map((member) => (
                         <span
                             key={member.id}
-                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-2xs dark:border-slate-700/80 dark:bg-slate-800/90 dark:text-slate-200"
                         >
-                            <span>👤</span>
-                            <span>{member.member?.name || "Unknown"}</span>
-                            <span className="text-slate-400">•</span>
-                            <span className="text-slate-500 dark:text-slate-400">{member.role_in_survey}</span>
+                            <span className="text-[11px]">👤</span>
+                            <span className="font-semibold">{member.member?.name || "Unknown"}</span>
+                            <span className="text-slate-300 dark:text-slate-600">•</span>
+                            <span className="capitalize text-slate-500 dark:text-slate-400">{member.role_in_survey}</span>
                         </span>
                     ))}
                 </div>
             )}
 
             {/* Bottom bar with Visits Summary & View More button */}
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5 dark:border-slate-800">
+                <div className="flex items-center gap-2.5 text-xs text-slate-500 dark:text-slate-400">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-indigo-200/60 bg-indigo-50 text-[11px] font-bold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
                         {visits.length}
                     </span>
-                    <span>
+                    <span className="font-medium">
                         {visits.length === 0
                             ? "No field check-in visits yet"
                             : `${visits.length} field visit${visits.length > 1 ? "s" : ""} recorded`}
@@ -766,16 +706,16 @@ function SurveyPlanCard({ plan }) {
                 <button
                     type="button"
                     onClick={() => setShowModal(true)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 shadow-2xs transition hover:bg-indigo-100 hover:border-indigo-300 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
+                    className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/90 px-4 py-2 text-xs font-semibold text-indigo-700 shadow-xs transition hover:border-indigo-300 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-200 dark:hover:border-indigo-400 dark:hover:bg-indigo-500/25"
                 >
                     <span>👁️</span>
                     <span>View More Details</span>
                     {visits.length > 0 && (
-                        <span className="rounded-full bg-indigo-200/90 px-1.5 py-0.2 text-[10px] font-bold text-indigo-800 dark:bg-indigo-800 dark:text-indigo-200">
+                        <span className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white dark:bg-indigo-500">
                             {visits.length}
                         </span>
                     )}
-                    <span>↗</span>
+                    <span className="text-indigo-500 dark:text-indigo-300">↗</span>
                 </button>
             </div>
 
@@ -812,7 +752,7 @@ function SurveyPlanCard({ plan }) {
                         {/* Modal Body - Scrollable */}
                         <div className="flex-1 space-y-6 overflow-y-auto p-6">
                             {/* Plan Overview Card */}
-                            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-indigo-50/20 p-4.5 shadow-2xs dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
+                            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-indigo-50/20 p-5 shadow-2xs dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
                                 <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                                     Survey Plan Overview
                                 </h4>

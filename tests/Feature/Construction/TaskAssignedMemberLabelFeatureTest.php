@@ -41,7 +41,7 @@ class TaskAssignedMemberLabelFeatureTest extends TestCase
             'Overview block should not use Supervisor label'
         );
         $this->assertMatchesRegularExpression(
-            '/<p[^>]*>Assigned Member<\/p>\s*<p[^>]*>\{task\.supervisor\?\.name/',
+            '/<p[^>]*>Assigned Member<\/p>\s*<p[^>]*>\s*\{task\.supervisor\?\.name/',
             $content,
             'Overview block should use Assigned Member label'
         );

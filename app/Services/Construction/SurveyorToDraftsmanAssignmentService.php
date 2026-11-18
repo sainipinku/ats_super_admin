@@ -2,6 +2,9 @@
 
 namespace App\Services\Construction;
 
+use App\Models\Company;
+use App\Models\ConstructionRole;
+use App\Models\Designation;
 use App\Models\ExecutionTask;
 use App\Models\ExecutionTaskAssignee;
 use App\Models\DraftingJob;
@@ -10,6 +13,7 @@ use App\Models\MemberRoleAssignment;
 use App\Models\Project;
 use App\Models\ProjectTeamMember;
 use App\Models\Role;
+use App\Models\SuperAdmin;
 use App\Models\SurveySubmission;
 use App\Models\SurveyVisit;
 use App\Models\Task;
@@ -53,7 +57,7 @@ class SurveyorToDraftsmanAssignmentService
                 ]);
             }
 
-            if (strtolower((string) $task->status) !== 'completed') {
+            if (!$this->isReadyForDraftsmanAssignment($task)) {
                 throw ValidationException::withMessages([
                     'task_id' => ['A Surveyor task must be completed before it can be assigned to a Draftsman.'],
                 ]);
@@ -72,6 +76,8 @@ class SurveyorToDraftsmanAssignmentService
                 ]);
             }
 
+            $this->ensureDraftsmanOnProjectTeam($project, $draftsman, $actor);
+
             if ($task instanceof ExecutionTask) {
                 $this->assignExecutionTask($task, $draftsman, $dueDate, $actor, $project, $request);
             } else {
@@ -80,6 +86,13 @@ class SurveyorToDraftsmanAssignmentService
 
             return $task->refresh();
         });
+    }
+
+    private function isReadyForDraftsmanAssignment(ExecutionTask|Task $task): bool
+    {
+        $status = strtolower(trim((string) $task->status));
+
+        return in_array($status, ['completed', 'survey_approved', 'review'], true);
     }
 
     private function hasSurveyorAssignment(ExecutionTask|Task $task, Project $project): bool
@@ -97,8 +110,15 @@ class SurveyorToDraftsmanAssignmentService
                 }
             }
 
-            return $task->supervisor_member_id
-                && $this->memberHasRole($project, (int) $task->supervisor_member_id, self::SURVEYOR_ROLE_SLUGS);
+            if ($task->supervisor_member_id
+                && $this->memberHasRole($project, (int) $task->supervisor_member_id, self::SURVEYOR_ROLE_SLUGS)) {
+                return true;
+            }
+
+            return SurveyVisit::query()
+                ->where('project_id', $project->id)
+                ->where('execution_task_id', $task->id)
+                ->exists();
         }
 
         foreach ($task->activeAssignments()->with('assignee')->get() as $assignment) {
@@ -108,8 +128,15 @@ class SurveyorToDraftsmanAssignmentService
             }
         }
 
-        return $task->assigned_supervisor_member_id
-            && $this->memberHasRole($project, (int) $task->assigned_supervisor_member_id, self::SURVEYOR_ROLE_SLUGS);
+        if ($task->assigned_supervisor_member_id
+            && $this->memberHasRole($project, (int) $task->assigned_supervisor_member_id, self::SURVEYOR_ROLE_SLUGS)) {
+            return true;
+        }
+
+        return SurveyVisit::query()
+            ->where('project_id', $project->id)
+            ->where('task_id', $task->id)
+            ->exists();
     }
 
     private function assignExecutionTask(
@@ -368,7 +395,15 @@ class SurveyorToDraftsmanAssignmentService
             ->exists();
 
         if (!$activeTeamMember && !$hasProjectRoleAssignment) {
-            return false;
+            if (isset($member->status)) {
+                $statusStr = strtolower(trim((string) $member->status));
+                if ($statusStr === 'inactive' || $statusStr === 'disabled' || $statusStr === '2') {
+                    return false;
+                }
+            }
+            if (!$this->memberBelongsToProjectCompany($project, $member)) {
+                return false;
+            }
         }
 
         $teamRole = ProjectTeamMember::query()
@@ -382,17 +417,165 @@ class SurveyorToDraftsmanAssignmentService
             return true;
         }
 
-        return MemberRoleAssignment::query()
+        $assignedRole = MemberRoleAssignment::query()
             ->where('member_id', $member->id)
             ->where('status', 1)
-            ->where(function ($query) use ($project, $activeTeamMember) {
-                $query->where('project_id', $project->id);
-                if ($activeTeamMember) {
-                    $query->orWhereNull('project_id');
-                }
+            ->where(function ($query) use ($project) {
+                $query->where('project_id', $project->id)
+                    ->orWhereNull('project_id');
             })
-            ->whereHas('role', fn ($query) => $query->whereIn('slug', self::DRAFTSMAN_ROLE_SLUGS))
+            ->whereHas('role', function ($query) {
+                $query->whereIn('slug', self::DRAFTSMAN_ROLE_SLUGS)
+                    ->orWhere('slug', 'like', '%draft%');
+            })
             ->exists();
+
+        if ($assignedRole) {
+            return true;
+        }
+
+        return $this->memberHasDraftsmanRole($member);
+    }
+
+    private function memberBelongsToProjectCompany(Project $project, Member $member): bool
+    {
+        $company = $project->company ?: ($project->company_id ? Company::find($project->company_id) : null);
+        $companyNames = [];
+        if ($company) {
+            if (!empty($company->name)) {
+                $companyNames[] = strtolower(trim((string) $company->name));
+            }
+            if (!empty($company->legal_name)) {
+                $companyNames[] = strtolower(trim((string) $company->legal_name));
+            }
+        }
+        $companyNames = array_values(array_unique(array_filter($companyNames)));
+
+        $memberCompany = strtolower(trim((string) ($member->company_name ?? '')));
+        if ($memberCompany !== '' && !empty($companyNames)) {
+            return in_array($memberCompany, $companyNames, true);
+        }
+
+        if ($project->company_id) {
+            $companySuperAdminIds = SuperAdmin::query()
+                ->where('company_id', $project->company_id)
+                ->pluck('id')
+                ->all();
+
+            if (!empty($companySuperAdminIds) && in_array((int) $member->created_by, array_map('intval', $companySuperAdminIds), true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function memberHasDraftsmanRole(Member $member): bool
+    {
+        $draftRoleIds = Role::query()
+            ->where(function ($q) {
+                $q->whereIn('slug', self::DRAFTSMAN_ROLE_SLUGS)
+                    ->orWhere('slug', 'like', '%draft%');
+            })
+            ->pluck('id')
+            ->all();
+
+        $draftConstructionRoleIds = ConstructionRole::query()
+            ->where(function ($q) {
+                $q->whereIn('slug', self::DRAFTSMAN_ROLE_SLUGS)
+                    ->orWhere('slug', 'like', '%draft%');
+            })
+            ->pluck('id')
+            ->all();
+
+        $allDraftRoleIds = array_values(array_unique(array_merge($draftRoleIds, $draftConstructionRoleIds)));
+
+        $storedRoles = $member->getRawOriginal('roles');
+        $storedRoles = is_array($storedRoles) ? $storedRoles : (json_decode((string) $storedRoles, true) ?: []);
+        foreach ($storedRoles as $roleVal) {
+            if (is_numeric($roleVal) && in_array((int) $roleVal, $allDraftRoleIds, true)) {
+                return true;
+            }
+            if (is_string($roleVal)) {
+                $norm = strtolower(str_replace(['-', ' '], '_', trim($roleVal)));
+                if (in_array($norm, self::DRAFTSMAN_ROLE_SLUGS, true) || str_contains($norm, 'draft')) {
+                    return true;
+                }
+            }
+        }
+
+        if (Member::query()
+            ->whereKey($member->id)
+            ->whereHas('roles', fn ($q) => $q->whereIn('slug', self::DRAFTSMAN_ROLE_SLUGS)->orWhere('slug', 'like', '%draft%'))
+            ->exists()) {
+            return true;
+        }
+
+        // Check member designation (string or array of IDs/strings)
+        $desig = $member->designation;
+        if (is_string($desig) && stripos($desig, 'draft') !== false) {
+            return true;
+        }
+        if (is_array($desig) && !empty($desig)) {
+            $numericIds = array_values(array_filter($desig, 'is_numeric'));
+            if (!empty($numericIds)) {
+                if (Designation::whereIn('id', $numericIds)->where('name', 'like', '%draft%')->exists()) {
+                    return true;
+                }
+            }
+            foreach ($desig as $item) {
+                if (is_string($item) && stripos($item, 'draft') !== false) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function ensureDraftsmanOnProjectTeam(Project $project, Member $draftsman, Model $actor): void
+    {
+        $existing = ProjectTeamMember::query()
+            ->where('project_id', $project->id)
+            ->where('member_id', $draftsman->id)
+            ->first();
+
+        if ($existing) {
+            if ($existing->status !== 'active') {
+                $existing->update(['status' => 'active']);
+            }
+            return;
+        }
+
+        $draftRole = ConstructionRole::query()
+            ->whereIn('slug', self::DRAFTSMAN_ROLE_SLUGS)
+            ->where(function ($q) use ($project) {
+                $q->where('company_id', $project->company_id)
+                    ->orWhereNull('company_id');
+            })
+            ->orderByRaw('CASE WHEN company_id IS NOT NULL THEN 0 ELSE 1 END')
+            ->first();
+
+        if (!$draftRole) {
+            $draftRole = ConstructionRole::create([
+                'company_id' => $project->company_id,
+                'name' => 'Draft Person',
+                'slug' => 'draft_person',
+                'description' => 'Drafting and CAD revisions',
+                'is_system_role' => true,
+                'status' => 'active',
+            ]);
+        }
+
+        ProjectTeamMember::create([
+            'project_id' => $project->id,
+            'member_id' => $draftsman->id,
+            'role_id' => $draftRole->id,
+            'assignment_scope' => 'Draft Person',
+            'assigned_by_type' => $actor::class,
+            'assigned_by_id' => $actor->getKey(),
+            'status' => 'active',
+        ]);
     }
 
     private function memberHasRole(Project $project, int $memberId, array $slugs): bool

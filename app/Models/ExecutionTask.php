@@ -45,6 +45,23 @@ class ExecutionTask extends Model
         'requires_gps_verification' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (ExecutionTask $task) {
+            if (empty($task->execution_plan_id) && !empty($task->project_id)) {
+                $plan = ExecutionPlan::firstOrCreate(
+                    ['project_id' => $task->project_id],
+                    [
+                        'title' => 'Default Master Plan',
+                        'plan_code' => 'EXP-' . $task->project_id . '-1',
+                        'status' => 'draft',
+                    ]
+                );
+                $task->execution_plan_id = $plan->id;
+            }
+        });
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);

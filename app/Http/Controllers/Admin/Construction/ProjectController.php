@@ -113,8 +113,11 @@ class ProjectController extends Controller
             'accountsProofDocument',
         ]);
 
+        $companyDraftsmen = $this->resolveCompanyDraftsmen($project);
+
         return Inertia::render('Admin/Construction/Projects/Show', [
             'project' => $project,
+            'companyDraftsmen' => $companyDraftsmen,
             'activityLog' => ConstructionActivityLog::with('actor')
                 ->where('project_id', $project->id)
                 ->latest('created_at')
@@ -1094,5 +1097,121 @@ class ProjectController extends Controller
             ($taskProjectId !== null && (int) $taskProjectId !== (int) $project->id)
             || ($planProjectId !== null && (int) $planProjectId !== (int) $project->id)
         );
+    }
+
+    private function resolveCompanyDraftsmen(Project $project): array
+    {
+        $company = $project->company ?: ($project->company_id ? \App\Models\Company::find($project->company_id) : null);
+        $companyNames = array_values(array_unique(array_filter([
+            $company?->name ? trim($company->name) : null,
+            $company?->legal_name ? trim($company->legal_name) : null,
+        ])));
+
+        $companySuperAdminIds = $project->company_id
+            ? \App\Models\SuperAdmin::where('company_id', $project->company_id)->pluck('id')->all()
+            : [];
+
+        $projectMemberIds = ProjectTeamMember::where('project_id', $project->id)
+            ->where('status', 'active')
+            ->pluck('member_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $draftRoleIds = \App\Models\Role::whereIn('slug', ['draft_person', 'draftsman', 'drafter', 'draft_man'])
+            ->orWhere('slug', 'like', '%draft%')
+            ->pluck('id')
+            ->all();
+
+        $draftConstructionRoleIds = \App\Models\ConstructionRole::whereIn('slug', ['draft_person', 'draftsman', 'drafter', 'draft_man'])
+            ->orWhere('slug', 'like', '%draft%')
+            ->pluck('id')
+            ->all();
+
+        $allDraftRoleIds = array_values(array_unique(array_merge($draftRoleIds, $draftConstructionRoleIds)));
+
+        $draftAssignedMemberIds = \App\Models\MemberRoleAssignment::where('status', 1)
+            ->whereHas('role', fn ($q) => $q->whereIn('slug', ['draft_person', 'draftsman', 'drafter', 'draft_man'])->orWhere('slug', 'like', '%draft%'))
+            ->pluck('member_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $projectDraftMemberIds = ProjectTeamMember::where('project_id', $project->id)
+            ->where('status', 'active')
+            ->whereHas('role', fn ($q) => $q->whereIn('slug', ['draft_person', 'draftsman', 'drafter', 'draft_man'])->orWhere('slug', 'like', '%draft%'))
+            ->pluck('member_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $candidates = Member::query()
+            ->where('status', 1)
+            ->where(function ($q) use ($companyNames, $companySuperAdminIds, $projectMemberIds) {
+                $hasClause = false;
+                if (!empty($companyNames)) {
+                    $q->whereIn('company_name', $companyNames);
+                    $hasClause = true;
+                }
+                if (!empty($companySuperAdminIds)) {
+                    $hasClause
+                        ? $q->orWhereIn('created_by', $companySuperAdminIds)
+                        : $q->whereIn('created_by', $companySuperAdminIds);
+                    $hasClause = true;
+                }
+                if (!empty($projectMemberIds)) {
+                    $hasClause
+                        ? $q->orWhereIn('id', $projectMemberIds)
+                        : $q->whereIn('id', $projectMemberIds);
+                    $hasClause = true;
+                }
+                if (!$hasClause) {
+                    $q->whereRaw('1 = 0');
+                }
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'roles', 'designation', 'company_name']);
+
+        $draftDesignationIds = \App\Models\Designation::where('name', 'like', '%draft%')->pluck('id')->all();
+
+        return $candidates
+            ->filter(function ($member) use ($draftAssignedMemberIds, $projectDraftMemberIds, $allDraftRoleIds, $draftDesignationIds) {
+                if (in_array((int) $member->id, $projectDraftMemberIds, true) || in_array((int) $member->id, $draftAssignedMemberIds, true)) {
+                    return true;
+                }
+                $roles = is_array($member->roles) ? $member->roles : (json_decode((string) $member->getRawOriginal('roles'), true) ?: []);
+                foreach ($roles as $r) {
+                    if (is_numeric($r) && in_array((int) $r, $allDraftRoleIds, true)) {
+                        return true;
+                    }
+                    if (is_string($r) && stripos($r, 'draft') !== false) {
+                        return true;
+                    }
+                }
+                $desig = $member->designation;
+                if (is_string($desig) && stripos($desig, 'draft') !== false) {
+                    return true;
+                }
+                if (is_array($desig)) {
+                    foreach ($desig as $d) {
+                        if ((is_numeric($d) && in_array((int) $d, $draftDesignationIds, true)) || (is_string($d) && stripos($d, 'draft') !== false)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            })
+            ->map(function ($member) use ($projectDraftMemberIds, $projectMemberIds) {
+                $isOnProject = in_array((int) $member->id, $projectDraftMemberIds, true) || in_array((int) $member->id, $projectMemberIds, true);
+                return [
+                    'id' => $member->id,
+                    'member_id' => $member->id,
+                    'name' => $member->name,
+                    'email' => $member->email ?? '',
+                    'role_name' => 'Draft Person',
+                    'is_draft_person' => true,
+                    'is_project_member' => $isOnProject,
+                ];
+            })
+            ->sortByDesc('is_project_member')
+            ->values()
+            ->all();
     }
 }

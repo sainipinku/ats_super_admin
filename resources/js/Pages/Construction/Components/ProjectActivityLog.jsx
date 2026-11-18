@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import gsap from "gsap";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
 import EmptyState from "@/Pages/Construction/Components/EmptyState";
+import Modal from "@/Components/Modal";
 import {
     Activity,
     CheckCircle2,
@@ -23,7 +25,14 @@ import {
     UserCheck,
     Coins,
     MapPin,
-    PenTool
+    PenTool,
+    Info,
+    ExternalLink,
+    Zap,
+    UserMinus,
+    ArrowRightLeft,
+    RefreshCw,
+    Eye
 } from "lucide-react";
 
 const MODULE_DEFINITIONS = {
@@ -116,6 +125,15 @@ function getModuleMeta(rawModule) {
     };
 }
 
+function isActivityRecent(dateString) {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return false;
+    const now = new Date();
+    const diffHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+    return diffHours >= 0 && diffHours <= 24;
+}
+
 function getRelativeTime(dateString) {
     if (!dateString) return "-";
     const date = new Date(dateString);
@@ -172,12 +190,18 @@ function getActionNarrative(item) {
         if (action === "updated") {
             return `Updated checklist item ${itemTitle} ${dayInfo ? `(${dayInfo})` : ""}`.trim();
         }
+        if (action === "deleted") {
+            return `Deleted checklist item ${itemTitle}`.trim();
+        }
     }
 
     if (module === "execution_task" || module === "task") {
         const taskTitle = meta.task_title || meta.title ? `"${meta.task_title || meta.title}"` : "";
         if (action === "task_transferred" || action === "transferred") {
             return `Task transferred to new assignee ${taskTitle}`.trim();
+        }
+        if (action === "unassigned" || action === "task_unassigned") {
+            return `Task unassigned from team member ${taskTitle}`.trim();
         }
         if (action === "status_changed") {
             return `Status changed ${meta.from ? `from ${meta.from}` : ""} ${meta.to ? `to ${meta.to}` : ""}`.trim();
@@ -214,7 +238,6 @@ function getActionNarrative(item) {
     if (meta.from && meta.to) return `Status transition: ${meta.from} → ${meta.to}`;
     if (meta.notes) return meta.notes;
 
-    // Fallback based on action
     const readableAction = (item.action || "Activity recorded")
         .replace(/[_-]+/g, " ")
         .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -246,10 +269,74 @@ function getInitials(name = "System") {
     return name.slice(0, 2).toUpperCase();
 }
 
+function renderActionPill(action) {
+    const act = String(action || "").toLowerCase().replace(/[\s-]+/g, "_");
+
+    if (act.includes("transfer")) {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-200/80 bg-purple-50/90 px-2.5 py-0.5 text-[11px] font-semibold text-purple-700 shadow-2xs dark:border-purple-800/80 dark:bg-purple-950/60 dark:text-purple-300">
+                <ArrowRightLeft className="h-3 w-3 text-purple-500" />
+                <span>Task Transferred</span>
+            </span>
+        );
+    }
+
+    if (act.includes("unassign") || act.includes("removed") || act.includes("revoked")) {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-200/80 bg-rose-50/90 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 shadow-2xs dark:border-rose-800/80 dark:bg-rose-950/60 dark:text-rose-300">
+                <UserMinus className="h-3 w-3 text-rose-500" />
+                <span>{act.includes("unassign") ? "Task Unassigned" : "Member Removed"}</span>
+            </span>
+        );
+    }
+
+    if (act.includes("completed") || act.includes("approved")) {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 shadow-2xs dark:border-emerald-800/80 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                <span>Completed</span>
+            </span>
+        );
+    }
+
+    if (act.includes("create") || act.includes("added")) {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200/80 bg-sky-50/90 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 shadow-2xs dark:border-sky-800/80 dark:bg-sky-950/60 dark:text-sky-300">
+                <Sparkles className="h-3 w-3 text-sky-500" />
+                <span>Created</span>
+            </span>
+        );
+    }
+
+    if (act.includes("delete")) {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-200/80 bg-rose-50/90 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 shadow-2xs dark:border-rose-800/80 dark:bg-rose-950/60 dark:text-rose-300">
+                <AlertCircle className="h-3 w-3 text-rose-500" />
+                <span>Deleted</span>
+            </span>
+        );
+    }
+
+    if (act.includes("update") || act.includes("changed")) {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200/80 bg-indigo-50/90 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700 shadow-2xs dark:border-indigo-800/80 dark:bg-indigo-950/60 dark:text-indigo-300">
+                <RefreshCw className="h-3 w-3 text-indigo-500" />
+                <span>Updated</span>
+            </span>
+        );
+    }
+
+    return <StatusBadge value={action} />;
+}
+
 export default function ProjectActivityLog({ activityLog = [], className = "" }) {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("all");
-    const [viewMode, setViewMode] = useState("grid"); // "grid" | "timeline"
+    const [viewMode, setViewMode] = useState("list"); // "list" | "grid" | "timeline"
+    const [selectedActivity, setSelectedActivity] = useState(null);
+    const [showRawJson, setShowRawJson] = useState(false);
+
+    const cardsContainerRef = useRef(null);
 
     // Derive category counts
     const categoryCounts = useMemo(() => {
@@ -313,16 +400,66 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
         });
     }, [activityLog, selectedCategory, searchQuery]);
 
+    // GSAP Entrance and Stagger Animations
+    useEffect(() => {
+        if (!cardsContainerRef.current) return;
+
+        const ctx = gsap.context(() => {
+            const cards = cardsContainerRef.current?.querySelectorAll(".activity-log-card");
+            if (cards && cards.length > 0) {
+                gsap.fromTo(
+                    cards,
+                    {
+                        opacity: 0,
+                        y: 18,
+                        scale: 0.97,
+                    },
+                    {
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        duration: 0.42,
+                        stagger: 0.04,
+                        ease: "power2.out",
+                        clearProps: "transform,opacity",
+                    }
+                );
+            }
+        }, cardsContainerRef);
+
+        return () => ctx.revert();
+    }, [filteredLogs, viewMode, selectedCategory]);
+
+    const handleCardMouseEnter = (e) => {
+        const card = e.currentTarget;
+        gsap.to(card, {
+            y: -3,
+            duration: 0.22,
+            ease: "power1.out",
+            overwrite: "auto",
+        });
+    };
+
+    const handleCardMouseLeave = (e) => {
+        const card = e.currentTarget;
+        gsap.to(card, {
+            y: 0,
+            duration: 0.22,
+            ease: "power1.out",
+            overwrite: "auto",
+        });
+    };
+
     if (!activityLog || activityLog.length === 0) {
         return (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-950">
                 <div className="flex items-center gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
                         <Activity className="h-5 w-5" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Activity Log</h2>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white">Activity Log</h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                             Every major action in the project workflow should show up here.
                         </p>
                     </div>
@@ -338,23 +475,36 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
     }
 
     return (
-        <section className={`rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950 ${className}`.trim()}>
-            {/* Header with Title, Search, and View Controls */}
+        <section className={`rounded-3xl border border-slate-200/90 bg-white/90 p-5 backdrop-blur-xs sm:p-6 shadow-sm dark:border-slate-800/80 dark:bg-slate-950/90 ${className}`.trim()}>
+            {/* Header with Title, Live Blinking Badge, Search, and View Controls */}
             <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 dark:border-slate-800/80 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-md shadow-indigo-500/20">
-                        <Activity className="h-5 w-5" />
+                <div className="flex items-start gap-3.5">
+                    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-700 text-white shadow-md shadow-indigo-500/20">
+                        <Activity className="h-6 w-6" />
+                        <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex h-3 w-3 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-950"></span>
+                        </span>
                     </div>
                     <div>
-                        <div className="flex items-center gap-2.5">
-                            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
                                 Activity Log
                             </h2>
                             <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-600/10 dark:bg-indigo-950/50 dark:text-indigo-300 dark:ring-indigo-400/20">
                                 {activityLog.length} events
                             </span>
+
+                            {/* Blinking Live Indicator */}
+                            <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                                </span>
+                                <span>LIVE</span>
+                            </div>
                         </div>
-                        <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                             Every major action in the project workflow should show up here.
                         </p>
                     </div>
@@ -386,8 +536,21 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                     <div className="flex items-center rounded-xl border border-slate-200 bg-slate-100/70 p-1 dark:border-slate-800 dark:bg-slate-900">
                         <button
                             type="button"
+                            onClick={() => setViewMode("list")}
+                            title="List View (One item per row)"
+                            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                                viewMode === "list"
+                                    ? "bg-white text-slate-900 shadow-xs dark:bg-slate-800 dark:text-white"
+                                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                            }`}
+                        >
+                            <List className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">List</span>
+                        </button>
+                        <button
+                            type="button"
                             onClick={() => setViewMode("grid")}
-                            title="Grid View"
+                            title="Grid View (2 columns)"
                             className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
                                 viewMode === "grid"
                                     ? "bg-white text-slate-900 shadow-xs dark:bg-slate-800 dark:text-white"
@@ -407,7 +570,7 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                     : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                             }`}
                         >
-                            <List className="h-3.5 w-3.5" />
+                            <Clock className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Timeline</span>
                         </button>
                     </div>
@@ -426,13 +589,13 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                 onClick={() => setSelectedCategory(cat.id)}
                                 className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
                                     isActive
-                                        ? "bg-indigo-600 text-white shadow-xs dark:bg-indigo-600"
+                                        ? "bg-indigo-600 text-white shadow-xs shadow-indigo-600/20 dark:bg-indigo-600"
                                         : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                                 }`}
                             >
                                 <span>{cat.label}</span>
                                 <span
-                                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                                         isActive
                                             ? "bg-white/20 text-white"
                                             : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
@@ -446,8 +609,8 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                 </div>
             )}
 
-            {/* Content Area */}
-            <div className="mt-4">
+            {/* Content Area with GSAP Targeting Container */}
+            <div ref={cardsContainerRef} className="mt-4">
                 {filteredLogs.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 py-12 text-center dark:border-slate-800">
                         <Activity className="mx-auto h-8 w-8 text-slate-400" />
@@ -472,9 +635,152 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                             </button>
                         )}
                     </div>
+                ) : viewMode === "list" ? (
+                    /* Single-Line Listing Layout (One item per row) with GSAP staggered cards */
+                    <div className="max-h-[640px] overflow-y-auto pr-1.5 scrollbar-thin space-y-2.5">
+                        {filteredLogs.map((item) => {
+                            const modMeta = getModuleMeta(item.module);
+                            const ModuleIcon = modMeta.icon;
+                            const actorName = item.actor?.name || item.actor?.email || "System";
+                            const actorPhoto = item.actor?.profile_photo_url || item.actor?.profile_image;
+                            const narrative = getActionNarrative(item);
+                            const meta = item.meta || {};
+                            const isRecent = isActivityRecent(item.created_at);
+
+                            return (
+                                <div
+                                    key={item.id}
+                                    onMouseEnter={handleCardMouseEnter}
+                                    onMouseLeave={handleCardMouseLeave}
+                                    onClick={() => setSelectedActivity(item)}
+                                    className="activity-log-card group relative flex flex-col gap-3 rounded-2xl border border-slate-200/90 bg-white/95 p-3.5 sm:px-5 sm:py-3.5 shadow-2xs transition-all duration-200 hover:border-indigo-400/80 hover:bg-white hover:shadow-md hover:shadow-indigo-500/5 dark:border-slate-800/90 dark:bg-slate-900/80 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900 cursor-pointer lg:flex-row lg:items-center lg:justify-between"
+                                >
+                                    {/* Left & Center: Badges, Actor, Narrative, and Chips */}
+                                    <div className="flex flex-1 flex-col gap-2 min-w-0 sm:flex-row sm:items-center sm:gap-4">
+                                        {/* Actor Avatar */}
+                                        <div className="flex items-center gap-2.5 shrink-0">
+                                            {actorPhoto ? (
+                                                <img
+                                                    src={actorPhoto}
+                                                    alt={actorName}
+                                                    className="h-8 w-8 rounded-full object-cover ring-2 ring-slate-100 dark:ring-slate-800"
+                                                />
+                                            ) : (
+                                                <div
+                                                    className={`flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br text-[11px] font-bold shadow-2xs ring-2 ring-slate-100 dark:ring-slate-800 ${getAvatarColor(
+                                                        actorName
+                                                    )}`}
+                                                >
+                                                    {getInitials(actorName)}
+                                                </div>
+                                            )}
+                                            <div className="block sm:hidden font-semibold text-xs text-slate-800 dark:text-slate-200 truncate">
+                                                {actorName}
+                                            </div>
+                                        </div>
+
+                                        {/* Event Details: Module Pill + Action Pill + Narrative Text */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span
+                                                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-xs font-semibold ${modMeta.colorClass}`}
+                                                >
+                                                    <ModuleIcon className="h-3 w-3 shrink-0" />
+                                                    <span>{modMeta.label}</span>
+                                                </span>
+
+                                                {isRecent && (
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                                        <span className="relative flex h-1.5 w-1.5">
+                                                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                                        </span>
+                                                        LIVE
+                                                    </span>
+                                                )}
+
+                                                <div>{renderActionPill(item.action)}</div>
+
+                                                <div className="hidden sm:inline-block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                                    • <span className="text-slate-500 font-normal">by</span> {actorName}
+                                                </div>
+                                            </div>
+
+                                            {/* Narrative & Context Meta */}
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                                <p className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                    {narrative}
+                                                </p>
+
+                                                {/* Meta Chips */}
+                                                {(meta.day_number || meta.project_code || meta.from || meta.scope || meta.task_code) && (
+                                                    <div className="inline-flex flex-wrap items-center gap-1.5">
+                                                        {meta.day_number && (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                                <Calendar className="h-2.5 w-2.5 text-slate-400" />
+                                                                Day {meta.day_number}
+                                                            </span>
+                                                        )}
+                                                        {(meta.project_code || meta.project_id) && (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                                                <Tag className="h-2.5 w-2.5 text-indigo-400" />
+                                                                {meta.project_code || `PRJ-${meta.project_id}`}
+                                                            </span>
+                                                        )}
+                                                        {meta.task_code && (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                                                                <ListTodo className="h-2.5 w-2.5 text-blue-400" />
+                                                                {meta.task_code}
+                                                            </span>
+                                                        )}
+                                                        {meta.scope && (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                                Scope: {meta.scope}
+                                                            </span>
+                                                        )}
+                                                        {meta.from && meta.to && (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                                <ArrowLeftRight className="h-2.5 w-2.5 text-slate-400" />
+                                                                {meta.from} → {meta.to}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right: Timestamp and View Icon Button */}
+                                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-slate-100 sm:border-0 dark:border-slate-800/80 shrink-0">
+                                        <div
+                                            className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400"
+                                            title={formatFullDate(item.created_at)}
+                                        >
+                                            <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                            <span>{getRelativeTime(item.created_at)}</span>
+                                        </div>
+
+                                        {/* Dedicated View Details Icon Button */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedActivity(item);
+                                            }}
+                                            title="View Activity Details"
+                                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition-all hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600 hover:shadow-xs group-hover:border-indigo-200 dark:border-slate-800 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:border-indigo-600 dark:hover:bg-indigo-950/80 dark:hover:text-indigo-300"
+                                        >
+                                            <Eye className="h-3.5 w-3.5 text-slate-500 group-hover:text-indigo-600 dark:text-slate-400 dark:group-hover:text-indigo-300" />
+                                            <span>View Details</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 ) : viewMode === "grid" ? (
-                    /* Responsive 2-Column Grid Layout */
-                    <div className="max-h-[620px] overflow-y-auto pr-1.5 scrollbar-thin">
+                    /* Responsive 2-Column Grid Layout with GSAP staggered cards */
+                    <div className="max-h-[640px] overflow-y-auto pr-1.5 scrollbar-thin">
                         <div className="grid gap-3.5 sm:grid-cols-1 md:grid-cols-2">
                             {filteredLogs.map((item) => {
                                 const modMeta = getModuleMeta(item.module);
@@ -483,51 +789,75 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                 const actorPhoto = item.actor?.profile_photo_url || item.actor?.profile_image;
                                 const narrative = getActionNarrative(item);
                                 const meta = item.meta || {};
+                                const isRecent = isActivityRecent(item.created_at);
 
                                 return (
                                     <div
                                         key={item.id}
-                                        className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-slate-50/60 p-4 transition-all duration-200 hover:border-slate-300 hover:bg-white hover:shadow-md dark:border-slate-800/80 dark:bg-slate-900/60 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+                                        onMouseEnter={handleCardMouseEnter}
+                                        onMouseLeave={handleCardMouseLeave}
+                                        onClick={() => setSelectedActivity(item)}
+                                        className="activity-log-card group relative flex cursor-pointer flex-col justify-between rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-2xs transition-all duration-200 hover:border-indigo-300/80 hover:bg-white hover:shadow-md hover:shadow-indigo-500/5 dark:border-slate-800/80 dark:bg-slate-900/70 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900"
                                     >
                                         <div>
-                                            {/* Top Row: Module Badge + Action Badge */}
+                                            {/* Top Row: Module Badge + Live Ping + Action Pill */}
                                             <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <span
-                                                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold ${modMeta.colorClass}`}
-                                                >
-                                                    <ModuleIcon className="h-3.5 w-3.5 shrink-0" />
-                                                    <span>{modMeta.label}</span>
-                                                </span>
-                                                <StatusBadge value={item.action} />
+                                                <div className="flex items-center gap-2">
+                                                    <span
+                                                        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold ${modMeta.colorClass}`}
+                                                    >
+                                                        <ModuleIcon className="h-3.5 w-3.5 shrink-0" />
+                                                        <span>{modMeta.label}</span>
+                                                    </span>
+
+                                                    {/* Blinking Live dot for Recent event */}
+                                                    {isRecent && (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                                            <span className="relative flex h-1.5 w-1.5">
+                                                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                                                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                                            </span>
+                                                            LIVE
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <div>{renderActionPill(item.action)}</div>
                                             </div>
 
                                             {/* Narrative Description */}
-                                            <p className="mt-3 text-sm font-medium text-slate-800 dark:text-slate-100">
+                                            <p className="mt-3 text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">
                                                 {narrative}
                                             </p>
 
                                             {/* Metadata chips if present */}
-                                            {(meta.day_number || meta.project_code || meta.from || meta.scope) && (
+                                            {(meta.day_number || meta.project_code || meta.from || meta.scope || meta.task_code) && (
                                                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                                                     {meta.day_number && (
-                                                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-200/70 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                                                             <Calendar className="h-3 w-3 text-slate-400" />
                                                             Day {meta.day_number}
                                                         </span>
                                                     )}
-                                                    {meta.project_code && (
-                                                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-200/70 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                                            <Tag className="h-3 w-3 text-slate-400" />
-                                                            {meta.project_code}
+                                                    {(meta.project_code || meta.project_id) && (
+                                                        <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                                            <Tag className="h-3 w-3 text-indigo-400" />
+                                                            {meta.project_code || `PRJ-${meta.project_id}`}
+                                                        </span>
+                                                    )}
+                                                    {meta.task_code && (
+                                                        <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                                                            <ListTodo className="h-3 w-3 text-blue-400" />
+                                                            {meta.task_code}
                                                         </span>
                                                     )}
                                                     {meta.scope && (
-                                                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-200/70 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                                                             Scope: {meta.scope}
                                                         </span>
                                                     )}
                                                     {meta.from && meta.to && (
-                                                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-200/70 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                                                             <ArrowLeftRight className="h-3 w-3 text-slate-400" />
                                                             {meta.from} → {meta.to}
                                                         </span>
@@ -537,24 +867,24 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
 
                                             {/* Notes / Remarks quote if present */}
                                             {meta.notes && (
-                                                <div className="mt-2.5 rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+                                                <div className="mt-2.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
                                                     <p className="line-clamp-2 italic">"{meta.notes}"</p>
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Bottom Row: Actor & Timestamp */}
-                                        <div className="mt-4 flex items-center justify-between border-t border-slate-200/60 pt-3 dark:border-slate-800/60">
+                                        {/* Bottom Row: Actor & Timestamp & View Button */}
+                                        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800/80">
                                             <div className="flex items-center gap-2.5 min-w-0">
                                                 {actorPhoto ? (
                                                     <img
                                                         src={actorPhoto}
                                                         alt={actorName}
-                                                        className="h-7 w-7 shrink-0 rounded-full object-cover ring-2 ring-slate-200 dark:ring-slate-700"
+                                                        className="h-7 w-7 shrink-0 rounded-full object-cover ring-2 ring-slate-100 dark:ring-slate-800"
                                                     />
                                                 ) : (
                                                     <div
-                                                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-[11px] font-bold ring-2 ring-slate-200 dark:ring-slate-700 ${getAvatarColor(
+                                                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-[11px] font-bold shadow-2xs ring-2 ring-slate-100 dark:ring-slate-800 ${getAvatarColor(
                                                             actorName
                                                         )}`}
                                                     >
@@ -568,14 +898,29 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                                 </div>
                                             </div>
 
-                                            <div
-                                                className="shrink-0 text-right text-[11px] text-slate-500 dark:text-slate-400"
-                                                title={formatFullDate(item.created_at)}
-                                            >
-                                                <div className="flex items-center gap-1">
-                                                    <Clock className="h-3 w-3 text-slate-400" />
-                                                    <span>{getRelativeTime(item.created_at)}</span>
+                                            <div className="flex items-center gap-2">
+                                                <div
+                                                    className="shrink-0 text-right text-[11px] text-slate-500 dark:text-slate-400"
+                                                    title={formatFullDate(item.created_at)}
+                                                >
+                                                    <div className="flex items-center gap-1">
+                                                        <Clock className="h-3 w-3 text-slate-400" />
+                                                        <span>{getRelativeTime(item.created_at)}</span>
+                                                    </div>
                                                 </div>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedActivity(item);
+                                                    }}
+                                                    title="View Details"
+                                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
+                                                >
+                                                    <Eye className="h-3 w-3" />
+                                                    <span>View</span>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -584,8 +929,8 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                         </div>
                     </div>
                 ) : (
-                    /* Timeline View */
-                    <div className="max-h-[620px] overflow-y-auto pl-4 pr-1.5 scrollbar-thin">
+                    /* Timeline View with GSAP target cards */
+                    <div className="max-h-[640px] overflow-y-auto pl-4 pr-1.5 scrollbar-thin">
                         <div className="relative border-l-2 border-slate-200/80 dark:border-slate-800 ml-2 space-y-6 pl-6 py-2">
                             {filteredLogs.map((item) => {
                                 const modMeta = getModuleMeta(item.module);
@@ -593,32 +938,64 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                 const actorName = item.actor?.name || item.actor?.email || "System";
                                 const narrative = getActionNarrative(item);
                                 const meta = item.meta || {};
+                                const isRecent = isActivityRecent(item.created_at);
 
                                 return (
-                                    <div key={item.id} className="relative group">
+                                    <div
+                                        key={item.id}
+                                        onMouseEnter={handleCardMouseEnter}
+                                        onMouseLeave={handleCardMouseLeave}
+                                        onClick={() => setSelectedActivity(item)}
+                                        className="activity-log-card relative group cursor-pointer"
+                                    >
                                         {/* Timeline Dot Icon */}
-                                        <span className="absolute -left-[35px] top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white dark:bg-slate-950 ring-4 ring-slate-100 dark:ring-slate-900 shadow-xs border border-slate-200 dark:border-slate-800 text-indigo-600 dark:text-indigo-400">
+                                        <span className="absolute -left-[35px] top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white dark:bg-slate-950 ring-4 ring-slate-100 dark:ring-slate-900 shadow-xs border border-slate-200 dark:border-slate-800 text-indigo-600 dark:text-indigo-400">
                                             <ModuleIcon className="h-3.5 w-3.5" />
                                         </span>
 
-                                        <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 transition-all hover:border-slate-300 hover:bg-white hover:shadow-xs dark:border-slate-800 dark:bg-slate-900/70 dark:hover:border-slate-700 dark:hover:bg-slate-900">
-                                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5 dark:border-slate-800/60">
+                                        <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-2xs transition-all hover:border-indigo-300 hover:bg-white hover:shadow-md dark:border-slate-800 dark:bg-slate-900/80 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900">
+                                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800/60">
                                                 <div className="flex items-center gap-2">
                                                     <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold border ${modMeta.colorClass}`}>
                                                         {modMeta.label}
                                                     </span>
-                                                    <StatusBadge value={item.action} />
+                                                    {isRecent && (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                                            <span className="relative flex h-1.5 w-1.5">
+                                                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                                                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                                            </span>
+                                                            LIVE
+                                                        </span>
+                                                    )}
+                                                    <div>{renderActionPill(item.action)}</div>
                                                 </div>
-                                                <span
-                                                    className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400"
-                                                    title={formatFullDate(item.created_at)}
-                                                >
-                                                    <Clock className="h-3 w-3 text-slate-400" />
-                                                    {getRelativeTime(item.created_at)} • {formatFullDate(item.created_at)}
-                                                </span>
+
+                                                <div className="flex items-center gap-2">
+                                                    <span
+                                                        className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400"
+                                                        title={formatFullDate(item.created_at)}
+                                                    >
+                                                        <Clock className="h-3 w-3 text-slate-400" />
+                                                        {getRelativeTime(item.created_at)}
+                                                    </span>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedActivity(item);
+                                                        }}
+                                                        title="View Details"
+                                                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-indigo-950 dark:hover:text-indigo-300"
+                                                    >
+                                                        <Eye className="h-3 w-3" />
+                                                        <span>View</span>
+                                                    </button>
+                                                </div>
                                             </div>
 
-                                            <p className="mt-2.5 text-sm font-medium text-slate-900 dark:text-slate-100">
+                                            <p className="mt-2.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
                                                 {narrative}
                                             </p>
 
@@ -632,15 +1009,15 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                                     </span>
                                                 </div>
 
-                                                {(meta.day_number || meta.project_code) && (
+                                                {(meta.day_number || meta.project_code || meta.task_code) && (
                                                     <div className="flex items-center gap-2">
                                                         {meta.day_number && (
-                                                            <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                                                                 Day {meta.day_number}
                                                             </span>
                                                         )}
                                                         {meta.project_code && (
-                                                            <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                                                                 {meta.project_code}
                                                             </span>
                                                         )}
@@ -655,6 +1032,127 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                     </div>
                 )}
             </div>
+
+            {/* Interactive Activity Detail Modal */}
+            <Modal
+                show={selectedActivity !== null}
+                onClose={() => {
+                    setSelectedActivity(null);
+                    setShowRawJson(false);
+                }}
+                maxWidth="2xl"
+                topCloseButton={true}
+            >
+                {selectedActivity && (
+                    <div className="p-6">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+                                    <Activity className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                        Activity Event Details
+                                    </h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        Event ID #{selectedActivity.id} • {formatFullDate(selectedActivity.created_at)}
+                                    </p>
+                                </div>
+                            </div>
+                            <div>{renderActionPill(selectedActivity.action)}</div>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="mt-5 space-y-4">
+                            {/* Narrative Quote */}
+                            <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/40">
+                                <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                                    Action Summary
+                                </p>
+                                <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
+                                    {getActionNarrative(selectedActivity)}
+                                </p>
+                            </div>
+
+                            {/* Core Metadata Grid */}
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900">
+                                    <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Module</p>
+                                    <p className="mt-0.5 text-xs font-bold text-slate-900 dark:text-white">
+                                        {formatModuleName(selectedActivity.module)}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900">
+                                    <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Performed By</p>
+                                    <p className="mt-0.5 truncate text-xs font-bold text-slate-900 dark:text-white">
+                                        {selectedActivity.actor?.name || selectedActivity.actor?.email || "System"}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900">
+                                    <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Timestamp</p>
+                                    <p className="mt-0.5 text-xs font-bold text-slate-900 dark:text-white">
+                                        {getRelativeTime(selectedActivity.created_at)}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Extended Meta Tags if present */}
+                            {selectedActivity.meta && Object.keys(selectedActivity.meta).length > 0 && (
+                                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+                                    <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                                        <p className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                                            Event Parameters
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowRawJson(!showRawJson)}
+                                            className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                                        >
+                                            {showRawJson ? "Show Formatted" : "View Raw JSON"}
+                                        </button>
+                                    </div>
+
+                                    {showRawJson ? (
+                                        <pre className="mt-3 max-h-48 overflow-auto rounded-xl bg-slate-950 p-3 text-[11px] text-emerald-400 font-mono">
+                                            {JSON.stringify(selectedActivity.meta, null, 2)}
+                                        </pre>
+                                    ) : (
+                                        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                            {Object.entries(selectedActivity.meta).map(([key, val]) => (
+                                                <div key={key} className="rounded-lg bg-slate-50 p-2 text-xs dark:bg-slate-800/60">
+                                                    <span className="font-semibold text-slate-500 dark:text-slate-400">
+                                                        {key.replace(/_/g, " ")}:{" "}
+                                                    </span>
+                                                    <span className="font-bold text-slate-900 dark:text-white">
+                                                        {typeof val === "object" ? JSON.stringify(val) : String(val)}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="mt-6 flex justify-end border-t border-slate-100 pt-4 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedActivity(null);
+                                    setShowRawJson(false);
+                                }}
+                                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </section>
     );
 }

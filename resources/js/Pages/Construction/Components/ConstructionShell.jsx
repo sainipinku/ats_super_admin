@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react";
 import { Head, Link, usePage } from "@inertiajs/react";
+import gsap from "gsap";
 import SuperAdminLayout from "@/Pages/SuperAdmin/Layouts/AuthenticatedLayout";
 import AdminLayout from "@/Pages/Admin/Layouts/AuthenticatedLayout";
 import MemberLayout from "@/Pages/Member/Layouts/AuthenticatedLayout";
@@ -121,28 +123,73 @@ export default function ConstructionShell({
     };
 
     const navItems = config.items.filter((item) => hasPerm(item.permissions));
+    const shellHeaderRef = useRef(null);
+
+    useEffect(() => {
+        if (!shellHeaderRef.current) return;
+
+        const ctx = gsap.context(() => {
+            gsap.fromTo(
+                shellHeaderRef.current,
+                { opacity: 0, y: -8 },
+                { opacity: 1, y: 0, duration: 0.35, ease: "power2.out", clearProps: "transform,opacity" }
+            );
+
+            const pills = shellHeaderRef.current.querySelectorAll(".shell-nav-pill");
+            if (pills.length > 0) {
+                gsap.fromTo(
+                    pills,
+                    { opacity: 0, y: 6, scale: 0.96 },
+                    {
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        duration: 0.28,
+                        stagger: 0.022,
+                        ease: "power2.out",
+                        clearProps: "transform,opacity",
+                    }
+                );
+            }
+        }, shellHeaderRef);
+
+        return () => ctx.revert();
+    }, [title, variant]);
+
+    const handlePillEnter = (e) => {
+        gsap.to(e.currentTarget, { y: -1.5, duration: 0.16, ease: "power1.out", overwrite: "auto" });
+    };
+
+    const handlePillLeave = (e) => {
+        gsap.to(e.currentTarget, { y: 0, duration: 0.16, ease: "power1.out", overwrite: "auto" });
+    };
 
     return (
         <Layout>
             <Head title={title} />
-            <div className="space-y-6 px-2 py-5 sm:px-3 lg:px-5">
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                        <div>
-                            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">
+            <div className="space-y-3.5 px-2 py-3 sm:px-3 lg:px-4">
+                <div
+                    ref={shellHeaderRef}
+                    className="rounded-2xl border border-slate-200/90 bg-white/95 px-4 py-3 shadow-xs dark:border-slate-800 dark:bg-slate-950/95"
+                >
+                    <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="min-w-0 shrink-0">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">
                                 Construction ERP
                             </p>
-                            <h1 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-                                {title}
-                            </h1>
-                            {description ? (
-                                <p className="mt-2 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
-                                    {description}
-                                </p>
-                            ) : null}
+                            <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+                                <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+                                    {title}
+                                </h1>
+                                {description ? (
+                                    <p className="truncate max-w-xl text-xs text-slate-500 dark:text-slate-400">
+                                        {description}
+                                    </p>
+                                ) : null}
+                            </div>
                         </div>
                         {navItems.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
                                 {navItems.map((item) => {
                                     const active = route().current(item.active);
 
@@ -150,9 +197,11 @@ export default function ConstructionShell({
                                         <Link
                                             key={item.href}
                                             href={item.href}
-                                            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                                            onMouseEnter={handlePillEnter}
+                                            onMouseLeave={handlePillLeave}
+                                            className={`shell-nav-pill rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                                                 active
-                                                    ? "bg-indigo-600 text-white"
+                                                    ? "bg-indigo-600 text-white shadow-xs shadow-indigo-600/25"
                                                     : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                                             }`}
                                         >
