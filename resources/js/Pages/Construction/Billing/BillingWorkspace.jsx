@@ -1,9 +1,25 @@
 import { useForm, usePage } from "@inertiajs/react";
 import { useMemo, useState } from "react";
+import {
+    AlertCircle,
+    CalendarDays,
+    CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
+    Download,
+    Eye,
+    FileText,
+    FolderKanban,
+    Percent,
+    RotateCcw,
+    Scale,
+    Search,
+    Wallet,
+    UsersRound,
+} from "lucide-react";
 import ConstructionShell from "@/Pages/Construction/Components/ConstructionShell";
 import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
-import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
 import Modal from "@/Components/Modal";
 
@@ -38,16 +54,22 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
 
     // Search and filter for Projects & Clients Listing
     const [searchQuery, setSearchQuery] = useState("");
-    const [stageFilter, setStageFilter] = useState("all");
+    const [periodMonths, setPeriodMonths] = useState(6);
+    const [projectFilter, setProjectFilter] = useState("all");
+    const [clientFilter, setClientFilter] = useState("all");
+    const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
+    const [appliedFilters, setAppliedFilters] = useState({ project: "all", client: "all", paymentStatus: "all" });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     // Modal state for project details
     const [selectedProject, setSelectedProject] = useState(null);
 
     // Global Stats calculation
     const stats = useMemo(() => {
-        const totalBilled = invoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
-        const totalReceived = invoices.reduce((sum, inv) => sum + Number(inv.paid_amount || 0), 0);
-        const outstanding = invoices.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0);
+        const totalBilled = projects.reduce((sum, project) => sum + Number(project.billing_summary?.total_billed || 0), 0);
+        const totalReceived = projects.reduce((sum, project) => sum + Number(project.billing_summary?.total_paid || 0), 0);
+        const outstanding = projects.reduce((sum, project) => sum + Number(project.billing_summary?.outstanding || 0), 0);
 
         const uniqueClientIds = new Set(
             projects
@@ -75,7 +97,20 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
     const filteredProjects = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
         return projects.filter((project) => {
-            if (stageFilter !== "all" && String(project.current_stage || "").toLowerCase() !== stageFilter.toLowerCase()) {
+            if (appliedFilters.project !== "all" && String(project.id) !== appliedFilters.project) {
+                return false;
+            }
+
+            const clientId = project.client?.id ? String(project.client.id) : "";
+            if (appliedFilters.client !== "all" && clientId !== appliedFilters.client) {
+                return false;
+            }
+
+            const billing = project.billing_summary || {};
+            const billed = Number(billing.total_billed || 0);
+            const outstanding = Number(billing.outstanding || 0);
+            const paymentStatus = billed > 0 && outstanding <= 0 ? "paid" : "pending";
+            if (appliedFilters.paymentStatus !== "all" && paymentStatus !== appliedFilters.paymentStatus) {
                 return false;
             }
 
@@ -99,7 +134,87 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
 
             return matchesProject || matchesClient;
         });
-    }, [projects, searchQuery, stageFilter]);
+    }, [projects, searchQuery, appliedFilters]);
+
+    const billingChartData = useMemo(() => {
+        const now = new Date();
+        const firstMonth = new Date(now.getFullYear(), now.getMonth() - periodMonths + 1, 1);
+        const monthRows = Array.from({ length: periodMonths }, (_, index) => {
+            const date = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + index, 1);
+            return {
+                key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+                month: date.toLocaleDateString("en-IN", { month: "short" }),
+                billed: 0,
+                received: 0,
+            };
+        });
+        const rowByMonth = new Map(monthRows.map((row) => [row.key, row]));
+
+        invoices.forEach((invoice) => {
+            const date = parseBillingDate(invoice.invoice_date);
+            const row = date ? rowByMonth.get(monthKey(date)) : null;
+            if (row) row.billed += Number(invoice.total_amount || 0);
+        });
+
+        payments.forEach((payment) => {
+            const date = parseBillingDate(payment.received_at);
+            const row = date ? rowByMonth.get(monthKey(date)) : null;
+            if (row) row.received += Number(payment.amount || 0);
+        });
+
+        const totalBilled = monthRows.reduce((sum, row) => sum + row.billed, 0);
+        const totalReceived = monthRows.reduce((sum, row) => sum + row.received, 0);
+        return monthRows.map((row) => ({
+            ...row,
+            billedPercent: percentageValue(row.billed, totalBilled),
+            receivedPercent: percentageValue(row.received, totalReceived),
+        }));
+    }, [invoices, payments, periodMonths]);
+
+    const projectBillingChartData = useMemo(() => {
+        const rows = projects
+            .map((project) => ({
+                name: project.name || project.project_code || "Project",
+                billed: Number(project.billing_summary?.total_billed || 0),
+                received: Number(project.billing_summary?.total_paid || 0),
+            }))
+            .sort((a, b) => b.billed - a.billed);
+        const topProjects = rows.slice(0, 4);
+        const otherProjects = rows.slice(4);
+        if (otherProjects.length > 0) {
+            topProjects.push({
+                name: "Others",
+                billed: otherProjects.reduce((sum, project) => sum + project.billed, 0),
+                received: otherProjects.reduce((sum, project) => sum + project.received, 0),
+            });
+        }
+        const totalBilled = topProjects.reduce((sum, project) => sum + project.billed, 0);
+        return topProjects.map((project) => ({
+            ...project,
+            sharePercent: percentageValue(project.billed, totalBilled),
+        }));
+    }, [projects]);
+
+    const paymentStatusData = useMemo(() => {
+        const totalBilled = stats.totalBilled;
+        return [
+            { name: "Paid", value: percentageValue(stats.totalReceived, totalBilled), color: "#10b981" },
+            { name: "Pending", value: percentageValue(stats.outstanding, totalBilled), color: "#f59e0b" },
+        ];
+    }, [stats]);
+
+    const clientOptions = useMemo(() => {
+        const clients = new Map();
+        projects.forEach((project) => {
+            if (project.client?.id) {
+                clients.set(String(project.client.id), project.client.name || "Client");
+            }
+        });
+        return [...clients.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    }, [projects]);
+
+    const pageCount = Math.max(1, Math.ceil(filteredProjects.length / pageSize));
+    const visibleProjects = filteredProjects.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     // CSV Download handler
     const handleDownloadCsv = (targetData = filteredProjects) => {
@@ -127,9 +242,8 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
             "Total Checklists",
             "Completed Checklists",
             "Checklist Progress %",
-            "Total Billed (INR)",
-            "Total Received (INR)",
-            "Balance Outstanding (INR)",
+            "Collected (%)",
+            "Outstanding (%)",
         ];
 
         const escapeCsv = (val) => {
@@ -162,9 +276,8 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
             escapeCsv(p.checklist_counts?.total ?? 0),
             escapeCsv(p.checklist_counts?.completed ?? 0),
             escapeCsv(`${p.checklist_counts?.progress_percent ?? 0}%`),
-            escapeCsv(Number(p.billing_summary?.total_billed ?? 0).toFixed(2)),
-            escapeCsv(Number(p.billing_summary?.total_paid ?? 0).toFixed(2)),
-            escapeCsv(Number(p.billing_summary?.outstanding ?? 0).toFixed(2)),
+            escapeCsv(formatPercentage(p.billing_summary?.total_paid, p.billing_summary?.total_billed)),
+            escapeCsv(formatPercentage(p.billing_summary?.outstanding, p.billing_summary?.total_billed)),
         ]);
 
         const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
@@ -304,23 +417,96 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
             description="GST-aware client invoices, project directories, task completion tracking, and financial reconciliation."
             variant={variant}
         >
-            {/* Top Stat Cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                <StatCard label="Total Projects" value={stats.projects} />
-                <StatCard label="Registered Clients" value={stats.clients} />
-                <StatCard label="Execution Tasks" value={`${stats.completedTasks} / ${stats.totalTasks}`} />
-                <StatCard label="Total Billed" value={`₹${stats.totalBilled.toFixed(2)}`} />
-                <StatCard label="Total Received" value={`₹${stats.totalReceived.toFixed(2)}`} />
-                <StatCard label="Outstanding Balance" value={`₹${stats.outstanding.toFixed(2)}`} />
-            </div>
+            <section className="space-y-4">
+                <div className="flex items-center justify-end">
+                    <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                        <CalendarDays className="h-4 w-4 text-indigo-500" />
+                        <select
+                            aria-label="Chart date range"
+                            value={periodMonths}
+                            onChange={(event) => setPeriodMonths(Number(event.target.value))}
+                            className="border-0 bg-transparent py-0 pl-0 pr-6 text-xs font-semibold text-slate-700 outline-none focus:ring-0 dark:text-slate-200"
+                        >
+                            <option value={3}>Last 3 Months</option>
+                            <option value={6}>Last 6 Months</option>
+                            <option value={12}>Last 12 Months</option>
+                        </select>
+                    </label>
+                </div>
 
-            {/* Navigation Tabs */}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-3 dark:border-slate-800">
-                <div className="flex items-center gap-2">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                    <BillingMetricCard label="Total Projects" value={stats.projects} icon={FolderKanban} color="violet" />
+                    <BillingMetricCard label="Registered Clients" value={stats.clients} icon={UsersRound} color="sky" />
+                    <BillingMetricCard label="Execution Tasks" value={`${stats.completedTasks} / ${stats.totalTasks}`} icon={CheckCircle2} color="emerald" />
+                    <BillingMetricCard
+                        label="Projects Billed"
+                        value={formatPercentage(projects.filter((project) => Number(project.billing_summary?.total_billed || 0) > 0).length, stats.projects)}
+                        hint="of all projects"
+                        icon={Percent}
+                        color="orange"
+                    />
+                    <BillingMetricCard label="Collected Rate" value={formatPercentage(stats.totalReceived, stats.totalBilled)} hint="of billed value" icon={Wallet} color="teal" />
+                    <BillingMetricCard label="Outstanding Rate" value={formatPercentage(stats.outstanding, stats.totalBilled)} hint="of billed value" icon={Scale} color="blue" />
+                </div>
+
+                <div className="grid gap-3 xl:grid-cols-3">
+                    <ChartCard title="Monthly Billing Share" icon={Percent} accent="violet">
+                        <BillingBarChart data={billingChartData} />
+                        <ChartLegend items={[{ label: "Billed share", color: "#6d36e8" }, { label: "Received share", color: "#3b82f6" }]} />
+                    </ChartCard>
+
+                    <ChartCard title="Project-wise Billing" icon={FolderKanban} accent="blue">
+                        <div className="flex h-44 items-center justify-center gap-3">
+                            <DonutChart
+                                data={projectBillingChartData.map((project, index) => ({
+                                    name: project.name,
+                                    value: project.sharePercent,
+                                    color: ["#6d36e8", "#3b82f6", "#14b8a6", "#f59e0b", "#a78bfa"][index % 5],
+                                }))}
+                                centerValue={projectBillingChartData.some((project) => project.billed > 0) ? "100%" : "—"}
+                                centerLabel="of billed value"
+                            />
+                            <div className="min-w-0 flex-1 space-y-2">
+                                {projectBillingChartData.slice(0, 4).map((project, index) => (
+                                    <div key={`${project.name}-${index}`} className="flex items-center gap-2 text-[10px]">
+                                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: ["#6d36e8", "#3b82f6", "#14b8a6", "#f59e0b", "#a78bfa"][index % 5] }} />
+                                        <span className="min-w-0 flex-1 truncate text-slate-600 dark:text-slate-300">{project.name}</span>
+                                        <span className="shrink-0 font-semibold text-slate-700 dark:text-slate-200">{formatPercentage(project.sharePercent, 100)}</span>
+                                    </div>
+                                ))}
+                                {projectBillingChartData.length === 0 ? <p className="text-xs text-slate-400">No project billing data yet.</p> : null}
+                            </div>
+                        </div>
+                        <p className="text-center text-[10px] text-slate-500">Project share of billed value</p>
+                    </ChartCard>
+
+                    <ChartCard title="Payment Status" icon={CheckCircle2} accent="emerald">
+                        <div className="flex h-44 items-center justify-center gap-3">
+                            <DonutChart
+                                data={paymentStatusData}
+                                centerValue={stats.totalBilled > 0 ? `${Math.round((stats.totalReceived / stats.totalBilled) * 100)}%` : "—"}
+                                centerLabel={stats.totalBilled > 0 ? "Received" : "No billing"}
+                            />
+                            <div className="space-y-3 text-[10px]">
+                                {paymentStatusData.map((entry) => (
+                                    <div key={entry.name} className="flex items-center gap-2">
+                                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                        <span className="text-slate-600 dark:text-slate-300">{entry.name}</span>
+                                        <span className="ml-1 font-semibold text-slate-700 dark:text-slate-200">{stats.totalBilled > 0 ? formatPercentage(entry.value, 100) : "—"}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </ChartCard>
+                </div>
+            </section>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                     <button
                         type="button"
                         onClick={() => setActiveTab("directory")}
-                        className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                        className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition sm:text-sm ${
                             activeTab === "directory"
                                 ? "bg-indigo-600 text-white shadow-sm"
                                 : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -337,15 +523,13 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
                     <button
                         type="button"
                         onClick={() => setActiveTab("invoices")}
-                        className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                        className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition sm:text-sm ${
                             activeTab === "invoices"
                                 ? "bg-indigo-600 text-white shadow-sm"
                                 : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                         }`}
                     >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                        <FileText className="h-4 w-4" />
                         Invoices & Payments Manager
                         <span className={`ml-1.5 rounded-full px-2 py-0.5 text-xs ${activeTab === "invoices" ? "bg-indigo-500 text-white" : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300"}`}>
                             {invoices.length}
@@ -358,12 +542,10 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
                         <button
                             type="button"
                             onClick={() => handleDownloadCsv(filteredProjects)}
-                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500"
+                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-500 sm:text-sm"
                         >
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            Download CSV
+                            <Download className="h-4 w-4" />
+                            Download Report
                         </button>
                     </div>
                 ) : null}
@@ -373,39 +555,58 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
             {activeTab === "directory" ? (
                 <div className="space-y-4">
                     {/* Filter and Search Bar */}
-                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                        <div className="flex flex-1 items-center gap-3 min-w-[280px]">
-                            <div className="relative w-full max-w-md">
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
-                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                </span>
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search by project, client, khasra no, phone..."
-                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                                />
-                            </div>
-
-                            <select
-                                value={stageFilter}
-                                onChange={(e) => setStageFilter(e.target.value)}
-                                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-                            >
-                                <option value="all">All Lifecycle Stages</option>
-                                <option value="planning">Planning</option>
-                                <option value="survey">Survey</option>
-                                <option value="execution">Execution</option>
-                                <option value="completed">Completed</option>
-                            </select>
-                        </div>
-
-                        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                            <span>Showing <strong>{filteredProjects.length}</strong> of <strong>{projects.length}</strong> projects</span>
-                        </div>
+                    <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:grid-cols-[minmax(240px,1.5fr)_repeat(3,minmax(140px,0.6fr))_auto_auto]">
+                        <label className="relative block">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                                type="search"
+                                value={searchQuery}
+                                onChange={(event) => {
+                                    setSearchQuery(event.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                placeholder="Search by project, client, khasra no, phone..."
+                                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                            />
+                        </label>
+                        <select aria-label="Filter by project" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-700 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                            <option value="all">All Projects</option>
+                            {projects.map((project) => <option key={project.id} value={String(project.id)}>{project.project_code} • {project.name}</option>)}
+                        </select>
+                        <select aria-label="Filter by client" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-700 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                            <option value="all">All Clients</option>
+                            {clientOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                        </select>
+                        <select aria-label="Filter by payment status" value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-700 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                            <option value="all">All Status</option>
+                            <option value="paid">Paid</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setAppliedFilters({ project: projectFilter, client: clientFilter, paymentStatus: paymentStatusFilter });
+                                setCurrentPage(1);
+                            }}
+                            className="rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                        >
+                            Apply Filter
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSearchQuery("");
+                                setProjectFilter("all");
+                                setClientFilter("all");
+                                setPaymentStatusFilter("all");
+                                setAppliedFilters({ project: "all", client: "all", paymentStatus: "all" });
+                                setCurrentPage(1);
+                            }}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Reset
+                        </button>
                     </div>
 
                     {/* Listing Table */}
@@ -414,151 +615,82 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
                             <div className="py-12">
                                 <EmptyState
                                     title="No projects match your filter."
-                                    description="Try clearing your search query or reset the stage filter to view all project records."
+                                    description="Try changing your search or filters to view project records."
                                 />
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-800">
-                                    <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+                                    <thead className="bg-indigo-50/70 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-950 dark:text-slate-400">
                                         <tr>
-                                            <th className="px-5 py-3.5">Project</th>
-                                            <th className="px-5 py-3.5">Client Details</th>
-                                            <th className="px-5 py-3.5">Khasra / Site Area</th>
-                                            <th className="px-5 py-3.5">Task Breakdown</th>
-                                            <th className="px-5 py-3.5">Checklist Progress</th>
-                                            <th className="px-5 py-3.5">Billing Snapshot</th>
-                                            <th className="px-5 py-3.5 text-right">Actions</th>
+                                            <th className="px-3 py-3">#</th>
+                                            <th className="px-3 py-3">Project Details</th>
+                                            <th className="px-3 py-3">Client Details</th>
+                                            <th className="px-3 py-3">Khasra / Site Area</th>
+                                            <th className="px-3 py-3">Billing Info</th>
+                                            <th className="px-3 py-3">Payment Status</th>
+                                            <th className="px-3 py-3 text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                                        {filteredProjects.map((project) => {
-                                            const tasks = project.task_counts || { total: 0, completed: 0, in_progress: 0, pending: 0, progress_percent: 0 };
-                                            const checklists = project.checklist_counts || { total: 0, completed: 0, pending: 0, progress_percent: 0 };
-                                            const billing = project.billing_summary || { total_billed: 0, total_paid: 0, outstanding: 0 };
+                                        {visibleProjects.map((project, index) => {
+                                            const billing = project.billing_summary || {};
                                             const client = project.client || {};
+                                            const paid = Number(billing.total_paid || 0);
+                                            const due = Number(billing.outstanding || 0);
+                                            const billed = Number(billing.total_billed || 0);
+                                            const isPaid = billed > 0 && due <= 0;
 
                                             return (
                                                 <tr key={project.id} className="transition hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                                                    <td className="px-3 py-3 text-xs text-slate-500">{(currentPage - 1) * pageSize + index + 1}</td>
                                                     {/* Project */}
-                                                    <td className="px-5 py-4">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                                                                {project.project_code}
-                                                            </span>
-                                                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium capitalize text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                                                {project.current_stage || "Planning"}
-                                                            </span>
+                                                    <td className="px-3 py-3">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <span className="flex h-9 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"><FolderKanban className="h-4 w-4" /></span>
+                                                            <div className="min-w-0">
+                                                                <p className="truncate text-xs font-semibold text-slate-900 dark:text-white">{project.name}</p>
+                                                                <p className="mt-0.5 text-[10px] text-slate-500">{project.location_name || project.project_address || project.project_code}</p>
+                                                                <span className="mt-1 inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-semibold capitalize text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">{project.current_stage || "Planning"}</span>
+                                                            </div>
                                                         </div>
-                                                        <p className="mt-1 font-semibold text-slate-900 dark:text-white">
-                                                            {project.name}
-                                                        </p>
-                                                        {project.project_address ? (
-                                                            <p className="mt-0.5 text-xs text-slate-500 line-clamp-1 dark:text-slate-400">
-                                                                {project.project_address}
-                                                            </p>
-                                                        ) : null}
                                                     </td>
 
                                                     {/* Client Details */}
-                                                    <td className="px-5 py-4">
-                                                        <p className="font-semibold text-slate-900 dark:text-white">
-                                                            {client.name || "N/A"}
-                                                        </p>
-                                                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                                                            <span className="font-mono text-[11px] text-slate-400">{client.client_code}</span>
-                                                            {client.phone && client.phone !== "—" ? (
-                                                                <>
-                                                                    <span>•</span>
-                                                                    <span>{client.phone}</span>
-                                                                </>
-                                                            ) : null}
-                                                        </div>
-                                                        {client.email && client.email !== "—" ? (
-                                                            <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{client.email}</p>
-                                                        ) : null}
+                                                    <td className="px-3 py-3">
+                                                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{client.name || "N/A"}</p>
+                                                        {client.phone && client.phone !== "—" ? <p className="mt-0.5 text-[10px] text-slate-500">{client.phone}</p> : null}
+                                                        {client.email && client.email !== "—" ? <p className="text-[10px] text-slate-400">{client.email}</p> : null}
                                                     </td>
 
                                                     {/* Khasra / Site Area */}
-                                                    <td className="px-5 py-4">
-                                                        <div className="inline-flex items-center rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
-                                                            <span>Khasra: {project.khasra_number || "—"}</span>
-                                                        </div>
+                                                    <td className="px-3 py-3">
+                                                        <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-300">Khasra: {project.khasra_number || "—"}</span>
                                                         {project.site_area && project.site_area !== "—" ? (
-                                                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                                Area: {project.site_area}
-                                                            </p>
+                                                            <p className="mt-1 text-[10px] text-slate-500">Area: {project.site_area}</p>
                                                         ) : null}
                                                     </td>
 
-                                                    {/* Task Breakdown */}
-                                                    <td className="px-5 py-4">
-                                                        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                                            <span className="rounded-md bg-emerald-100 px-2 py-0.5 font-medium text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                                                {tasks.completed} Done
-                                                            </span>
-                                                            <span className="rounded-md bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
-                                                                {tasks.in_progress} In Progress
-                                                            </span>
-                                                            <span className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                                                {tasks.pending} Pending
-                                                            </span>
-                                                        </div>
-                                                        <div className="mt-2 flex items-center gap-2">
-                                                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                                                                <div
-                                                                    className="h-full bg-emerald-500 transition-all duration-300"
-                                                                    style={{ width: `${tasks.progress_percent}%` }}
-                                                                />
-                                                            </div>
-                                                            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                                                {tasks.total} Total ({tasks.progress_percent}%)
-                                                            </span>
-                                                        </div>
-                                                    </td>
-
-                                                    {/* Checklist Progress */}
-                                                    <td className="px-5 py-4">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                                                                {checklists.completed} / {checklists.total} done
-                                                            </span>
-                                                            <span className="text-[11px] text-slate-400">
-                                                                ({checklists.progress_percent}%)
-                                                            </span>
-                                                        </div>
-                                                        <div className="mt-1.5 h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                                                            <div
-                                                                className="h-full bg-indigo-500 transition-all duration-300"
-                                                                style={{ width: `${checklists.progress_percent}%` }}
-                                                            />
-                                                        </div>
-                                                    </td>
-
                                                     {/* Billing Snapshot */}
-                                                    <td className="px-5 py-4">
-                                                        <p className="text-xs font-semibold text-slate-900 dark:text-white">
-                                                            Billed: ₹{Number(billing.total_billed || 0).toFixed(2)}
-                                                        </p>
-                                                        <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                                                            Paid: ₹{Number(billing.total_paid || 0).toFixed(2)}
-                                                        </p>
-                                                        <p className={`text-xs font-medium ${billing.outstanding > 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-400"}`}>
-                                                            Due: ₹{Number(billing.outstanding || 0).toFixed(2)}
-                                                        </p>
+                                                    <td className="px-3 py-3">
+                                                        <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Collected: {formatPercentage(paid, billed)}</p>
+                                                        <p className={`text-[10px] font-medium ${due > 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-400"}`}>Outstanding: {formatPercentage(due, billed)}</p>
+                                                    </td>
+                                                    <td className="px-3 py-3">
+                                                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold ${isPaid ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>
+                                                            {isPaid ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+                                                            {isPaid ? "Paid" : "Pending"}
+                                                        </span>
                                                     </td>
 
                                                     {/* Action */}
-                                                    <td className="px-5 py-4 text-right">
+                                                    <td className="px-3 py-3 text-right">
                                                         <button
                                                             type="button"
                                                             onClick={() => setSelectedProject(project)}
-                                                            className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 dark:hover:bg-indigo-900"
+                                                            className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 transition hover:bg-indigo-50 dark:border-indigo-800 dark:bg-slate-900 dark:text-indigo-300 dark:hover:bg-indigo-950/50"
                                                         >
-                                                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                            </svg>
+                                                            <Eye className="h-3 w-3" />
                                                             View Details
                                                         </button>
                                                     </td>
@@ -569,6 +701,22 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
                                 </table>
                             </div>
                         )}
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-3 py-2.5 text-[10px] text-slate-500 dark:border-slate-800">
+                            <span>Showing {filteredProjects.length ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, filteredProjects.length)} of {filteredProjects.length} projects</span>
+                            <div className="flex items-center gap-2">
+                                <button type="button" aria-label="Previous page" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} className="rounded-md border border-slate-200 p-1 disabled:opacity-40 dark:border-slate-700"><ChevronLeft className="h-3.5 w-3.5" /></button>
+                                <span className="rounded-md bg-indigo-600 px-2 py-1 font-semibold text-white">{currentPage}</span>
+                                <button type="button" aria-label="Next page" disabled={currentPage >= pageCount} onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))} className="rounded-md border border-slate-200 p-1 disabled:opacity-40 dark:border-slate-700"><ChevronRight className="h-3.5 w-3.5" /></button>
+                                <label className="ml-1 inline-flex items-center gap-1.5">
+                                    Show:
+                                    <select aria-label="Rows per page" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setCurrentPage(1); }} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] dark:border-slate-700 dark:bg-slate-900">
+                                        <option value={10}>10</option>
+                                        <option value={25}>25</option>
+                                        <option value={50}>50</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
             ) : null}
@@ -699,7 +847,7 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
                                                 { value: "", label: "Select invoice" },
                                                 ...selectedProjectInvoices.map((invoice) => ({
                                                     value: String(invoice.id),
-                                                    label: `${invoice.invoice_code} • ₹${Number(invoice.balance_amount || 0).toFixed(2)} due`,
+                                                    label: `${invoice.invoice_code} • ${formatPercentage(invoice.balance_amount, invoice.total_amount)} outstanding`,
                                                 })),
                                             ]}
                                             error={paymentForm.errors.invoice_id}
@@ -765,9 +913,8 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
                                                 <th className="py-2 pr-4">Project</th>
                                                 <th className="py-2 pr-4">Invoice</th>
                                                 <th className="py-2 pr-4">Date</th>
-                                                <th className="py-2 pr-4">Total</th>
-                                                <th className="py-2 pr-4">Paid</th>
-                                                <th className="py-2 pr-4">Balance</th>
+                                                <th className="py-2 pr-4">Paid %</th>
+                                                <th className="py-2 pr-4">Balance %</th>
                                                 <th className="py-2 pr-4">Status</th>
                                                 <th className="py-2 pr-4">Actions</th>
                                             </tr>
@@ -789,14 +936,11 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
                                                     <td className="py-3 pr-4 text-slate-700 dark:text-slate-200">
                                                         {formatDate(invoice.invoice_date)}
                                                     </td>
-                                                    <td className="py-3 pr-4 text-slate-700 dark:text-slate-200">
-                                                        ₹{Number(invoice.total_amount || 0).toFixed(2)}
+                                                    <td className="py-3 pr-4 text-emerald-600 dark:text-emerald-400">
+                                                        {formatPercentage(invoice.paid_amount, invoice.total_amount)}
                                                     </td>
-                                                    <td className="py-3 pr-4 text-slate-700 dark:text-slate-200">
-                                                        ₹{Number(invoice.paid_amount || 0).toFixed(2)}
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-slate-700 dark:text-slate-200">
-                                                        ₹{Number(invoice.balance_amount || 0).toFixed(2)}
+                                                    <td className="py-3 pr-4 text-amber-600 dark:text-amber-400">
+                                                        {formatPercentage(invoice.balance_amount, invoice.total_amount)}
                                                     </td>
                                                     <td className="py-3 pr-4">
                                                         <StatusBadge value={invoice.status} />
@@ -831,7 +975,7 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
                                                 <th className="py-2 pr-4">Project</th>
                                                 <th className="py-2 pr-4">Payment</th>
                                                 <th className="py-2 pr-4">Invoice</th>
-                                                <th className="py-2 pr-4">Amount</th>
+                                                <th className="py-2 pr-4">Invoice %</th>
                                                 <th className="py-2 pr-4">Method</th>
                                             </tr>
                                         </thead>
@@ -853,7 +997,7 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
                                                         {payment.invoice?.invoice_code || `#${payment.invoice_id}`}
                                                     </td>
                                                     <td className="py-3 pr-4 text-slate-700 dark:text-slate-200">
-                                                        ₹{Number(payment.amount || 0).toFixed(2)}
+                                                        {formatPercentage(payment.amount, payment.invoice?.total_amount)}
                                                     </td>
                                                     <td className="py-3 pr-4 text-slate-700 dark:text-slate-200">
                                                         {String(payment.method || "").replaceAll("_", " ")}
@@ -1090,21 +1234,21 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
                                 </div>
                                 <div className="mt-3 grid grid-cols-3 gap-3 text-center">
                                     <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
-                                        <p className="text-xs text-slate-500">Total Invoiced</p>
+                                        <p className="text-xs text-slate-500">Invoice Coverage</p>
                                         <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
-                                            ₹{Number(selectedProject.billing_summary?.total_billed || 0).toFixed(2)}
+                                            {Number(selectedProject.billing_summary?.total_billed || 0) > 0 ? "100%" : "—"}
                                         </p>
                                     </div>
                                     <div className="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-950/40">
-                                        <p className="text-xs text-emerald-700 dark:text-emerald-300">Total Received</p>
+                                        <p className="text-xs text-emerald-700 dark:text-emerald-300">Collected</p>
                                         <p className="mt-1 text-base font-bold text-emerald-600 dark:text-emerald-400">
-                                            ₹{Number(selectedProject.billing_summary?.total_paid || 0).toFixed(2)}
+                                            {formatPercentage(selectedProject.billing_summary?.total_paid, selectedProject.billing_summary?.total_billed)}
                                         </p>
                                     </div>
                                     <div className="rounded-xl bg-rose-50 p-3 dark:bg-rose-950/40">
-                                        <p className="text-xs text-rose-700 dark:text-rose-300">Balance Outstanding</p>
+                                        <p className="text-xs text-rose-700 dark:text-rose-300">Outstanding</p>
                                         <p className="mt-1 text-base font-bold text-rose-600 dark:text-rose-400">
-                                            ₹{Number(selectedProject.billing_summary?.outstanding || 0).toFixed(2)}
+                                            {formatPercentage(selectedProject.billing_summary?.outstanding, selectedProject.billing_summary?.total_billed)}
                                         </p>
                                     </div>
                                 </div>
@@ -1117,9 +1261,8 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
                                                 <tr className="border-b border-slate-100 text-left text-slate-400 dark:border-slate-800">
                                                     <th className="py-2 pr-3">Invoice</th>
                                                     <th className="py-2 pr-3">Date</th>
-                                                    <th className="py-2 pr-3">Total</th>
-                                                    <th className="py-2 pr-3">Paid</th>
-                                                    <th className="py-2 pr-3">Balance</th>
+                                                    <th className="py-2 pr-3">Paid %</th>
+                                                    <th className="py-2 pr-3">Outstanding %</th>
                                                     <th className="py-2 pr-3">Status</th>
                                                 </tr>
                                             </thead>
@@ -1128,9 +1271,8 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
                                                     <tr key={inv.id}>
                                                         <td className="py-2 pr-3 font-semibold text-slate-900 dark:text-white">{inv.invoice_code}</td>
                                                         <td className="py-2 pr-3 text-slate-600 dark:text-slate-400">{formatDate(inv.invoice_date)}</td>
-                                                        <td className="py-2 pr-3 font-medium text-slate-900 dark:text-white">₹{Number(inv.total_amount).toFixed(2)}</td>
-                                                        <td className="py-2 pr-3 text-emerald-600 dark:text-emerald-400">₹{Number(inv.paid_amount).toFixed(2)}</td>
-                                                        <td className="py-2 pr-3 font-medium text-rose-600 dark:text-rose-400">₹{Number(inv.balance_amount).toFixed(2)}</td>
+                                                        <td className="py-2 pr-3 text-emerald-600 dark:text-emerald-400">{formatPercentage(inv.paid_amount, inv.total_amount)}</td>
+                                                        <td className="py-2 pr-3 text-rose-600 dark:text-rose-400">{formatPercentage(inv.balance_amount, inv.total_amount)}</td>
                                                         <td className="py-2 pr-3"><StatusBadge value={inv.status} /></td>
                                                     </tr>
                                                 ))}
@@ -1216,6 +1358,173 @@ export default function BillingWorkspace({ variant = "super", projects = [], raw
             </Modal>
         </ConstructionShell>
     );
+}
+
+function BillingMetricCard({ label, value, icon: Icon, color, hint }) {
+    const colorClasses = {
+        violet: "bg-violet-50 text-violet-600 dark:bg-violet-950/40 dark:text-violet-300",
+        sky: "bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300",
+        emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300",
+        orange: "bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-300",
+        teal: "bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-300",
+        blue: "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300",
+    };
+
+    return (
+        <div className="relative min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-start gap-2.5">
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${colorClasses[color]}`}><Icon className="h-4 w-4" /></span>
+                <div className="min-w-0">
+                    <p className="truncate text-[10px] font-medium text-slate-500 dark:text-slate-400">{label}</p>
+                    <p className="mt-1 truncate text-base font-bold tracking-tight text-slate-900 dark:text-white">{value}</p>
+                    <p className="mt-1 text-[9px] text-slate-400">{hint || "Current total"}</p>
+                </div>
+            </div>
+            <div className="absolute -bottom-2 right-0 h-7 w-16 rounded-tl-full bg-gradient-to-t from-indigo-100/70 to-transparent dark:from-indigo-950/50" />
+        </div>
+    );
+}
+
+function ChartCard({ title, icon: Icon, accent, children }) {
+    const accentClasses = {
+        violet: "bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300",
+        blue: "bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300",
+        emerald: "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300",
+    };
+
+    return (
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center gap-2 border-b border-slate-100 px-3.5 py-2.5 dark:border-slate-800">
+                <span className={`flex h-6 w-6 items-center justify-center rounded-md ${accentClasses[accent]}`}><Icon className="h-3.5 w-3.5" /></span>
+                <h2 className="text-xs font-semibold text-slate-800 dark:text-slate-100">{title}</h2>
+            </div>
+            <div className="p-3">{children}</div>
+        </section>
+    );
+}
+
+function ChartLegend({ items }) {
+    return (
+        <div className="flex items-center justify-center gap-4">
+            {items.map((item) => (
+                <span key={item.label} className="inline-flex items-center gap-1.5 text-[10px] text-slate-500">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                    {item.label}
+                </span>
+            ))}
+        </div>
+    );
+}
+
+function BillingBarChart({ data }) {
+    const values = data.flatMap((row) => [Number(row.billedPercent || 0), Number(row.receivedPercent || 0)]);
+    const maxValue = Math.max(0, ...values);
+    const plotLeft = 44;
+    const plotTop = 10;
+    const plotWidth = 400;
+    const plotHeight = 126;
+    const slotWidth = plotWidth / Math.max(data.length, 1);
+    const barWidth = Math.min(10, slotWidth * 0.28);
+    const axisMax = 100;
+    const ticks = [0, 1 / 3, 2 / 3, 1];
+
+    return (
+        <div className="h-44 w-full min-w-0">
+            <svg viewBox="0 0 460 178" preserveAspectRatio="none" className="h-full w-full" role="img" aria-label="Monthly billed and received percentages">
+                <title>Monthly billed and received percentages</title>
+                {ticks.map((fraction) => {
+                    const y = plotTop + plotHeight * (1 - fraction);
+                    return (
+                        <g key={fraction}>
+                            <line x1={plotLeft} y1={y} x2={plotLeft + plotWidth} y2={y} stroke="#e2e8f0" strokeDasharray="3 4" />
+                            <text x={plotLeft - 5} y={y + 3} textAnchor="end" fill="#64748b" fontSize="9">
+                                {formatPercentage(axisMax * fraction, 100)}
+                            </text>
+                        </g>
+                    );
+                })}
+                {data.map((row, index) => {
+                    const center = plotLeft + (index + 0.5) * slotWidth;
+                    const billed = Math.max(0, Number(row.billedPercent || 0));
+                    const received = Math.max(0, Number(row.receivedPercent || 0));
+                    const billedHeight = (billed / axisMax) * plotHeight;
+                    const receivedHeight = (received / axisMax) * plotHeight;
+                    return (
+                        <g key={row.key}>
+                            {billed > 0 ? (
+                                <rect x={center - barWidth - 1} y={plotTop + plotHeight - billedHeight} width={barWidth} height={billedHeight} rx="2" fill="#6d36e8">
+                                    <title>{`${row.month} billed share: ${formatPercentage(billed, 100)}`}</title>
+                                </rect>
+                            ) : null}
+                            {received > 0 ? (
+                                <rect x={center + 1} y={plotTop + plotHeight - receivedHeight} width={barWidth} height={receivedHeight} rx="2" fill="#3b82f6">
+                                    <title>{`${row.month} received share: ${formatPercentage(received, 100)}`}</title>
+                                </rect>
+                            ) : null}
+                            <text x={center} y="160" textAnchor="middle" fill="#64748b" fontSize="9">{row.month}</text>
+                        </g>
+                    );
+                })}
+                {maxValue === 0 ? (
+                    <text x="244" y="76" textAnchor="middle" fill="#94a3b8" fontSize="11">No billing activity in this period</text>
+                ) : null}
+            </svg>
+        </div>
+    );
+}
+
+function DonutChart({ data, centerValue, centerLabel }) {
+    const values = data.map((item) => Number(item.value || 0));
+    const total = values.reduce((sum, value) => sum + Math.max(0, value), 0);
+    let angle = 0;
+    const gradient = total > 0
+        ? `conic-gradient(${data.map((item, index) => {
+            const value = Math.max(0, Number(item.value || 0));
+            const start = angle;
+            angle += (value / total) * 360;
+            return `${item.color} ${start}deg ${angle}deg`;
+        }).join(", ")})`
+        : "conic-gradient(#e2e8f0 0deg 360deg)";
+
+    return (
+        <div
+            role="img"
+            aria-label={`${centerLabel}: ${centerValue}`}
+            className="h-36 w-36 shrink-0 rounded-full p-[10px]"
+            style={{ backgroundImage: gradient }}
+        >
+            <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-white px-2 text-center dark:bg-slate-900">
+                <span className="max-w-full truncate text-sm font-bold text-slate-900 dark:text-white">{centerValue}</span>
+                <span className="mt-0.5 text-[9px] text-slate-500">{total === 0 ? "No data" : centerLabel}</span>
+            </div>
+        </div>
+    );
+}
+
+function formatCurrency(value) {
+    const amount = Number(value || 0);
+    return `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function percentageValue(value, total) {
+    const denominator = Number(total || 0);
+    if (denominator <= 0) return 0;
+    return Math.max(0, (Number(value || 0) / denominator) * 100);
+}
+
+function formatPercentage(value, total) {
+    if (Number(total || 0) <= 0) return "—";
+    return `${percentageValue(value, total).toFixed(0)}%`;
+}
+
+function parseBillingDate(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function monthKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function formatDate(dateString) {
