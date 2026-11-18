@@ -2974,6 +2974,13 @@ class ProjectController extends Controller
                 $uniqueBadges = array_values(array_filter($uniqueBadges, fn ($u) => strcasecmp($u, 'Driver') !== 0));
             }
 
+            $draftSignal = strtolower(implode(' ', array_filter([
+                implode(' ', $uniqueBadges),
+                $desigStr,
+                is_array($member->roles) ? implode(' ', array_filter($member->roles, 'is_scalar')) : (string) ($member->roles ?? ''),
+            ])));
+            $member->is_draft_person = (bool) preg_match('/draft[\s_-]?person|draftsman|drafter|draft[\s_-]?man|\bdraft\b/i', $draftSignal);
+
             $member->roles_list = $uniqueBadges;
             $member->role_badges = $uniqueBadges;
             $member->role_badge = !empty($uniqueBadges) ? implode(', ', $uniqueBadges) : null;

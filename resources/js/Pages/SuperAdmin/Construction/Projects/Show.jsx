@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMemo } from "react";
+import gsap from "gsap";
 import { useForm, router, usePage } from "@inertiajs/react";
 import { toast } from "react-hot-toast";
 import ConstructionShell from "@/Pages/Construction/Components/ConstructionShell";
@@ -10,11 +11,6 @@ import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
 import WorkflowTracker from "@/Pages/Construction/Components/WorkflowTracker";
 import Modal from "@/Components/Modal";
 import DynamicChecklistManager from "@/Pages/Construction/Components/DynamicChecklistManager";
-import SupervisorSingleScreenReview from "@/Pages/Construction/Components/SupervisorSingleScreenReview";
-import DraftingWorkflowPanel from "@/Pages/Construction/Components/DraftingWorkflowPanel";
-import AccountsVerificationPanel from "@/Pages/Construction/Components/AccountsVerificationPanel";
-import SurveySubmissionPanel from "@/Pages/Construction/Components/SurveySubmissionPanel";
-import WorkflowAuditTrail from "@/Pages/Construction/Components/WorkflowAuditTrail";
 import FieldNotesDisplay from "@/Pages/Construction/Components/FieldNotesDisplay";
 import ProjectActivityLog from "@/Pages/Construction/Components/ProjectActivityLog";
 import { getMemberRoleBadges, formatMemberSelectOption, formatMemberOptionLabel } from "@/lib/memberBadges";
@@ -358,49 +354,32 @@ export default function ProjectShow({ project, members, roles, activityLog, work
     ]);
 
     const canTransferTask = hasPerm("execution.edit");
-
-    const [activeWorkflowTab, setActiveWorkflowTab] = useState(() => isDraftPersonUser ? "drafting" : "supervisor");
+    const metricsGridRef = useRef(null);
 
     useEffect(() => {
-        if (isDraftPersonUser) {
-            setActiveWorkflowTab("drafting");
-        }
-    }, [isDraftPersonUser]);
+        if (!metricsGridRef.current) return;
 
-    const latestSubmission = project.survey_submissions?.[0] ?? null;
-    const latestDraftingJob = project.drafting_jobs?.[0] ?? null;
+        const ctx = gsap.context(() => {
+            const cards = metricsGridRef.current.querySelectorAll(".stat-card-item");
+            if (cards.length > 0) {
+                gsap.fromTo(
+                    cards,
+                    { opacity: 0, y: 12, scale: 0.96 },
+                    {
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        duration: 0.34,
+                        stagger: 0.03,
+                        ease: "power2.out",
+                        clearProps: "transform,opacity",
+                    }
+                );
+            }
+        }, metricsGridRef);
 
-    const [showDirectDraftUpload, setShowDirectDraftUpload] = useState(false);
-    const directDraftForm = useForm({
-        drafting_job_id: latestDraftingJob?.id || "",
-        drawing_type: "2D Floor Layout Plan",
-        drawing_no: `DWG-${project.project_code || "001"}`,
-        revision_no: (latestDraftingJob?.drawing_revisions?.[0]?.revision_no || 0) + 1,
-        khasra_number: latestDraftingJob?.khasra_number || project.khasra_number || "",
-        site_area: latestDraftingJob?.site_area || project.site_area || "",
-        scope_of_work: latestDraftingJob?.scope_of_work || project.scope_of_work || "",
-        changes_made: "",
-        notes: "",
-        dwg_file: null,
-        pdf_file: null,
-    });
-
-    const handleDirectDraftSubmit = (e) => {
-        e.preventDefault();
-        directDraftForm.post(route("super.construction.projects.tasks-v2.submit-draft", project.id), {
-            preserveScroll: true,
-            forceFormData: true,
-            onSuccess: () => {
-                directDraftForm.reset("changes_made", "notes", "dwg_file", "pdf_file");
-                setShowDirectDraftUpload(false);
-                toast.success("CAD Drawing revision submitted successfully!");
-            },
-            onError: (errs) => {
-                const first = Object.values(errs)[0];
-                if (first) toast.error(first);
-            },
-        });
-    };
+        return () => ctx.revert();
+    }, [project.id, isDraftPersonUser]);
 
     const taskCounts = workflowSummary?.task_counts ?? { total: 0, completed: 0, in_progress: 0, pending: 0 };
     const checklistCounts = workflowSummary?.checklist_counts ?? { total: 0, completed: 0 };
@@ -719,17 +698,6 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                             <button
                                 type="button"
                                 onClick={() => {
-                                    setShowDirectDraftUpload(true);
-                                    const el = document.getElementById("drafting-jobs-section");
-                                    el?.scrollIntoView({ behavior: "smooth" });
-                                }}
-                                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-indigo-500 transition"
-                            >
-                                <span>⬆ Upload CAD Revision</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
                                     const el = document.getElementById("survey-reference-section");
                                     el?.scrollIntoView({ behavior: "smooth" });
                                 }}
@@ -744,465 +712,43 @@ export default function ProjectShow({ project, members, roles, activityLog, work
 
             {/* Metric Stat Cards */}
             {isDraftPersonUser ? (
-                <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-                    <StatCard label="Drafting Jobs" value={metrics.draftingJobs} />
-                    <StatCard label="Approvals" value={metrics.approvals} />
-                    <StatCard label="Survey Submissions" value={metrics.submissions} />
-                    <StatCard label="Survey Plans" value={metrics.surveyPlans} />
-                    <StatCard label="Execution Tasks" value={metrics.executionTasks} />
-                    <StatCard label="Team Members" value={metrics.teamMembers} />
+                <div ref={metricsGridRef} className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+                    <StatCard compact label="Drafting Jobs" value={metrics.draftingJobs} />
+                    <StatCard compact label="Approvals" value={metrics.approvals} />
+                    <StatCard compact label="Survey Submissions" value={metrics.submissions} />
+                    <StatCard compact label="Survey Plans" value={metrics.surveyPlans} />
+                    <StatCard compact label="Execution Tasks" value={metrics.executionTasks} />
+                    <StatCard compact label="Team Members" value={metrics.teamMembers} />
                 </div>
             ) : (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-                    <StatCard label="Budget Versions" value={metrics.budgets} />
-                    <StatCard label="Team Members" value={metrics.teamMembers} />
-                    <StatCard label="Survey Plans" value={metrics.surveyPlans} />
-                    <StatCard label="Survey Submissions" value={metrics.submissions} />
-                    <StatCard label="Drafting Jobs" value={metrics.draftingJobs} />
-                    <StatCard label="Approvals" value={metrics.approvals} />
-                    <StatCard label="Execution Tasks" value={metrics.executionTasks} />
-                    <StatCard label="Daily Progress" value={metrics.dailyProgressReports} />
-                    <StatCard label="Attendance" value={metrics.attendanceRecords} />
-                    <StatCard label="Material Stock" value={metrics.materialStocks} />
-                    <StatCard label="Invoices" value={metrics.clientInvoices} />
-                    <StatCard label="Handovers" value={metrics.handovers} />
+                <div ref={metricsGridRef} className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+                    <StatCard compact label="Budget Versions" value={metrics.budgets} />
+                    <StatCard compact label="Team Members" value={metrics.teamMembers} />
+                    <StatCard compact label="Survey Plans" value={metrics.surveyPlans} />
+                    <StatCard compact label="Survey Submissions" value={metrics.submissions} />
+                    <StatCard compact label="Drafting Jobs" value={metrics.draftingJobs} />
+                    <StatCard compact label="Approvals" value={metrics.approvals} />
+                    <StatCard compact label="Execution Tasks" value={metrics.executionTasks} />
+                    <StatCard compact label="Daily Progress" value={metrics.dailyProgressReports} />
+                    <StatCard compact label="Attendance" value={metrics.attendanceRecords} />
+                    <StatCard compact label="Material Stock" value={metrics.materialStocks} />
+                    <StatCard compact label="Invoices" value={metrics.clientInvoices} />
+                    <StatCard compact label="Handovers" value={metrics.handovers} />
                 </div>
             )}
 
-            {/* Workflow Stage Management Panels */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-                    <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                            {isDraftPersonUser ? "Drafting Stage Workflow" : "5-Stage Complete Workflow Management"}
-                        </h3>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-semibold">
-                        {!isDraftPersonUser && (
-                            <button
-                                type="button"
-                                onClick={() => setActiveWorkflowTab("supervisor")}
-                                className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "supervisor"
-                                    ? "bg-indigo-600 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-                                    }`}
-                            >
-                                Supervisor Review
-                            </button>
-                        )}
-                        {!isDraftPersonUser && (
-                            <button
-                                type="button"
-                                onClick={() => setActiveWorkflowTab("survey")}
-                                className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "survey"
-                                    ? "bg-sky-600 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-                                    }`}
-                            >
-                                Stage 1: Survey
-                            </button>
-                        )}
-                        <button
-                            type="button"
-                            onClick={() => setActiveWorkflowTab("drafting")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "drafting"
-                                ? "bg-indigo-600 text-white shadow-sm"
-                                : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-                                }`}
-                        >
-                            Stage 2: Drafting
-                        </button>
-                        {!isDraftPersonUser && (
-                            <button
-                                type="button"
-                                onClick={() => setActiveWorkflowTab("accounts")}
-                                className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "accounts"
-                                    ? "bg-amber-600 text-white shadow-sm"
-                                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-                                    }`}
-                            >
-                                Stage 3: Accounts
-                            </button>
-                        )}
-                        <button
-                            type="button"
-                            onClick={() => setActiveWorkflowTab("audit")}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${activeWorkflowTab === "audit"
-                                ? "bg-slate-700 text-white shadow-sm"
-                                : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-                                }`}
-                        >
-                            Audit Trail Logs
-                        </button>
-                    </div>
-                </div>
-
-                {activeWorkflowTab === "supervisor" && !isDraftPersonUser && (
-                    <SupervisorSingleScreenReview
-                        project={project}
-                        submitRoute="super.construction.projects.workflow.supervisor-review"
-                    />
-                )}
-
-                {activeWorkflowTab === "survey" && !isDraftPersonUser && (
-                    <SurveySubmissionPanel
-                        project={project}
-                        submitSurveyRoute="super.construction.projects.workflow.submit-survey"
-                        isSurveyRole={true}
-                    />
-                )}
-
-                {activeWorkflowTab === "drafting" && (
-                    <DraftingWorkflowPanel
-                        project={project}
-                        acceptRoute="super.construction.projects.workflow.accept-drafting"
-                        submitDraftRoute="super.construction.projects.workflow.submit-draft"
-                        verifyRoute="super.construction.projects.workflow.verify-draft"
-                        isDraftRole={true}
-                    />
-                )}
-
-                {activeWorkflowTab === "accounts" && !isDraftPersonUser && (
-                    <AccountsVerificationPanel
-                        project={project}
-                        submitAccountsRoute="super.construction.projects.workflow.submit-accounts"
-                        isAccountsRole={true}
-                    />
-                )}
-
-                {activeWorkflowTab === "audit" && (
-                    <WorkflowAuditTrail logs={project.workflow_logs} />
-                )}
-            </div>
-
-            {/* Drafting Jobs & Drawing Approvals (Prioritized for Draft Persons) */}
-            <div id="drafting-jobs-section" className="grid gap-6 xl:grid-cols-[1.4fr,1fr]">
+            {/* Survey References */}
+            <div id="survey-reference-section" className="grid gap-4 xl:grid-cols-3 items-stretch">
                 <SectionCard
-                    title="Drafting Jobs & CAD Submissions"
-                    description="Approved survey data moves here for CAD work, revisions, and final drawing handoff."
+                    title="Survey Plans"
+                    description="Survey planning, assigned members, and submitted field-duty payloads."
+                    className="xl:col-span-2 flex flex-col"
                     actions={
-                        <button
-                            type="button"
-                            onClick={() => setShowDirectDraftUpload((prev) => !prev)}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition"
-                        >
-                            <span>{showDirectDraftUpload ? "✕ Close Form" : "+ Upload CAD Revision"}</span>
-                        </button>
+                        <span className="inline-flex items-center rounded-full border border-indigo-200/70 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
+                            {project.survey_plans?.length || 0} {(project.survey_plans?.length || 0) === 1 ? "Plan" : "Plans"}
+                        </span>
                     }
                 >
-                    {/* Direct CAD Upload Form */}
-                    {showDirectDraftUpload && (
-                        <form
-                            onSubmit={handleDirectDraftSubmit}
-                            className="mb-6 rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/60 via-white to-slate-50 p-5 shadow-sm dark:border-indigo-900/60 dark:from-slate-900 dark:to-slate-950 space-y-4"
-                        >
-                            <div className="flex items-center justify-between border-b border-indigo-100 dark:border-slate-800 pb-3">
-                                <div>
-                                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                                        Upload CAD Drawing Revision
-                                    </h4>
-                                    <p className="text-xs text-slate-500">
-                                        Upload DWG drawing file and PDF sheet for supervisor approval.
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowDirectDraftUpload(false)}
-                                    className="rounded-lg p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                        Drawing Type *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={directDraftForm.data.drawing_type}
-                                        onChange={(e) => directDraftForm.setData("drawing_type", e.target.value)}
-                                        placeholder="e.g. 2D Floor Layout Plan, Contour Map"
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                        Drawing Number *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={directDraftForm.data.drawing_no}
-                                        onChange={(e) => directDraftForm.setData("drawing_no", e.target.value)}
-                                        placeholder="e.g. DWG-PRJ-00003-01"
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                        Khasra Number
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={directDraftForm.data.khasra_number}
-                                        onChange={(e) => directDraftForm.setData("khasra_number", e.target.value)}
-                                        placeholder="e.g. 142/3, 144/1"
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                        Site Area
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={directDraftForm.data.site_area}
-                                        onChange={(e) => directDraftForm.setData("site_area", e.target.value)}
-                                        placeholder="e.g. 2,500 sq ft / 1.5 Acres"
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                        Revision Number
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={directDraftForm.data.revision_no}
-                                        onChange={(e) => directDraftForm.setData("revision_no", e.target.value)}
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                        Changes Made in this Revision
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={directDraftForm.data.changes_made}
-                                        onChange={(e) => directDraftForm.setData("changes_made", e.target.value)}
-                                        placeholder="Summary of modifications or feedback addressed..."
-                                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                    Scope of Work
-                                </label>
-                                <textarea
-                                    rows={2}
-                                    value={directDraftForm.data.scope_of_work}
-                                    onChange={(e) => directDraftForm.setData("scope_of_work", e.target.value)}
-                                    placeholder="Scope of CAD drafting, layout specification, boundary details..."
-                                    className="w-full rounded-xl border border-slate-300 p-2.5 text-xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                />
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                        CAD DWG / DXF File
-                                    </label>
-                                    <input
-                                        type="file"
-                                        accept=".dwg,.dxf,.zip"
-                                        onChange={(e) => directDraftForm.setData("dwg_file", e.target.files[0])}
-                                        className="w-full rounded-xl border border-slate-300 p-1.5 text-xs text-slate-700 file:mr-2 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                        PDF Drawing / Sheet
-                                    </label>
-                                    <input
-                                        type="file"
-                                        accept=".pdf"
-                                        onChange={(e) => directDraftForm.setData("pdf_file", e.target.files[0])}
-                                        className="w-full rounded-xl border border-slate-300 p-1.5 text-xs text-slate-700 file:mr-2 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                    Notes & Scale Details
-                                </label>
-                                <textarea
-                                    rows={2}
-                                    value={directDraftForm.data.notes}
-                                    onChange={(e) => directDraftForm.setData("notes", e.target.value)}
-                                    placeholder="Scale ratio, coordinate system, layers, draftsman remarks..."
-                                    className="w-full rounded-xl border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                />
-                            </div>
-
-                            <div className="flex items-center justify-end gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowDirectDraftUpload(false)}
-                                    className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={directDraftForm.processing}
-                                    className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white shadow hover:bg-indigo-500 disabled:opacity-60"
-                                >
-                                    {directDraftForm.processing ? "Uploading Drawing..." : "Submit Drawing for Approval"}
-                                </button>
-                            </div>
-                        </form>
-                    )}
-
-                    {project.drafting_jobs?.length ? (
-                        <div className="space-y-4">
-                            {project.drafting_jobs.map((job) => (
-                                <div key={job.id} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <p className="font-semibold text-slate-900 dark:text-white">Drafting Job #{job.id}</p>
-                                            <p className="text-sm text-slate-500">
-                                                Assigned to {job.assigned_to?.name || "Unassigned"} • Due {formatDate(job.due_date) || "Not set"}
-                                            </p>
-                                        </div>
-                                        <StatusBadge value={job.status} />
-                                    </div>
-                                    {(job.khasra_number || project.khasra_number || job.site_area || project.site_area || job.scope_of_work || project.scope_of_work) && (
-                                        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
-                                            {(job.khasra_number || project.khasra_number) && (
-                                                <span className="rounded-md bg-indigo-50 px-2.5 py-1 font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-                                                    <strong>Khasra:</strong> {job.khasra_number || project.khasra_number}
-                                                </span>
-                                            )}
-                                            {(job.site_area || project.site_area) && (
-                                                <span className="rounded-md bg-amber-50 px-2.5 py-1 font-medium text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
-                                                    <strong>Area:</strong> {job.site_area || project.site_area}
-                                                </span>
-                                            )}
-                                            {(job.scope_of_work || project.scope_of_work) && (
-                                                <span className="rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                                    <strong>Scope:</strong> {job.scope_of_work || project.scope_of_work}
-                                                </span>
-                                            )}
-                                        </div>
-                                    )}
-                                    <div className="mt-4 space-y-3">
-                                        {(job.drawing_revisions || []).length ? (
-                                            job.drawing_revisions.map((revision) => (
-                                                <div key={revision.id} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
-                                                    <div className="flex flex-wrap items-center justify-between gap-3">
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-bold text-slate-900 dark:text-white">
-                                                                    Revision {revision.revision_no}
-                                                                </span>
-                                                                {revision.drawing_type && (
-                                                                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                                                        {revision.drawing_type}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <p className="text-xs text-slate-500 mt-1">
-                                                                Uploaded by {revision.uploaded_by?.name || "Unknown"} • {formatDateTime(revision.uploaded_at) || "No upload time"}
-                                                            </p>
-                                                        </div>
-                                                        <StatusBadge value={revision.status} />
-                                                    </div>
-
-                                                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
-                                                        {revision.dwg_document ? (
-                                                            <a
-                                                                href={route("super.construction.documents.download", revision.dwg_document.id)}
-                                                                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 font-semibold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:hover:bg-indigo-900 transition"
-                                                            >
-                                                                <span>💾 DWG: {revision.dwg_document.original_name}</span>
-                                                            </a>
-                                                        ) : (
-                                                            <span className="text-slate-400">DWG: Not uploaded</span>
-                                                        )}
-                                                        {revision.pdf_document ? (
-                                                            <a
-                                                                href={route("super.construction.documents.download", revision.pdf_document.id)}
-                                                                className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-3 py-1.5 font-semibold text-rose-700 hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-300 dark:hover:bg-rose-900 transition"
-                                                            >
-                                                                <span>📄 PDF: {revision.pdf_document.original_name}</span>
-                                                            </a>
-                                                        ) : (
-                                                            <span className="text-slate-400">PDF: Not uploaded</span>
-                                                        )}
-                                                    </div>
-
-                                                    {revision.changes_made && (
-                                                        <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                                                            <span className="font-semibold text-slate-700 dark:text-slate-200">Changes:</span> {revision.changes_made}
-                                                        </p>
-                                                    )}
-                                                    {revision.notes && (
-                                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                            <span className="font-semibold">Notes:</span> {revision.notes}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <EmptyState title="No revisions uploaded yet." description="Click '+ Upload CAD Revision' above to upload your first drawing." />
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <EmptyState title="No drafting jobs yet." description="Click '+ Upload CAD Revision' above to create and upload the initial drawing revision." />
-                    )}
-                </SectionCard>
-
-                <SectionCard title="Drawing Approvals" description="Final Phase 2 gate before the project becomes ready for construction.">
-                    {project.drawing_approvals?.length ? (
-                        <div className="space-y-3">
-                            {project.drawing_approvals.map((approval) => (
-                                <div key={approval.id} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div>
-                                            <p className="font-semibold text-slate-900 dark:text-white">Approval #{approval.id}</p>
-                                            <p className="text-xs text-slate-500">Revision #{approval.drawing_revision_id}</p>
-                                        </div>
-                                        <StatusBadge value={approval.decision} />
-                                    </div>
-                                    {approval.remarks && (
-                                        <div className="mt-2 rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
-                                            <p className="font-semibold">Reviewer Feedback:</p>
-                                            <p className="mt-0.5 whitespace-pre-wrap">{approval.remarks}</p>
-                                        </div>
-                                    )}
-                                    <p className="mt-2 text-[11px] text-slate-400">
-                                        Requested {formatDateTime(approval.requested_at) || formatDate(approval.created_at)}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <EmptyState title="No drawing approvals yet." description="A submitted drawing revision will automatically generate an approval record here." />
-                    )}
-                </SectionCard>
-            </div>
-
-            {/* Survey References */}
-            <div id="survey-reference-section" className="grid gap-6 xl:grid-cols-3">
-                <SectionCard title="Survey Plans" description="Survey planning, assigned members, and submitted field-duty payloads." className="xl:col-span-2">
                     {project.survey_plans?.length ? (
                         <div className="space-y-4">
                             {project.survey_plans.map((plan) => (
@@ -1214,7 +760,16 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                     )}
                 </SectionCard>
 
-                <SectionCard title="Survey Submission Queue" description="Review outcomes with full GPS/photos/report references before drafting starts.">
+                <SectionCard
+                    title="Survey Submission Queue"
+                    description="Review outcomes with full GPS/photos/report references before drafting starts."
+                    className="flex flex-col"
+                    actions={
+                        <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            {project.survey_submissions?.length || 0} {(project.survey_submissions?.length || 0) === 1 ? "Submission" : "Submissions"}
+                        </span>
+                    }
+                >
                     {project.survey_submissions?.length ? (
                         <div className="space-y-3 max-h-[820px] overflow-y-auto pr-1">
                             {project.survey_submissions.map((submission) => (
@@ -1444,7 +999,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                                     <span className="text-sm leading-none">{option.icon}</span>
                                     <span>{option.label}</span>
                                     <span
-                                        className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                                        className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                                             isSelected
                                                 ? "bg-white/25 text-white"
                                                 : option.count > 0
@@ -2013,6 +1568,69 @@ function TaskRow({
         [projectTeamMembers]
     );
 
+    const projectDraftsmen = useMemo(
+        () => projectTeamMembers.filter((member) => member.is_draft_person),
+        [projectTeamMembers]
+    );
+
+    const defaultDraftsmanId = useMemo(
+        () => (projectDraftsmen[0]?.member_id ? String(projectDraftsmen[0].member_id) : ""),
+        [projectDraftsmen]
+    );
+
+    const allCompanyDraftsmen = useMemo(() => {
+        const map = new Map();
+
+        for (const tm of projectDraftsmen) {
+            const id = String(tm.member_id || tm.id);
+            if (!id) continue;
+            map.set(id, {
+                id,
+                member_id: tm.member_id || tm.id,
+                name: tm.name,
+                email: tm.email || "",
+                role_name: tm.role_name || "Draft Person",
+                is_draft_person: true,
+                is_project_member: true,
+            });
+        }
+
+        const employeeList = Array.isArray(members) ? members : [];
+        for (const emp of employeeList) {
+            const id = String(emp.id || emp.member_id || "");
+            if (!id || map.has(id)) continue;
+
+            const signal = [
+                emp.role_badge,
+                ...(Array.isArray(emp.role_badges) ? emp.role_badges : []),
+                ...(Array.isArray(emp.roles_list) ? emp.roles_list : []),
+                emp.designation_text,
+                typeof emp.designation === "string" ? emp.designation : "",
+                ...(Array.isArray(emp.roles) ? emp.roles : []),
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+
+            const isDraftEmployee = Boolean(emp.is_draft_person)
+                || /draft[\s_-]?person|draftsman|drafter|draft[\s_-]?man|\bdraft\b/i.test(signal);
+
+            if (!isDraftEmployee) continue;
+
+            map.set(id, {
+                id,
+                member_id: emp.id,
+                name: emp.name || `Employee #${id}`,
+                email: emp.email || "",
+                role_name: emp.role_badge || "Draft Person",
+                is_draft_person: true,
+                is_project_member: false,
+            });
+        }
+
+        return Array.from(map.values());
+    }, [projectDraftsmen, members]);
+
     // Role and Drafting Job Resolution
     const isDraftPersonUser = useMemo(() => {
         if (activeRoleSlug === "draft_person" || activeRoleSlug === "drafter" || activeRoleSlug === "draftsman") return true;
@@ -2040,9 +1658,10 @@ function TaskRow({
 
         const isDraftStatus = task.status === "drafting_in_progress" || (task.assignees || []).some((a) => isActiveAssignment(a) && a.assignment_role === "draft_person");
         if (isDraftStatus && jobs.length > 0) {
-            const taskSupervisorId = task.supervisor_member_id || task.supervisor?.id || task.member_id;
-            const matchingJob = jobs.find((j) => Number(j.assigned_to_member_id) === Number(taskSupervisorId));
-            return matchingJob || jobs[0];
+            const draftAssignee = (task.assignees || []).find((a) => isActiveAssignment(a) && a.assignment_role === "draft_person");
+            const targetDraftId = draftAssignee?.member_id || task.supervisor_member_id || task.supervisor?.id || task.member_id;
+            const matchingJob = jobs.find((j) => Number(j.assigned_to_member_id) === Number(targetDraftId));
+            return matchingJob || null;
         }
         return null;
     }, [project.drafting_jobs, project.draftingJobs, task, taskVisits]);
@@ -2425,7 +2044,7 @@ function TaskRow({
 
     return (
         <>
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 sm:p-5 shadow-xs transition hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700">
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-5 shadow-xs transition hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700">
                 {/* 1. Header: Task Code, Title, Badges & Administrative Actions */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-2 min-w-0">
@@ -2503,7 +2122,7 @@ function TaskRow({
                             </span>
                             <span className="truncate">{assignedDraftPerson?.name || task.supervisor?.name || "Unassigned"}</span>
                             {isDraftingAssigned && (
-                                <span className="ml-1 rounded bg-violet-100 px-1 py-0.2 text-[9px] font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                                <span className="ml-1 rounded bg-violet-100 px-1 py-0.5 text-[9px] font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
                                     CAD
                                 </span>
                             )}
@@ -2584,7 +2203,9 @@ function TaskRow({
                             projectId={project.id}
                             taskSource={task._source === "legacy" ? "execution" : "task"}
                             routeName="super.construction.projects.tasks.assign-draftsman"
-                            draftsmen={projectTeamMembers.filter((member) => member.is_draft_person)}
+                            draftsmen={allCompanyDraftsmen}
+                            defaultDraftsmanId={defaultDraftsmanId}
+                            hasSurveyVisits={taskVisits.length > 0}
                             authorized={Boolean(propCanAssignDraftsman)}
                         />
                         <button
@@ -2599,7 +2220,7 @@ function TaskRow({
                             </svg>
                             <span>View Details</span>
                             {taskVisits.length > 0 && (
-                                <span className="rounded-full bg-sky-200/90 px-1.5 py-0.2 text-[10px] font-bold text-sky-800 dark:bg-sky-800 dark:text-sky-200">
+                                <span className="rounded-full bg-sky-200/90 px-1.5 py-0.5 text-[10px] font-bold text-sky-800 dark:bg-sky-800 dark:text-sky-200">
                                     {taskVisits.length}
                                 </span>
                             )}
@@ -3097,7 +2718,7 @@ function TaskRow({
                                     {taskVisits.map((v, vIdx) => (
                                         <div
                                             key={v.id || vIdx}
-                                            className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4.5 shadow-xs dark:border-slate-800 dark:bg-slate-950"
+                                            className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 shadow-xs dark:border-slate-800 dark:bg-slate-950"
                                         >
                                             {/* Submitter Info Card */}
                                             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-slate-800">
@@ -3364,7 +2985,7 @@ function TaskRow({
 
                             {/* Drafting & CAD Drawing Phase Section */}
                             {((isSurveyorTask && isSurveyApproved) || isDraftingAssigned || isCurrentUserDraftPerson || drawingRevisions.length > 0) && (
-                                <div id="drafting-cad-workspace-card" className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-4.5 dark:border-indigo-900/60 dark:bg-indigo-950/20 mt-6 shadow-sm">
+                                <div id="drafting-cad-workspace-card" className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-5 dark:border-indigo-900/60 dark:bg-indigo-950/20 mt-6 shadow-sm">
                                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 pb-3 dark:border-indigo-900/60">
                                         <div className="flex items-center gap-2">
                                             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600 text-base text-white shadow-xs">
@@ -4323,51 +3944,66 @@ function SurveyPlanCard({ plan }) {
     const visits = plan.visits || [];
 
     return (
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-2xs transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900">
+        <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-5 shadow-xs transition-all duration-200 hover:border-indigo-300/80 hover:bg-white hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-500/40">
+            {/* Card Header: Code Badge, Title & Status */}
             <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="inline-flex items-center rounded-lg border border-indigo-200/70 bg-indigo-50 px-2.5 py-1 font-mono text-xs font-bold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
                             {plan.survey_code}
                         </span>
-                        <h4 className="font-bold text-slate-900 dark:text-white">
+                        <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
                             {plan.title}
                         </h4>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                        Planned Date: {formatDate(plan.planned_date) || "No planned date"}
-                        {plan.site_address ? ` • 📍 ${plan.site_address}` : " • No site address recorded."}
-                    </p>
+
+                    {/* Metadata Row: Planned Date & Site Address */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="inline-flex items-center gap-1.5">
+                            <span>📅</span>
+                            <span>Planned Date:</span>
+                            <strong className="font-semibold text-slate-700 dark:text-slate-200">
+                                {formatDate(plan.planned_date) || "Not scheduled"}
+                            </strong>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                            <span>📍</span>
+                            <span className="truncate max-w-md text-slate-600 dark:text-slate-300">
+                                {plan.site_address || "No site address recorded"}
+                            </span>
+                        </span>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="shrink-0 flex items-center gap-2">
                     <StatusBadge value={plan.status_key || plan.status} />
                 </div>
             </div>
 
             {/* Assigned Survey Team Members */}
             {(plan.plan_members || []).length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
+                <div className="mt-4 flex flex-wrap items-center gap-2">
                     {plan.plan_members.map((member) => (
                         <span
                             key={member.id}
-                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-2xs dark:border-slate-700/80 dark:bg-slate-800/90 dark:text-slate-200"
                         >
-                            <span>👤</span>
-                            <span>{member.member?.name || "Unknown"}</span>
-                            <span className="text-slate-400">•</span>
-                            <span className="text-slate-500 dark:text-slate-400">{member.role_in_survey}</span>
+                            <span className="text-[11px]">👤</span>
+                            <span className="font-semibold">{member.member?.name || "Unknown"}</span>
+                            <span className="text-slate-300 dark:text-slate-600">•</span>
+                            <span className="capitalize text-slate-500 dark:text-slate-400">{member.role_in_survey}</span>
                         </span>
                     ))}
                 </div>
             )}
 
             {/* Bottom bar with Visits Summary & View More button */}
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5 dark:border-slate-800">
+                <div className="flex items-center gap-2.5 text-xs text-slate-500 dark:text-slate-400">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-indigo-200/60 bg-indigo-50 text-[11px] font-bold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-300">
                         {visits.length}
                     </span>
-                    <span>
+                    <span className="font-medium">
                         {visits.length === 0
                             ? "No field check-in visits yet"
                             : `${visits.length} field visit${visits.length > 1 ? "s" : ""} recorded`}
@@ -4377,16 +4013,16 @@ function SurveyPlanCard({ plan }) {
                 <button
                     type="button"
                     onClick={() => setShowModal(true)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 shadow-2xs transition hover:bg-indigo-100 hover:border-indigo-300 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
+                    className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/90 px-4 py-2 text-xs font-semibold text-indigo-700 shadow-xs transition hover:border-indigo-300 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-200 dark:hover:border-indigo-400 dark:hover:bg-indigo-500/25"
                 >
                     <span>👁️</span>
                     <span>View More Details</span>
                     {visits.length > 0 && (
-                        <span className="rounded-full bg-indigo-200/90 px-1.5 py-0.2 text-[10px] font-bold text-indigo-800 dark:bg-indigo-800 dark:text-indigo-200">
+                        <span className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white dark:bg-indigo-500">
                             {visits.length}
                         </span>
                     )}
-                    <span>↗</span>
+                    <span className="text-indigo-500 dark:text-indigo-300">↗</span>
                 </button>
             </div>
 
@@ -4423,7 +4059,7 @@ function SurveyPlanCard({ plan }) {
                         {/* Modal Body - Scrollable */}
                         <div className="flex-1 space-y-6 overflow-y-auto p-6">
                             {/* Plan Overview Card */}
-                            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-indigo-50/20 p-4.5 shadow-2xs dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
+                            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-indigo-50/20 p-5 shadow-2xs dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
                                 <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                                     Survey Plan Overview
                                 </h4>

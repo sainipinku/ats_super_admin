@@ -595,7 +595,7 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                             >
                                 <span>{cat.label}</span>
                                 <span
-                                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                                         isActive
                                             ? "bg-white/20 text-white"
                                             : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
@@ -716,30 +716,30 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                                 {(meta.day_number || meta.project_code || meta.from || meta.scope || meta.task_code) && (
                                                     <div className="inline-flex flex-wrap items-center gap-1.5">
                                                         {meta.day_number && (
-                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                                                                 <Calendar className="h-2.5 w-2.5 text-slate-400" />
                                                                 Day {meta.day_number}
                                                             </span>
                                                         )}
                                                         {(meta.project_code || meta.project_id) && (
-                                                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.2 text-[10px] font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
                                                                 <Tag className="h-2.5 w-2.5 text-indigo-400" />
                                                                 {meta.project_code || `PRJ-${meta.project_id}`}
                                                             </span>
                                                         )}
                                                         {meta.task_code && (
-                                                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-1.5 py-0.2 text-[10px] font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                                                                 <ListTodo className="h-2.5 w-2.5 text-blue-400" />
                                                                 {meta.task_code}
                                                             </span>
                                                         )}
                                                         {meta.scope && (
-                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                                                                 Scope: {meta.scope}
                                                             </span>
                                                         )}
                                                         {meta.from && meta.to && (
-                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                                                                 <ArrowLeftRight className="h-2.5 w-2.5 text-slate-400" />
                                                                 {meta.from} → {meta.to}
                                                             </span>
@@ -797,7 +797,7 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                         onMouseEnter={handleCardMouseEnter}
                                         onMouseLeave={handleCardMouseLeave}
                                         onClick={() => setSelectedActivity(item)}
-                                        className="activity-log-card group relative flex cursor-pointer flex-col justify-between rounded-2xl border border-slate-200/80 bg-white/80 p-4.5 shadow-2xs transition-all duration-200 hover:border-indigo-300/80 hover:bg-white hover:shadow-md hover:shadow-indigo-500/5 dark:border-slate-800/80 dark:bg-slate-900/70 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900"
+                                        className="activity-log-card group relative flex cursor-pointer flex-col justify-between rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-2xs transition-all duration-200 hover:border-indigo-300/80 hover:bg-white hover:shadow-md hover:shadow-indigo-500/5 dark:border-slate-800/80 dark:bg-slate-900/70 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900"
                                     >
                                         <div>
                                             {/* Top Row: Module Badge + Live Ping + Action Pill */}
@@ -953,7 +953,7 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                             <ModuleIcon className="h-3.5 w-3.5" />
                                         </span>
 
-                                        <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4.5 shadow-2xs transition-all hover:border-indigo-300 hover:bg-white hover:shadow-md dark:border-slate-800 dark:bg-slate-900/80 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900">
+                                        <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-2xs transition-all hover:border-indigo-300 hover:bg-white hover:shadow-md dark:border-slate-800 dark:bg-slate-900/80 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900">
                                             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800/60">
                                                 <div className="flex items-center gap-2">
                                                     <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold border ${modMeta.colorClass}`}>

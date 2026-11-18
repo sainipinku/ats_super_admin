@@ -1,3 +1,6 @@
+import { useEffect, useRef, useState } from "react";
+import gsap from "gsap";
+
 const colorPresets = {
     indigo: {
         bg: "bg-indigo-50 dark:bg-indigo-950/40",
@@ -67,33 +70,90 @@ export default function StatCard({
     trend,
     trendLabel,
     onClick,
+    compact = false,
 }) {
     const preset = colorPresets[color] || colorPresets.indigo;
     const IconComp = icon;
     const Wrapper = onClick ? "button" : "div";
+    const cardRef = useRef(null);
+
+    const isPureInteger =
+        typeof value === "number" && Number.isFinite(value) && Number.isInteger(value);
+    const [displayValue, setDisplayValue] = useState(value);
+
+    useEffect(() => {
+        if (!cardRef.current) return;
+
+        const ctx = gsap.context(() => {
+            if (isPureInteger && value > 0) {
+                const counter = { val: 0 };
+                gsap.to(counter, {
+                    val: value,
+                    duration: 0.55,
+                    ease: "power2.out",
+                    onUpdate: () => setDisplayValue(Math.round(counter.val)),
+                });
+            } else {
+                setDisplayValue(value);
+            }
+        }, cardRef);
+
+        return () => ctx.revert();
+    }, [value, isPureInteger]);
+
+    const handleMouseEnter = () => {
+        if (!cardRef.current) return;
+        gsap.to(cardRef.current, {
+            y: -2,
+            duration: 0.18,
+            ease: "power1.out",
+            overwrite: "auto",
+        });
+    };
+
+    const handleMouseLeave = () => {
+        if (!cardRef.current) return;
+        gsap.to(cardRef.current, {
+            y: 0,
+            duration: 0.18,
+            ease: "power1.out",
+            overwrite: "auto",
+        });
+    };
 
     return (
         <Wrapper
+            ref={cardRef}
             onClick={onClick}
-            className={`group relative w-full text-left rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 dark:border-slate-800 dark:bg-slate-950 ${
-                onClick ? "cursor-pointer" : ""
-            }`}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            className={`stat-card-item group relative w-full text-left border border-slate-200/90 bg-white shadow-2xs transition-colors duration-200 hover:border-indigo-300/80 hover:shadow-md dark:border-slate-800 dark:bg-slate-950 dark:hover:border-indigo-500/40 ${
+                compact ? "rounded-xl px-3 py-2.5" : "rounded-2xl p-4"
+            } ${onClick ? "cursor-pointer" : ""}`}
         >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start justify-between gap-2.5">
                 <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 tracking-wide">
+                    <p
+                        className={`font-medium text-slate-500 dark:text-slate-400 truncate ${
+                            compact ? "text-[11px] tracking-normal" : "text-xs tracking-wide"
+                        }`}
+                    >
                         {label}
                     </p>
-                    <p className="mt-2.5 text-2xl font-bold text-slate-900 dark:text-white tracking-tight truncate">
-                        {value}
+                    <p
+                        className={`font-bold text-slate-900 dark:text-white tracking-tight truncate ${
+                            compact ? "mt-0.5 text-lg leading-tight" : "mt-1.5 text-2xl"
+                        }`}
+                    >
+                        {displayValue}
                     </p>
                     {hint ? (
-                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
                             {hint}
                         </p>
                     ) : null}
                     {trend !== undefined && trend !== null ? (
-                        <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium">
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium">
                             <span
                                 className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 ${
                                     Number(trend) >= 0
@@ -115,12 +175,16 @@ export default function StatCard({
 
                 {IconComp && iconPosition === "right" ? (
                     <div
-                        className={`shrink-0 flex items-center justify-center w-11 h-11 rounded-xl ring-1 ${preset.bg} ${preset.ring}`}
+                        className={`shrink-0 flex items-center justify-center rounded-xl ring-1 ${preset.bg} ${preset.ring} ${
+                            compact ? "w-8 h-8" : "w-10 h-10"
+                        }`}
                     >
                         <div
-                            className={`w-9 h-9 rounded-lg flex items-center justify-center ${preset.iconBg} ${preset.iconText}`}
+                            className={`rounded-lg flex items-center justify-center ${preset.iconBg} ${preset.iconText} ${
+                                compact ? "w-6 h-6" : "w-8 h-8"
+                            }`}
                         >
-                            <IconComp size={18} strokeWidth={2} />
+                            <IconComp size={compact ? 14 : 16} strokeWidth={2} />
                         </div>
                     </div>
                 ) : null}
@@ -128,9 +192,9 @@ export default function StatCard({
 
             {IconComp && iconPosition === "top" ? (
                 <div
-                    className={`absolute -top-3 left-5 w-12 h-12 rounded-xl shadow-lg ring-4 ring-white dark:ring-slate-950 ${preset.iconBg} ${preset.iconText} flex items-center justify-center`}
+                    className={`absolute -top-3 left-5 w-10 h-10 rounded-xl shadow-lg ring-4 ring-white dark:ring-slate-950 ${preset.iconBg} ${preset.iconText} flex items-center justify-center`}
                 >
-                    <IconComp size={22} strokeWidth={2} />
+                    <IconComp size={18} strokeWidth={2} />
                 </div>
             ) : null}
         </Wrapper>
