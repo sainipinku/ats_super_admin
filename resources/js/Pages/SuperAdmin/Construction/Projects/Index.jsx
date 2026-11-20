@@ -1000,7 +1000,13 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
                         <InputField form={form} name="khasra_number" label="Khasra Number / Land Parcel ID" placeholder="e.g. 142/3, 144/1" />
                         <InputField form={form} name="site_area" label="Site Area" placeholder="e.g. 2400 sq.ft / 2.5 Acres" />
                     </div>
-                    <TextAreaField form={form} name="scope_of_work" label="Scope of Work" rows={2} placeholder="Brief description of work scope, surveying & drafting requirements..." />
+                    <TextAreaField
+                        form={form}
+                        name="scope_of_work"
+                        label="Scope of Work"
+                        rows={3}
+                        placeholder="Enter detailed scope of work, deliverables, surveying & drafting requirements (shown & editable on Project Details)..."
+                    />
                     <TextAreaField form={form} name="project_address" label="Project Address" rows={2} />
                     <GoogleMapLocationSection
                         initialLat={form.data.latitude}

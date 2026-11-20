@@ -190,6 +190,41 @@ class ProjectController extends Controller
             ->first();
     }
 
+    public function updateScopeOfWork(
+        Project $project,
+        Request $request,
+        ConstructionActivityService $activityService
+    ) {
+        $actor = $this->constructionActor();
+        $accessibleProjectIds = $this->getAccessibleProjectIds($actor);
+        abort_unless($accessibleProjectIds->contains($project->id), 403, 'You are not assigned to this project.');
+
+        $validated = $request->validate([
+            'scope_of_work' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $scopeValue = isset($validated['scope_of_work']) ? trim($validated['scope_of_work']) : null;
+
+        $project->update([
+            'scope_of_work' => $scopeValue !== '' ? $scopeValue : null,
+        ]);
+
+        $activityService->log(
+            module: 'project',
+            action: 'updated_scope_of_work',
+            actor: $actor,
+            reference: $project,
+            companyId: $project->company_id,
+            projectId: $project->id,
+            meta: [
+                'project_code' => $project->project_code,
+            ],
+            request: $request
+        );
+
+        return back()->with('success', 'Scope of work updated successfully.');
+    }
+
     private function resolveUnifiedParentTaskId(Project $project, mixed $legacyParentId): ?int
     {
         if (empty($legacyParentId)) {

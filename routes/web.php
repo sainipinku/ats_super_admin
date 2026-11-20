@@ -377,6 +377,9 @@ Route::prefix('super/construction')
         Route::put('/projects/{project}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'update'])
             ->middleware('construction.permission:project.edit')
             ->name('projects.update');
+        Route::patch('/projects/{project}/scope-of-work', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'updateScopeOfWork'])
+            ->middleware('construction.permission:project.edit,project.manage')
+            ->name('projects.scope-of-work.update');
         Route::get('/projects/{project}', [App\Http\Controllers\SuperAdmin\Construction\ProjectController::class, 'show'])
             ->middleware('construction.permission:project.manage,project.view')
             ->name('projects.show');
@@ -700,6 +703,9 @@ Route::prefix('admin/construction')
         Route::get('/projects/{project}', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'show'])
             ->middleware('construction.permission:project.manage,project.view')
             ->name('projects.show');
+        Route::patch('/projects/{project}/scope-of-work', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'updateScopeOfWork'])
+            ->middleware('construction.permission:project.edit,project.manage')
+            ->name('projects.scope-of-work.update');
 
         Route::post('/projects/{project}/workflow/submit-survey', [App\Http\Controllers\Construction\ProjectWorkflowController::class, 'submitSurvey'])->name('projects.workflow.submit-survey');
         Route::post('/projects/{project}/workflow/accept-drafting', [App\Http\Controllers\Construction\ProjectWorkflowController::class, 'acceptDrafting'])->name('projects.workflow.accept-drafting');

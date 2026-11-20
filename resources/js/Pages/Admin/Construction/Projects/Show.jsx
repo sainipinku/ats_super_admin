@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import gsap from "gsap";
-import { usePage } from "@inertiajs/react";
+import { useForm, usePage } from "@inertiajs/react";
+import { toast } from "react-hot-toast";
 import ConstructionShell from "@/Pages/Construction/Components/ConstructionShell";
 import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
@@ -55,6 +56,30 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
 
     const canManageChecklist = hasPerm("execution.create") || hasPerm("execution.edit");
     const canAssignDraftsman = isRootSuperAdmin || hasPerm("execution.edit") || hasPerm("execution.manage");
+    const canEditScopeOfWork = isRootSuperAdmin || hasPerm("project.edit") || hasPerm("project.manage");
+    const [showScopeModal, setShowScopeModal] = useState(false);
+    const scopeOfWorkForm = useForm({
+        scope_of_work: project.scope_of_work || "",
+    });
+    const openScopeModal = () => {
+        scopeOfWorkForm.setData("scope_of_work", project.scope_of_work || "");
+        scopeOfWorkForm.clearErrors();
+        setShowScopeModal(true);
+    };
+    const submitScopeOfWork = (e) => {
+        e.preventDefault();
+        scopeOfWorkForm.patch(route("admin.construction.projects.scope-of-work.update", project.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowScopeModal(false);
+                toast.success("Scope of work updated successfully.");
+            },
+            onError: (errors) => {
+                const firstError = Object.values(errors)[0];
+                if (firstError) toast.error(firstError);
+            },
+        });
+    };
 
     const projectDraftsmenList = getProjectDraftsmen(project.team_members).map((m) => ({
         ...m,
@@ -572,25 +597,147 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
 
             <div className="grid gap-4 xl:grid-cols-2 items-stretch">
                 <SectionCard
-                    title="Survey Execution"
-                    description="Plan status, submitted GPS/photos/reports, and field activity."
+                    title="Scope of Work"
+                    description="Project scope of work, deliverables, and linked field survey plans."
                     className="flex flex-col"
                     actions={
-                        <span className="inline-flex items-center rounded-full border border-indigo-200/70 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
-                            {project.survey_plans?.length || 0} {(project.survey_plans?.length || 0) === 1 ? "Plan" : "Plans"}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {project.survey_plans?.length > 0 && (
+                                <span className="inline-flex items-center rounded-full border border-indigo-200/70 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
+                                    {project.survey_plans.length} {project.survey_plans.length === 1 ? "Plan" : "Plans"}
+                                </span>
+                            )}
+                            {canEditScopeOfWork && (
+                                <button
+                                    type="button"
+                                    onClick={openScopeModal}
+                                    className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-2xs transition hover:bg-indigo-100 hover:border-indigo-300 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200 dark:hover:bg-indigo-500/25"
+                                >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                    <span>Edit Scope of Work</span>
+                                </button>
+                            )}
+                        </div>
                     }
                 >
-                    {project.survey_plans?.length ? (
-                        <div className="space-y-4">
-                            {project.survey_plans.map((plan) => (
-                                <SurveyPlanCard key={plan.id} plan={plan} />
-                            ))}
+                    <div className="space-y-4">
+                        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 pb-2 dark:border-slate-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                                    Defined Project Scope
+                                </span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {project.khasra_number && (
+                                        <span className="inline-flex items-center rounded-md bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-700">
+                                            Khasra: {project.khasra_number}
+                                        </span>
+                                    )}
+                                    {project.site_area && (
+                                        <span className="inline-flex items-center rounded-md bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-700">
+                                            Area: {project.site_area}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {project.scope_of_work ? (
+                                <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+                                    {project.scope_of_work}
+                                </p>
+                            ) : (
+                                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300/80 bg-white/70 px-4 py-3.5 dark:border-slate-700 dark:bg-slate-950/40">
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                            No scope of work added yet.
+                                        </p>
+                                        <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                            Click Edit Scope of Work to define project deliverables and instructions.
+                                        </p>
+                                    </div>
+                                    {canEditScopeOfWork && (
+                                        <button
+                                            type="button"
+                                            onClick={openScopeModal}
+                                            className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-500"
+                                        >
+                                            <span>+ Add Scope</span>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <EmptyState title="No survey plans yet." description="Create the first survey plan from the survey module." />
-                    )}
+
+                        {project.survey_plans?.length ? (
+                            <div className="space-y-3">
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                    Linked Survey Plans ({project.survey_plans.length})
+                                </p>
+                                {project.survey_plans.map((plan) => (
+                                    <SurveyPlanCard key={plan.id} plan={plan} />
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
                 </SectionCard>
+
+                <Modal show={showScopeModal} onClose={() => setShowScopeModal(false)} maxWidth="2xl">
+                    <form onSubmit={submitScopeOfWork} className="p-6">
+                        <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                    Edit Scope of Work
+                                </h3>
+                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                    {project.project_code} • {project.name}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowScopeModal(false)}
+                                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="mt-4">
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                Scope of Work Details
+                            </label>
+                            <textarea
+                                rows={6}
+                                maxLength={5000}
+                                value={scopeOfWorkForm.data.scope_of_work}
+                                onChange={(e) => scopeOfWorkForm.setData("scope_of_work", e.target.value)}
+                                placeholder="Enter detailed project scope of work, surveying requirements, CAD deliverables, milestones, or special instructions..."
+                                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                            />
+                            <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                                <span>{scopeOfWorkForm.errors.scope_of_work ? <span className="text-rose-500 font-medium">{scopeOfWorkForm.errors.scope_of_work}</span> : "Visible to the project team on Project Details."}</span>
+                                <span>{(scopeOfWorkForm.data.scope_of_work || "").length} / 5000</span>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-200 pt-4 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setShowScopeModal(false)}
+                                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={scopeOfWorkForm.processing}
+                                className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-60"
+                            >
+                                {scopeOfWorkForm.processing ? "Saving..." : "Save Scope of Work"}
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
 
                 <SectionCard
                     title="Survey Submission Queue"

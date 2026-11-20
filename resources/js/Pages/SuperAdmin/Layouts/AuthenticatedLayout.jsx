@@ -684,9 +684,6 @@ export default function AuthenticatedLayout({ header, children }) {
                                     <ResponsiveNavLink href={route("super.construction.projects.index")} active={route().current("super.construction.projects.*")}>
                                         Projects & Budget
                                     </ResponsiveNavLink>
-                                    <ResponsiveNavLink href={route("super.construction.drafting.index")} active={route().current("super.construction.drafting.*")}>
-                                        Drawing Approval
-                                    </ResponsiveNavLink>
                                     {/* <ResponsiveNavLink href={route("super.construction.execution.index")} active={route().current("super.construction.execution.*")}>
                                         Construction Execution
                                     </ResponsiveNavLink> */}

@@ -658,9 +658,6 @@ function MobileNav() {
                 <ResponsiveNavLink href={route("admin.construction.projects.index")} active={route().current("admin.construction.projects.*")}>
                     Assigned Projects
                 </ResponsiveNavLink>
-                <ResponsiveNavLink href={route("admin.construction.drafting.index")} active={route().current("admin.construction.drafting.*")}>
-                    Drawing Approval
-                </ResponsiveNavLink>
                 {/* <ResponsiveNavLink href={route("admin.construction.execution.index")} active={route().current("admin.construction.execution.*")}>
                     Construction Execution
                 </ResponsiveNavLink> */}

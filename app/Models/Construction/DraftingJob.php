@@ -20,12 +20,21 @@ class DraftingJob extends Model
         'assigned_by_id',
         'assigned_at',
         'due_date',
+        'khasra_number',
+        'site_area',
+        'scope_of_work',
         'status',
+        'rejection_reason',
+        'rejected_by_member_id',
+        'rejected_at',
+        'rejection_count',
     ];
 
     protected $casts = [
         'assigned_at' => 'datetime',
         'due_date' => 'date',
+        'rejected_at' => 'datetime',
+        'rejection_count' => 'integer',
     ];
 
     public function project(): BelongsTo
