@@ -1376,9 +1376,6 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                 </SectionCard>
             )}
 
-            {/* Activity Log - Responsive Full Width */}
-            <ProjectActivityLog activityLog={activityLog} />
-
             {/* Execution Tasks - Compact Mini-Space, 2 per row, 10 per batch + GSAP Choreography */}
             <div ref={executionTasksRef} className="et-stage w-full space-y-3.5">
                 {/* Header & Role Filter Card */}
@@ -1807,14 +1804,16 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                 </div>
             </div>
 
-            <DynamicChecklistManager
-                project={project}
-                namespace="super"
-                variant="project-show"
-                enableDeltaPoll
-                canManage={canManageChecklist}
-                initialCounts={{ total: checklistCounts.total, completed: checklistCounts.completed, completion: checklistCompletion }}
-            />
+            <div id="project-checklist-workspace" className="scroll-mt-28">
+                <DynamicChecklistManager
+                    project={project}
+                    namespace="super"
+                    variant="project-show"
+                    enableDeltaPoll
+                    canManage={canManageChecklist}
+                    initialCounts={{ total: checklistCounts.total, completed: checklistCounts.completed, completion: checklistCompletion }}
+                />
+            </div>
 
             <div className="grid gap-6 xl:grid-cols-3">
                 <SectionCard title="Daily Progress & Attendance" description="Submissions, attendance and materials snapshot.">
@@ -1862,6 +1861,9 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                     </div>
                 </SectionCard>
             </div>
+
+            {/* Project Activity Log - Placed at Bottom */}
+            <ProjectActivityLog activityLog={activityLog} />
 
             {canEditTask && editingTask ? (
                 <Modal show={true} onClose={() => setEditingTask(null)}>

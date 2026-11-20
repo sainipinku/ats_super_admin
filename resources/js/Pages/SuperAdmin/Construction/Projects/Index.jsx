@@ -7,7 +7,8 @@ import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
 import Modal from "@/Components/Modal";
 import GoogleMapLocationSection from "@/Components/GoogleMapLocationSection.jsx";
 import DeleteActionButton from "@/Components/DeleteActionButton";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import gsap from "gsap";
 import {
     FaProjectDiagram,
     FaPlayCircle,
@@ -426,23 +427,23 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
                 title="Project Lifecycle Stages"
                 description="Click any stage to filter the register below. Every project moves through this linear flow."
             >
-                <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-6">
+                <div className="grid gap-2.5 sm:gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
                     <button
                         onClick={() => setStageFilter("all")}
-                        className={`text-left rounded-2xl border p-3.5 transition-all duration-200 ${
+                        className={`text-left rounded-xl border p-2.5 sm:p-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                             stageFilter === "all"
                                 ? "border-slate-900 bg-slate-900 text-white shadow-md dark:border-white dark:bg-white dark:text-slate-900"
-                                : "border-slate-200 bg-white hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                                : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
                         }`}
                     >
                         <div className="flex items-center justify-between">
-                            <p className={`text-[11px] font-semibold uppercase tracking-wider ${stageFilter === "all" ? "opacity-80" : "text-slate-500 dark:text-slate-400"}`}>
+                            <p className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider ${stageFilter === "all" ? "opacity-80" : "text-slate-500 dark:text-slate-400"}`}>
                                 View
                             </p>
-                            <span className={`text-lg font-bold ${stageFilter === "all" ? "" : "text-slate-900 dark:text-white"}`}>{counts.total}</span>
+                            <span className={`text-base sm:text-lg font-bold ${stageFilter === "all" ? "" : "text-slate-900 dark:text-white"}`}>{counts.total}</span>
                         </div>
-                        <p className={`mt-2 text-sm font-semibold ${stageFilter === "all" ? "" : "text-slate-900 dark:text-white"}`}>All Projects</p>
-                        <p className={`mt-0.5 text-[11px] ${stageFilter === "all" ? "opacity-80" : "text-slate-500 dark:text-slate-400"}`}>
+                        <p className={`mt-1.5 text-xs sm:text-sm font-semibold ${stageFilter === "all" ? "" : "text-slate-900 dark:text-white"}`}>All Projects</p>
+                        <p className={`mt-0.5 text-[10px] sm:text-[11px] ${stageFilter === "all" ? "opacity-80" : "text-slate-500 dark:text-slate-400"}`}>
                             No filter applied
                         </p>
                     </button>
@@ -453,15 +454,15 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
                             <button
                                 key={st.value}
                                 onClick={() => setStageFilter(stageFilter === st.value ? "all" : st.value)}
-                                className={`text-left rounded-2xl border p-3.5 transition-all duration-200 ${
+                                className={`text-left rounded-xl border p-2.5 sm:p-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                                     stageFilter === st.value
                                         ? "border-indigo-500 bg-indigo-50 shadow-md shadow-indigo-100 dark:border-indigo-500 dark:bg-indigo-950/60 dark:shadow-none"
-                                        : "border-slate-200 bg-white hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                                        : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
                                 }`}
                             >
                                 <div className="flex items-start justify-between gap-2">
                                     <div
-                                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-white ${
+                                        className={`w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 ${
                                             {
                                                 indigo: "bg-indigo-600",
                                                 sky: "bg-sky-600",
@@ -473,155 +474,19 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
                                             }[st.color]
                                         }`}
                                     >
-                                        <Icon size={14} />
+                                        <Icon size={12} />
                                     </div>
-                                    <span className="text-lg font-bold text-slate-900 dark:text-white">{count}</span>
+                                    <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">{count}</span>
                                 </div>
-                                <p className="mt-2.5 text-sm font-semibold text-slate-900 dark:text-white">{st.label}</p>
-                                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 leading-snug">{st.description}</p>
+                                <p className="mt-1.5 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">{st.label}</p>
+                                <p className="mt-0.5 text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 leading-snug truncate">{st.description}</p>
                             </button>
                         );
                     })}
                 </div>
             </SectionCard>
 
-            <SectionCard
-                title="Checklist Monitoring Dashboard"
-                description="Top 3 lowest-completion projects. Deep-link directly to the checklist workspace on the project details page."
-                className="mt-6"
-            >
-                {(() => {
-                    const SLUG_SAFE = (s) =>
-                        String(s ?? "")
-                            .toLowerCase()
-                            .replace(/[^a-z0-9]+/g, "-")
-                            .replace(/(^-|-$)/g, "");
-
-                    const withMeta = (projects || []).map((p) => {
-                        const cl = p.workflow_counts?.checklists || { total: 0, completed: 0 };
-                        const pct = cl.total > 0 ? (cl.completed / cl.total) * 100 : -1;
-                        return { project: p, total: cl.total, completed: cl.completed, pct };
-                    });
-
-                    const needingAttention = withMeta
-                        .filter((m) => m.total > 0)
-                        .sort((a, b) => a.pct - b.pct)
-                        .slice(0, 3);
-
-                    const zeroItemProjects = withMeta
-                        .filter((m) => m.total === 0)
-                        .slice(0, 2);
-
-                    if (!needingAttention.length && !zeroItemProjects.length) {
-                        return (
-                            <EmptyState
-                                title="No checklist data yet."
-                                description="Open a project and seed defaults to begin monitoring completion progress here."
-                            />
-                        );
-                    }
-
-                    const colorForPct = (pct) => {
-                        if (pct < 0 || pct === null) return "from-slate-400 to-slate-500";
-                        if (pct < 35) return "from-rose-500 to-amber-500";
-                        if (pct < 70) return "from-amber-500 to-sky-500";
-                        return "from-emerald-500 to-indigo-500";
-                    };
-
-                    const chipForPct = (pct) => {
-                        if (pct < 0) return { label: "No items", cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" };
-                        if (pct < 35) return { label: "Behind", cls: "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300" };
-                        if (pct < 70) return { label: "In Progress", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" };
-                        return { label: "On Track", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" };
-                    };
-
-                    return (
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                            {needingAttention.map(({ project, total, completed, pct }) => {
-                                const rounded = pct < 0 ? 0 : Math.round(pct);
-                                const chip = chipForPct(pct);
-                                return (
-                                    <article
-                                        key={project.id}
-                                        className="rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
-                                    >
-                                        <div className="flex flex-wrap items-start justify-between gap-2">
-                                            <div className="min-w-0">
-                                                <p className="truncate font-semibold text-slate-900 dark:text-white">{project.name}</p>
-                                                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                                                    {project.project_code || "—"} · {project.company?.name || project.client?.name || "Unassigned"}
-                                                </p>
-                                            </div>
-                                            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${chip.cls}`}>
-                                                {chip.label}
-                                            </span>
-                                        </div>
-                                        <div className="mt-4 flex items-baseline justify-between">
-                                            <div>
-                                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                                    {rounded}
-                                                    <span className="text-sm text-slate-400">%</span>
-                                                </p>
-                                                <p className="mt-0.5 text-[11px] text-slate-500">
-                                                    {completed}/{total} items complete
-                                                </p>
-                                            </div>
-                                            <StatusBadge value={project.current_stage} />
-                                        </div>
-                                        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                                            <div
-                                                className={`h-full bg-gradient-to-r transition-all ${colorForPct(pct)}`}
-                                                style={{ width: `${rounded}%` }}
-                                            />
-                                        </div>
-                                        <div className="mt-4 flex items-center justify-between gap-2">
-                                            <span className="text-[11px] text-slate-400">
-                                                {String(project.status || "draft").replace(/_/g, " ")}
-                                            </span>
-                                            <Link
-                                                href={route("super.construction.projects.show", project.id) + `#chk-group-${SLUG_SAFE(project.project_code || project.id)}`}
-                                                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-indigo-500"
-                                            >
-                                                Open checklists →
-                                            </Link>
-                                        </div>
-                                    </article>
-                                );
-                            })}
-
-                            {zeroItemProjects.map(({ project }) => (
-                                <article
-                                    key={`empty-${project.id}`}
-                                    className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40"
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <p className="truncate font-semibold text-slate-900 dark:text-white">{project.name}</p>
-                                            <p className="mt-0.5 text-[11px] text-slate-500 truncate">
-                                                {project.project_code || "—"} · {project.client?.name || "No client"}
-                                            </p>
-                                        </div>
-                                        <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                                            No checklists
-                                        </span>
-                                    </div>
-                                    <p className="mt-4 text-[11px] leading-snug text-slate-500">
-                                        Seed the default survey checklist or add custom items to start tracking this project's field progress.
-                                    </p>
-                                    <div className="mt-4 flex justify-end">
-                                        <Link
-                                            href={route("super.construction.projects.show", project.id) + `#chk-group-default`}
-                                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:border-slate-700 dark:bg-slate-900 dark:text-indigo-400 dark:hover:bg-slate-800"
-                                        >
-                                            Go to project →
-                                        </Link>
-                                    </div>
-                                </article>
-                            ))}
-                        </div>
-                    );
-                })()}
-            </SectionCard>
+            <ChecklistMonitoringDashboard projects={projects} />
 
             {canCreateProject && (
                 <div className="mt-6">
@@ -1263,7 +1128,6 @@ function InputField({ form, name, label, type = "text", step, placeholder = "", 
     );
 }
 
-
 function TextAreaField({ form, name, label, rows = 4 }) {
     return (
         <div>
@@ -1308,6 +1172,290 @@ function SelectField({ form, name, label, options, disabled = false, badge = nul
             </select>
             {helper ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{helper}</p> : null}
             {form.errors[name] ? <p className="mt-1 text-xs text-rose-600">{form.errors[name]}</p> : null}
+        </div>
+    );
+}
+
+function ChecklistMonitoringDashboard({ projects }) {
+    const containerRef = useRef(null);
+
+    const prefersReducedMotion = () =>
+        typeof window !== "undefined" &&
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const withMeta = useMemo(() => {
+        return (projects || []).map((p) => {
+            const cl = p.workflow_counts?.checklists || { total: 0, completed: 0 };
+            const pct = cl.total > 0 ? (cl.completed / cl.total) * 100 : -1;
+            return { project: p, total: cl.total, completed: cl.completed, pct };
+        });
+    }, [projects]);
+
+    const needingAttention = useMemo(
+        () => withMeta.filter((m) => m.total > 0).sort((a, b) => a.pct - b.pct).slice(0, 3),
+        [withMeta]
+    );
+
+    const zeroItemProjects = useMemo(
+        () => withMeta.filter((m) => m.total === 0).slice(0, 2),
+        [withMeta]
+    );
+
+    useEffect(() => {
+        if (!containerRef.current || prefersReducedMotion()) return undefined;
+
+        const ctx = gsap.context(() => {
+            // Stage zoom-out reveal
+            gsap.fromTo(
+                containerRef.current,
+                { opacity: 0, scale: 1.03, y: 14 },
+                {
+                    opacity: 1,
+                    scale: 1,
+                    y: 0,
+                    duration: 0.6,
+                    ease: "power3.out",
+                    clearProps: "scale",
+                }
+            );
+
+            // Kinetic word-by-word title reveal
+            gsap.fromTo(
+                ".cmd-title-word",
+                { opacity: 0, y: 8, rotateX: -20 },
+                {
+                    opacity: 1,
+                    y: 0,
+                    rotateX: 0,
+                    stagger: 0.04,
+                    duration: 0.5,
+                    ease: "back.out(1.7)",
+                    clearProps: "all",
+                }
+            );
+
+            // Staggered card entrance cascade
+            gsap.fromTo(
+                ".cmd-card",
+                { opacity: 0, y: 12, scale: 0.97 },
+                {
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    stagger: 0.06,
+                    duration: 0.45,
+                    ease: "power3.out",
+                    clearProps: "opacity,y",
+                }
+            );
+
+            // Smooth animated progress bar fill
+            gsap.fromTo(
+                ".cmd-progress-bar",
+                { width: "0%" },
+                {
+                    width: (i, el) => `${el.dataset.pct || 0}%`,
+                    duration: 0.9,
+                    ease: "power2.out",
+                    delay: 0.15,
+                }
+            );
+
+            // Pulsing live indicator dot
+            gsap.to(".cmd-live-dot", {
+                scale: 1.4,
+                opacity: 0.35,
+                repeat: -1,
+                yoyo: true,
+                duration: 1.1,
+                ease: "sine.inOut",
+            });
+        }, containerRef);
+
+        return () => ctx.revert();
+    }, [needingAttention.length, zeroItemProjects.length]);
+
+    const handleCardEnter = (e) => {
+        if (prefersReducedMotion()) return;
+        gsap.to(e.currentTarget, {
+            y: -3,
+            scale: 1.02,
+            boxShadow: "0 10px 25px -4px rgba(99, 102, 241, 0.18)",
+            duration: 0.22,
+            ease: "back.out(2)",
+        });
+    };
+
+    const handleCardLeave = (e) => {
+        if (prefersReducedMotion()) return;
+        gsap.to(e.currentTarget, {
+            y: 0,
+            scale: 1,
+            boxShadow: "none",
+            duration: 0.22,
+            ease: "power2.out",
+        });
+    };
+
+    if (!needingAttention.length && !zeroItemProjects.length) {
+        return (
+            <div ref={containerRef} className="cmd-stage mt-5 rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800/80">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                        <span className="cmd-title-word inline-block mr-1">Checklist</span>
+                        <span className="cmd-title-word inline-block mr-1">Monitoring</span>
+                        <span className="cmd-title-word inline-block">Dashboard</span>
+                    </h3>
+                </div>
+                <div className="py-6 text-center">
+                    <EmptyState
+                        title="No checklist data yet."
+                        description="Open a project and seed defaults to begin monitoring completion progress here."
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    const colorForPct = (pct) => {
+        if (pct < 0 || pct === null) return "from-slate-400 to-slate-500";
+        if (pct < 35) return "from-rose-500 to-amber-500";
+        if (pct < 70) return "from-amber-500 to-sky-500";
+        return "from-emerald-500 to-indigo-500";
+    };
+
+    const chipForPct = (pct) => {
+        if (pct < 0) return { label: "No items", cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" };
+        if (pct < 35) return { label: "Behind", cls: "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300" };
+        if (pct < 70) return { label: "In Progress", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" };
+        return { label: "On Track", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" };
+    };
+
+    return (
+        <div ref={containerRef} className="cmd-stage mt-5 rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+            {/* Header: Compact title with kinetic reveal & Live pulse indicator */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800/80">
+                <div className="flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center">
+                        <span className="cmd-title-word inline-block mr-1">Checklist</span>
+                        <span className="cmd-title-word inline-block mr-1">Monitoring</span>
+                        <span className="cmd-title-word inline-block">Dashboard</span>
+                    </h3>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/50 dark:text-emerald-300">
+                        <span className="relative flex h-1.5 w-1.5">
+                            <span className="cmd-live-dot absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                        </span>
+                        LIVE
+                    </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
+                    Top lowest-completion projects · Deep-link to checklist workspace
+                </p>
+            </div>
+
+            {/* Compact Mini Space Grid */}
+            <div className="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                {needingAttention.map(({ project, total, completed, pct }) => {
+                    const rounded = pct < 0 ? 0 : Math.round(pct);
+                    const chip = chipForPct(pct);
+                    const deepLink = `${route("super.construction.projects.show", project.id)}?focus=checklist#dynamic-checklist-manager`;
+
+                    return (
+                        <article
+                            key={project.id}
+                            onMouseEnter={handleCardEnter}
+                            onMouseLeave={handleCardLeave}
+                            className="cmd-card relative overflow-hidden rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 shadow-2xs transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                        >
+                            <div className={`pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${colorForPct(pct)} opacity-90`} />
+
+                            <div className="flex items-start justify-between gap-1.5">
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">{project.name}</p>
+                                    <p className="mt-0.5 text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                        {project.project_code || "—"} · {project.company?.name || project.client?.name || "Unassigned"}
+                                    </p>
+                                </div>
+                                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] sm:text-[10px] font-semibold ${chip.cls}`}>
+                                    {chip.label}
+                                </span>
+                            </div>
+
+                            <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                                        {rounded}%
+                                    </span>
+                                    <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400">
+                                        {completed}/{total} items complete
+                                    </span>
+                                </div>
+                                <StatusBadge value={project.current_stage} />
+                            </div>
+
+                            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                                <div
+                                    data-pct={rounded}
+                                    className={`cmd-progress-bar h-full rounded-full bg-gradient-to-r ${colorForPct(pct)}`}
+                                    style={{ width: `${rounded}%` }}
+                                />
+                            </div>
+
+                            <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-slate-100 pt-2 dark:border-slate-800/80">
+                                <span className="text-[10px] text-slate-400 capitalize">
+                                    {String(project.status || "draft").replace(/_/g, " ")}
+                                </span>
+                                <Link
+                                    href={deepLink}
+                                    className="group inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-2xs transition hover:bg-indigo-500"
+                                >
+                                    <span>Open checklists</span>
+                                    <span className="transition-transform group-hover:translate-x-0.5">→</span>
+                                </Link>
+                            </div>
+                        </article>
+                    );
+                })}
+
+                {zeroItemProjects.map(({ project }) => {
+                    const deepLink = `${route("super.construction.projects.show", project.id)}?focus=checklist#dynamic-checklist-manager`;
+
+                    return (
+                        <article
+                            key={`empty-${project.id}`}
+                            onMouseEnter={handleCardEnter}
+                            onMouseLeave={handleCardLeave}
+                            className="cmd-card relative rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-2.5 sm:p-3 transition hover:shadow-2xs dark:border-slate-700 dark:bg-slate-900/40"
+                        >
+                            <div className="flex items-start justify-between gap-1.5">
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">{project.name}</p>
+                                    <p className="mt-0.5 text-[10px] sm:text-[11px] text-slate-500 truncate">
+                                        {project.project_code || "—"} · {project.client?.name || "No client"}
+                                    </p>
+                                </div>
+                                <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] sm:text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                                    No checklists
+                                </span>
+                            </div>
+                            <p className="mt-2 text-[10px] sm:text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+                                Seed default survey checklist to start tracking field progress.
+                            </p>
+                            <div className="mt-2.5 flex justify-end border-t border-slate-200/60 pt-2 dark:border-slate-800">
+                                <Link
+                                    href={deepLink}
+                                    className="group inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:border-slate-700 dark:bg-slate-900 dark:text-indigo-400 dark:hover:bg-slate-800"
+                                >
+                                    <span>Go to project</span>
+                                    <span className="transition-transform group-hover:translate-x-0.5">→</span>
+                                </Link>
+                            </div>
+                        </article>
+                    );
+                })}
+            </div>
         </div>
     );
 }

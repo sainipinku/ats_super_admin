@@ -561,6 +561,63 @@ export default function DynamicChecklistManager({
         return () => observer.disconnect();
     }, []);
 
+    // Deep-link auto-scroll and highlight when navigating with #dynamic-checklist-manager or ?focus=checklist
+    useEffect(() => {
+        if (typeof window === "undefined" || !containerRef.current) return undefined;
+
+        const checkAndScroll = () => {
+            const hash = window.location.hash || "";
+            const searchParams = new URLSearchParams(window.location.search);
+            const isChecklistFocus =
+                searchParams.get("focus") === "checklist" ||
+                hash === "#dynamic-checklist-manager" ||
+                hash === "#checklists" ||
+                hash === "#checklist" ||
+                hash.startsWith("#chk-group");
+
+            if (isChecklistFocus && containerRef.current) {
+                const timer = setTimeout(() => {
+                    containerRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                    });
+
+                    if (!prefersReducedMotion()) {
+                        const ctx = gsap.context(() => {
+                            gsap.fromTo(
+                                containerRef.current,
+                                {
+                                    scale: 0.992,
+                                    boxShadow: "0 0 0 0 rgba(99, 102, 241, 0)",
+                                },
+                                {
+                                    scale: 1,
+                                    boxShadow: "0 0 0 6px rgba(99, 102, 241, 0.4)",
+                                    duration: 0.6,
+                                    yoyo: true,
+                                    repeat: 3,
+                                    ease: "power2.out",
+                                    clearProps: "scale,boxShadow",
+                                }
+                            );
+                        }, containerRef);
+                        return () => ctx.revert();
+                    }
+                }, 300);
+
+                return () => clearTimeout(timer);
+            }
+            return undefined;
+        };
+
+        const cleanup = checkAndScroll();
+        window.addEventListener("hashchange", checkAndScroll);
+        return () => {
+            if (typeof cleanup === "function") cleanup();
+            window.removeEventListener("hashchange", checkAndScroll);
+        };
+    }, []);
+
     // Screen zoom-out entrance + kinetic title text effect
     useEffect(() => {
         if (!isInView || !containerRef.current || prefersReducedMotion()) return undefined;
@@ -840,7 +897,13 @@ export default function DynamicChecklistManager({
     );
 
     return (
-        <div ref={containerRef} className="dcm-stage w-full space-y-3.5">
+        <div
+            id="dynamic-checklist-manager"
+            ref={containerRef}
+            className="dcm-stage w-full scroll-mt-28 space-y-3.5"
+        >
+            <span id="checklists" className="sr-only pointer-events-none" />
+            <span id="chk-group-default" className="sr-only pointer-events-none" />
             {/* Header & Metrics */}
             <div className="dcm-header-card relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800/90 dark:bg-slate-900/95">
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-500 opacity-85" />

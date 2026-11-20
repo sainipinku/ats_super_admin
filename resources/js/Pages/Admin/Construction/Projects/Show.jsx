@@ -796,14 +796,16 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
                 </SectionCard>
             </div>
 
-            <DynamicChecklistManager
-                project={project}
-                namespace="admin"
-                variant="project-show"
-                enableDeltaPoll
-                canManage={canManageChecklist}
-                initialCounts={{ total: checklistCounts.total, completed: checklistCounts.completed, completion: checklistCompletion }}
-            />
+            <div id="project-checklist-workspace" className="scroll-mt-28">
+                <DynamicChecklistManager
+                    project={project}
+                    namespace="admin"
+                    variant="project-show"
+                    enableDeltaPoll
+                    canManage={canManageChecklist}
+                    initialCounts={{ total: checklistCounts.total, completed: checklistCounts.completed, completion: checklistCompletion }}
+                />
+            </div>
 
             <ProjectActivityLog activityLog={activityLog} />
         </ConstructionShell>
