@@ -48,7 +48,7 @@ const formatCurrency = (value) => {
     return "₹" + num.toFixed(0);
 };
 
-export default function Dashboard({ stats, recentProjects, recentActivity }) {
+export default function Dashboard({ stats, recentProjects, recentActivity, companies = [], selected_company_id, is_project_owner }) {
     const { props } = usePage();
     const auth = props?.auth;
     const isImpersonating = Boolean(props?.is_impersonating || auth?.is_impersonating);
@@ -136,7 +136,28 @@ export default function Dashboard({ stats, recentProjects, recentActivity }) {
                         Complete visibility across every project lifecycle stage.
                     </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    {is_project_owner && Array.isArray(companies) && companies.length > 0 && (
+                        <select
+                            value={selected_company_id ? String(selected_company_id) : ""}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                router.get(
+                                    route("super.construction.dashboard"),
+                                    val ? { company_id: val } : {},
+                                    { preserveState: true, preserveScroll: true }
+                                );
+                            }}
+                            className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-medium text-slate-700 shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 cursor-pointer"
+                        >
+                            <option value="">All Companies</option>
+                            {companies.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                    🏢 {c.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
                     {hasPerm("client.manage") && (
                         <Link
                             href={route("super.construction.clients.index")}
