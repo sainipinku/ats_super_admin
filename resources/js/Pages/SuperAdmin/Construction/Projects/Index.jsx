@@ -34,6 +34,26 @@ const projectStatusFlow = [
     { value: "completed", label: "Completed", color: "emerald", icon: FaFlagCheckered, description: "Project closed" },
 ];
 
+function formatDateForInput(value) {
+    if (!value) return "";
+    const str = String(value).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    if (str.includes("T")) return str.split("T")[0];
+    if (str.includes(" ")) return str.split(" ")[0];
+    try {
+        const d = new Date(str);
+        if (!Number.isNaN(d.getTime())) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const dd = String(d.getDate()).padStart(2, "0");
+            return `${yyyy}-${mm}-${dd}`;
+        }
+    } catch {
+        // fallback
+    }
+    return str;
+}
+
 export default function ProjectsIndex({ projects, companies, clients, user_company_id, next_project_code }) {
     const pageProps = usePage().props;
     const { auth } = pageProps;
@@ -46,21 +66,30 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
         !['super_admin', 'superadmin', 'crm_super_admin', 'admin', 'project_admin'].includes(activeRoleSlug)
     );
 
-    const isProjectOwner = !isImpersonating && !isRestrictedRole && !isProjectAdmin && Boolean(
+    const isProjectOwner = !isImpersonating && !isRestrictedRole && Boolean(
         auth?.user?.is_project_owner == 1 ||
         auth?.user?.is_project_owner === true ||
         auth?.user?.id == 1 ||
         auth?.user?.id === '1' ||
+        auth?.user?.email === 'superadmin@gmail.com' ||
+        auth?.user?.role === 'project_owner' ||
+        auth?.user?.slug === 'project-owner' ||
         (!auth?.user?.company_id && auth?.guard === "superadmin")
     );
 
-    const isSuperAdmin = !isImpersonating && !isRestrictedRole && !isProjectAdmin && (
+    const isSuperAdmin = !isImpersonating && !isRestrictedRole && (
         isProjectOwner ||
         auth?.guard === "superadmin" ||
+        auth?.user?.is_super_admin == 1 ||
+        Boolean(auth?.user?.is_super_admin) ||
+        auth?.user?.slug === "super-admin" ||
+        auth?.user?.email === "superadmin@gmail.com" ||
         (Array.isArray(auth?.user?.roles) && (auth?.user?.roles.includes("super_admin") || auth?.user?.roles.includes("superadmin")))
     );
 
-    const isCompanyAdmin = auth?.guard === "admin" || isProjectAdmin || activeRoleSlug === "admin" || (!isSuperAdmin && !isProjectOwner);
+    const isCompanyAdmin = !isProjectOwner && !isSuperAdmin && (
+        auth?.guard === "admin" || isProjectAdmin || activeRoleSlug === "admin"
+    );
     const effectiveCompanyId = user_company_id ?? auth?.user?.company_id ?? null;
     const isCompanyLocked = Boolean(effectiveCompanyId);
 
@@ -309,8 +338,8 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
             scope_of_work: project.scope_of_work || "",
             latitude: project.latitude ?? "",
             longitude: project.longitude ?? "",
-            start_date: project.start_date || "",
-            expected_end_date: project.expected_end_date || "",
+            start_date: formatDateForInput(project.start_date),
+            expected_end_date: formatDateForInput(project.expected_end_date),
             priority: project.priority || "medium",
             status: project.status || "",
             current_stage: project.current_stage || "",
@@ -611,7 +640,7 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
                                                 )}
                                             </td>
                                             <td className="px-3 py-3 text-right">
-                                                <div className="inline-flex items-center justify-end gap-1">
+                                                <div className="inline-flex items-center justify-end gap-1.5 flex-nowrap whitespace-nowrap">
                                                     {canViewProject && (
                                                         <Link
                                                             href={route("super.construction.projects.show", project.id)}
@@ -627,54 +656,38 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
                                                         if (!rowCanEdit && !rowCanDelete) return null;
 
                                                         return (
-                                                            <div className="relative inline-block text-left" data-project-dropdown>
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => openProjectDropdown(e, project.id)}
-                                                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
-                                                                title="Actions"
-                                                            >
-                                                                <FaEllipsisV size={14} />
-                                                            </button>
-                                                            {openDropdownId === project.id && (
-                                                                <div
-                                                                    className="fixed w-44 rounded-xl border border-slate-200 bg-white py-1 shadow-xl z-50 dark:border-slate-700 dark:bg-slate-900"
-                                                                    style={{ top: dropdownPos.top, left: dropdownPos.left }}
-                                                                >
-                                                                    {rowCanEdit && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => { setOpenDropdownId(null); openEditModal(project); }}
-                                                                            className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors text-left"
-                                                                        >
-                                                                            <FaEdit size={13} className="text-sky-500" />
-                                                                            Edit
-                                                                        </button>
-                                                                    )}
-                                                                    {rowCanDelete && (
-                                                                        <DeleteActionButton
-                                                                            resourceType="project"
-                                                                            resourceId={project.id}
-                                                                            resourceName={project.name}
-                                                                            onDelete={() => {
-                                                                                setOpenDropdownId(null);
-                                                                                if (confirm(`Delete project "${project.name}"? All survey, execution, material, billing and handover data tied to this project will be removed and cannot be restored.`)) {
-                                                                                    router.delete(route("super.construction.projects.destroy", project.id), {
-                                                                                        preserveScroll: true,
-                                                                                        onError: (errs) => {
-                                                                                            if (typeof window !== "undefined" && typeof window.alert === "function") {
-                                                                                                window.alert(Object.values(errs).find(Boolean) || "Failed to delete project.");
-                                                                                            }
-                                                                                        },
-                                                                                    });
-                                                                                }
-                                                                            }}
-                                                                            className="w-full flex items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/60 transition-colors text-left"
-                                                                        />
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            </div>
+                                                            <>
+                                                                {rowCanEdit && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => openEditModal(project)}
+                                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-950"
+                                                                        title="Edit Project"
+                                                                    >
+                                                                        <FaEdit size={12} />
+                                                                        Edit
+                                                                    </button>
+                                                                )}
+                                                                {rowCanDelete && (
+                                                                    <DeleteActionButton
+                                                                        resourceType="project"
+                                                                        resourceId={project.id}
+                                                                        resourceName={project.name}
+                                                                        onDelete={() => {
+                                                                            if (confirm(`Delete project "${project.name}"? All survey, execution, material, billing and handover data tied to this project will be removed and cannot be restored.`)) {
+                                                                                router.delete(route("super.construction.projects.destroy", project.id), {
+                                                                                    preserveScroll: true,
+                                                                                    onError: (errs) => {
+                                                                                        if (typeof window !== "undefined" && typeof window.alert === "function") {
+                                                                                            window.alert(Object.values(errs).find(Boolean) || "Failed to delete project.");
+                                                                                        }
+                                                                                    },
+                                                                                });
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                )}
+                                                            </>
                                                         );
                                                     })()}
                                                 </div>
@@ -1109,6 +1122,11 @@ function formatDate(value) {
 }
 
 function InputField({ form, name, label, type = "text", step, placeholder = "", onChange, extraAction }) {
+    const rawValue = form.data[name];
+    const inputValue = type === "date"
+        ? formatDateForInput(rawValue)
+        : (rawValue ?? "");
+
     return (
         <div>
             <div className="mb-1 flex items-center justify-between">
@@ -1119,7 +1137,7 @@ function InputField({ form, name, label, type = "text", step, placeholder = "", 
                 type={type}
                 step={step}
                 placeholder={placeholder}
-                value={form.data[name] ?? ""}
+                value={inputValue}
                 onChange={onChange || ((e) => form.setData(name, e.target.value))}
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-[14px] dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:border-indigo-700 dark:focus:ring-indigo-900/60"
             />

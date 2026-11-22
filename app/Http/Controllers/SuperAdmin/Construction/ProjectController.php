@@ -668,7 +668,7 @@ class ProjectController extends Controller
         $actor = $this->constructionActor();
         $isProjectOwner = $this->isProjectOwner($actor);
         $isGlobalSuperAdmin = ($actor instanceof SuperAdmin && empty($actor->company_id)) || $isProjectOwner;
-        $isCompanySuperAdmin = ($actor instanceof SuperAdmin && !empty($actor->company_id));
+        $isCompanySuperAdmin = ($actor instanceof SuperAdmin && !empty($actor->company_id) && !$isProjectOwner);
 
         // Company admins are strictly prohibited from updating projects
         abort_if(!$isGlobalSuperAdmin && !$isCompanySuperAdmin, 403, 'Company admins are not permitted to edit projects.');
@@ -683,7 +683,7 @@ class ProjectController extends Controller
 
         $userCompanyId = $this->getAccessibleCompanyId($actor);
 
-        if ($userCompanyId) {
+        if ($userCompanyId && !$isProjectOwner) {
             $request->merge(['company_id' => $userCompanyId]);
         }
 
@@ -1383,7 +1383,7 @@ class ProjectController extends Controller
         $actor = $this->constructionActor();
         $isProjectOwner = $this->isProjectOwner($actor);
         $isGlobalSuperAdmin = ($actor instanceof SuperAdmin && empty($actor->company_id)) || $isProjectOwner;
-        $isCompanySuperAdmin = ($actor instanceof SuperAdmin && !empty($actor->company_id));
+        $isCompanySuperAdmin = ($actor instanceof SuperAdmin && !empty($actor->company_id) && !$isProjectOwner);
 
         // Company admins are strictly prohibited from deleting projects
         abort_if(!$isGlobalSuperAdmin && !$isCompanySuperAdmin, 403, 'Company admins are not permitted to delete projects.');
