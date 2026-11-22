@@ -671,13 +671,24 @@ class MemberDashboardController extends Controller
                 $q->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
                     $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
                         $assignmentOrSupervisor->whereHas('assignments', function (Builder $sub) use ($memberId) {
-                            $sub->where('assigned_to', $memberId);
+                            $sub->where('assigned_to', $memberId)
+                                ->whereNull('deleted_at')
+                                ->where(fn ($sq) => $sq->whereNull('is_transferred')->orWhere('is_transferred', 0))
+                                ->whereNotIn('status', ['revoked', 'transferred', 'cancelled']);
                         })
                         ->orWhereHas('assignedMembers', function (Builder $sub) use ($memberId) {
                             $sub->where('members.id', $memberId);
                         })
                         ->orWhere('assigned_supervisor_member_id', $memberId)
-                        ->orWhere('member_id', $memberId);
+                        ->orWhere(function (Builder $sub) use ($memberId) {
+                            $sub->where('member_id', $memberId)
+                                ->whereDoesntHave('assignments', function (Builder $asg) use ($memberId) {
+                                    $asg->where('assigned_to', '!=', $memberId)
+                                        ->where('is_primary', true)
+                                        ->where(fn ($sq) => $sq->whereNull('is_transferred')->orWhere('is_transferred', 0))
+                                        ->whereNotIn('status', ['revoked', 'transferred', 'cancelled']);
+                                });
+                        });
                     });
                     if ($accessibleProjectIds !== []) {
                         $direct->where(function (Builder $scope) use ($accessibleProjectIds) {
@@ -1091,8 +1102,9 @@ class MemberDashboardController extends Controller
 
         $currentProjectCard = $this->getCurrentProject($projects);
         $quickActionsList = $this->getQuickActions();
-        $fieldActivityCard = $this->getFieldActivity($todayAttendance);
-        $performanceCard = $this->getPerformance($attendanceLast30, $tasks, $hoursWorked);
+        $primaryProj = $primaryProjects->first() ?: $projects->first();
+        $fieldActivityCard = $this->getFieldActivity($todayAttendance, $todayVisits, $member, $primaryProj);
+        $performanceCard = $this->getPerformance($attendanceLast30, $tasks, $hoursWorked, $todayAttendance);
         $notificationsList = $this->getNotifications($member);
 
         $isDriver = (bool) ($member->isDriver()
@@ -1672,13 +1684,24 @@ $completed = SurveyPlan::whereHas(
         ])->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
             $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
                 $assignmentOrSupervisor->whereHas('assignments', function (Builder $sub) use ($memberId) {
-                    $sub->where('assigned_to', $memberId);
+                    $sub->where('assigned_to', $memberId)
+                        ->whereNull('deleted_at')
+                        ->where(fn ($sq) => $sq->whereNull('is_transferred')->orWhere('is_transferred', 0))
+                        ->whereNotIn('status', ['revoked', 'transferred', 'cancelled']);
                 })
                 ->orWhereHas('assignedMembers', function (Builder $sub) use ($memberId) {
                     $sub->where('members.id', $memberId);
                 })
                 ->orWhere('assigned_supervisor_member_id', $memberId)
-                ->orWhere('member_id', $memberId)
+                ->orWhere(function (Builder $sub) use ($memberId) {
+                    $sub->where('member_id', $memberId)
+                        ->whereDoesntHave('assignments', function (Builder $asg) use ($memberId) {
+                            $asg->where('assigned_to', '!=', $memberId)
+                                ->where('is_primary', true)
+                                ->where(fn ($sq) => $sq->whereNull('is_transferred')->orWhere('is_transferred', 0))
+                                ->whereNotIn('status', ['revoked', 'transferred', 'cancelled']);
+                        });
+                })
                 ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
                     $sub->where('assigned_to_member_id', $memberId);
                 });
@@ -2022,13 +2045,24 @@ $completed = SurveyPlan::whereHas(
         ])->where(function (Builder $direct) use ($memberId, $accessibleProjectIds) {
             $direct->where(function (Builder $assignmentOrSupervisor) use ($memberId) {
                 $assignmentOrSupervisor->whereHas('assignments', function (Builder $sub) use ($memberId) {
-                    $sub->where('assigned_to', $memberId);
+                    $sub->where('assigned_to', $memberId)
+                        ->whereNull('deleted_at')
+                        ->where(fn ($sq) => $sq->whereNull('is_transferred')->orWhere('is_transferred', 0))
+                        ->whereNotIn('status', ['revoked', 'transferred', 'cancelled']);
                 })
                 ->orWhereHas('assignedMembers', function (Builder $sub) use ($memberId) {
                     $sub->where('members.id', $memberId);
                 })
                 ->orWhere('assigned_supervisor_member_id', $memberId)
-                ->orWhere('member_id', $memberId)
+                ->orWhere(function (Builder $sub) use ($memberId) {
+                    $sub->where('member_id', $memberId)
+                        ->whereDoesntHave('assignments', function (Builder $asg) use ($memberId) {
+                            $asg->where('assigned_to', '!=', $memberId)
+                                ->where('is_primary', true)
+                                ->where(fn ($sq) => $sq->whereNull('is_transferred')->orWhere('is_transferred', 0))
+                                ->whereNotIn('status', ['revoked', 'transferred', 'cancelled']);
+                        });
+                })
                 ->orWhereHas('surveyVisits.submission.draftingJobs', function (Builder $sub) use ($memberId) {
                     $sub->where('assigned_to_member_id', $memberId);
                 });
@@ -2267,7 +2301,10 @@ $completed = SurveyPlan::whereHas(
         if ($isRevisionRequested) {
             $reviewStatus = $isReplied ? 'revision_replied' : 'revision_requested';
             $statusLabel = $isReplied ? 'Revision Submitted' : 'Revision Requested';
-        } elseif ($subStatus === SurveySubmission::STATUS_APPROVED || $visitStatus === SurveyStatus::APPROVED) {
+        } elseif ($subStatus === SurveySubmission::STATUS_APPROVED 
+            || $visitStatus === SurveyStatus::APPROVED
+            || $clientReviewStatus === 'approved'
+            || in_array(strtolower((string) ($t->status ?? '')), ['approved', 'survey_approved'], true)) {
             $reviewStatus = 'approved';
             $statusLabel = 'Approved';
         } elseif ($subStatus === SurveySubmission::STATUS_SUBMITTED || $visitStatus === SurveyStatus::SUBMITTED) {
@@ -3915,8 +3952,15 @@ $completed = SurveyPlan::whereHas(
         };
 
         $statusRaw = $t->status ?? '';
-        $statusStr = is_object($statusRaw) ? ($statusRaw->value ?? (string) $statusRaw) : (string) $statusRaw;
-        $isCompleted = (strtolower($statusStr) === 'completed');
+        $statusStr = is_object($statusRaw) ? ($statusRaw instanceof \BackedEnum ? $statusRaw->value : (string) $statusRaw) : (string) $statusRaw;
+        $statusLower = strtolower(trim((string) $statusStr));
+        $crRaw = $t->client_review_status ?? '';
+        $clientReviewStatusLower = strtolower(trim(is_object($crRaw) ? ($crRaw instanceof \BackedEnum ? $crRaw->value : (string) $crRaw) : (string) $crRaw));
+
+        $isApproved = in_array($statusLower, ['approved', 'survey_approved'], true)
+            || $clientReviewStatusLower === 'approved';
+        $isCompleted = ($statusLower === 'completed' || $isApproved || !empty($t->is_completed) || (float) ($t->progress_percent ?? 0) >= 100);
+
         $priority = $this->formatPriorityValue($t->priority ?? null, 'medium');
         $isLegacy = ($t->_source ?? null) === 'legacy' || $t instanceof \App\Models\ExecutionTask;
         $startVal = $isLegacy
@@ -3930,12 +3974,18 @@ $completed = SurveyPlan::whereHas(
         $due = $endParsed;
         $supervisor = $t->supervisor ?? $t->assignedSupervisor ?? null;
         $revInfo = $this->resolveTaskRevisionInfo($t);
-        $normalizedStatus = match (strtolower($statusStr)) {
+
+        $normalizedStatus = match ($statusLower) {
             'planned' => 'pending',
-            default => in_array(strtolower($statusStr), ['pending', 'in_progress', 'review', 'completed', 'blocked', 'cancelled'], true)
-                ? strtolower($statusStr)
+            'survey_approved', 'approved' => 'approved',
+            default => in_array($statusLower, ['pending', 'in_progress', 'review', 'completed', 'blocked', 'cancelled'], true)
+                ? $statusLower
                 : 'pending',
         };
+
+        $reviewStatus = $isApproved
+            ? 'approved'
+            : ($revInfo['review_status'] ?? ($statusLower === 'review' ? 'submitted' : $normalizedStatus));
 
         return [
             'id' => $t->id,
@@ -3953,13 +4003,13 @@ $completed = SurveyPlan::whereHas(
             'priority' => $priority,
             'priority_label' => ucfirst($priority),
             'is_completed' => $isCompleted,
-            'status' => $statusStr,
+            'status' => $isApproved ? 'approved' : $statusStr,
             'normalized_status' => $normalizedStatus,
             'source' => $isLegacy ? 'legacy' : 'unified',
             'task_code' => $t->task_code ?? null,
             'supervisor_name' => $supervisor?->name ?? null,
             'created_at' => $t->created_at?->toIso8601String(),
-            'review_status' => $revInfo['review_status'] ?? ($statusStr === 'review' ? 'submitted' : $normalizedStatus),
+            'review_status' => $reviewStatus,
             'is_revision_requested' => $revInfo['is_revision_requested'] ?? false,
             'revision_remarks' => $revInfo['revision_remarks'] ?? null,
             'revision_requested_at' => $revInfo['requested_at'] ?? null,
@@ -3996,6 +4046,17 @@ $completed = SurveyPlan::whereHas(
         }
 
         return $tasks->filter(function ($t) use ($todayStr, $today, $parseDate) {
+            $statusRaw = $t->status ?? '';
+            $statusLower = strtolower(trim(is_object($statusRaw) ? ($statusRaw instanceof \BackedEnum ? $statusRaw->value : (string) $statusRaw) : (string) $statusRaw));
+            $crRaw = $t->client_review_status ?? '';
+            $clientReviewStatusLower = strtolower(trim(is_object($crRaw) ? ($crRaw instanceof \BackedEnum ? $crRaw->value : (string) $crRaw) : (string) $crRaw));
+            if (in_array($statusLower, ['completed', 'done', 'approved', 'survey_approved', 'closed'], true)
+                || $clientReviewStatusLower === 'approved'
+                || !empty($t->is_completed)
+                || (float) ($t->progress_percent ?? 0) >= 100) {
+                return false;
+            }
+
             $isLegacy = ($t->_source ?? null) === 'legacy' || $t instanceof \App\Models\ExecutionTask;
             if ($isLegacy) {
                 $start = $parseDate($t->planned_start_date ?? null);
@@ -4113,37 +4174,115 @@ $completed = SurveyPlan::whereHas(
         ];
     }
 
-    protected function getFieldActivity($todayAttendance)
+    protected function getFieldActivity($todayAttendance, $todayVisits = null, $member = null, $project = null)
     {
-        $hours = $todayAttendance && $todayAttendance->hours_worked ? (float) $todayAttendance->hours_worked : 0;
+        $hours = 0;
+        if ($todayAttendance) {
+            if (!empty($todayAttendance->hours_worked)) {
+                $hours = (float) $todayAttendance->hours_worked;
+            } elseif ($todayAttendance->check_in_at && is_null($todayAttendance->check_out_at)) {
+                $elapsedMin = max(0, Carbon::parse($todayAttendance->check_in_at)->diffInMinutes(now()));
+                $hours = $elapsedMin / 60;
+            }
+        }
         $h = floor($hours);
         $m = round(($hours - $h) * 60);
         $workHoursStr = "{$h}h {$m}m";
+
+        $totalDistanceM = 0;
+        if ($todayVisits && $todayVisits->isNotEmpty()) {
+            $totalDistanceM += (float) $todayVisits->sum('distance_covered_m');
+        } elseif ($member) {
+            $today = now()->setTimezone('Asia/Kolkata')->toDateString();
+            try {
+                $visitDistance = (float) SurveyVisit::where(function ($q) use ($member) {
+                    $q->where('member_id', $member->id)
+                      ->orWhere('checked_in_by_member_id', $member->id);
+                })
+                ->where(function ($q) use ($today) {
+                    $q->whereDate('check_in_at', $today)
+                      ->orWhereDate('created_at', $today)
+                      ->orWhereDate('submitted_at', $today);
+                })
+                ->sum('distance_covered_m');
+                $totalDistanceM += $visitDistance;
+            } catch (\Throwable) {}
+        }
+        if ($member) {
+            $today = now()->setTimezone('Asia/Kolkata')->toDateString();
+            try {
+                $tripDistance = (float) \App\Models\DriverTrip::where('driver_member_id', $member->id)
+                    ->whereDate('created_at', $today)
+                    ->sum('total_distance');
+                $totalDistanceM += ($tripDistance * 1000);
+            } catch (\Throwable) {}
+        }
+        $distanceKm = $totalDistanceM > 0 ? round($totalDistanceM / 1000, 1) : 0.0;
+        $distanceStr = number_format($distanceKm, 1) . ' km';
+
+        $location = 'Not Checked In';
+        if ($todayAttendance && $todayAttendance->check_in_at) {
+            $location = $todayAttendance->check_in_location 
+                ?: ($project?->project_address 
+                    ?: ($project?->name 
+                        ?: ($todayAttendance->check_in_latitude ? 'Site' : 'Not Checked In')));
+        }
+
         $isVerified = (bool) ($todayAttendance && ($todayAttendance->status === 'approved' || $todayAttendance->check_in_latitude));
+        $siteVisitStatus = 'Pending';
+        if ($todayVisits && $todayVisits->isNotEmpty()) {
+            $hasApproved = $todayVisits->contains(fn ($v) => $v->status == 2 || $v->status === 'approved');
+            $siteVisitStatus = $hasApproved ? 'Verified' : 'In Progress';
+        } elseif ($isVerified) {
+            $siteVisitStatus = 'Verified';
+        } elseif ($todayAttendance && $todayAttendance->check_in_at) {
+            $siteVisitStatus = 'In Progress';
+        }
 
         return [
-            'distance' => '0.0 km',
+            'distance' => $distanceStr,
+            'distance_km' => $distanceKm,
             'work_hours' => $workHoursStr,
-            'current_location' => $todayAttendance && $todayAttendance->check_in_latitude ? 'Site' : 'Not Checked In',
-            'site_visit_status' => $isVerified ? 'Verified' : 'Pending',
+            'work_hours_numeric' => round($hours, 2),
+            'current_location' => $location,
+            'site_visit_status' => $siteVisitStatus,
         ];
     }
 
-    protected function getPerformance($attendanceLast30, $tasks, $hoursWorked)
+    protected function getPerformance($attendanceLast30, $tasks, $hoursWorked, $todayAttendance = null)
     {
         $totalTasks = $tasks->count();
-        $completedTasks = $tasks->where('status', 'completed')->count();
-        $taskRate = $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100) : 0;
+        $completedTasks = $tasks->filter(function ($t) {
+            $statusRaw = $t->status ?? '';
+            $st = strtolower(trim(is_object($statusRaw) ? ($statusRaw instanceof \BackedEnum ? $statusRaw->value : (string) $statusRaw) : (string) $statusRaw));
+            $crRaw = $t->client_review_status ?? '';
+            $cr = strtolower(trim(is_object($crRaw) ? ($crRaw instanceof \BackedEnum ? $crRaw->value : (string) $crRaw) : (string) $crRaw));
+            return in_array($st, ['completed', 'approved', 'survey_approved', 'done', 'closed'], true)
+                || $cr === 'approved'
+                || !empty($t->is_completed)
+                || (float) ($t->progress_percent ?? 0) >= 100;
+        })->count();
+        $taskRate = $totalTasks > 0 ? (int) round(($completedTasks / $totalTasks) * 100) : 0;
+
         $presentDays = $attendanceLast30->whereIn('attendance_type', ['present', 'overtime'])->count();
-        $attendanceRate = $attendanceLast30->count() > 0 ? round(($presentDays / 30) * 100) : 0;
+        if ($todayAttendance && $todayAttendance->check_in_at && $attendanceLast30->where('attendance_date', $todayAttendance->attendance_date)->isEmpty()) {
+            $presentDays++;
+        }
+        $trackedDays = max(1, min(30, $attendanceLast30->count() ?: 1));
+        $attendanceRate = (int) round(($presentDays / $trackedDays) * 100);
 
         $h = floor($hoursWorked);
         $m = round(($hoursWorked - $h) * 60);
 
         return [
             'attendance_rate' => $attendanceRate . '%',
+            'attendance_percentage' => $attendanceRate,
+            'attendance' => $attendanceRate,
             'task_completion_rate' => $taskRate . '%',
+            'task_completion_percentage' => $taskRate,
+            'task_completion' => $taskRate,
             'working_hours' => "{$h}h {$m}m",
+            'working_hours_numeric' => round($hoursWorked, 1),
         ];
     }
 

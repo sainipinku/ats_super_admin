@@ -986,7 +986,7 @@ class ProjectTaskController extends Controller implements HasMiddleware
                     $legacyTask->save();
                 }
                 if ($unifiedTask) {
-                    $unifiedTask->status = 'review';
+                    $unifiedTask->status = 'survey_approved';
                     $unifiedTask->client_review_status = 'approved';
                     $unifiedTask->save();
                 }
