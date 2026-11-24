@@ -58,13 +58,18 @@ jobs:
       - name: Build Frontend Assets
         run: |
           npm run build
-          tar -czf frontend-build.tar.gz -C public/build .
+          if [ ! -f public/build/manifest.json ] && [ -f public/build/.vite/manifest.json ]; then
+            cp public/build/.vite/manifest.json public/build/manifest.json
+          fi
+          test -f public/build/manifest.json
+          tar -czf "frontend-build-${{ github.run_id }}.tar.gz" -C public/build .
+          test -s "frontend-build-${{ github.run_id }}.tar.gz"
 
       - name: Upload Frontend Build Archive
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build-archive
-          path: frontend-build.tar.gz
+          path: frontend-build-${{ github.run_id }}.tar.gz
           retention-days: 1
 
       - name: Prepare Laravel Environment
@@ -104,6 +109,11 @@ jobs:
           name: frontend-build-archive
           path: .
 
+      - name: Verify Downloaded Frontend Archive
+        run: |
+          ls -lh "frontend-build-${{ github.run_id }}.tar.gz"
+          test -s "frontend-build-${{ github.run_id }}.tar.gz"
+
       - name: Transfer Pre-Built Assets to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -112,7 +122,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          source: "frontend-build.tar.gz"
+          source: "frontend-build-${{ github.run_id }}.tar.gz"
           target: "/tmp"
 
       - name: Execute Remote Zero-Downtime Deployment via SSH
@@ -167,29 +177,75 @@ jobs:
             echo "📦 Installing Composer dependencies..."
             composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
 
-            # 5. Atomically unpack pre-compiled frontend assets (No npm install or build on VPS!)
+            # 5. Safely unpack pre-compiled frontend assets (with manifest verification & VPS build fallback)
+            rm -f public/hot
+
+            RUN_TAR="/tmp/frontend-build-${{ github.run_id }}.tar.gz"
             TAR_FILE=""
-            if [ -f "/tmp/frontend-build.tar.gz" ]; then
+            if [ -f "$RUN_TAR" ]; then
+              TAR_FILE="$RUN_TAR"
+            elif [ -f "/tmp/frontend-build.tar.gz" ]; then
               TAR_FILE="/tmp/frontend-build.tar.gz"
             elif [ -f "/tmp/dist/frontend-build.tar.gz" ]; then
               TAR_FILE="/tmp/dist/frontend-build.tar.gz"
             fi
 
-            if [ -n "$TAR_FILE" ] && [ -f "$TAR_FILE" ]; then
-              echo "🎨 Deploying pre-compiled frontend assets..."
+            if [ -n "$TAR_FILE" ] && [ -s "$TAR_FILE" ]; then
+              echo "🎨 Unpacking pre-compiled frontend assets from $TAR_FILE..."
               rm -rf public/build_new
               mkdir -p public/build_new
               tar -xzf "$TAR_FILE" -C public/build_new
               rm -f "$TAR_FILE"
-              
-              # Atomic directory swap so active web visitors never hit 404 for assets
-              rm -rf public/build_old
-              [ -d public/build ] && mv public/build public/build_old
-              mv public/build_new public/build
-              rm -rf public/build_old
+
+              # Normalize Vite 5/6 manifest location if nested inside .vite/
+              if [ ! -f public/build_new/manifest.json ] && [ -f public/build_new/.vite/manifest.json ]; then
+                cp public/build_new/.vite/manifest.json public/build_new/manifest.json
+              fi
+
+              if [ -f public/build_new/manifest.json ]; then
+                if command -v rsync >/dev/null 2>&1; then
+                  mkdir -p public/build
+                  rsync -a --delete public/build_new/ public/build/
+                  rm -rf public/build_new
+                else
+                  rm -rf public/build_old
+                  [ -d public/build ] && mv public/build public/build_old
+                  if mv public/build_new public/build; then
+                    rm -rf public/build_old
+                  else
+                    [ -d public/build_old ] && mv public/build_old public/build
+                    echo "❌ Failed to swap public/build_new into public/build"
+                    exit 1
+                  fi
+                fi
+                echo "✅ Verified public/build/manifest.json deployed."
+              else
+                echo "⚠️ Extracted archive missing manifest.json — preserving existing public/build."
+                rm -rf public/build_new
+              fi
             else
-              echo "ℹ️ No new frontend archive found in /tmp; keeping existing build."
+              echo "⚠️ No pre-built frontend archive found in /tmp."
             fi
+
+            # Fallback: if public/build/manifest.json is still missing on VPS, build directly
+            if [ ! -f public/build/manifest.json ]; then
+              echo "🛠️ public/build/manifest.json missing — attempting fallback frontend build on VPS..."
+              if command -v npm >/dev/null 2>&1; then
+                npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+                npm run build
+                if [ ! -f public/build/manifest.json ] && [ -f public/build/.vite/manifest.json ]; then
+                  cp public/build/.vite/manifest.json public/build/manifest.json
+                fi
+              fi
+            fi
+
+            # Hard gate: never finish deployment without Vite manifest.json
+            if [ ! -f public/build/manifest.json ]; then
+              echo "❌ FATAL: Vite manifest not found at $DEPLOY_DIR/public/build/manifest.json!"
+              ls -la public/ public/build/ 2>/dev/null || true
+              exit 1
+            fi
+            chmod -R a+rX public/build || true
 
             # 6. Run database migrations safely
             echo "🗄️ Running database migrations..."

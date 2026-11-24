@@ -539,6 +539,7 @@ class ConstructionBillingService
                 'priority' => $project->priority ?? 'medium',
                 'start_date' => $project->start_date ? (is_string($project->start_date) ? $project->start_date : $project->start_date->format('Y-m-d')) : null,
                 'expected_end_date' => $project->expected_end_date ? (is_string($project->expected_end_date) ? $project->expected_end_date : $project->expected_end_date->format('Y-m-d')) : null,
+                'created_at' => $project->created_at ? (is_string($project->created_at) ? $project->created_at : $project->created_at->format('Y-m-d')) : null,
                 'project_address' => $project->project_address,
                 'location_name' => $project->location_name,
                 'khasra_number' => $khasraNumber ?: '—',
@@ -594,23 +595,48 @@ class ConstructionBillingService
     /**
      * Export project and client billing summary as a downloadable CSV.
      */
-    public function exportProjectsBillingCsv(array $projectsData): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function exportProjectsBillingCsv(array $projectsData, ?string $startDate = null, ?string $endDate = null): \Symfony\Component\HttpFoundation\StreamedResponse
     {
+        $filename = 'projects_clients_billing_summary_';
+        if ($startDate && $endDate) {
+            $filename .= $startDate . '_to_' . $endDate . '.csv';
+        } elseif ($startDate) {
+            $filename .= 'from_' . $startDate . '.csv';
+        } elseif ($endDate) {
+            $filename .= 'until_' . $endDate . '.csv';
+        } else {
+            $filename .= date('Y-m-d_His') . '.csv';
+        }
+
         $headers = [
             'Content-Type' => 'text/csv; charset=utf-8',
-            'Content-Disposition' => 'attachment; filename="projects_clients_billing_summary_' . date('Y-m-d_His') . '.csv"',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             'Pragma' => 'no-cache',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
         ];
 
-        return response()->stream(function () use ($projectsData) {
+        return response()->stream(function () use ($projectsData, $startDate, $endDate) {
             $handle = fopen('php://output', 'w');
+
+            // If date range specified, write metadata row
+            if ($startDate || $endDate) {
+                fputcsv($handle, [
+                    '# REPORT PERIOD',
+                    ($startDate ?: 'Any') . ' to ' . ($endDate ?: 'Any'),
+                    'Generated At',
+                    date('Y-m-d H:i:s'),
+                ]);
+            }
+
             fputcsv($handle, [
                 'Project Code',
                 'Project Name',
                 'Stage',
                 'Status',
+                'Start Date',
+                'Expected End Date',
+                'Created Date',
                 'Client Code',
                 'Client Name',
                 'Company Name',
@@ -619,12 +645,6 @@ class ConstructionBillingService
                 'Client Email',
                 'Khasra Number',
                 'Site Area',
-                'Total Tasks',
-                'Completed Tasks',
-                'In Progress Tasks',
-                'Pending Tasks',
-                'Total Checklists',
-                'Completed Checklists',
                 'Total Billed (INR)',
                 'Total Paid (INR)',
                 'Balance Outstanding (INR)',
@@ -636,6 +656,9 @@ class ConstructionBillingService
                     $row['name'] ?? '',
                     $row['current_stage'] ?? '',
                     $row['status'] ?? '',
+                    $row['start_date'] ?? '',
+                    $row['expected_end_date'] ?? '',
+                    $row['created_at'] ?? '',
                     $row['client']['client_code'] ?? '',
                     $row['client']['name'] ?? '',
                     $row['client']['company_name'] ?? '',
@@ -644,12 +667,6 @@ class ConstructionBillingService
                     $row['client']['email'] ?? '',
                     $row['khasra_number'] ?? '',
                     $row['site_area'] ?? '',
-                    $row['task_counts']['total'] ?? 0,
-                    $row['task_counts']['completed'] ?? 0,
-                    $row['task_counts']['in_progress'] ?? 0,
-                    $row['task_counts']['pending'] ?? 0,
-                    $row['checklist_counts']['total'] ?? 0,
-                    $row['checklist_counts']['completed'] ?? 0,
                     $row['billing_summary']['total_billed'] ?? 0,
                     $row['billing_summary']['total_paid'] ?? 0,
                     $row['billing_summary']['outstanding'] ?? 0,

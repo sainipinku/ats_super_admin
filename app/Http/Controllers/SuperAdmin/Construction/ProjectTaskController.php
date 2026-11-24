@@ -27,6 +27,7 @@ use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -985,7 +986,7 @@ class ProjectTaskController extends Controller implements HasMiddleware
                     $legacyTask->save();
                 }
                 if ($unifiedTask) {
-                    $unifiedTask->status = 'review';
+                    $unifiedTask->status = 'survey_approved';
                     $unifiedTask->client_review_status = 'approved';
                     $unifiedTask->save();
                 }
@@ -1168,10 +1169,12 @@ class ProjectTaskController extends Controller implements HasMiddleware
         $remarks = $validated['remarks'] ?? null;
 
         if ($decision === 'approved') {
-            $draftingJob->update([
-                'status' => 'approved',
-                'rejection_reason' => null,
-            ]);
+            $jobUpdates = ['status' => 'approved'];
+            if (Schema::hasColumn('construction_drafting_jobs', 'rejection_reason')) {
+                $jobUpdates['rejection_reason'] = null;
+            }
+            $draftingJob->update($jobUpdates);
+
             $latestRev = $draftingJob->drawingRevisions()->latest()->first();
             if ($latestRev) {
                 $latestRev->update(['status' => 'approved', 'is_locked' => true]);
@@ -1198,13 +1201,21 @@ class ProjectTaskController extends Controller implements HasMiddleware
             // Advance project stage to Construction Execution
             $project->update(['current_stage' => 'ready_for_construction']);
         } else {
-            $draftingJob->update([
-                'status' => 'revision_requested',
-                'rejection_reason' => $remarks,
-                'rejected_at' => now(),
-                'rejected_by_member_id' => $actor instanceof Member ? $actor->id : null,
-                'rejection_count' => (int) $draftingJob->rejection_count + 1,
-            ]);
+            $jobUpdates = ['status' => 'revision_requested'];
+            if (Schema::hasColumn('construction_drafting_jobs', 'rejection_reason')) {
+                $jobUpdates['rejection_reason'] = $remarks;
+            }
+            if (Schema::hasColumn('construction_drafting_jobs', 'rejected_at')) {
+                $jobUpdates['rejected_at'] = now();
+            }
+            if (Schema::hasColumn('construction_drafting_jobs', 'rejected_by_member_id')) {
+                $jobUpdates['rejected_by_member_id'] = $actor instanceof Member ? $actor->id : null;
+            }
+            if (Schema::hasColumn('construction_drafting_jobs', 'rejection_count')) {
+                $jobUpdates['rejection_count'] = (int) ($draftingJob->rejection_count ?? 0) + 1;
+            }
+            $draftingJob->update($jobUpdates);
+
             $latestRev = $draftingJob->drawingRevisions()->latest()->first();
             if ($latestRev) {
                 $latestRev->update(['status' => 'revision_requested']);
@@ -1220,6 +1231,16 @@ class ProjectTaskController extends Controller implements HasMiddleware
             }
             $project->update(['current_stage' => 'drafting_in_progress']);
         }
+
+        app(ConstructionActivityService::class)->log(
+            module: 'drawing_approval',
+            action: $decision,
+            actor: $actor,
+            reference: $draftingJob,
+            companyId: $project->company_id,
+            projectId: $project->id,
+            request: $request
+        );
 
         return Redirect::back()->with('success', 'Drafting review updated: ' . ucfirst($decision));
     }

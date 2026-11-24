@@ -28,4 +28,23 @@ class WorkflowTrackerMotionPathFeatureTest extends TestCase
         $this->assertStringContainsString('.kill()', $trackerCode);
         $this->assertStringContainsString('Complete Workflow Progress', $trackerCode);
     }
+
+    public function test_workflow_tracker_blinks_active_stage_after_file_arrival_and_respects_reduced_motion(): void
+    {
+        $trackerCode = file_get_contents(resource_path('js/Pages/Construction/Components/WorkflowTracker.jsx'));
+
+        $this->assertStringContainsString('hasArrived', $trackerCode);
+        $this->assertStringContainsString('setHasArrived(true)', $trackerCode);
+        $this->assertStringContainsString('prefers-reduced-motion', $trackerCode);
+        $this->assertStringContainsString('startActiveStepBling', $trackerCode);
+    }
+
+    public function test_edit_path_mode_registers_motion_path_helper_with_live_tween_and_cleans_up(): void
+    {
+        $trackerCode = file_get_contents(resource_path('js/Pages/Construction/Components/WorkflowTracker.jsx'));
+
+        $this->assertStringContainsString('gsap.registerPlugin(MotionPathPlugin, MotionPathHelper)', $trackerCode);
+        $this->assertStringContainsString('editTweenRef', $trackerCode);
+        $this->assertStringContainsString('gsap,', $trackerCode);
+    }
 }

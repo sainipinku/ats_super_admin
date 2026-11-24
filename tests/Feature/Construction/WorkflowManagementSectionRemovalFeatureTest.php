@@ -23,7 +23,7 @@ class WorkflowManagementSectionRemovalFeatureTest extends TestCase
 
         // Core sections preserved
         $this->assertStringContainsString('<WorkflowTracker', $content);
-        $this->assertStringContainsString('title="Survey Plans"', $content);
+        $this->assertStringContainsString('title="Scope of Work"', $content);
         $this->assertStringContainsString('title="Survey Submission Queue"', $content);
         $this->assertStringContainsString('<DynamicChecklistManager', $content);
         $this->assertStringContainsString('<ProjectActivityLog', $content);

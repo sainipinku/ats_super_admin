@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import gsap from "gsap";
-import { usePage } from "@inertiajs/react";
+import { useForm, usePage } from "@inertiajs/react";
+import { toast } from "react-hot-toast";
 import ConstructionShell from "@/Pages/Construction/Components/ConstructionShell";
 import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
@@ -12,6 +13,14 @@ import FieldNotesDisplay from "@/Pages/Construction/Components/FieldNotesDisplay
 import Modal from "@/Components/Modal";
 import ProjectActivityLog from "@/Pages/Construction/Components/ProjectActivityLog";
 import AssignToDraftsmanButton from "@/Pages/Construction/Components/AssignToDraftsmanButton";
+
+const TASKS_PER_PAGE = 10;
+const EXECUTION_TASKS_TITLE_WORDS = ["Execution", "Tasks"];
+
+const prefersReducedMotion = () =>
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export default function ProjectShow({ project, activityLog, workflowSummary, companyDraftsmen = [] }) {
     const { auth } = usePage().props;
@@ -47,6 +56,30 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
 
     const canManageChecklist = hasPerm("execution.create") || hasPerm("execution.edit");
     const canAssignDraftsman = isRootSuperAdmin || hasPerm("execution.edit") || hasPerm("execution.manage");
+    const canEditScopeOfWork = isRootSuperAdmin || hasPerm("project.edit") || hasPerm("project.manage");
+    const [showScopeModal, setShowScopeModal] = useState(false);
+    const scopeOfWorkForm = useForm({
+        scope_of_work: project.scope_of_work || "",
+    });
+    const openScopeModal = () => {
+        scopeOfWorkForm.setData("scope_of_work", project.scope_of_work || "");
+        scopeOfWorkForm.clearErrors();
+        setShowScopeModal(true);
+    };
+    const submitScopeOfWork = (e) => {
+        e.preventDefault();
+        scopeOfWorkForm.patch(route("admin.construction.projects.scope-of-work.update", project.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowScopeModal(false);
+                toast.success("Scope of work updated successfully.");
+            },
+            onError: (errors) => {
+                const firstError = Object.values(errors)[0];
+                if (firstError) toast.error(firstError);
+            },
+        });
+    };
 
     const projectDraftsmenList = getProjectDraftsmen(project.team_members).map((m) => ({
         ...m,
@@ -97,6 +130,148 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
         ? Math.round((checklistCounts.completed / checklistCounts.total) * 100)
         : 0;
 
+    // Execution Tasks pagination (10 per batch, 2 per row) + GSAP choreography
+    const allAdminTasks = useMemo(() => project.execution_tasks || [], [project.execution_tasks]);
+    const [visibleTaskCount, setVisibleTaskCount] = useState(TASKS_PER_PAGE);
+    const [isLoadingMoreTasks, setIsLoadingMoreTasks] = useState(false);
+    const [isExecutionInView, setIsExecutionInView] = useState(false);
+    const executionTasksRef = useRef(null);
+    const taskLoaderRef = useRef(null);
+    const prevVisibleTaskCountRef = useRef(0);
+    const loadMoreTasksTimerRef = useRef(null);
+
+    const visibleAdminTasks = useMemo(
+        () => allAdminTasks.slice(0, visibleTaskCount),
+        [allAdminTasks, visibleTaskCount]
+    );
+    const remainingTasks = Math.max(0, allAdminTasks.length - visibleAdminTasks.length);
+    const hasMoreTasks = remainingTasks > 0;
+
+    useEffect(() => {
+        if (loadMoreTasksTimerRef.current) {
+            clearTimeout(loadMoreTasksTimerRef.current);
+            loadMoreTasksTimerRef.current = null;
+        }
+        setIsLoadingMoreTasks(false);
+        prevVisibleTaskCountRef.current = 0;
+        setVisibleTaskCount(TASKS_PER_PAGE);
+    }, [project.id]);
+
+    useEffect(() => {
+        return () => {
+            if (loadMoreTasksTimerRef.current) {
+                clearTimeout(loadMoreTasksTimerRef.current);
+                loadMoreTasksTimerRef.current = null;
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        const el = executionTasksRef.current;
+        if (!el || typeof IntersectionObserver === "undefined") {
+            setIsExecutionInView(true);
+            return undefined;
+        }
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    setIsExecutionInView(true);
+                    observer.disconnect();
+                }
+            },
+            { threshold: 0.05 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
+    useEffect(() => {
+        if (!isExecutionInView || !executionTasksRef.current || prefersReducedMotion()) return undefined;
+        const ctx = gsap.context(() => {
+            const tl = gsap.timeline();
+            tl.fromTo(
+                ".et-header-card",
+                { opacity: 0, scale: 1.045, y: 14 },
+                { opacity: 1, scale: 1, y: 0, duration: 0.52, ease: "power3.out", clearProps: "transform,opacity" }
+            );
+            tl.fromTo(
+                ".et-title-word",
+                { y: 20, opacity: 0, rotateX: -24, scale: 1.08 },
+                { y: 0, opacity: 1, rotateX: 0, scale: 1, duration: 0.5, stagger: 0.085, ease: "back.out(1.7)", clearProps: "transform,opacity" },
+                "-=0.35"
+            );
+        }, executionTasksRef);
+        return () => ctx.revert();
+    }, [isExecutionInView]);
+
+    useEffect(() => {
+        if (!isExecutionInView || !executionTasksRef.current || prefersReducedMotion()) {
+            prevVisibleTaskCountRef.current = visibleAdminTasks.length;
+            return undefined;
+        }
+        const startIdx = prevVisibleTaskCountRef.current;
+        const allCards = Array.from(executionTasksRef.current.querySelectorAll(".et-task-card"));
+        const targetCards = allCards.filter((card) => Number(card.getAttribute("data-et-index")) >= startIdx);
+        if (!targetCards.length) {
+            prevVisibleTaskCountRef.current = visibleAdminTasks.length;
+            return undefined;
+        }
+        const ctx = gsap.context(() => {
+            gsap.fromTo(
+                targetCards,
+                { opacity: 0, scale: 1.04, y: 16 },
+                { opacity: 1, scale: 1, y: 0, duration: 0.44, stagger: 0.055, ease: "power3.out", clearProps: "transform,opacity" }
+            );
+        }, executionTasksRef);
+        prevVisibleTaskCountRef.current = visibleAdminTasks.length;
+        return () => ctx.revert();
+    }, [isExecutionInView, visibleAdminTasks.length]);
+
+    useEffect(() => {
+        if (!isLoadingMoreTasks || !taskLoaderRef.current || prefersReducedMotion()) return undefined;
+        const ctx = gsap.context(() => {
+            gsap.fromTo(".et-load-more-loader", { opacity: 0, scale: 0.92 }, { opacity: 1, scale: 1, duration: 0.22, ease: "back.out(2)" });
+            gsap.to(".et-loader-ring", { rotation: 360, duration: 0.72, repeat: -1, ease: "none", transformOrigin: "50% 50%" });
+            gsap.to(".et-loader-dot", { y: -5, scale: 1.35, opacity: 1, duration: 0.34, stagger: 0.1, repeat: -1, yoyo: true, ease: "sine.inOut" });
+        }, taskLoaderRef);
+        return () => ctx.revert();
+    }, [isLoadingMoreTasks]);
+
+    const handleLoadMoreTasks = useCallback(() => {
+        if (isLoadingMoreTasks || !hasMoreTasks) return;
+        prevVisibleTaskCountRef.current = visibleAdminTasks.length;
+        if (prefersReducedMotion()) {
+            setVisibleTaskCount((prev) => Math.min(prev + TASKS_PER_PAGE, allAdminTasks.length));
+            return;
+        }
+        setIsLoadingMoreTasks(true);
+        loadMoreTasksTimerRef.current = setTimeout(() => {
+            setVisibleTaskCount((prev) => Math.min(prev + TASKS_PER_PAGE, allAdminTasks.length));
+            setIsLoadingMoreTasks(false);
+            loadMoreTasksTimerRef.current = null;
+        }, 460);
+    }, [isLoadingMoreTasks, hasMoreTasks, visibleAdminTasks.length, allAdminTasks.length]);
+
+    const handleShowLessTasks = useCallback(() => {
+        if (loadMoreTasksTimerRef.current) {
+            clearTimeout(loadMoreTasksTimerRef.current);
+            loadMoreTasksTimerRef.current = null;
+        }
+        setIsLoadingMoreTasks(false);
+        prevVisibleTaskCountRef.current = 0;
+        setVisibleTaskCount(TASKS_PER_PAGE);
+    }, []);
+
+    const handleTaskPopEnter = useCallback((e, { scale = 1.014, y = -3 } = {}) => {
+        if (prefersReducedMotion()) return;
+        gsap.to(e.currentTarget, { scale, y, duration: 0.24, ease: "back.out(2.2)", overwrite: "auto" });
+    }, []);
+
+    const handleTaskPopLeave = useCallback((e) => {
+        if (prefersReducedMotion()) return;
+        gsap.to(e.currentTarget, { scale: 1, y: 0, duration: 0.24, ease: "power2.out", overwrite: "auto" });
+    }, []);
+
     return (
         <ConstructionShell title={project.name} description={`${project.project_code} • ${project.company?.name || ""}`} variant="admin">
             <WorkflowTracker currentStage={project.current_stage} isLocked={project.is_locked} />
@@ -110,45 +285,158 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
                 <StatCard compact label="Approvals" value={project.drawing_approvals?.length || 0} />
             </div>
 
-            <SectionCard title="Execution Tasks" description="Monitor Surveyor task progress and assign completed Surveyor work to a Draftsman.">
-                {project.execution_tasks?.length ? (
-                    <div className="space-y-3">
-                        {project.execution_tasks.map((task) => (
-                            <div key={task.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <p className="font-semibold text-slate-900 dark:text-white">{task.title}</p>
-                                        <p className="mt-1 text-xs text-slate-500">{task.task_code} • Surveyor: {task.supervisor?.name || "Unassigned"}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <StatusBadge value={task.status} />
-                                        <AssignToDraftsmanButton
-                                            task={task}
-                                            projectId={project.id}
-                                            taskSource="execution"
-                                            routeName="admin.construction.projects.tasks.assign-draftsman"
-                                            draftsmen={allAdminDraftsmen}
-                                            defaultDraftsmanId={defaultDraftsmanId}
-                                            authorized={canAssignDraftsman}
-                                        />
-                                    </div>
-                                </div>
-                                {task.assignees?.length ? (
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        {task.assignees.map((assignment) => (
-                                            <span key={assignment.id} className="rounded-full bg-white px-3 py-1 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300">
-                                                {assignment.member?.name || "Employee"} • {assignment.assignment_role}
+            <div ref={executionTasksRef} className="et-stage w-full space-y-3.5">
+                <div className="et-header-card relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-sm dark:border-slate-800/90 dark:bg-slate-900/95">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-500 opacity-85" />
+                    <div className="flex flex-wrap items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <span
+                                onMouseEnter={(e) => handleTaskPopEnter(e, { scale: 1.08, y: -2 })}
+                                onMouseLeave={handleTaskPopLeave}
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-base text-indigo-700 ring-1 ring-indigo-500/20 dark:from-indigo-500/20 dark:to-sky-500/20 dark:text-indigo-300"
+                            >
+                                ⚡
+                            </span>
+                            <div className="min-w-0">
+                                <h2
+                                    aria-label="Execution Tasks"
+                                    className="flex flex-wrap items-center gap-x-1.5 text-base font-extrabold tracking-tight text-slate-900 dark:text-white"
+                                >
+                                    {EXECUTION_TASKS_TITLE_WORDS.map((word) => (
+                                        <span key={word} className="inline-flex overflow-hidden py-0.5">
+                                            <span className="et-title-word inline-block bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 bg-clip-text text-transparent dark:from-white dark:via-indigo-200 dark:to-white">
+                                                {word}
                                             </span>
-                                        ))}
-                                    </div>
-                                ) : null}
+                                        </span>
+                                    ))}
+                                </h2>
+                                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                    Monitor Surveyor task progress and assign completed Surveyor work to a Draftsman.
+                                    {allAdminTasks.length > 0 && (
+                                        <span className="ml-1.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                                            • Showing {visibleAdminTasks.length} of {allAdminTasks.length}
+                                        </span>
+                                    )}
+                                </p>
                             </div>
-                        ))}
+                        </div>
+                    </div>
+                </div>
+
+                {visibleAdminTasks.length ? (
+                    <div className="space-y-3">
+                        <div className="grid gap-3 md:grid-cols-2">
+                            {visibleAdminTasks.map((task, taskIndex) => (
+                                <div
+                                    key={task.id}
+                                    data-et-index={taskIndex}
+                                    onMouseEnter={(e) => handleTaskPopEnter(e, { scale: 1.014, y: -3 })}
+                                    onMouseLeave={handleTaskPopLeave}
+                                    className="et-task-card rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm transition-colors hover:border-indigo-300/80 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/95 dark:hover:border-indigo-500/40"
+                                >
+                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="inline-flex items-center rounded bg-indigo-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                                    {task.task_code}
+                                                </span>
+                                                <div className="scale-90 origin-left">
+                                                    <StatusBadge value={task.status} />
+                                                </div>
+                                            </div>
+                                            <p className="et-task-title mt-1 truncate text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                                {task.title}
+                                            </p>
+                                            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                                Surveyor: <span className="font-semibold text-slate-700 dark:text-slate-200">{task.supervisor?.name || "Unassigned"}</span>
+                                            </p>
+                                        </div>
+                                        <div className="flex shrink-0 items-center gap-1.5">
+                                            <AssignToDraftsmanButton
+                                                task={task}
+                                                projectId={project.id}
+                                                taskSource="execution"
+                                                routeName="admin.construction.projects.tasks.assign-draftsman"
+                                                draftsmen={allAdminDraftsmen}
+                                                defaultDraftsmanId={defaultDraftsmanId}
+                                                authorized={canAssignDraftsman}
+                                            />
+                                        </div>
+                                    </div>
+                                    {task.assignees?.length ? (
+                                        <div className="mt-2 flex flex-wrap gap-1.5 border-t border-slate-100 pt-2 dark:border-slate-800">
+                                            {task.assignees.map((assignment) => (
+                                                <span key={assignment.id} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                    {assignment.member?.name || "Employee"} • {assignment.assignment_role}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ))}
+                        </div>
+
+                        {(hasMoreTasks || visibleAdminTasks.length > TASKS_PER_PAGE) && (
+                            <div
+                                ref={taskLoaderRef}
+                                className="flex flex-wrap items-center justify-center gap-3 rounded-xl border border-slate-200/80 bg-white/90 px-4 py-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80"
+                            >
+                                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                    Showing <strong className="font-bold text-slate-800 dark:text-slate-200">{visibleAdminTasks.length}</strong> of{" "}
+                                    <strong className="font-bold text-slate-800 dark:text-slate-200">{allAdminTasks.length}</strong> tasks
+                                </span>
+
+                                {hasMoreTasks && (
+                                    <button
+                                        type="button"
+                                        onClick={handleLoadMoreTasks}
+                                        disabled={isLoadingMoreTasks}
+                                        onMouseEnter={(e) => handleTaskPopEnter(e, { scale: 1.04, y: -1.5 })}
+                                        onMouseLeave={handleTaskPopLeave}
+                                        className="et-load-more-btn inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm shadow-indigo-500/20 transition hover:from-indigo-500 hover:to-violet-500 disabled:cursor-wait disabled:opacity-90"
+                                    >
+                                        {isLoadingMoreTasks ? (
+                                            <span className="et-load-more-loader inline-flex items-center gap-2">
+                                                <svg className="et-loader-ring h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none">
+                                                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
+                                                    <path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                                                </svg>
+                                                <span>Loading next {Math.min(TASKS_PER_PAGE, remainingTasks)}</span>
+                                                <span className="inline-flex items-center gap-1">
+                                                    <span className="et-loader-dot h-1.5 w-1.5 rounded-full bg-white/80" />
+                                                    <span className="et-loader-dot h-1.5 w-1.5 rounded-full bg-white/80" />
+                                                    <span className="et-loader-dot h-1.5 w-1.5 rounded-full bg-white/80" />
+                                                </span>
+                                            </span>
+                                        ) : (
+                                            <>
+                                                <span>Load More (+{Math.min(TASKS_PER_PAGE, remainingTasks)} of {remainingTasks} left)</span>
+                                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </>
+                                        )}
+                                    </button>
+                                )}
+
+                                {visibleAdminTasks.length > TASKS_PER_PAGE && !isLoadingMoreTasks && (
+                                    <button
+                                        type="button"
+                                        onClick={handleShowLessTasks}
+                                        onMouseEnter={(e) => handleTaskPopEnter(e, { scale: 1.04, y: -1 })}
+                                        onMouseLeave={handleTaskPopLeave}
+                                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                                    >
+                                        Show Less
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <EmptyState title="No execution tasks yet." description="Tasks will appear after the project execution plan is created." />
                 )}
-            </SectionCard>
+            </div>
 
             <div className="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
                 <SectionCard title="Project Summary" description="Current project context for assigned admin execution.">
@@ -309,25 +597,147 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
 
             <div className="grid gap-4 xl:grid-cols-2 items-stretch">
                 <SectionCard
-                    title="Survey Execution"
-                    description="Plan status, submitted GPS/photos/reports, and field activity."
+                    title="Scope of Work"
+                    description="Project scope of work, deliverables, and linked field survey plans."
                     className="flex flex-col"
                     actions={
-                        <span className="inline-flex items-center rounded-full border border-indigo-200/70 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
-                            {project.survey_plans?.length || 0} {(project.survey_plans?.length || 0) === 1 ? "Plan" : "Plans"}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {project.survey_plans?.length > 0 && (
+                                <span className="inline-flex items-center rounded-full border border-indigo-200/70 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
+                                    {project.survey_plans.length} {project.survey_plans.length === 1 ? "Plan" : "Plans"}
+                                </span>
+                            )}
+                            {canEditScopeOfWork && (
+                                <button
+                                    type="button"
+                                    onClick={openScopeModal}
+                                    className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-2xs transition hover:bg-indigo-100 hover:border-indigo-300 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200 dark:hover:bg-indigo-500/25"
+                                >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                    <span>Edit Scope of Work</span>
+                                </button>
+                            )}
+                        </div>
                     }
                 >
-                    {project.survey_plans?.length ? (
-                        <div className="space-y-4">
-                            {project.survey_plans.map((plan) => (
-                                <SurveyPlanCard key={plan.id} plan={plan} />
-                            ))}
+                    <div className="space-y-4">
+                        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 pb-2 dark:border-slate-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                                    Defined Project Scope
+                                </span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {project.khasra_number && (
+                                        <span className="inline-flex items-center rounded-md bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-700">
+                                            Khasra: {project.khasra_number}
+                                        </span>
+                                    )}
+                                    {project.site_area && (
+                                        <span className="inline-flex items-center rounded-md bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-700">
+                                            Area: {project.site_area}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {project.scope_of_work ? (
+                                <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+                                    {project.scope_of_work}
+                                </p>
+                            ) : (
+                                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300/80 bg-white/70 px-4 py-3.5 dark:border-slate-700 dark:bg-slate-950/40">
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                            No scope of work added yet.
+                                        </p>
+                                        <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                            Click Edit Scope of Work to define project deliverables and instructions.
+                                        </p>
+                                    </div>
+                                    {canEditScopeOfWork && (
+                                        <button
+                                            type="button"
+                                            onClick={openScopeModal}
+                                            className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-500"
+                                        >
+                                            <span>+ Add Scope</span>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <EmptyState title="No survey plans yet." description="Create the first survey plan from the survey module." />
-                    )}
+
+                        {project.survey_plans?.length ? (
+                            <div className="space-y-3">
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                    Linked Survey Plans ({project.survey_plans.length})
+                                </p>
+                                {project.survey_plans.map((plan) => (
+                                    <SurveyPlanCard key={plan.id} plan={plan} />
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
                 </SectionCard>
+
+                <Modal show={showScopeModal} onClose={() => setShowScopeModal(false)} maxWidth="2xl">
+                    <form onSubmit={submitScopeOfWork} className="p-6">
+                        <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                    Edit Scope of Work
+                                </h3>
+                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                    {project.project_code} • {project.name}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowScopeModal(false)}
+                                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="mt-4">
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                Scope of Work Details
+                            </label>
+                            <textarea
+                                rows={6}
+                                maxLength={5000}
+                                value={scopeOfWorkForm.data.scope_of_work}
+                                onChange={(e) => scopeOfWorkForm.setData("scope_of_work", e.target.value)}
+                                placeholder="Enter detailed project scope of work, surveying requirements, CAD deliverables, milestones, or special instructions..."
+                                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                            />
+                            <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                                <span>{scopeOfWorkForm.errors.scope_of_work ? <span className="text-rose-500 font-medium">{scopeOfWorkForm.errors.scope_of_work}</span> : "Visible to the project team on Project Details."}</span>
+                                <span>{(scopeOfWorkForm.data.scope_of_work || "").length} / 5000</span>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-200 pt-4 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setShowScopeModal(false)}
+                                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={scopeOfWorkForm.processing}
+                                className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-60"
+                            >
+                                {scopeOfWorkForm.processing ? "Saving..." : "Save Scope of Work"}
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
 
                 <SectionCard
                     title="Survey Submission Queue"
@@ -386,14 +796,16 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
                 </SectionCard>
             </div>
 
-            <DynamicChecklistManager
-                project={project}
-                namespace="admin"
-                variant="project-show"
-                enableDeltaPoll
-                canManage={canManageChecklist}
-                initialCounts={{ total: checklistCounts.total, completed: checklistCounts.completed, completion: checklistCompletion }}
-            />
+            <div id="project-checklist-workspace" className="scroll-mt-28">
+                <DynamicChecklistManager
+                    project={project}
+                    namespace="admin"
+                    variant="project-show"
+                    enableDeltaPoll
+                    canManage={canManageChecklist}
+                    initialCounts={{ total: checklistCounts.total, completed: checklistCounts.completed, completion: checklistCompletion }}
+                />
+            </div>
 
             <ProjectActivityLog activityLog={activityLog} />
         </ConstructionShell>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useMemo } from "react";
 import gsap from "gsap";
 import { useForm, router, usePage } from "@inertiajs/react";
@@ -15,6 +15,14 @@ import FieldNotesDisplay from "@/Pages/Construction/Components/FieldNotesDisplay
 import ProjectActivityLog from "@/Pages/Construction/Components/ProjectActivityLog";
 import { getMemberRoleBadges, formatMemberSelectOption, formatMemberOptionLabel } from "@/lib/memberBadges";
 import AssignToDraftsmanButton from "@/Pages/Construction/Components/AssignToDraftsmanButton";
+
+const TASKS_PER_PAGE = 10;
+const EXECUTION_TASKS_TITLE_WORDS = ["Execution", "Tasks"];
+
+const prefersReducedMotion = () =>
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const isActiveAssignment = (assignment) => {
     const status = assignment?.status?.value ?? assignment?.status;
@@ -354,6 +362,30 @@ export default function ProjectShow({ project, members, roles, activityLog, work
     ]);
 
     const canTransferTask = hasPerm("execution.edit");
+    const canEditScopeOfWork = !isDraftPersonUser && (isAdminUser || hasPerm(["project.edit", "project.manage"]));
+    const [showScopeModal, setShowScopeModal] = useState(false);
+    const scopeOfWorkForm = useForm({
+        scope_of_work: project.scope_of_work || "",
+    });
+    const openScopeModal = () => {
+        scopeOfWorkForm.setData("scope_of_work", project.scope_of_work || "");
+        scopeOfWorkForm.clearErrors();
+        setShowScopeModal(true);
+    };
+    const submitScopeOfWork = (e) => {
+        e.preventDefault();
+        scopeOfWorkForm.patch(route("super.construction.projects.scope-of-work.update", project.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowScopeModal(false);
+                toast.success("Scope of work updated successfully.");
+            },
+            onError: (errors) => {
+                const firstError = Object.values(errors)[0];
+                if (firstError) toast.error(firstError);
+            },
+        });
+    };
     const metricsGridRef = useRef(null);
 
     useEffect(() => {
@@ -564,6 +596,296 @@ export default function ProjectShow({ project, members, roles, activityLog, work
     const [showCreateTask, setShowCreateTask] = useState(false);
     const [showAdvancedTaskFields, setShowAdvancedTaskFields] = useState(false);
 
+    // Execution Tasks pagination (10 per batch, 2 per row) + GSAP choreography
+    const [visibleTaskCount, setVisibleTaskCount] = useState(TASKS_PER_PAGE);
+    const [isLoadingMoreTasks, setIsLoadingMoreTasks] = useState(false);
+    const [isExecutionInView, setIsExecutionInView] = useState(false);
+    const executionTasksRef = useRef(null);
+    const taskLoaderRef = useRef(null);
+    const createTaskFormRef = useRef(null);
+    const taskHeaderProgressRef = useRef(null);
+    const prevVisibleTaskCountRef = useRef(0);
+    const loadMoreTasksTimerRef = useRef(null);
+
+    const visibleTaskList = useMemo(
+        () => filteredTaskList.slice(0, visibleTaskCount),
+        [filteredTaskList, visibleTaskCount]
+    );
+    const remainingTasks = Math.max(0, filteredTaskList.length - visibleTaskList.length);
+    const hasMoreTasks = remainingTasks > 0;
+    const taskCompletionPct = taskCounts.total > 0
+        ? Math.round((taskCounts.completed / taskCounts.total) * 100)
+        : 0;
+
+    useEffect(() => {
+        if (loadMoreTasksTimerRef.current) {
+            clearTimeout(loadMoreTasksTimerRef.current);
+            loadMoreTasksTimerRef.current = null;
+        }
+        setIsLoadingMoreTasks(false);
+        prevVisibleTaskCountRef.current = 0;
+        setVisibleTaskCount(TASKS_PER_PAGE);
+    }, [selectedRoleFilter, project.id]);
+
+    useEffect(() => {
+        return () => {
+            if (loadMoreTasksTimerRef.current) {
+                clearTimeout(loadMoreTasksTimerRef.current);
+                loadMoreTasksTimerRef.current = null;
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        const el = executionTasksRef.current;
+        if (!el || typeof IntersectionObserver === "undefined") {
+            setIsExecutionInView(true);
+            return undefined;
+        }
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    setIsExecutionInView(true);
+                    observer.disconnect();
+                }
+            },
+            { threshold: 0.05 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
+    // Screen zoom-out entrance + kinetic title text effect for Execution Tasks
+    useEffect(() => {
+        if (!isExecutionInView || !executionTasksRef.current || prefersReducedMotion()) return undefined;
+        const ctx = gsap.context(() => {
+            const tl = gsap.timeline();
+
+            tl.fromTo(
+                ".et-header-card",
+                { opacity: 0, scale: 1.045, y: 14 },
+                {
+                    opacity: 1,
+                    scale: 1,
+                    y: 0,
+                    duration: 0.54,
+                    ease: "power3.out",
+                    clearProps: "transform,opacity",
+                }
+            );
+
+            tl.fromTo(
+                ".et-title-word",
+                { y: 20, opacity: 0, rotateX: -24, scale: 1.08 },
+                {
+                    y: 0,
+                    opacity: 1,
+                    rotateX: 0,
+                    scale: 1,
+                    duration: 0.52,
+                    stagger: 0.085,
+                    ease: "back.out(1.7)",
+                    clearProps: "transform,opacity",
+                },
+                "-=0.36"
+            );
+
+            tl.fromTo(
+                ".et-filter-pill",
+                { opacity: 0, scale: 1.05, y: 8 },
+                {
+                    opacity: 1,
+                    scale: 1,
+                    y: 0,
+                    duration: 0.32,
+                    stagger: 0.035,
+                    ease: "power2.out",
+                    clearProps: "transform,opacity",
+                },
+                "-=0.32"
+            );
+
+            if (taskHeaderProgressRef.current) {
+                gsap.fromTo(
+                    taskHeaderProgressRef.current,
+                    { scaleX: 0, transformOrigin: "left center" },
+                    { scaleX: 1, duration: 0.65, ease: "power3.out", clearProps: "transform" }
+                );
+            }
+        }, executionTasksRef);
+
+        return () => ctx.revert();
+    }, [isExecutionInView]);
+
+    // Incremental zoom-out + inner cascade for Execution Task cards
+    useEffect(() => {
+        if (!isExecutionInView || !executionTasksRef.current || prefersReducedMotion()) {
+            prevVisibleTaskCountRef.current = visibleTaskList.length;
+            return undefined;
+        }
+
+        const startIdx = prevVisibleTaskCountRef.current;
+        const allCards = Array.from(executionTasksRef.current.querySelectorAll(".et-task-card"));
+        const targetCards = allCards.filter((card) => Number(card.getAttribute("data-et-index")) >= startIdx);
+
+        if (!targetCards.length) {
+            prevVisibleTaskCountRef.current = visibleTaskList.length;
+            return undefined;
+        }
+
+        const ctx = gsap.context(() => {
+            gsap.fromTo(
+                targetCards,
+                { opacity: 0, scale: 1.04, y: 16 },
+                {
+                    opacity: 1,
+                    scale: 1,
+                    y: 0,
+                    duration: 0.44,
+                    stagger: 0.055,
+                    ease: "power3.out",
+                    clearProps: "transform,opacity",
+                }
+            );
+
+            const titles = targetCards.flatMap((c) => Array.from(c.querySelectorAll(".et-task-title")));
+            if (titles.length) {
+                gsap.fromTo(
+                    titles,
+                    { opacity: 0, x: -8 },
+                    {
+                        opacity: 1,
+                        x: 0,
+                        duration: 0.34,
+                        stagger: 0.04,
+                        delay: 0.06,
+                        ease: "power2.out",
+                        clearProps: "transform,opacity",
+                    }
+                );
+            }
+
+            const bars = targetCards.flatMap((c) => Array.from(c.querySelectorAll(".et-task-progress-fill")));
+            if (bars.length) {
+                gsap.fromTo(
+                    bars,
+                    { scaleX: 0, transformOrigin: "left center" },
+                    {
+                        scaleX: 1,
+                        duration: 0.52,
+                        stagger: 0.045,
+                        delay: 0.09,
+                        ease: "power3.out",
+                        clearProps: "transform",
+                    }
+                );
+            }
+        }, executionTasksRef);
+
+        prevVisibleTaskCountRef.current = visibleTaskList.length;
+
+        return () => ctx.revert();
+    }, [isExecutionInView, selectedRoleFilter, visibleTaskList.length]);
+
+    // Collapsible Create Task Form zoom-out reveal
+    useEffect(() => {
+        if (!showCreateTask || !createTaskFormRef.current || prefersReducedMotion()) return undefined;
+        const ctx = gsap.context(() => {
+            gsap.fromTo(
+                createTaskFormRef.current,
+                { opacity: 0, scale: 1.035, y: -10 },
+                {
+                    opacity: 1,
+                    scale: 1,
+                    y: 0,
+                    duration: 0.4,
+                    ease: "power3.out",
+                    clearProps: "transform,opacity",
+                }
+            );
+        }, createTaskFormRef);
+
+        return () => ctx.revert();
+    }, [showCreateTask]);
+
+    // GSAP loading animation while fetching next 10 Execution Tasks
+    useEffect(() => {
+        if (!isLoadingMoreTasks || !taskLoaderRef.current || prefersReducedMotion()) return undefined;
+        const ctx = gsap.context(() => {
+            gsap.fromTo(
+                ".et-load-more-loader",
+                { opacity: 0, scale: 0.92 },
+                { opacity: 1, scale: 1, duration: 0.22, ease: "back.out(2)" }
+            );
+            gsap.to(".et-loader-ring", {
+                rotation: 360,
+                duration: 0.72,
+                repeat: -1,
+                ease: "none",
+                transformOrigin: "50% 50%",
+            });
+            gsap.to(".et-loader-dot", {
+                y: -5,
+                scale: 1.35,
+                opacity: 1,
+                duration: 0.34,
+                stagger: 0.1,
+                repeat: -1,
+                yoyo: true,
+                ease: "sine.inOut",
+            });
+        }, taskLoaderRef);
+
+        return () => ctx.revert();
+    }, [isLoadingMoreTasks]);
+
+    const handleLoadMoreTasks = useCallback(() => {
+        if (isLoadingMoreTasks || !hasMoreTasks) return;
+        prevVisibleTaskCountRef.current = visibleTaskList.length;
+        if (prefersReducedMotion()) {
+            setVisibleTaskCount((prev) => Math.min(prev + TASKS_PER_PAGE, filteredTaskList.length));
+            return;
+        }
+        setIsLoadingMoreTasks(true);
+        loadMoreTasksTimerRef.current = setTimeout(() => {
+            setVisibleTaskCount((prev) => Math.min(prev + TASKS_PER_PAGE, filteredTaskList.length));
+            setIsLoadingMoreTasks(false);
+            loadMoreTasksTimerRef.current = null;
+        }, 460);
+    }, [isLoadingMoreTasks, hasMoreTasks, visibleTaskList.length, filteredTaskList.length]);
+
+    const handleShowLessTasks = useCallback(() => {
+        if (loadMoreTasksTimerRef.current) {
+            clearTimeout(loadMoreTasksTimerRef.current);
+            loadMoreTasksTimerRef.current = null;
+        }
+        setIsLoadingMoreTasks(false);
+        prevVisibleTaskCountRef.current = 0;
+        setVisibleTaskCount(TASKS_PER_PAGE);
+    }, []);
+
+    const handleTaskPopEnter = useCallback((e, { scale = 1.015, y = -3 } = {}) => {
+        if (prefersReducedMotion()) return;
+        gsap.to(e.currentTarget, {
+            scale,
+            y,
+            duration: 0.24,
+            ease: "back.out(2.2)",
+            overwrite: "auto",
+        });
+    }, []);
+
+    const handleTaskPopLeave = useCallback((e) => {
+        if (prefersReducedMotion()) return;
+        gsap.to(e.currentTarget, {
+            scale: 1,
+            y: 0,
+            duration: 0.24,
+            ease: "power2.out",
+            overwrite: "auto",
+        });
+    }, []);
+
     const editingTaskForm = useForm({
         title: "",
         description: "",
@@ -737,28 +1059,153 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                 </div>
             )}
 
-            {/* Survey References */}
+            {/* Scope of Work & Survey Submission Queue */}
             <div id="survey-reference-section" className="grid gap-4 xl:grid-cols-3 items-stretch">
                 <SectionCard
-                    title="Survey Plans"
-                    description="Survey planning, assigned members, and submitted field-duty payloads."
+                    title="Scope of Work"
+                    description="Project scope of work, deliverables, and linked field survey plans."
                     className="xl:col-span-2 flex flex-col"
                     actions={
-                        <span className="inline-flex items-center rounded-full border border-indigo-200/70 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
-                            {project.survey_plans?.length || 0} {(project.survey_plans?.length || 0) === 1 ? "Plan" : "Plans"}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {project.survey_plans?.length > 0 && (
+                                <span className="inline-flex items-center rounded-full border border-indigo-200/70 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
+                                    {project.survey_plans.length} {project.survey_plans.length === 1 ? "Plan" : "Plans"}
+                                </span>
+                            )}
+                            {canEditScopeOfWork && (
+                                <button
+                                    type="button"
+                                    onClick={openScopeModal}
+                                    className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-2xs transition hover:bg-indigo-100 hover:border-indigo-300 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200 dark:hover:bg-indigo-500/25"
+                                >
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                    <span>Edit Scope of Work</span>
+                                </button>
+                            )}
+                        </div>
                     }
                 >
-                    {project.survey_plans?.length ? (
-                        <div className="space-y-4">
-                            {project.survey_plans.map((plan) => (
-                                <SurveyPlanCard key={plan.id} plan={plan} />
-                            ))}
+                    <div className="space-y-4">
+                        {/* Project Scope of Work Content */}
+                        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200/70 dark:border-slate-800">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                                    Defined Project Scope
+                                </span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {project.khasra_number && (
+                                        <span className="inline-flex items-center rounded-md bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-700">
+                                            Khasra: {project.khasra_number}
+                                        </span>
+                                    )}
+                                    {project.site_area && (
+                                        <span className="inline-flex items-center rounded-md bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-700">
+                                            Area: {project.site_area}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {project.scope_of_work ? (
+                                <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+                                    {project.scope_of_work}
+                                </p>
+                            ) : (
+                                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300/80 bg-white/70 px-4 py-3.5 dark:border-slate-700 dark:bg-slate-950/40">
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                            No scope of work added yet.
+                                        </p>
+                                        <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                            Fill scope of work when adding a project or click Edit Scope of Work to define deliverables and site instructions.
+                                        </p>
+                                    </div>
+                                    {canEditScopeOfWork && (
+                                        <button
+                                            type="button"
+                                            onClick={openScopeModal}
+                                            className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-500"
+                                        >
+                                            <span>+ Add Scope</span>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <EmptyState title="No survey plans yet." description="Create a survey plan once budget approval and team assignment are complete." />
-                    )}
+
+                        {/* Linked Survey Plans (when present) */}
+                        {project.survey_plans?.length ? (
+                            <div className="space-y-3">
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                    Linked Survey Plans ({project.survey_plans.length})
+                                </p>
+                                {project.survey_plans.map((plan) => (
+                                    <SurveyPlanCard key={plan.id} plan={plan} />
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
                 </SectionCard>
+
+                {/* Edit Scope of Work Modal */}
+                <Modal show={showScopeModal} onClose={() => setShowScopeModal(false)} maxWidth="2xl">
+                    <form onSubmit={submitScopeOfWork} className="p-6">
+                        <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                    Edit Scope of Work
+                                </h3>
+                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                    {project.project_code} • {project.name}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowScopeModal(false)}
+                                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="mt-4">
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                Scope of Work Details
+                            </label>
+                            <textarea
+                                rows={6}
+                                maxLength={5000}
+                                value={scopeOfWorkForm.data.scope_of_work}
+                                onChange={(e) => scopeOfWorkForm.setData("scope_of_work", e.target.value)}
+                                placeholder="Enter detailed project scope of work, surveying requirements, CAD deliverables, milestones, or special instructions..."
+                                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                            />
+                            <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                                <span>{scopeOfWorkForm.errors.scope_of_work ? <span className="text-rose-500 font-medium">{scopeOfWorkForm.errors.scope_of_work}</span> : "Visible to the project team on Project Details."}</span>
+                                <span>{(scopeOfWorkForm.data.scope_of_work || "").length} / 5000</span>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 flex items-center justify-end gap-2.5 border-t border-slate-200 pt-4 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setShowScopeModal(false)}
+                                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={scopeOfWorkForm.processing}
+                                className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-60"
+                            >
+                                {scopeOfWorkForm.processing ? "Saving..." : "Save Scope of Work"}
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
 
                 <SectionCard
                     title="Survey Submission Queue"
@@ -929,94 +1376,145 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                 </SectionCard>
             )}
 
-            {/* Activity Log - Responsive Full Width */}
-            <ProjectActivityLog activityLog={activityLog} />
+            {/* Execution Tasks - Compact Mini-Space, 2 per row, 10 per batch + GSAP Choreography */}
+            <div ref={executionTasksRef} className="et-stage w-full space-y-3.5">
+                {/* Header & Role Filter Card */}
+                <div className="et-header-card relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md dark:border-slate-800/90 dark:bg-slate-900/95">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-500 opacity-85" />
 
-            <SectionCard
-                title="Execution Tasks"
-                description={
-                    selectedRoleFilter !== "all"
-                        ? `Filtered by ${activeFilterOption.label}: Showing ${filteredTaskList.length} of ${mergedTaskList.length} tasks`
-                        : `${taskCounts.total} total tasks · ${taskCounts.completed} complete · ${taskCounts.in_progress} in-progress · ${taskCounts.pending} pending`
-                }
-                actions={
-                    canCreateTask ? (
-                        <button
-                            type="button"
-                            onClick={() => setShowCreateTask((prev) => !prev)}
-                            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold shadow-xs transition ${showCreateTask
-                                ? "bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200"
-                                : "bg-indigo-600 text-white hover:bg-indigo-500"
-                                }`}
-                        >
-                            <span className="text-base font-bold leading-none">{showCreateTask ? "✕" : "+"}</span>
-                            <span>{showCreateTask ? "Close Task Form" : "New Task"}</span>
-                        </button>
-                    ) : null
-                }
-            >
-                {/* Role Filter Badges Bar */}
-                <div className="mb-5 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5 dark:border-slate-800 dark:bg-slate-900/60">
-                    <div className="mb-2.5 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                Filter Tasks By Assigned Role
-                            </span>
-                            {selectedRoleFilter !== "all" && (
-                                <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
-                                    {activeFilterOption.label} ({filteredTaskList.length})
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2.5">
+                                <span
+                                    onMouseEnter={(e) => handleTaskPopEnter(e, { scale: 1.08, y: -2 })}
+                                    onMouseLeave={handleTaskPopLeave}
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-base text-indigo-700 ring-1 ring-indigo-500/20 dark:from-indigo-500/20 dark:to-sky-500/20 dark:text-indigo-300 dark:ring-indigo-400/25"
+                                >
+                                    ⚡
                                 </span>
-                            )}
+                                <div className="min-w-0">
+                                    <h2
+                                        aria-label="Execution Tasks"
+                                        className="flex flex-wrap items-center gap-x-1.5 text-base font-extrabold tracking-tight text-slate-900 dark:text-white"
+                                    >
+                                        {EXECUTION_TASKS_TITLE_WORDS.map((word) => (
+                                            <span key={word} className="inline-flex overflow-hidden py-0.5">
+                                                <span className="et-title-word inline-block bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 bg-clip-text text-transparent dark:from-white dark:via-indigo-200 dark:to-white">
+                                                    {word}
+                                                </span>
+                                            </span>
+                                        ))}
+                                    </h2>
+                                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                                        <span>
+                                            {selectedRoleFilter !== "all"
+                                                ? `Filtered by ${activeFilterOption.label}: Showing ${filteredTaskList.length} of ${mergedTaskList.length} tasks`
+                                                : `${taskCounts.total} total tasks · ${taskCounts.completed} complete · ${taskCounts.in_progress} in-progress · ${taskCounts.pending} pending`}
+                                        </span>
+                                        <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 ring-1 ring-indigo-200/70 dark:bg-indigo-500/15 dark:text-indigo-300 dark:ring-indigo-500/30">
+                                            {taskCompletionPct}%
+                                        </span>
+                                        {filteredTaskList.length > 0 && (
+                                            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                                                • Showing {visibleTaskList.length} of {filteredTaskList.length}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 ring-1 ring-inset ring-slate-200/70 dark:bg-slate-800/90 dark:ring-slate-700/60">
+                                <div
+                                    ref={taskHeaderProgressRef}
+                                    className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-500"
+                                    style={{ width: `${taskCompletionPct}%` }}
+                                />
+                            </div>
                         </div>
-                        {selectedRoleFilter !== "all" && (
+
+                        {canCreateTask ? (
                             <button
                                 type="button"
-                                onClick={() => setSelectedRoleFilter("all")}
-                                className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition"
-                            >
-                                <span>Clear filter (Show all {mergedTaskList.length})</span>
-                                <span className="text-[10px]">✕</span>
-                            </button>
-                        )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        {roleFilterOptions.map((option) => {
-                            const isSelected = selectedRoleFilter === option.key || (selectedRoleFilter && normalizeRoleStr(selectedRoleFilter) === normalizeRoleStr(option.key));
-                            const isUnassignedPill = option.key === "unassigned";
-                            return (
-                                <button
-                                    key={option.key}
-                                    type="button"
-                                    onClick={() => setSelectedRoleFilter(option.key)}
-                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all shadow-2xs ${
-                                        isSelected
-                                            ? isUnassignedPill
-                                                ? "bg-amber-500 text-white shadow-amber-500/20 ring-2 ring-amber-400 ring-offset-1 dark:ring-offset-slate-900"
-                                                : "bg-indigo-600 text-white shadow-indigo-600/20 ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-slate-900"
-                                            : "bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/90 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:border-slate-800"
+                                onClick={() => setShowCreateTask((prev) => !prev)}
+                                onMouseEnter={(e) => handleTaskPopEnter(e, { scale: 1.04, y: -1.5 })}
+                                onMouseLeave={handleTaskPopLeave}
+                                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold shadow-sm transition-colors ${showCreateTask
+                                    ? "bg-slate-200 text-slate-800 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                    : "bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-500/20"
                                     }`}
+                            >
+                                <span className="text-sm font-bold leading-none">{showCreateTask ? "✕" : "+"}</span>
+                                <span>{showCreateTask ? "Close Task Form" : "New Task"}</span>
+                            </button>
+                        ) : null}
+                    </div>
+
+                    {/* Compact Role Filter Badges Bar */}
+                    <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 dark:border-slate-800 dark:bg-slate-950/60">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Filter Tasks By Assigned Role
+                                </span>
+                                {selectedRoleFilter !== "all" && (
+                                    <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
+                                        {activeFilterOption.label} ({filteredTaskList.length})
+                                    </span>
+                                )}
+                            </div>
+                            {selectedRoleFilter !== "all" && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedRoleFilter("all")}
+                                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 transition hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
                                 >
-                                    <span className="text-sm leading-none">{option.icon}</span>
-                                    <span>{option.label}</span>
-                                    <span
-                                        className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                                    <span>Clear filter (Show all {mergedTaskList.length})</span>
+                                    <span className="text-[10px]">✕</span>
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {roleFilterOptions.map((option) => {
+                                const isSelected = selectedRoleFilter === option.key || (selectedRoleFilter && normalizeRoleStr(selectedRoleFilter) === normalizeRoleStr(option.key));
+                                const isUnassignedPill = option.key === "unassigned";
+                                return (
+                                    <button
+                                        key={option.key}
+                                        type="button"
+                                        onClick={() => setSelectedRoleFilter(option.key)}
+                                        onMouseEnter={(e) => handleTaskPopEnter(e, { scale: 1.04, y: -1 })}
+                                        onMouseLeave={handleTaskPopLeave}
+                                        className={`et-filter-pill inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors shadow-2xs ${
                                             isSelected
-                                                ? "bg-white/25 text-white"
-                                                : option.count > 0
-                                                    ? "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
-                                                    : "bg-slate-100/60 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500"
+                                                ? isUnassignedPill
+                                                    ? "bg-amber-500 text-white shadow-amber-500/20 ring-2 ring-amber-400 ring-offset-1 dark:ring-offset-slate-900"
+                                                    : "bg-indigo-600 text-white shadow-indigo-600/20 ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-slate-900"
+                                                : "bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/90 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:border-slate-800"
                                         }`}
                                     >
-                                        {option.count}
-                                    </span>
-                                </button>
-                            );
-                        })}
+                                        <span className="text-xs leading-none">{option.icon}</span>
+                                        <span>{option.label}</span>
+                                        <span
+                                            className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                                                isSelected
+                                                    ? "bg-white/25 text-white"
+                                                    : option.count > 0
+                                                        ? "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                                                        : "bg-slate-100/60 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500"
+                                            }`}
+                                        >
+                                            {option.count}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
                 {canCreateTask && showCreateTask && (
                     <form
+                        ref={createTaskFormRef}
                         onSubmit={(e) => {
                             e.preventDefault();
                             taskForm.post(route("super.construction.projects.tasks.store", project.id), {
@@ -1048,7 +1546,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                                 },
                             });
                         }}
-                        className="mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-slate-50 p-5 shadow-xs dark:border-indigo-950 dark:from-slate-900 dark:to-slate-950"
+                        className="et-create-form-panel rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/50 via-white to-slate-50 p-4 shadow-sm dark:border-indigo-950 dark:from-slate-900 dark:to-slate-950"
                     >
                         <div className="flex items-center justify-between border-b border-indigo-100 pb-3 dark:border-slate-800">
                             <div>
@@ -1163,29 +1661,110 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                 )}
 
                 <div>
-                    {filteredTaskList.length ? (
+                    {visibleTaskList.length ? (
                         <div className="space-y-3">
-                            {filteredTaskList.map((task) => (
-                                <TaskRow
-                                    key={task._sourceKey}
-                                    task={task}
-                                    project={project}
-                                    members={members}
-                                    canEditTask={canEditTask}
-                                    canDeleteTask={canDeleteTask}
-                                    canManageChecklist={canManageChecklist}
-                                    canTransferTask={canTransferTask}
-                                    canAssignDraftsman={isAdminUser && canTransferTask}
-                                    onEdit={() => setEditingTask(task)}
-                                />
-                            ))}
+                            <div className="grid gap-3 md:grid-cols-2">
+                                {visibleTaskList.map((task, taskIndex) => (
+                                    <TaskRow
+                                        key={task._sourceKey}
+                                        task={task}
+                                        taskIndex={taskIndex}
+                                        project={project}
+                                        members={members}
+                                        canEditTask={canEditTask}
+                                        canDeleteTask={canDeleteTask}
+                                        canManageChecklist={canManageChecklist}
+                                        canTransferTask={canTransferTask}
+                                        canAssignDraftsman={isAdminUser && canTransferTask}
+                                        onEdit={() => setEditingTask(task)}
+                                        onPopEnter={handleTaskPopEnter}
+                                        onPopLeave={handleTaskPopLeave}
+                                    />
+                                ))}
+                            </div>
+
+                            {/* Load More / Show Less Footer with GSAP Loading Animation */}
+                            {(hasMoreTasks || visibleTaskList.length > TASKS_PER_PAGE) && (
+                                <div
+                                    ref={taskLoaderRef}
+                                    className="flex flex-wrap items-center justify-center gap-3 rounded-xl border border-slate-200/80 bg-white/90 px-4 py-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80"
+                                >
+                                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                        Showing <strong className="font-bold text-slate-800 dark:text-slate-200">{visibleTaskList.length}</strong> of{" "}
+                                        <strong className="font-bold text-slate-800 dark:text-slate-200">{filteredTaskList.length}</strong> tasks
+                                    </span>
+
+                                    {hasMoreTasks && (
+                                        <button
+                                            type="button"
+                                            onClick={handleLoadMoreTasks}
+                                            disabled={isLoadingMoreTasks}
+                                            onMouseEnter={(e) => handleTaskPopEnter(e, { scale: 1.04, y: -1.5 })}
+                                            onMouseLeave={handleTaskPopLeave}
+                                            className="et-load-more-btn inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm shadow-indigo-500/20 transition hover:from-indigo-500 hover:to-violet-500 disabled:cursor-wait disabled:opacity-90"
+                                        >
+                                            {isLoadingMoreTasks ? (
+                                                <span className="et-load-more-loader inline-flex items-center gap-2">
+                                                    <svg
+                                                        className="et-loader-ring h-3.5 w-3.5 text-white"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                    >
+                                                        <circle
+                                                            cx="12"
+                                                            cy="12"
+                                                            r="9"
+                                                            stroke="currentColor"
+                                                            strokeOpacity="0.3"
+                                                            strokeWidth="3"
+                                                        />
+                                                        <path
+                                                            d="M12 3a9 9 0 0 1 9 9"
+                                                            stroke="currentColor"
+                                                            strokeWidth="3"
+                                                            strokeLinecap="round"
+                                                        />
+                                                    </svg>
+                                                    <span>Loading next {Math.min(TASKS_PER_PAGE, remainingTasks)}</span>
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <span className="et-loader-dot h-1.5 w-1.5 rounded-full bg-white/80" />
+                                                        <span className="et-loader-dot h-1.5 w-1.5 rounded-full bg-white/80" />
+                                                        <span className="et-loader-dot h-1.5 w-1.5 rounded-full bg-white/80" />
+                                                    </span>
+                                                </span>
+                                            ) : (
+                                                <>
+                                                    <span>
+                                                        Load More (+{Math.min(TASKS_PER_PAGE, remainingTasks)} of {remainingTasks} left)
+                                                    </span>
+                                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
+
+                                    {visibleTaskList.length > TASKS_PER_PAGE && !isLoadingMoreTasks && (
+                                        <button
+                                            type="button"
+                                            onClick={handleShowLessTasks}
+                                            onMouseEnter={(e) => handleTaskPopEnter(e, { scale: 1.04, y: -1 })}
+                                            onMouseLeave={handleTaskPopLeave}
+                                            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                                        >
+                                            Show Less
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ) : mergedTaskList.length > 0 ? (
-                        <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center dark:border-slate-800">
-                            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-2xl text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+                        <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-6 text-center dark:border-slate-800 dark:bg-slate-900/80">
+                            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-xl text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
                                 🔍
                             </span>
-                            <h3 className="mt-3 text-sm font-bold text-slate-900 dark:text-white">
+                            <h3 className="mt-2.5 text-sm font-bold text-slate-900 dark:text-white">
                                 No tasks found for &ldquo;{activeFilterOption.label}&rdquo;
                             </h3>
                             <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
@@ -1194,17 +1773,17 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                             <button
                                 type="button"
                                 onClick={() => setSelectedRoleFilter("all")}
-                                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500"
+                                className="mt-3.5 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500"
                             >
                                 <span>Show All Tasks ({mergedTaskList.length})</span>
                             </button>
                         </div>
                     ) : (
-                        <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center dark:border-slate-800">
-                            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-2xl text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+                        <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-6 text-center dark:border-slate-800 dark:bg-slate-900/80">
+                            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-xl text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
                                 🏗️
                             </span>
-                            <h3 className="mt-3 text-sm font-bold text-slate-900 dark:text-white">No execution tasks yet</h3>
+                            <h3 className="mt-2.5 text-sm font-bold text-slate-900 dark:text-white">No execution tasks yet</h3>
                             <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
                                 {canCreateTask
                                     ? "Create your first task to assign supervisors, track dates, and attach checklists."
@@ -1214,7 +1793,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                                 <button
                                     type="button"
                                     onClick={() => setShowCreateTask(true)}
-                                    className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500"
+                                    className="mt-3.5 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500"
                                 >
                                     <span className="font-bold">+</span>
                                     <span>Create First Task</span>
@@ -1223,16 +1802,18 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                         </div>
                     )}
                 </div>
-            </SectionCard>
+            </div>
 
-            <DynamicChecklistManager
-                project={project}
-                namespace="super"
-                variant="project-show"
-                enableDeltaPoll
-                canManage={canManageChecklist}
-                initialCounts={{ total: checklistCounts.total, completed: checklistCounts.completed, completion: checklistCompletion }}
-            />
+            <div id="project-checklist-workspace" className="scroll-mt-28">
+                <DynamicChecklistManager
+                    project={project}
+                    namespace="super"
+                    variant="project-show"
+                    enableDeltaPoll
+                    canManage={canManageChecklist}
+                    initialCounts={{ total: checklistCounts.total, completed: checklistCounts.completed, completion: checklistCompletion }}
+                />
+            </div>
 
             <div className="grid gap-6 xl:grid-cols-3">
                 <SectionCard title="Daily Progress & Attendance" description="Submissions, attendance and materials snapshot.">
@@ -1280,6 +1861,9 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                     </div>
                 </SectionCard>
             </div>
+
+            {/* Project Activity Log - Placed at Bottom */}
+            <ProjectActivityLog activityLog={activityLog} />
 
             {canEditTask && editingTask ? (
                 <Modal show={true} onClose={() => setEditingTask(null)}>
@@ -1381,9 +1965,12 @@ export default function ProjectShow({ project, members, roles, activityLog, work
 
 function TaskRow({
     task,
+    taskIndex = 0,
     project,
     members,
     onEdit,
+    onPopEnter,
+    onPopLeave,
     canEditTask: propCanEdit,
     canDeleteTask: propCanDelete,
     canManageChecklist: propCanManageChecklist,
@@ -2042,139 +2629,178 @@ function TaskRow({
         );
     };
 
+    const checklistDrawerRef = useRef(null);
+
+    useEffect(() => {
+        if (!showChecklists || !checklistDrawerRef.current || prefersReducedMotion()) return undefined;
+        const ctx = gsap.context(() => {
+            gsap.fromTo(
+                checklistDrawerRef.current,
+                { opacity: 0, scale: 1.03, y: -6 },
+                { opacity: 1, scale: 1, y: 0, duration: 0.34, ease: "power3.out", clearProps: "transform,opacity" }
+            );
+            const items = checklistDrawerRef.current.querySelectorAll(".et-checklist-item");
+            if (items.length) {
+                gsap.fromTo(
+                    items,
+                    { opacity: 0, scale: 1.025, y: 8 },
+                    { opacity: 1, scale: 1, y: 0, duration: 0.3, stagger: 0.035, ease: "power2.out", clearProps: "transform,opacity" }
+                );
+            }
+        }, checklistDrawerRef);
+        return () => ctx.revert();
+    }, [showChecklists]);
+
     return (
         <>
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-5 shadow-xs transition hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700">
-                {/* 1. Header: Task Code, Title, Badges & Administrative Actions */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2 min-w-0">
-                        <span className="inline-flex items-center rounded-md bg-indigo-50 px-2.5 py-1 font-mono text-[11px] font-bold text-indigo-700 border border-indigo-100 dark:bg-indigo-950/60 dark:border-indigo-900/60 dark:text-indigo-300">
-                            {task.task_code}
-                        </span>
-                        <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                            {task.title}
-                        </h4>
-                        <StatusBadge value={task.status} />
-                        <StatusBadge value={task.priority} />
-                    </div>
-
-                    {(canEditTask || canDeleteTask) && (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                            {canEditTask && (
-                                <button
-                                    type="button"
-                                    onClick={onEdit}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                                    title="Edit Task Details"
-                                >
-                                    <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                    </svg>
-                                    <span>Edit</span>
-                                </button>
-                            )}
-                            {canDeleteTask && (
-                                <button
-                                    type="button"
-                                    onClick={() => setConfirmingDelete(true)}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-rose-200/80 bg-rose-50/60 px-2.5 py-1 text-xs font-medium text-rose-600 shadow-2xs transition hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-400"
-                                    title="Delete Task"
-                                >
-                                    <svg className="h-3.5 w-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    <span>Delete</span>
-                                </button>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {task.description ? (
-                    <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                        {task.description}
-                    </p>
-                ) : null}
-
-                {/* 2. Middle Grid: Key Metadata & Status Spanning Full Width */}
-                <div className="mt-3.5 grid grid-cols-2 gap-3 sm:grid-cols-4 rounded-xl border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-800/80 dark:bg-slate-900/40">
-                    <div className="flex flex-col min-w-0">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                            Planned Schedule
-                        </span>
-                        <span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200">
-                            <svg className="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span className="truncate">
-                                {formatDate(task.planned_start_date) || "TBD"} → {formatDate(task.planned_end_date) || "TBD"}
-                            </span>
-                        </span>
-                    </div>
-
-                    <div className="flex flex-col min-w-0">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                            {isDraftingAssigned ? "Draft Person" : "Assigned Member"}
-                        </span>
-                        <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
-                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
-                                {((assignedDraftPerson?.name || task.supervisor?.name || "U")[0] || "U").toUpperCase()}
-                            </span>
-                            <span className="truncate">{assignedDraftPerson?.name || task.supervisor?.name || "Unassigned"}</span>
-                            {isDraftingAssigned && (
-                                <span className="ml-1 rounded bg-violet-100 px-1 py-0.5 text-[9px] font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
-                                    CAD
+            <div
+                data-et-index={taskIndex}
+                onMouseEnter={(e) => onPopEnter?.(e, { scale: 1.014, y: -3 })}
+                onMouseLeave={(e) => onPopLeave?.(e)}
+                className="et-task-card flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm transition-colors hover:border-indigo-300/80 hover:shadow-md hover:shadow-indigo-500/5 dark:border-slate-800 dark:bg-slate-950/95 dark:hover:border-indigo-500/40"
+            >
+                <div>
+                    {/* 1. Compact Header: Task Code, Title, Badges & Administrative Actions */}
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="inline-flex shrink-0 items-center rounded bg-indigo-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-indigo-700 border border-indigo-100 dark:bg-indigo-950/60 dark:border-indigo-900/60 dark:text-indigo-300">
+                                    {task.task_code}
                                 </span>
-                            )}
-                        </span>
-                    </div>
-
-                    <div className="flex flex-col min-w-0">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                            Checklists
-                        </span>
-                        <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
-                            <svg className="h-3.5 w-3.5 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span>{completedChecklists} of {taskChecklists.length} done</span>
-                        </span>
-                    </div>
-
-                    <div className="flex flex-col justify-center min-w-0">
-                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                            <span>Progress</span>
-                            <span className="font-mono text-xs font-bold text-slate-700 dark:text-slate-200">{progress}%</span>
+                                <div className="inline-flex items-center gap-1 scale-90 origin-left">
+                                    <StatusBadge value={task.status} />
+                                    <StatusBadge value={task.priority} />
+                                </div>
+                            </div>
+                            <h4 className="et-task-title mt-1 truncate text-xs sm:text-sm font-bold text-slate-900 dark:text-white tracking-tight" title={task.title}>
+                                {task.title}
+                            </h4>
                         </div>
-                        <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                            <div
-                                className={`h-full rounded-full transition-all duration-500 ${progress === 100
-                                    ? "bg-emerald-500"
-                                    : "bg-gradient-to-r from-indigo-500 to-sky-500"
-                                    }`}
-                                style={{ width: `${progress}%` }}
-                            />
+
+                        {(canEditTask || canDeleteTask) && (
+                            <div className="flex shrink-0 items-center gap-1">
+                                {canEditTask && (
+                                    <button
+                                        type="button"
+                                        onClick={onEdit}
+                                        onMouseEnter={(e) => onPopEnter?.(e, { scale: 1.07, y: -1 })}
+                                        onMouseLeave={(e) => onPopLeave?.(e)}
+                                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-2xs transition-colors hover:bg-slate-50 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                                        title="Edit Task Details"
+                                    >
+                                        <svg className="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                        </svg>
+                                        <span>Edit</span>
+                                    </button>
+                                )}
+                                {canDeleteTask && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmingDelete(true)}
+                                        onMouseEnter={(e) => onPopEnter?.(e, { scale: 1.07, y: -1 })}
+                                        onMouseLeave={(e) => onPopLeave?.(e)}
+                                        className="inline-flex items-center gap-1 rounded-md border border-rose-200/80 bg-rose-50/60 px-2 py-0.5 text-[11px] font-medium text-rose-600 shadow-2xs transition-colors hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-400"
+                                        title="Delete Task"
+                                    >
+                                        <svg className="h-3 w-3 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        <span>Delete</span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {task.description ? (
+                        <p className="mt-1.5 line-clamp-2 text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                            {task.description}
+                        </p>
+                    ) : null}
+
+                    {/* 2. Compact Mini-Space 2x2 Metadata Strip */}
+                    <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2 rounded-lg border border-slate-100 bg-slate-50/70 p-2 dark:border-slate-800/80 dark:bg-slate-900/50">
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                Planned Schedule
+                            </span>
+                            <span className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-slate-700 dark:text-slate-200">
+                                <svg className="h-3 w-3 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span className="truncate">
+                                    {formatDate(task.planned_start_date) || "TBD"} → {formatDate(task.planned_end_date) || "TBD"}
+                                </span>
+                            </span>
+                        </div>
+
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                {isDraftingAssigned ? "Draft Person" : "Assigned Member"}
+                            </span>
+                            <span className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-slate-800 dark:text-slate-200">
+                                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[9px] font-bold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
+                                    {((assignedDraftPerson?.name || task.supervisor?.name || "U")[0] || "U").toUpperCase()}
+                                </span>
+                                <span className="truncate">{assignedDraftPerson?.name || task.supervisor?.name || "Unassigned"}</span>
+                                {isDraftingAssigned && (
+                                    <span className="ml-0.5 rounded bg-violet-100 px-1 py-0.5 text-[8px] font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                                        CAD
+                                    </span>
+                                )}
+                            </span>
+                        </div>
+
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                Checklists
+                            </span>
+                            <span className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-slate-800 dark:text-slate-200">
+                                <svg className="h-3 w-3 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>{completedChecklists} of {taskChecklists.length} done</span>
+                            </span>
+                        </div>
+
+                        <div className="flex flex-col justify-center min-w-0">
+                            <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                <span>Progress</span>
+                                <span className="font-mono text-[11px] font-bold text-slate-700 dark:text-slate-200">{progress}%</span>
+                            </div>
+                            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                                <div
+                                    className={`et-task-progress-fill h-full rounded-full ${progress === 100
+                                        ? "bg-emerald-500"
+                                        : "bg-gradient-to-r from-indigo-500 to-sky-500"
+                                        }`}
+                                    style={{ width: `${progress}%` }}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* 3. Bottom Action Bar: Checklist actions & Primary workflow actions */}
-                <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-100 pt-3 dark:border-slate-800/80">
-                    <div className="flex flex-wrap items-center gap-2">
+                {/* 3. Compact Bottom Action Bar: Checklist actions & Primary workflow actions */}
+                <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1.5 border-t border-slate-100 pt-2 dark:border-slate-800/80">
+                    <div className="flex flex-wrap items-center gap-1.5">
                         <button
                             type="button"
                             onClick={() => setShowChecklists((prev) => !prev)}
-                            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-2xs transition ${showChecklists
+                            onMouseEnter={(e) => onPopEnter?.(e, { scale: 1.04, y: -1 })}
+                            onMouseLeave={(e) => onPopLeave?.(e)}
+                            className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold shadow-2xs transition-colors ${showChecklists
                                 ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300"
                                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                                 }`}
                         >
-                            <svg className="h-3.5 w-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="h-3 w-3 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                             </svg>
                             <span>Checklists ({completedChecklists}/{taskChecklists.length})</span>
                             <svg
-                                className={`h-3 w-3 text-slate-400 transition-transform duration-200 ${showChecklists ? "rotate-180" : ""}`}
+                                className={`h-2.5 w-2.5 text-slate-400 transition-transform duration-200 ${showChecklists ? "rotate-180" : ""}`}
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -2186,10 +2812,12 @@ function TaskRow({
                             <button
                                 type="button"
                                 onClick={() => setShowAddChecklistModal(true)}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-2xs transition hover:bg-emerald-100 hover:border-emerald-300 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                onMouseEnter={(e) => onPopEnter?.(e, { scale: 1.04, y: -1 })}
+                                onMouseLeave={(e) => onPopLeave?.(e)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 shadow-2xs transition-colors hover:bg-emerald-100 hover:border-emerald-300 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300"
                                 title="Add a checklist item directly to this task"
                             >
-                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
                                 </svg>
                                 <span>Add Checklist</span>
@@ -2197,7 +2825,7 @@ function TaskRow({
                         )}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                         <AssignToDraftsmanButton
                             task={task}
                             projectId={project.id}
@@ -2211,16 +2839,18 @@ function TaskRow({
                         <button
                             type="button"
                             onClick={() => setShowDetailsModal(true)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 shadow-2xs transition hover:bg-sky-100 hover:border-sky-300 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-300 dark:hover:bg-sky-900/50"
+                            onMouseEnter={(e) => onPopEnter?.(e, { scale: 1.04, y: -1 })}
+                            onMouseLeave={(e) => onPopLeave?.(e)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 shadow-2xs transition-colors hover:bg-sky-100 hover:border-sky-300 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-300 dark:hover:bg-sky-900/50"
                             title="View all submitted survey data, coordinates, photos, and attached files"
                         >
-                            <svg className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="h-3 w-3 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                             <span>View Details</span>
                             {taskVisits.length > 0 && (
-                                <span className="rounded-full bg-sky-200/90 px-1.5 py-0.5 text-[10px] font-bold text-sky-800 dark:bg-sky-800 dark:text-sky-200">
+                                <span className="rounded-full bg-sky-200/90 px-1.5 py-0.5 text-[9px] font-bold text-sky-800 dark:bg-sky-800 dark:text-sky-200">
                                     {taskVisits.length}
                                 </span>
                             )}
@@ -2233,10 +2863,12 @@ function TaskRow({
                                     setShowDetailsModal(true);
                                     setShowDraftUploadSection(true);
                                 }}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:from-emerald-500 hover:to-teal-500"
+                                onMouseEnter={(e) => onPopEnter?.(e, { scale: 1.04, y: -1 })}
+                                onMouseLeave={(e) => onPopLeave?.(e)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs transition-colors hover:from-emerald-500 hover:to-teal-500"
                                 title="Upload and submit CAD drawing for this task"
                             >
-                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
                                 <span>Submit CAD Drawing</span>
@@ -2245,13 +2877,15 @@ function TaskRow({
                             <button
                                 type="button"
                                 onClick={() => setShowTransferModal(true)}
-                                className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-xs transition ${isDraftingAssigned
+                                onMouseEnter={(e) => onPopEnter?.(e, { scale: 1.04, y: -1 })}
+                                onMouseLeave={(e) => onPopLeave?.(e)}
+                                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold shadow-xs transition-colors ${isDraftingAssigned
                                         ? "border border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-300"
                                         : "bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500"
                                     }`}
                                 title={isDraftingAssigned ? "Re-assign or transfer this task to another team member" : "Assign or transfer this task to a project team member"}
                             >
-                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                                 </svg>
                                 <span>{isDraftingAssigned ? "Re-assign / Transfer" : "Assign / Transfer"}</span>
@@ -2262,10 +2896,10 @@ function TaskRow({
 
                 {/* Inline Checklist Section */}
                 {showChecklists && (
-                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-slate-800 dark:bg-slate-900/60">
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5 dark:border-slate-800">
+                    <div ref={checklistDrawerRef} className="mt-2.5 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 dark:border-slate-800 dark:bg-slate-900/60">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2 dark:border-slate-800">
                             <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
                                     Checklist Items ({completedChecklists}/{taskChecklists.length} completed)
                                 </span>
                             </div>
@@ -2273,7 +2907,7 @@ function TaskRow({
                                 <button
                                     type="button"
                                     onClick={() => setShowAddChecklistModal(true)}
-                                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-500 dark:text-emerald-400"
+                                    className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-500 dark:text-emerald-400"
                                 >
                                     + Detailed Add with Photos
                                 </button>
@@ -2281,11 +2915,11 @@ function TaskRow({
                         </div>
 
                         {taskChecklists.length > 0 ? (
-                            <div className="mt-3 space-y-2">
+                            <div className="mt-2 space-y-1.5">
                                 {taskChecklists.map((item) => (
                                     <div
                                         key={item.id}
-                                        className={`flex items-start justify-between gap-3 rounded-lg border p-2.5 text-xs transition ${item.is_completed
+                                        className={`et-checklist-item flex items-start justify-between gap-2 rounded-lg border p-2 text-[11px] transition ${item.is_completed
                                             ? "border-emerald-200 bg-emerald-50/40 dark:border-emerald-950 dark:bg-emerald-950/20"
                                             : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700/80 dark:bg-slate-950"
                                             }`}

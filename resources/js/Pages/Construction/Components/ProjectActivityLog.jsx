@@ -169,6 +169,17 @@ function formatFullDate(dateString) {
     });
 }
 
+function formatTimeOnly(dateString) {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+    });
+}
+
 function getActionNarrative(item) {
     const meta = item.meta || {};
     const module = (item.module || "").toLowerCase();
@@ -757,6 +768,14 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                             title={formatFullDate(item.created_at)}
                                         >
                                             <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                            {formatTimeOnly(item.created_at) && (
+                                                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                                    {formatTimeOnly(item.created_at)}
+                                                </span>
+                                            )}
+                                            {formatTimeOnly(item.created_at) && (
+                                                <span className="text-slate-300 dark:text-slate-600">•</span>
+                                            )}
                                             <span>{getRelativeTime(item.created_at)}</span>
                                         </div>
 
@@ -905,6 +924,14 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                                 >
                                                     <div className="flex items-center gap-1">
                                                         <Clock className="h-3 w-3 text-slate-400" />
+                                                        {formatTimeOnly(item.created_at) && (
+                                                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                                                {formatTimeOnly(item.created_at)}
+                                                            </span>
+                                                        )}
+                                                        {formatTimeOnly(item.created_at) && (
+                                                            <span className="text-slate-300 dark:text-slate-600">•</span>
+                                                        )}
                                                         <span>{getRelativeTime(item.created_at)}</span>
                                                     </div>
                                                 </div>
@@ -977,7 +1004,15 @@ export default function ProjectActivityLog({ activityLog = [], className = "" })
                                                         title={formatFullDate(item.created_at)}
                                                     >
                                                         <Clock className="h-3 w-3 text-slate-400" />
-                                                        {getRelativeTime(item.created_at)}
+                                                        {formatTimeOnly(item.created_at) && (
+                                                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                                                {formatTimeOnly(item.created_at)}
+                                                            </span>
+                                                        )}
+                                                        {formatTimeOnly(item.created_at) && (
+                                                            <span className="text-slate-300 dark:text-slate-600">•</span>
+                                                        )}
+                                                        <span>{getRelativeTime(item.created_at)}</span>
                                                     </span>
 
                                                     <button

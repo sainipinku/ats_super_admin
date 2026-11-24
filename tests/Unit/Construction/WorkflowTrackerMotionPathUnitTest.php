@@ -15,7 +15,7 @@ class WorkflowTrackerMotionPathUnitTest extends TestCase
 
         $this->assertStringContainsString('import { MotionPathPlugin } from "gsap/MotionPathPlugin"', $code);
         $this->assertStringContainsString('import { MotionPathHelper } from "gsap/MotionPathHelper"', $code);
-        $this->assertStringContainsString('gsap.registerPlugin(MotionPathPlugin)', $code);
+        $this->assertStringContainsString('gsap.registerPlugin(MotionPathPlugin, MotionPathHelper)', $code);
         $this->assertStringContainsString('motionPath:', $code);
         $this->assertStringContainsString('alignOrigin: [0.5, 0.5]', $code);
         $this->assertStringContainsString('autoRotate: 0', $code);
@@ -49,5 +49,24 @@ class WorkflowTrackerMotionPathUnitTest extends TestCase
         $this->assertStringNotContainsString('MotionPathHelper', $statCardCode);
         $this->assertStringNotContainsString('MotionPathPlugin', $activityLogCode);
         $this->assertStringNotContainsString('MotionPathHelper', $activityLogCode);
+    }
+
+    public function test_workflow_tracker_stops_file_at_active_project_step_and_starts_gsap_bling_animation(): void
+    {
+        $path = resource_path('js/Pages/Construction/Components/WorkflowTracker.jsx');
+        $code = file_get_contents($path);
+
+        // File must travel along MotionPath ending at the active stage progressRatio (not looping endlessly past it)
+        $this->assertStringContainsString('start: 0', $code);
+        $this->assertStringContainsString('end: progressRatio', $code);
+        $this->assertStringContainsString('gsap.timeline(', $code);
+
+        // Once arrived at the active step, proper GSAP bling / blinking animations activate on the current stage
+        $this->assertStringContainsString('wf-step-circle-active', $code);
+        $this->assertStringContainsString('wf-bling-ring', $code);
+        $this->assertStringContainsString('wf-bling-sparkle', $code);
+        $this->assertStringContainsString('wf-stage-pill-active', $code);
+        $this->assertStringContainsString('wf-file-aura', $code);
+        $this->assertStringContainsString('yoyo: true', $code);
     }
 }

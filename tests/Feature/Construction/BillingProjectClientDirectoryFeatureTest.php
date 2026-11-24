@@ -79,12 +79,12 @@ class BillingProjectClientDirectoryFeatureTest extends TestCase
         $this->assertStringContainsString('Project Code', $csvContent);
         $this->assertStringContainsString('Client Code', $csvContent);
         $this->assertStringContainsString('Khasra Number', $csvContent);
-        $this->assertStringContainsString('Total Tasks', $csvContent);
-        $this->assertStringContainsString('Completed Tasks', $csvContent);
-        $this->assertStringContainsString('In Progress Tasks', $csvContent);
-        $this->assertStringContainsString('Pending Tasks', $csvContent);
-        $this->assertStringContainsString('Total Checklists', $csvContent);
-        $this->assertStringContainsString('Completed Checklists', $csvContent);
+        $this->assertStringNotContainsString('Total Tasks', $csvContent);
+        $this->assertStringNotContainsString('Completed Tasks', $csvContent);
+        $this->assertStringNotContainsString('In Progress Tasks', $csvContent);
+        $this->assertStringNotContainsString('Pending Tasks', $csvContent);
+        $this->assertStringNotContainsString('Total Checklists', $csvContent);
+        $this->assertStringNotContainsString('Completed Checklists', $csvContent);
 
         $this->assertStringContainsString('PRJ-101', $csvContent);
         $this->assertStringContainsString('Metro Station Line 3', $csvContent);

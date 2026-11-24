@@ -12,7 +12,7 @@ class SurveySectionPaddingAndUiFeatureTest extends TestCase
 
         $this->assertStringContainsString('id="survey-reference-section"', $superCode);
         $this->assertStringContainsString('items-stretch', $superCode);
-        $this->assertStringContainsString('title="Survey Plans"', $superCode);
+        $this->assertStringContainsString('title="Scope of Work"', $superCode);
         $this->assertStringContainsString('title="Survey Submission Queue"', $superCode);
         $this->assertStringContainsString('View More Details', $superCode);
     }
@@ -21,7 +21,7 @@ class SurveySectionPaddingAndUiFeatureTest extends TestCase
     {
         $adminCode = file_get_contents(resource_path('js/Pages/Admin/Construction/Projects/Show.jsx'));
 
-        $this->assertStringContainsString('title="Survey Execution"', $adminCode);
+        $this->assertStringContainsString('title="Scope of Work"', $adminCode);
         $this->assertStringContainsString('title="Survey Submission Queue"', $adminCode);
         $this->assertStringContainsString('View More Details', $adminCode);
         $this->assertStringNotContainsString('p-4.5', $adminCode);

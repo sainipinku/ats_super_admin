@@ -668,7 +668,7 @@ class ProjectController extends Controller
         $actor = $this->constructionActor();
         $isProjectOwner = $this->isProjectOwner($actor);
         $isGlobalSuperAdmin = ($actor instanceof SuperAdmin && empty($actor->company_id)) || $isProjectOwner;
-        $isCompanySuperAdmin = ($actor instanceof SuperAdmin && !empty($actor->company_id));
+        $isCompanySuperAdmin = ($actor instanceof SuperAdmin && !empty($actor->company_id) && !$isProjectOwner);
 
         // Company admins are strictly prohibited from updating projects
         abort_if(!$isGlobalSuperAdmin && !$isCompanySuperAdmin, 403, 'Company admins are not permitted to edit projects.');
@@ -683,7 +683,7 @@ class ProjectController extends Controller
 
         $userCompanyId = $this->getAccessibleCompanyId($actor);
 
-        if ($userCompanyId) {
+        if ($userCompanyId && !$isProjectOwner) {
             $request->merge(['company_id' => $userCompanyId]);
         }
 
@@ -813,6 +813,46 @@ class ProjectController extends Controller
             'success',
             'Project updated successfully.'
         );
+    }
+
+    public function updateScopeOfWork(
+        Project $project,
+        Request $request,
+        ConstructionActivityService $activityService
+    ) {
+        $actor = $this->constructionActor();
+        $isProjectOwner = $this->isProjectOwner($actor);
+        $isGlobalSuperAdmin = ($actor instanceof SuperAdmin && empty($actor->company_id)) || $isProjectOwner;
+        $actorCompanyId = $this->getAccessibleCompanyId($actor);
+
+        if (! $isGlobalSuperAdmin && $actorCompanyId && $project->company_id && (int) $project->company_id !== (int) $actorCompanyId) {
+            abort(403, 'Unauthorized. You can only edit scope of work for projects belonging to your company.');
+        }
+
+        $validated = $request->validate([
+            'scope_of_work' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $scopeValue = isset($validated['scope_of_work']) ? trim($validated['scope_of_work']) : null;
+
+        $project->update([
+            'scope_of_work' => $scopeValue !== '' ? $scopeValue : null,
+        ]);
+
+        $activityService->log(
+            module: 'project',
+            action: 'updated_scope_of_work',
+            actor: $actor,
+            reference: $project,
+            companyId: $project->company_id,
+            projectId: $project->id,
+            meta: [
+                'project_code' => $project->project_code,
+            ],
+            request: $request
+        );
+
+        return back()->with('success', 'Scope of work updated successfully.');
     }
 
     public function storeBudget(
@@ -1343,7 +1383,7 @@ class ProjectController extends Controller
         $actor = $this->constructionActor();
         $isProjectOwner = $this->isProjectOwner($actor);
         $isGlobalSuperAdmin = ($actor instanceof SuperAdmin && empty($actor->company_id)) || $isProjectOwner;
-        $isCompanySuperAdmin = ($actor instanceof SuperAdmin && !empty($actor->company_id));
+        $isCompanySuperAdmin = ($actor instanceof SuperAdmin && !empty($actor->company_id) && !$isProjectOwner);
 
         // Company admins are strictly prohibited from deleting projects
         abort_if(!$isGlobalSuperAdmin && !$isCompanySuperAdmin, 403, 'Company admins are not permitted to delete projects.');

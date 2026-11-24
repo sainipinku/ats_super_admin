@@ -26,7 +26,9 @@ use App\Models\ConstructionVehicle;
 use App\Models\VehicleAssignment;
 use App\Models\VehicleLocationPing;
 use App\Models\Member;
+use App\Models\SuperAdmin;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -34,14 +36,29 @@ class DashboardController extends Controller
 {
     use ResolvesConstructionActor;
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $now = Carbon::now();
         $monthStart = $now->copy()->startOfMonth();
         $today = $now->copy()->toDateString();
 
         $actor = $this->constructionActor();
-        $accessibleProjectIds = $this->getAccessibleProjectIds($actor);
+        $isProjectOwner = $this->isProjectOwner($actor);
+
+        $requestedCompanyId = $request->query('company_id') ?: $request->query('id');
+        $effectiveCompanyId = $isProjectOwner
+            ? ($requestedCompanyId ? (int) $requestedCompanyId : null)
+            : $this->getAccessibleCompanyId($actor);
+
+        // 1. Projects scoping
+        $projectsQuery = Project::query();
+        if ($effectiveCompanyId) {
+            $projectsQuery->where('company_id', $effectiveCompanyId);
+        } elseif (!$isProjectOwner) {
+            $accessibleIds = $this->getAccessibleProjectIds($actor);
+            $projectsQuery->whereIn('id', $accessibleIds);
+        }
+        $accessibleProjectIds = $projectsQuery->pluck('id');
 
         $projects = Project::with(['company', 'client', 'latestBudget'])
             ->whereIn('id', $accessibleProjectIds)
@@ -72,36 +89,163 @@ class DashboardController extends Controller
         $completedProjects = $allProjects->whereIn('current_stage', $completedStages)->count();
         $pendingProjects = $allProjects->whereIn('current_stage', $pendingStages)->count();
 
-        $totalEmployees = Member::count();
-        $activeEmployees = Member::where('status', 'active')->count();
+        // 2. Employees scoping
+        $membersQuery = Member::query();
+        if ($effectiveCompanyId) {
+            $company = Company::find($effectiveCompanyId);
+            $companySuperAdminIds = SuperAdmin::where('company_id', $effectiveCompanyId)->pluck('id')->toArray();
+            $teamMemberIds = \App\Models\ProjectTeamMember::whereIn('project_id', $accessibleProjectIds)->pluck('member_id')->toArray();
 
-        $surveyTeams = SurveyPlan::distinct()->count('id');
-        $surveyTeamMembers = SurveyPlanMember::distinct()->count('member_id');
+            $membersQuery->where(function ($q) use ($company, $companySuperAdminIds, $teamMemberIds, $actor) {
+                if (!empty($companySuperAdminIds)) {
+                    $q->whereIn('created_by', $companySuperAdminIds);
+                }
+                if ($company) {
+                    $q->orWhere('company_name', $company->name);
+                    if (!empty($company->legal_name)) {
+                        $q->orWhere('company_name', $company->legal_name);
+                    }
+                }
+                if (!empty($teamMemberIds)) {
+                    $q->orWhereIn('id', $teamMemberIds);
+                }
+                if ($actor) {
+                    $q->orWhere('created_by', $actor->getKey());
+                }
+            });
+        } elseif (!$isProjectOwner) {
+            $teamMemberIds = \App\Models\ProjectTeamMember::whereIn('project_id', $accessibleProjectIds)->pluck('member_id')->toArray();
+            $membersQuery->where(function ($q) use ($teamMemberIds, $actor) {
+                if (!empty($teamMemberIds)) {
+                    $q->whereIn('id', $teamMemberIds);
+                }
+                if ($actor) {
+                    $q->orWhere('created_by', $actor->getKey());
+                }
+            });
+        }
+        $totalEmployees = (clone $membersQuery)->count();
+        $activeEmployees = (clone $membersQuery)->where(fn($q) => $q->where('status', 1)->orWhere('status', 'active'))->count();
 
-        $totalVehicles = ConstructionVehicle::count();
-        $activeVehicles = ConstructionVehicle::whereIn('status', ['active', 'assigned', 'in_use'])->count();
+        // 3. Vehicles scoping
+        $vehiclesQuery = ConstructionVehicle::query();
+        if ($effectiveCompanyId) {
+            $companySuperAdminIds = SuperAdmin::where('company_id', $effectiveCompanyId)->pluck('id')->toArray();
+            $vehiclesQuery->where(function ($q) use ($effectiveCompanyId, $accessibleProjectIds, $companySuperAdminIds) {
+                if ($accessibleProjectIds->isNotEmpty()) {
+                    $q->whereIn('project_id', $accessibleProjectIds);
+                } else {
+                    $q->whereHas('project', fn($pq) => $pq->where('company_id', $effectiveCompanyId));
+                }
+                if (!empty($companySuperAdminIds)) {
+                    $q->orWhere(function ($sq) use ($companySuperAdminIds) {
+                        $sq->where('created_by_type', SuperAdmin::class)
+                           ->whereIn('created_by_id', $companySuperAdminIds);
+                    });
+                }
+            });
+        } elseif (!$isProjectOwner) {
+            $vehiclesQuery->whereIn('project_id', $accessibleProjectIds);
+        }
+        $totalVehicles = (clone $vehiclesQuery)->count();
+        $activeVehicles = (clone $vehiclesQuery)->whereIn('status', ['active', 'assigned', 'in_use'])->count();
+        $vehicleIds = (clone $vehiclesQuery)->pluck('id');
 
-        $totalEquipment = ConstructionEquipment::count();
-        $allocatedEquipment = EquipmentAllocation::distinct()->count('equipment_id');
+        // 4. Equipment scoping
+        $equipmentQuery = ConstructionEquipment::query();
+        if ($effectiveCompanyId) {
+            $companySuperAdminIds = SuperAdmin::where('company_id', $effectiveCompanyId)->pluck('id')->toArray();
+            $equipmentQuery->where(function ($q) use ($effectiveCompanyId, $accessibleProjectIds, $companySuperAdminIds) {
+                if ($accessibleProjectIds->isNotEmpty()) {
+                    $q->whereIn('project_id', $accessibleProjectIds);
+                } else {
+                    $q->whereHas('project', fn($pq) => $pq->where('company_id', $effectiveCompanyId));
+                }
+                if (!empty($companySuperAdminIds)) {
+                    $q->orWhere(function ($sq) use ($companySuperAdminIds) {
+                        $sq->where('created_by_type', SuperAdmin::class)
+                           ->whereIn('created_by_id', $companySuperAdminIds);
+                    });
+                }
+            });
+        } elseif (!$isProjectOwner) {
+            $equipmentQuery->whereIn('project_id', $accessibleProjectIds);
+        }
+        $totalEquipment = (clone $equipmentQuery)->count();
+        $allocatedEquipment = EquipmentAllocation::whereIn('equipment_id', (clone $equipmentQuery)->pluck('id'))
+            ->where('status', 'active')
+            ->distinct()
+            ->count('equipment_id');
 
-        $totalClients = Client::count();
-        $companyClients = Client::where('client_type', 'company')->count();
-        $govtClients = Client::where('client_type', 'government')->count();
+        // 5. Clients scoping
+        $clientsQuery = Client::query();
+        if ($effectiveCompanyId) {
+            $clientsQuery->where('company_id', $effectiveCompanyId);
+        } elseif (!$isProjectOwner) {
+            $clientIds = Project::whereIn('id', $accessibleProjectIds)->whereNotNull('client_id')->pluck('client_id');
+            $clientsQuery->whereIn('id', $clientIds);
+        }
+        $totalClients = (clone $clientsQuery)->count();
+        $companyClients = (clone $clientsQuery)->where('client_type', 'company')->count();
+        $govtClients = (clone $clientsQuery)->where('client_type', 'government')->count();
 
-        $todayAttendance = AttendanceRecord::where('attendance_date', $today)->count();
-        $presentToday = AttendanceRecord::where('attendance_date', $today)->where('status', 'approved')->count();
-        $pendingAttendance = AttendanceRecord::where('status', 'pending')->count();
-        $attendanceThisMonth = AttendanceRecord::whereBetween('attendance_date', [$monthStart->toDateString(), $today])->count();
+        // 6. Attendance scoping
+        $attendanceQuery = AttendanceRecord::query();
+        if ($accessibleProjectIds->isNotEmpty()) {
+            $attendanceQuery->whereIn('project_id', $accessibleProjectIds);
+        } elseif ($effectiveCompanyId) {
+            $attendanceMemberIds = (clone $membersQuery)->pluck('id');
+            if ($attendanceMemberIds->isNotEmpty()) {
+                $attendanceQuery->whereIn('member_id', $attendanceMemberIds);
+            } else {
+                $attendanceQuery->whereRaw('1 = 0');
+            }
+        } elseif (!$isProjectOwner) {
+            $attendanceQuery->whereRaw('1 = 0');
+        }
+        $todayAttendance = (clone $attendanceQuery)->where('attendance_date', $today)->count();
+        $presentToday = (clone $attendanceQuery)->where('attendance_date', $today)->where('status', 'approved')->count();
+        $pendingAttendance = (clone $attendanceQuery)->where('status', 'pending')->count();
+        $attendanceThisMonth = (clone $attendanceQuery)->whereBetween('attendance_date', [$monthStart->toDateString(), $today])->count();
 
-        $activeGPSVehicles = VehicleLocationPing::whereBetween('created_at', [$now->copy()->subHours(24), $now])
+        // 7. Survey scoping
+        $surveyTeams = SurveyPlan::whereIn('project_id', $accessibleProjectIds)->distinct()->count('id');
+        $surveyPlanIds = SurveyPlan::whereIn('project_id', $accessibleProjectIds)->pluck('id');
+        $surveyTeamMembers = SurveyPlanMember::whereIn('survey_plan_id', $surveyPlanIds)->distinct()->count('member_id');
+
+        // 8. GPS scoping
+        $activeGPSVehicles = VehicleLocationPing::whereIn('vehicle_id', $vehicleIds)
+            ->whereBetween('created_at', [$now->copy()->subHours(24), $now])
             ->distinct()
             ->count('vehicle_id');
-        $totalGPSPingsToday = VehicleLocationPing::whereBetween('created_at', [$now->copy()->startOfDay(), $now])->count();
+        $totalGPSPingsToday = VehicleLocationPing::whereIn('vehicle_id', $vehicleIds)
+            ->whereBetween('created_at', [$now->copy()->startOfDay(), $now])
+            ->count();
 
-        $projectStageDistribution = Project::selectRaw('current_stage, COUNT(*) as count')
+        // 9. Stage distribution scoping
+        $projectStageDistribution = Project::whereIn('id', $accessibleProjectIds)
+            ->selectRaw('current_stage, COUNT(*) as count')
             ->groupBy('current_stage')
             ->pluck('count', 'current_stage')
             ->toArray();
+
+        // 10. Activity logs scoping
+        $activityQuery = ConstructionActivityLog::with(['project'])->latest('created_at');
+        if ($effectiveCompanyId) {
+            $activityQuery->where(function ($q) use ($effectiveCompanyId, $accessibleProjectIds) {
+                $q->where('company_id', $effectiveCompanyId);
+                if ($accessibleProjectIds->isNotEmpty()) {
+                    $q->orWhereIn('project_id', $accessibleProjectIds);
+                }
+            });
+        } elseif (!$isProjectOwner) {
+            if ($accessibleProjectIds->isNotEmpty()) {
+                $activityQuery->whereIn('project_id', $accessibleProjectIds);
+            } else {
+                $activityQuery->whereRaw('1 = 0');
+            }
+        }
+        $recentActivity = $activityQuery->take(10)->get();
 
         return Inertia::render('SuperAdmin/Construction/Dashboard', [
             'stats' => [
@@ -144,24 +288,24 @@ class DashboardController extends Controller
                 ],
                 'stageDistribution' => $projectStageDistribution,
 
-                'companies' => Company::count(),
-                'clientsLegacy' => Client::count(),
-                'projectsLegacy' => Project::count(),
-                'budgetPending' => Project::where('current_stage', 'budget_pending')->count(),
-                'teamAssigned' => Project::where('current_stage', 'team_assigned')->count(),
-               'surveyPlanned' => SurveyPlan::whereIn('status', [SurveyPlan::STATUS_PLANNED,SurveyPlan::STATUS_IN_PROGRESS,])->count(),
-                'surveyApprovalsPending' => SurveySubmission::where('status',SurveySubmission::STATUS_SUBMITTED)->count(),
-                'draftingQueue' => DraftingJob::whereIn('status', ['queued', 'in_progress'])->count(),
-                'readyForConstruction' => Project::where('current_stage', 'ready_for_construction')->count(),
-                'executionTasks' => ExecutionTask::count(),
-                'dprPending' => DailyProgressReport::where('status', 'submitted')->count(),
-                'attendancePending' => AttendanceRecord::where('status', 'pending')->count(),
+                'companies' => $isProjectOwner ? Company::count() : ($effectiveCompanyId ? 1 : 0),
+                'clientsLegacy' => $totalClients,
+                'projectsLegacy' => $totalProjects,
+                'budgetPending' => Project::whereIn('id', $accessibleProjectIds)->where('current_stage', 'budget_pending')->count(),
+                'teamAssigned' => Project::whereIn('id', $accessibleProjectIds)->where('current_stage', 'team_assigned')->count(),
+                'surveyPlanned' => SurveyPlan::whereIn('project_id', $accessibleProjectIds)->whereIn('status', [SurveyPlan::STATUS_PLANNED, SurveyPlan::STATUS_IN_PROGRESS])->count(),
+                'surveyApprovalsPending' => SurveySubmission::whereIn('project_id', $accessibleProjectIds)->where('status', SurveySubmission::STATUS_SUBMITTED)->count(),
+                'draftingQueue' => DraftingJob::whereIn('project_id', $accessibleProjectIds)->whereIn('status', ['queued', 'in_progress'])->count(),
+                'readyForConstruction' => Project::whereIn('id', $accessibleProjectIds)->where('current_stage', 'ready_for_construction')->count(),
+                'executionTasks' => ExecutionTask::whereIn('project_id', $accessibleProjectIds)->count(),
+                'dprPending' => DailyProgressReport::whereIn('project_id', $accessibleProjectIds)->where('status', 'submitted')->count(),
+                'attendancePending' => (clone $attendanceQuery)->where('status', 'pending')->count(),
             ],
             'recentProjects' => $projects,
-            'recentActivity' => ConstructionActivityLog::with(['project'])
-                ->latest('created_at')
-                ->take(10)
-                ->get(),
+            'recentActivity' => $recentActivity,
+            'companies' => $isProjectOwner ? Company::orderBy('name')->get(['id', 'name']) : [],
+            'selected_company_id' => $effectiveCompanyId,
+            'is_project_owner' => $isProjectOwner,
             'projectStatusOptions' => [
                 ['value' => 'planning', 'label' => 'Planning'],
                 ['value' => 'survey', 'label' => 'Survey'],
