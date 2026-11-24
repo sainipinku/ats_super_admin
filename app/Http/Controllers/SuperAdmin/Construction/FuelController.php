@@ -24,9 +24,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 
 
-
-
-
 class FuelController extends Controller
 {
     use ResolvesConstructionActor;
