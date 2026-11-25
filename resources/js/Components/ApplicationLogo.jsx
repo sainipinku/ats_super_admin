@@ -1,5 +1,5 @@
 export const INNER_PROJECT_LOGO_SRC = "/storage/Logo_1.jpeg";
-export const INNER_PROJECT_LOGO_FALLBACK_SRC = "/images/logo.png";
+export const INNER_PROJECT_LOGO_FALLBACK_SRC = "/images/Logo_1.jpeg";
 
 /**
  * Resolve the inner portal logo URL, falling back to /storage/Logo_1.jpeg.

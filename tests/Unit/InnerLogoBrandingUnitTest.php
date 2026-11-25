@@ -66,4 +66,25 @@ class InnerLogoBrandingUnitTest extends TestCase
         $this->assertStringContainsString('/images/cadmax_con_logo.jpeg', $homepage);
         $this->assertStringNotContainsString('/storage/Logo_1.jpeg', $homepage);
     }
+
+    public function test_logo_1_is_unignored_for_git_deploy_and_has_tracked_public_images_fallback(): void
+    {
+        $storageGitignore = file_get_contents(storage_path('app/public/.gitignore'));
+        $this->assertIsString($storageGitignore);
+        $this->assertStringContainsString('!Logo_1.jpeg', $storageGitignore, 'storage/app/public/.gitignore must un-ignore Logo_1.jpeg for deployment');
+
+        $fallbackPath = public_path('images/Logo_1.jpeg');
+        $this->assertFileExists($fallbackPath, 'Tracked public/images/Logo_1.jpeg fallback must exist');
+
+        $appLogoContent = file_get_contents(resource_path('js/Components/ApplicationLogo.jsx'));
+        $this->assertStringContainsString('"/images/Logo_1.jpeg"', $appLogoContent, 'INNER_PROJECT_LOGO_FALLBACK_SRC should fall back to /images/Logo_1.jpeg');
+
+        $compiledFiles = glob(public_path('build/assets/*.js')) ?: [];
+        foreach ($compiledFiles as $file) {
+            $js = file_get_contents($file);
+            if (is_string($js)) {
+                $this->assertStringNotContainsString('SEPL_logo.jpg', $js, 'Compiled assets must not reference SEPL_logo.jpg');
+            }
+        }
+    }
 }

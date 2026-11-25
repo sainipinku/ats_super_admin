@@ -478,22 +478,13 @@ class SurveyorToDraftsmanAssignmentService
                     ->orWhere('slug', 'like', '%draft%');
             })
             ->pluck('id')
+            ->map(fn ($id) => (int) $id)
             ->all();
-
-        $draftConstructionRoleIds = ConstructionRole::query()
-            ->where(function ($q) {
-                $q->whereIn('slug', self::DRAFTSMAN_ROLE_SLUGS)
-                    ->orWhere('slug', 'like', '%draft%');
-            })
-            ->pluck('id')
-            ->all();
-
-        $allDraftRoleIds = array_values(array_unique(array_merge($draftRoleIds, $draftConstructionRoleIds)));
 
         $storedRoles = $member->getRawOriginal('roles');
         $storedRoles = is_array($storedRoles) ? $storedRoles : (json_decode((string) $storedRoles, true) ?: []);
         foreach ($storedRoles as $roleVal) {
-            if (is_numeric($roleVal) && in_array((int) $roleVal, $allDraftRoleIds, true)) {
+            if (is_numeric($roleVal) && in_array((int) $roleVal, $draftRoleIds, true)) {
                 return true;
             }
             if (is_string($roleVal)) {

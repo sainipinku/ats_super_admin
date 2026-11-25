@@ -928,13 +928,16 @@ export default function ProjectShow({ project, members, roles, activityLog, work
         const roleObj = roles.find((r) => String(r.id) === String(roleId));
         let defaultScope = teamForm.data.assignment_scope;
         if (roleObj) {
-            const slug = (roleObj.slug || roleObj.name || "").toLowerCase();
-            if (slug.includes('survey')) defaultScope = "Field Survey & Site Data Collection";
-            else if (slug.includes('draft')) defaultScope = "Drawing Revisions & CAD Drafting";
-            else if (slug.includes('driver')) defaultScope = "Vehicle Transport & Site Movement";
-            else if (slug.includes('admin')) defaultScope = "Project Oversight & Workflow Coordination";
-            else if (slug.includes('approv')) defaultScope = "Drawing & Progress Approvals";
-            else if (slug.includes('site')) defaultScope = "Site Work & Daily Execution";
+            defaultScope = roleObj.description || defaultScope || "";
+            if (!roleObj.description) {
+                const slug = (roleObj.slug || roleObj.name || "").toLowerCase();
+                if (slug.includes('survey')) defaultScope = "Field Survey & Site Data Collection";
+                else if (slug.includes('draft')) defaultScope = "Drawing Revisions & CAD Drafting";
+                else if (slug.includes('driver')) defaultScope = "Vehicle Transport & Site Movement";
+                else if (slug.includes('admin')) defaultScope = "Project Oversight & Workflow Coordination";
+                else if (slug.includes('approv')) defaultScope = "Drawing & Progress Approvals";
+                else if (slug.includes('site')) defaultScope = "Site Work & Daily Execution";
+            }
         }
         teamForm.setData((prev) => ({
             ...prev,
@@ -944,32 +947,57 @@ export default function ProjectShow({ project, members, roles, activityLog, work
     };
 
     const selectedRole = roles.find((r) => String(r.id) === String(teamForm.data.role_id));
-    const roleSlug = selectedRole ? (selectedRole.slug || selectedRole.name || "").toLowerCase() : "";
 
     const sortedMembers = useMemo(() => {
-        if (!roleSlug) return members;
-        let targetKeyword = "";
-        if (roleSlug.includes("survey")) targetKeyword = "survey";
-        else if (roleSlug.includes("draft")) targetKeyword = "draft";
-        else if (roleSlug.includes("driver")) targetKeyword = "driver";
-        else if (roleSlug.includes("admin")) targetKeyword = "admin";
-        else if (roleSlug.includes("approv")) targetKeyword = "review";
+        if (!selectedRole) return members;
 
-        if (!targetKeyword) return members;
+        const normalizeRoleToken = (value) =>
+            String(value || "")
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, "");
 
-        const matching = [];
-        const others = [];
-        members.forEach((m) => {
-            const badgesText = (getMemberRoleBadges(m) || []).join(" ");
-            const desig = `${badgesText} ${m.role_badge || ""} ${m.designation_text || ""}`.toLowerCase();
-            if (desig.includes(targetKeyword)) {
-                matching.push(m);
-            } else {
-                others.push(m);
+        const expandRoleAliases = (token) => {
+            if (!token) return [];
+            const aliasGroups = [
+                ["surveyor", "surveyman"],
+                ["draftperson", "draftsman", "draftman", "drafter"],
+                ["vehicledriver", "driver"],
+                ["projectadmin", "admin"],
+            ];
+            for (const group of aliasGroups) {
+                if (group.includes(token)) {
+                    return group;
+                }
             }
+            return [token];
+        };
+
+        const targetTokens = new Set([
+            ...expandRoleAliases(normalizeRoleToken(selectedRole.slug)),
+            ...expandRoleAliases(normalizeRoleToken(selectedRole.name)),
+        ].filter(Boolean));
+
+        if (targetTokens.size === 0) return members;
+
+        const matching = members.filter((m) => {
+            const memberTokens = new Set();
+            if (Array.isArray(m.assigned_roles)) {
+                m.assigned_roles.forEach((slug) => memberTokens.add(normalizeRoleToken(slug)));
+            }
+            getMemberRoleBadges(m).forEach((badge) => memberTokens.add(normalizeRoleToken(badge)));
+            if (m.is_super_admin) memberTokens.add("superadmin");
+            if (m.is_admin) memberTokens.add("admin");
+
+            for (const token of targetTokens) {
+                if (memberTokens.has(token)) {
+                    return true;
+                }
+            }
+            return false;
         });
-        return [...matching, ...others];
-    }, [members, roleSlug]);
+
+        return matching.length > 0 ? matching : members;
+    }, [members, selectedRole]);
 
     const metrics = useMemo(
         () => ({

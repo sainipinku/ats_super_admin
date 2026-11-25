@@ -76,6 +76,10 @@ export function getMemberRoleBadges(memberOrItem) {
     if (uniqueBadges.some((b) => /^surveyor$/i.test(b.trim()))) {
         uniqueBadges = uniqueBadges.filter((b) => !/survey man/i.test(b));
     }
+    // If Draft Person exists, remove Draft Man
+    if (uniqueBadges.some((b) => /^draft person$/i.test(b.trim()))) {
+        uniqueBadges = uniqueBadges.filter((b) => !/draft man/i.test(b));
+    }
 
     return uniqueBadges;
 }

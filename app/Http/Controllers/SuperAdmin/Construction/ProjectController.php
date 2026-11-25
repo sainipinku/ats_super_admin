@@ -406,41 +406,56 @@ class ProjectController extends Controller
 
         $companyId = $project->company_id ?: $this->getAccessibleCompanyId($actor);
         $rolesQuery = ConstructionRole::where('status', 'active')
-            ->whereNotIn('slug', ['super_admin', 'superadmin']);
+            ->whereNotIn('slug', ['super_admin', 'superadmin', 'admin', 'member']);
 
-        // Official roles matching Role Management listing
+        // Sync active accessible roles from Role Management into ConstructionRole so role_id always references construction_roles.id.
         $officialRoles = Role::accessibleFor($actor)
             ->where(function ($q) {
                 $q->where('status', 1)->orWhere('status', 'active');
             })
             ->whereNull('deleted_at')
+            ->whereNotIn('slug', ['super_admin', 'superadmin', 'admin', 'member'])
             ->orderBy('id')
-            ->get(['id', 'name', 'slug']);
+            ->get(['id', 'name', 'slug', 'is_default']);
 
         if ($officialRoles->isNotEmpty()) {
-            $roles = $officialRoles;
+            $targetCompanyId = $companyId ?: null;
+            foreach ($officialRoles as $officialRole) {
+                $slug = trim((string) $officialRole->slug);
+                if ($slug === '') {
+                    continue;
+                }
+                ConstructionRole::firstOrCreate(
+                    ['company_id' => $targetCompanyId, 'slug' => $slug],
+                    [
+                        'name' => trim((string) $officialRole->name) ?: ucwords(str_replace('_', ' ', $slug)),
+                        'status' => 'active',
+                        'is_system_role' => (bool) ($officialRole->is_default ?? false),
+                    ]
+                );
+            }
+        }
+
+        if ($companyId) {
+            $companyRoles = (clone $rolesQuery)
+                ->where('company_id', $companyId)
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug', 'description', 'company_id']);
+
+            $roles = $companyRoles->isNotEmpty()
+                ? $companyRoles
+                : (clone $rolesQuery)->whereNull('company_id')->orderBy('name')->get(['id', 'name', 'slug', 'description', 'company_id']);
         } else {
-            if ($companyId) {
-                $companyRoles = (clone $rolesQuery)
-                    ->where('company_id', $companyId)
-                    ->orderBy('name')
-                    ->get(['id', 'name', 'slug', 'company_id']);
+            $roles = (clone $rolesQuery)->whereNull('company_id')->orderBy('name')->get(['id', 'name', 'slug', 'description', 'company_id']);
+        }
 
-                $roles = $companyRoles->isNotEmpty()
-                    ? $companyRoles
-                    : (clone $rolesQuery)->whereNull('company_id')->orderBy('name')->get(['id', 'name', 'slug', 'company_id']);
-            } else {
-                $roles = $rolesQuery->whereNull('company_id')->orderBy('name')->get(['id', 'name', 'slug', 'company_id']);
-            }
-
-            if ($roles->isEmpty()) {
-                $roles = ConstructionRole::where('status', 'active')
-                    ->whereNotIn('slug', ['super_admin', 'superadmin'])
-                    ->orderBy('name')
-                    ->get(['id', 'name', 'slug', 'company_id'])
-                    ->unique('slug')
-                    ->values();
-            }
+        if ($roles->isEmpty()) {
+            $roles = ConstructionRole::where('status', 'active')
+                ->whereNotIn('slug', ['super_admin', 'superadmin', 'admin', 'member'])
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug', 'description', 'company_id'])
+                ->unique('slug')
+                ->values();
         }
 
         return Inertia::render(
@@ -973,7 +988,12 @@ class ProjectController extends Controller
             'role_id' => [
                 'nullable',
                 'integer',
-                'exists:construction_roles,id',
+                Rule::exists('construction_roles', 'id')->where(function ($q) use ($project) {
+                    $q->whereNull('company_id');
+                    if ($project->company_id) {
+                        $q->orWhere('company_id', $project->company_id);
+                    }
+                }),
             ],
             'assigned_from' => [
                 'nullable',
@@ -1071,7 +1091,12 @@ class ProjectController extends Controller
             'role_id' => [
                 'nullable',
                 'integer',
-                'exists:construction_roles,id',
+                Rule::exists('construction_roles', 'id')->where(function ($q) use ($project) {
+                    $q->whereNull('company_id');
+                    if ($project->company_id) {
+                        $q->orWhere('company_id', $project->company_id);
+                    }
+                }),
             ],
             'assigned_from' => [
                 'nullable',
@@ -2893,24 +2918,66 @@ class ProjectController extends Controller
             ->get()
             ->groupBy('member_id');
 
-        $systemRoleNames = \App\Models\Role::pluck('name', 'id')->toArray();
-        $constructionRoleNames = \App\Models\ConstructionRole::pluck('name', 'id')->toArray();
-        $roleSlugNames = [
-            'super_admin' => 'Super Admin',
-            'superadmin' => 'Super Admin',
-            'admin' => 'Admin',
-            'project_admin' => 'Project Admin',
-            'surveyor' => 'Surveyor',
-            'draft_person' => 'Draft Person',
-            'draftsman' => 'Draft Person',
-            'vehicle_driver' => 'Driver',
-            'driver' => 'Driver',
-            'review_approver' => 'Review Approver',
-            'site_employee' => 'Site Employee',
-        ];
+        $assignmentHistoryMemberIds = \App\Models\MemberRoleAssignment::whereIn('member_id', $memberIds)
+            ->pluck('member_id')
+            ->flip();
+
+        // members.roles stores IDs from the legacy `roles` table (never construction_roles.id).
+        $systemRolesById = \App\Models\Role::get(['id', 'name', 'slug'])->keyBy('id');
+        $systemRolesBySlug = $systemRolesById->keyBy(fn ($role) => strtolower(trim((string) $role->slug)));
+
+        $superAdminSlugs = ['super_admin', 'superadmin'];
+        $adminOnlySlugs = ['admin', 'project_admin', 'project-admin'];
+        $adminRoleSlugs = array_merge($superAdminSlugs, $adminOnlySlugs);
+
+        $dbSuperAdminRoleIds = $systemRolesById
+            ->filter(fn ($role) => in_array(strtolower(trim((string) $role->slug)), $superAdminSlugs, true))
+            ->keys()
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $dbAdminOnlyRoleIds = $systemRolesById
+            ->filter(fn ($role) => in_array(strtolower(trim((string) $role->slug)), $adminOnlySlugs, true))
+            ->keys()
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $dbNonAdminRoleIds = $systemRolesById
+            ->filter(fn ($role) => !in_array(strtolower(trim((string) $role->slug)), $adminRoleSlugs, true))
+            ->keys()
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $superAdminRoleIds = array_values(array_unique(array_merge(
+            $dbSuperAdminRoleIds,
+            array_diff([2], $dbNonAdminRoleIds, $dbAdminOnlyRoleIds)
+        )));
+        $adminOnlyRoleIds = array_values(array_unique(array_merge(
+            $dbAdminOnlyRoleIds,
+            array_diff([3, 9], $dbNonAdminRoleIds, $dbSuperAdminRoleIds)
+        )));
+        $adminRoleIds = array_values(array_unique(array_merge($superAdminRoleIds, $adminOnlyRoleIds)));
+
+        $formatRoleFallback = static function (?string $slug): string {
+            $normalized = strtolower(trim((string) $slug));
+            if ($normalized === '') {
+                return '';
+            }
+
+            return match ($normalized) {
+                'super_admin', 'superadmin' => 'Super Admin',
+                'admin' => 'Admin',
+                'project_admin', 'project-admin' => 'Project Admin',
+                'surveyor' => 'Surveyor',
+                'draft_person', 'draftsman', 'draft_man' => 'Draft Person',
+                'vehicle_driver' => 'Vehicle Driver',
+                'driver' => 'Driver',
+                'review_approver' => 'Review Approver',
+                'site_employee' => 'Site Employee',
+                default => ucwords(str_replace(['_', '-'], ' ', $normalized)),
+            };
+        };
 
         // Build display text and role badges without additional database queries.
-        $members->transform(function ($member) use ($designationNames, $companySuperAdminMemberIds, $companyAdminMemberIds, $assignmentsByMember, $systemRoleNames, $constructionRoleNames, $roleSlugNames) {
+        $members->transform(function ($member) use ($designationNames, $companySuperAdminMemberIds, $companyAdminMemberIds, $assignmentsByMember, $assignmentHistoryMemberIds, $systemRolesById, $systemRolesBySlug, $superAdminSlugs, $adminOnlySlugs, $adminRoleSlugs, $superAdminRoleIds, $adminOnlyRoleIds, $adminRoleIds, $formatRoleFallback) {
             $desigStr = '';
 
             if (!empty($member->designation)) {
@@ -2936,65 +3003,103 @@ class ProjectController extends Controller
                 }
             }
 
+            $memberRolesList = is_array($member->roles) ? $member->roles : [];
             $isSuperAdmin = in_array($member->id, $companySuperAdminMemberIds, true)
-                || (is_array($member->roles) && (in_array('super_admin', $member->roles, true) || in_array('superadmin', $member->roles, true) || in_array(2, $member->roles, true) || in_array('2', $member->roles, true)))
-                || $member->slug === 'super-admin';
+                || $member->slug === 'super-admin'
+                || collect($memberRolesList)->contains(function ($r) use ($superAdminRoleIds, $superAdminSlugs) {
+                    if (is_numeric($r)) {
+                        return in_array((int) $r, $superAdminRoleIds, true);
+                    }
+
+                    return is_string($r) && in_array(strtolower(trim($r)), $superAdminSlugs, true);
+                });
 
             $isAdmin = !$isSuperAdmin && (
                 in_array($member->id, $companyAdminMemberIds, true)
                 || $member->isAdmin()
-                || (is_array($member->roles) && (in_array(9, $member->roles, true) || in_array('9', $member->roles, true) || in_array(3, $member->roles, true) || in_array('3', $member->roles, true) || in_array('admin', $member->roles, true) || in_array('project_admin', $member->roles, true)))
                 || $member->slug === 'admin'
                 || str_starts_with((string) ($member->slug ?? ''), 'admin-')
                 || str_starts_with((string) ($member->slug ?? ''), 'admin_')
+                || collect($memberRolesList)->contains(function ($r) use ($adminOnlyRoleIds, $adminOnlySlugs) {
+                    if (is_numeric($r)) {
+                        return in_array((int) $r, $adminOnlyRoleIds, true);
+                    }
+
+                    return is_string($r) && in_array(strtolower(trim($r)), $adminOnlySlugs, true);
+                })
             );
 
             $badges = [];
+            $memberRoleSlugs = [];
 
             if ($isSuperAdmin) {
                 $badges[] = 'Super Admin';
+                $memberRoleSlugs[] = 'super_admin';
             } elseif ($isAdmin) {
                 $badges[] = 'Admin';
+                $memberRoleSlugs[] = 'admin';
             }
 
-            // Roles from MemberRoleAssignment
+            // Dynamic roles from active MemberRoleAssignment records
             if ($assignmentsByMember->has($member->id)) {
                 foreach ($assignmentsByMember->get($member->id) as $assignment) {
-                    if ($assignment->role && !empty($assignment->role->name)) {
-                        $roleName = trim($assignment->role->name);
-                        $slug = strtolower(trim($assignment->role->slug ?? ''));
-                        $formattedRole = match ($slug) {
-                            'vehicle_driver' => 'Vehicle Driver',
-                            'driver' => 'Driver',
-                            'draft_person', 'draftsman' => 'Draft Person',
-                            'surveyor' => 'Surveyor',
-                            'super_admin', 'superadmin' => 'Super Admin',
-                            'admin' => 'Admin',
-                            'project_admin' => 'Project Admin',
-                            'review_approver' => 'Review Approver',
-                            'site_employee' => 'Site Employee',
-                            default => $roleName,
-                        };
-                        $badges[] = $formattedRole;
+                    if ($assignment->role) {
+                        $roleSlug = trim((string) ($assignment->role->slug ?? ''));
+                        $roleName = trim((string) ($assignment->role->name ?? ''));
+                        $resolvedName = $roleName !== '' ? $roleName : $formatRoleFallback($roleSlug);
+                        if ($resolvedName !== '') {
+                            $badges[] = $resolvedName;
+                        }
+                        if ($roleSlug !== '') {
+                            $memberRoleSlugs[] = $roleSlug;
+                        }
                     }
                 }
             }
 
-            // Roles from roles column
-            if (!empty($member->roles) && is_array($member->roles)) {
-                foreach ($member->roles as $r) {
+            // Roles from roles column (only non-admin legacy fallback when member has no assignment history)
+            $hasAssignmentHistory = $assignmentHistoryMemberIds->has($member->id);
+            if (!empty($memberRolesList)) {
+                foreach ($memberRolesList as $r) {
+                    $resolvedBadge = null;
+                    $resolvedSlug = null;
+                    $isAdminRoleEntry = false;
+
                     if (is_numeric($r)) {
                         $id = (int) $r;
-                        if (isset($constructionRoleNames[$id])) {
-                            $badges[] = $constructionRoleNames[$id];
-                        } elseif (isset($systemRoleNames[$id])) {
-                            $badges[] = $systemRoleNames[$id];
+                        $isAdminRoleEntry = in_array($id, $adminRoleIds, true);
+                        if ($hasAssignmentHistory && !$isAdminRoleEntry) {
+                            continue;
+                        }
+                        if (isset($systemRolesById[$id])) {
+                            $systemRole = $systemRolesById[$id];
+                            $resolvedSlug = trim((string) ($systemRole->slug ?? ''));
+                            $systemName = trim((string) ($systemRole->name ?? ''));
+                            $resolvedBadge = $systemName !== '' ? $systemName : $formatRoleFallback($resolvedSlug);
                         }
                     } elseif (is_string($r)) {
                         $slug = strtolower(trim($r));
-                        if (isset($roleSlugNames[$slug])) {
-                            $badges[] = $roleSlugNames[$slug];
+                        $isAdminRoleEntry = in_array($slug, $adminRoleSlugs, true);
+                        if ($hasAssignmentHistory && !$isAdminRoleEntry) {
+                            continue;
                         }
+                        $resolvedSlug = $slug;
+                        if (isset($systemRolesBySlug[$slug])) {
+                            $resolvedBadge = trim((string) $systemRolesBySlug[$slug]->name);
+                        }
+                        if (empty($resolvedBadge)) {
+                            $resolvedBadge = $formatRoleFallback($slug);
+                        }
+                    }
+
+                    if ($resolvedBadge !== null && $resolvedBadge !== '') {
+                        if ($isSuperAdmin && strcasecmp($resolvedBadge, 'Admin') === 0) {
+                            continue;
+                        }
+                        $badges[] = $resolvedBadge;
+                    }
+                    if (!empty($resolvedSlug)) {
+                        $memberRoleSlugs[] = $resolvedSlug;
                     }
                 }
             }
@@ -3014,25 +3119,33 @@ class ProjectController extends Controller
                 }
             }
 
-            // Deduplicate driver alias if Vehicle Driver is present
-            $hasVehicleDriver = false;
-            foreach ($uniqueBadges as $u) {
-                if (strcasecmp($u, 'Vehicle Driver') === 0) {
-                    $hasVehicleDriver = true;
-                    break;
-                }
-            }
-            if ($hasVehicleDriver) {
+            // Deduplicate canonical role aliases when both alias and canonical exist on the same member
+            $hasBadge = static fn (string $target): bool => collect($uniqueBadges)
+                ->contains(fn ($u) => strcasecmp((string) $u, $target) === 0);
+
+            if ($hasBadge('Vehicle Driver')) {
                 $uniqueBadges = array_values(array_filter($uniqueBadges, fn ($u) => strcasecmp($u, 'Driver') !== 0));
             }
+            if ($hasBadge('Surveyor')) {
+                $uniqueBadges = array_values(array_filter($uniqueBadges, fn ($u) => strcasecmp($u, 'Survey Man') !== 0));
+            }
+            if ($hasBadge('Draft Person')) {
+                $uniqueBadges = array_values(array_filter($uniqueBadges, fn ($u) => strcasecmp($u, 'Draft Man') !== 0));
+            }
+
+            $memberRoleSlugs = array_values(array_unique(array_filter($memberRoleSlugs)));
 
             $draftSignal = strtolower(implode(' ', array_filter([
                 implode(' ', $uniqueBadges),
+                implode(' ', $memberRoleSlugs),
                 $desigStr,
                 is_array($member->roles) ? implode(' ', array_filter($member->roles, 'is_scalar')) : (string) ($member->roles ?? ''),
             ])));
             $member->is_draft_person = (bool) preg_match('/draft[\s_-]?person|draftsman|drafter|draft[\s_-]?man|\bdraft\b/i', $draftSignal);
+            $member->is_super_admin = $isSuperAdmin;
+            $member->is_admin = $isAdmin;
 
+            $member->assigned_roles = $memberRoleSlugs;
             $member->roles_list = $uniqueBadges;
             $member->role_badges = $uniqueBadges;
             $member->role_badge = !empty($uniqueBadges) ? implode(', ', $uniqueBadges) : null;

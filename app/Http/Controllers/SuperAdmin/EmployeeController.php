@@ -163,7 +163,9 @@ class EmployeeController extends Controller
             })->pluck('id')->map(fn ($id) => (int) $id)->toArray();
         }
 
-        if (in_array('vehicle_driver', $selectedRoles, true) && !in_array(6, $roleIds, true)) {
+        if (in_array('vehicle_driver', $selectedRoles, true)
+            && !Role::whereIn('slug', ['vehicle_driver', 'driver'])->exists()
+            && !in_array(6, $roleIds, true)) {
             $roleIds[] = 6;
         }
 
@@ -613,7 +615,7 @@ class EmployeeController extends Controller
                     $siteEmployeeRole = ConstructionRole::where('slug', 'site_employee')->first();
                 }
 
-                if ($siteEmployeeRole) {
+                if (empty($selectedRoles) && $siteEmployeeRole) {
                     MemberRoleAssignment::firstOrCreate([
                         'member_id' => $member->id,
                         'role_id' => $siteEmployeeRole->id,
@@ -842,11 +844,14 @@ class EmployeeController extends Controller
                     ]);
                 }
 
-                $dbRole = Role::where('slug', $cRole->slug)->first();
+                $cSlug = strtolower((string) $cRole->slug);
+                $dbRole = Role::where('slug', $cSlug)->first();
+                if (!$dbRole && $cSlug === 'vehicle_driver') {
+                    $dbRole = Role::where('slug', 'driver')->first();
+                }
                 if ($dbRole) {
                     $activeRoleIds[] = (int) $dbRole->id;
-                }
-                if (strtolower($cRole->slug) === 'vehicle_driver') {
+                } elseif ($cSlug === 'vehicle_driver') {
                     $activeRoleIds[] = 6;
                 }
             }
