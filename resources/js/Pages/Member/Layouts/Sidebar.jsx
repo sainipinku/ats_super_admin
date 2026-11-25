@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, usePage } from "@inertiajs/react";
+import SidebarBrandLogo from "@/Components/SidebarBrandLogo";
 import {
     FaTachometerAlt,
     FaProjectDiagram,
@@ -98,26 +99,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 isOpen ? "translate-x-0" : "-translate-x-full"
             }`}
         >
-            <div className="border-b border-gray-200 px-4 py-3 dark:border-b-[#5146e64a]">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="block dark:hidden">
-                            <img className="max-w-[90px] sm:max-w-[110px]" src="/images/logo.png" alt="Logo" />
-                        </div>
-                        <div className="hidden dark:block">
-                            <img className="max-w-[90px] sm:max-w-[110px]" src="/images/logo-dark.png" alt="Logo" />
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="flex h-[38px] w-[48px] items-center justify-center rounded-[8px] border border-[#0000001A] bg-white text-[#000] transition focus:outline-none dark:border-[#61CC681A] dark:bg-[#61CC681A] dark:text-[#fff] xl:hidden"
-                    >
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
+            <SidebarBrandLogo onClose={onClose} />
 
             <div className="border-b border-gray-200 px-4 py-3 dark:border-b-[#5146e64a]">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-600 dark:text-emerald-400">

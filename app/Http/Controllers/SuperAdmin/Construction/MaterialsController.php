@@ -24,27 +24,35 @@ class MaterialsController extends Controller
 
     public function index(): Response
     {
+        $actor = $this->constructionActor();
+        $projectIds = $this->getAccessibleProjectIds($actor);
+
         return Inertia::render('SuperAdmin/Construction/Materials/Index', [
-            'projects' => Project::orderByDesc('id')->get(['id', 'project_code', 'name']),
-            'vendors' => Vendor::with('project')->latest()->take(50)->get(),
-            'materials' => Material::with('project')->latest()->take(50)->get(),
+            'projects' => Project::whereIn('id', $projectIds)->orderByDesc('id')->get(['id', 'project_code', 'name']),
+            'vendors' => Vendor::with('project')->whereIn('project_id', $projectIds)->latest()->take(50)->get(),
+            'materials' => Material::with('project')->whereIn('project_id', $projectIds)->latest()->take(50)->get(),
             'purchaseRequests' => PurchaseRequest::with(['project', 'requestedBy', 'reviewedBy', 'items.material'])
+                ->whereIn('project_id', $projectIds)
                 ->latest()
                 ->take(30)
                 ->get(),
             'purchaseOrders' => PurchaseOrder::with(['project', 'vendor', 'items.material', 'invoiceDocument'])
+                ->whereIn('project_id', $projectIds)
                 ->latest()
                 ->take(30)
                 ->get(),
             'receipts' => MaterialReceipt::with(['project', 'purchaseOrder.vendor', 'receivedBy', 'items.material', 'receiptDocument'])
+                ->whereIn('project_id', $projectIds)
                 ->latest()
                 ->take(30)
                 ->get(),
             'issues' => MaterialIssue::with(['project', 'issuedBy', 'items.material'])
+                ->whereIn('project_id', $projectIds)
                 ->latest()
                 ->take(30)
                 ->get(),
             'stocks' => MaterialStock::with(['project', 'material'])
+                ->whereIn('project_id', $projectIds)
                 ->latest('updated_at')
                 ->take(80)
                 ->get(),
@@ -66,7 +74,7 @@ class MaterialsController extends Controller
             'status' => ['nullable', 'in:active,inactive'],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
         $materialService->createVendor($project, $validated, $actor, $request);
 
         return back()->with('success', 'Vendor saved successfully.');
@@ -74,6 +82,8 @@ class MaterialsController extends Controller
 
     public function storeMaterial(Request $request, ConstructionMaterialService $materialService): RedirectResponse
     {
+        $actor = $this->constructionActor();
+
         $validated = $request->validate([
             'project_id' => ['required', 'exists:construction_projects,id'],
             'material_code' => ['nullable', 'string', 'max:30'],
@@ -83,7 +93,7 @@ class MaterialsController extends Controller
             'status' => ['nullable', 'in:active,inactive'],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
         $materialService->createMaterial($project, $validated);
 
         return back()->with('success', 'Material saved successfully.');
@@ -106,7 +116,7 @@ class MaterialsController extends Controller
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
         $materialService->createPurchaseRequest($project, $validated, $actor);
 
         return back()->with('success', 'Purchase request saved successfully.');
@@ -115,6 +125,7 @@ class MaterialsController extends Controller
     public function reviewPurchaseRequest(PurchaseRequest $purchaseRequest, Request $request, ConstructionMaterialService $materialService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $purchaseRequest->project_id, $actor);
 
         $validated = $request->validate([
             'status' => ['required', 'in:approved,rejected,revision_requested'],
@@ -146,7 +157,7 @@ class MaterialsController extends Controller
             'items.*.tax_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
         $materialService->createPurchaseOrder($project, $validated, $actor);
 
         return back()->with('success', 'Purchase order saved successfully.');
@@ -172,7 +183,7 @@ class MaterialsController extends Controller
             'items.*.rate' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
         $materialService->receiveMaterials($project, $validated, $actor);
 
         return back()->with('success', 'Material receipt saved successfully.');
@@ -197,7 +208,7 @@ class MaterialsController extends Controller
             'items.*.remarks' => ['nullable', 'string'],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
         $materialService->issueMaterials($project, $validated, $actor);
 
         return back()->with('success', 'Material issue saved successfully.');

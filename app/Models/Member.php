@@ -122,6 +122,19 @@ class Member extends Authenticatable
         $this->attributes['roles'] = json_encode($cleanRoles);
     }
 
+    protected function hasRoleAssignmentHistory(): bool
+    {
+        if (!$this->exists || !$this->id) {
+            return false;
+        }
+
+        try {
+            return \App\Models\MemberRoleAssignment::where('member_id', $this->id)->exists();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function getRolesAttribute($value): array
     {
         $raw = is_array($value) ? $value : (json_decode($value ?? '', true) ?: []);
@@ -137,7 +150,8 @@ class Member extends Authenticatable
                 foreach ($assignments as $assignment) {
                     if ($assignment->role && !empty($assignment->role->slug)) {
                         $slug = strtolower(trim($assignment->role->slug));
-                        $roleId = match ($slug) {
+                        $dbRoleId = \App\Models\Role::where('slug', $slug)->value('id');
+                        $roleId = $dbRoleId ?: match ($slug) {
                             'super_admin', 'superadmin' => 2,
                             'member' => 1,
                             'admin' => 9,
@@ -147,7 +161,7 @@ class Member extends Authenticatable
                             'draft_person', 'draftsman', 'draft man' => 5,
                             'review_approver' => 7,
                             'site_employee' => 8,
-                            default => \App\Models\Role::where('slug', $slug)->value('id'),
+                            default => null,
                         };
                         if ($roleId) {
                             $assignmentRoleIds[] = (int) $roleId;
@@ -159,8 +173,10 @@ class Member extends Authenticatable
             }
         }
 
-        // Fallback: If roles is only [1] and member has Driver in designation, resolve Driver role (6)
-        if (empty($assignmentRoleIds) && !empty($this->designation)) {
+        // Fallback: Only resolve role from designation for legacy members with no role assignment history
+        $hasRoleAssignmentHistory = $this->hasRoleAssignmentHistory();
+
+        if (empty($assignmentRoleIds) && !$hasRoleAssignmentHistory && !empty($this->designation)) {
             $desigs = is_array($this->designation) ? $this->designation : [$this->designation];
             foreach ($desigs as $d) {
                 if (is_string($d) && str_contains(strtolower($d), 'driver')) {
@@ -217,8 +233,7 @@ class Member extends Authenticatable
                 }
                 if (is_numeric($r)) {
                     try {
-                        $rName = \App\Models\ConstructionRole::where('id', $r)->value('name')
-                            ?? \App\Models\Role::where('id', $r)->value('name');
+                        $rName = \App\Models\Role::where('id', $r)->value('name');
                         if ($rName && str_contains(strtolower($rName), 'driver')) {
                             return true;
                         }
@@ -228,7 +243,7 @@ class Member extends Authenticatable
             }
         }
 
-        if (!empty($this->designation)) {
+        if (!$this->hasRoleAssignmentHistory() && !empty($this->designation)) {
             if (is_array($this->designation)) {
                 foreach ($this->designation as $d) {
                     if (is_string($d) && str_contains(strtolower($d), 'driver')) {

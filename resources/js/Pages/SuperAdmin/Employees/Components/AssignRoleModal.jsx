@@ -15,6 +15,7 @@ export default function AssignRoleModal({
     const [profilePhoto, setProfilePhoto] = useState(null);
     const [profilePreview, setProfilePreview] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errors, setErrors] = useState({});
     const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
     const fileInputRef = useRef(null);
 
@@ -30,12 +31,15 @@ export default function AssignRoleModal({
 
     useEffect(() => {
         if (employee) {
-            const currentRoles = member.assigned_roles || [];
+            const currentRoles = (member.assigned_roles || []).filter(
+                (role) => String(role).toLowerCase() !== "member"
+            );
             setSelectedRoles(currentRoles);
             setProfilePreview(member.profile_photo_url || null);
             setProfilePhoto(null);
+            setErrors({});
         }
-    }, [employee]);
+    }, [employee, isOpen]);
 
     const handleRoleToggle = (slug) => {
         setSelectedRoles((prev) => {
@@ -84,16 +88,26 @@ export default function AssignRoleModal({
 
         router.post(route("super.employees.assign_role", employee.uuid), formData, {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
+                const flashError = page?.props?.flash?.error;
+                const envelopes = page?.props?.messages?.envelopes || [];
+                const hasErrorEnvelope = envelopes.some((env) => env?.type === "error");
                 setIsSubmitting(false);
+                if (flashError || hasErrorEnvelope) {
+                    return;
+                }
+                setErrors({});
                 if (onSuccess) onSuccess();
                 onClose();
             },
-            onError: () => {
+            onError: (err) => {
+                setErrors(err || {});
                 setIsSubmitting(false);
             },
         });
     };
+
+    const errorMessages = Object.values(errors || {}).filter(Boolean);
 
     return (
         <>
@@ -109,6 +123,14 @@ export default function AssignRoleModal({
                             </p>
                         )}
                     </div>
+
+                    {errorMessages.length > 0 && (
+                        <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+                            {errorMessages.map((msg, idx) => (
+                                <p key={idx}>{msg}</p>
+                            ))}
+                        </div>
+                    )}
 
                     <form onSubmit={handleSubmit}>
                         {/* Profile Photo */}

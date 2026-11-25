@@ -31,7 +31,7 @@ class EnsureConstructionPermission
         // Any Super Admin actor accessing super admin/admin routes has full permission access
         if ($actor instanceof \App\Models\SuperAdmin) {
             $activeRoleSlug = session('active_role') ?? $request->query('role');
-            $isRestricted = $activeRoleSlug && !in_array(strtolower(trim($activeRoleSlug)), ['super_admin', 'superadmin', 'crm_super_admin', 'admin', 'project_admin'], true);
+            $isRestricted = $activeRoleSlug && !in_array(strtolower(trim($activeRoleSlug)), ['super_admin', 'superadmin', 'crm_super_admin', 'project_owner', 'admin', 'project_admin'], true);
             if (!$isRestricted) {
                 return $next($request);
             }

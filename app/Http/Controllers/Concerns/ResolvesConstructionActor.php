@@ -2,8 +2,16 @@
 
 namespace App\Http\Controllers\Concerns;
 
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\Member;
+use App\Models\Project;
+use App\Models\SuperAdmin;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 trait ResolvesConstructionActor
 {
@@ -15,7 +23,7 @@ trait ResolvesConstructionActor
             }
         }
 
-        return Auth::user();
+        return Auth::user() ?: request()?->user();
     }
 
     /**
@@ -125,6 +133,286 @@ trait ResolvesConstructionActor
         return false;
     }
 
+    protected function getOtherSuperAdminCompanyIds(SuperAdmin $actor): Collection
+    {
+        $otherCompanyIds = SuperAdmin::where('id', '!=', $actor->id)
+            ->whereNotNull('company_id')
+            ->pluck('company_id')
+            ->map(fn ($id) => (int) $id);
+
+        $createdByOtherSuperAdminIds = Company::whereIn('created_by_type', [SuperAdmin::class, 'super_admin'])
+            ->whereNotNull('created_by_id')
+            ->where('created_by_id', '!=', $actor->id)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id);
+
+        $otherSuperAdminIds = SuperAdmin::where('id', '!=', $actor->id)->pluck('id');
+        $otherDirectMemberIds = $otherSuperAdminIds->isNotEmpty()
+            ? Member::whereIn('created_by', $otherSuperAdminIds)->pluck('id')
+            : collect();
+
+        $createdByOtherMemberCompanyIds = $otherDirectMemberIds->isNotEmpty()
+            ? Company::whereIn('created_by_type', [Member::class, 'member'])
+                ->whereIn('created_by_id', $otherDirectMemberIds)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+            : collect();
+
+        $ownAssignedCompanyId = !empty($actor->company_id) ? (int) $actor->company_id : null;
+
+        return $otherCompanyIds
+            ->merge($createdByOtherSuperAdminIds)
+            ->merge($createdByOtherMemberCompanyIds)
+            ->unique()
+            ->reject(fn (int $id) => $ownAssignedCompanyId !== null && $id === $ownAssignedCompanyId)
+            ->values();
+    }
+
+    protected function getOwnedCompanyIds(?Model $actor = null): Collection
+    {
+        $actor = $actor ?? $this->constructionActor();
+
+        if (!$actor) {
+            return collect();
+        }
+
+        if ($actor instanceof SuperAdmin) {
+            $excludedCompanyIds = $this->getOtherSuperAdminCompanyIds($actor);
+            $companyIds = collect();
+
+            if (!empty($actor->company_id)) {
+                $companyIds->push((int) $actor->company_id);
+            }
+
+            $directCompanyIds = Company::whereIn('created_by_type', [SuperAdmin::class, 'super_admin'])
+                ->where('created_by_id', $actor->id)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id);
+
+            $directMemberIds = Member::where('created_by', $actor->id)->pluck('id');
+            $memberCompanyIds = $directMemberIds->isNotEmpty()
+                ? Company::whereIn('created_by_type', [Member::class, 'member'])
+                    ->whereIn('created_by_id', $directMemberIds)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                : collect();
+
+            $ownAssignedCompanyId = !empty($actor->company_id) ? (int) $actor->company_id : null;
+
+            return $companyIds
+                ->merge($directCompanyIds)
+                ->merge($memberCompanyIds)
+                ->unique()
+                ->reject(fn (int $id) => $excludedCompanyIds->contains($id) && $id !== $ownAssignedCompanyId)
+                ->values();
+        }
+
+        if ($actor instanceof Member) {
+            if ($this->isCompanyAdminActor($actor)) {
+                $companyId = $this->getAccessibleCompanyId($actor);
+                return $companyId ? collect([(int) $companyId]) : collect();
+            }
+
+            return Project::whereIn('id', $this->getAccessibleProjectIds($actor))
+                ->whereNotNull('company_id')
+                ->pluck('company_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+        }
+
+        return collect();
+    }
+
+    protected function getOwnedMemberIds(?Model $actor = null, ?Collection $ownCompanyIds = null): Collection
+    {
+        $actor = $actor ?? $this->constructionActor();
+
+        if (!$actor) {
+            return collect();
+        }
+
+        if ($actor instanceof SuperAdmin) {
+            $ownCompanyIds = $ownCompanyIds ?? $this->getOwnedCompanyIds($actor);
+            $coOwnerSuperAdminIds = collect([(int) $actor->id]);
+
+            if ($ownCompanyIds->isNotEmpty()) {
+                $coOwnerSuperAdminIds = $coOwnerSuperAdminIds
+                    ->merge(SuperAdmin::whereIn('company_id', $ownCompanyIds)->pluck('id')->map(fn ($id) => (int) $id))
+                    ->unique()
+                    ->values();
+            }
+
+            $companyNames = $ownCompanyIds->isNotEmpty()
+                ? Company::whereIn('id', $ownCompanyIds)->pluck('name')->filter()->unique()->values()
+                : collect();
+
+            $hasMemberCompanyId = Schema::hasColumn('members', 'company_id');
+
+            $memberQuery = Member::query()->where(function ($q) use ($coOwnerSuperAdminIds, $ownCompanyIds, $companyNames, $hasMemberCompanyId) {
+                $q->whereIn('created_by', $coOwnerSuperAdminIds);
+
+                if ($hasMemberCompanyId && $ownCompanyIds->isNotEmpty()) {
+                    $q->orWhereIn('company_id', $ownCompanyIds);
+                }
+
+                if ($companyNames->isNotEmpty()) {
+                    $q->orWhere(function ($cq) use ($companyNames, $coOwnerSuperAdminIds) {
+                        $cq->whereIn('company_name', $companyNames)
+                           ->where(function ($sub) use ($coOwnerSuperAdminIds) {
+                               $sub->whereNull('created_by')
+                                   ->orWhereIn('created_by', $coOwnerSuperAdminIds);
+                           });
+                    });
+                }
+            });
+
+            return $memberQuery->pluck('id')->map(fn ($id) => (int) $id)->unique()->values();
+        }
+
+        if ($actor instanceof Member) {
+            if ($this->isCompanyAdminActor($actor)) {
+                $companyId = $this->getAccessibleCompanyId($actor);
+                $creatorSuperAdminIds = $companyId
+                    ? SuperAdmin::where('company_id', $companyId)->pluck('id')->all()
+                    : ($actor->created_by ? [(int) $actor->created_by] : []);
+                $companyName = $companyId ? Company::where('id', $companyId)->value('name') : $actor->company_name;
+
+                return Member::query()
+                    ->where(function ($q) use ($actor, $creatorSuperAdminIds, $companyName) {
+                        $q->where('id', $actor->getKey())
+                          ->orWhere('created_by', $actor->getKey());
+                        if (!empty($creatorSuperAdminIds)) {
+                            $q->orWhereIn('created_by', $creatorSuperAdminIds);
+                        }
+                        if (!empty($companyName)) {
+                            $q->orWhere('company_name', $companyName);
+                        }
+                    })
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values();
+            }
+
+            return \App\Models\ProjectTeamMember::whereIn('project_id', $this->getAccessibleProjectIds($actor))
+                ->pluck('member_id')
+                ->push($actor->getKey())
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+        }
+
+        return collect();
+    }
+
+    protected function getAccessibleClientIds(?Model $actor = null): Collection
+    {
+        $actor = $actor ?? $this->constructionActor();
+
+        if (!$actor) {
+            return collect();
+        }
+
+        if ($actor instanceof SuperAdmin) {
+            $ownCompanyIds = $this->getOwnedCompanyIds($actor);
+            $excludedCompanyIds = $this->getOtherSuperAdminCompanyIds($actor);
+            $ownMemberIds = $this->getOwnedMemberIds($actor, $ownCompanyIds);
+            $coOwnerSuperAdminIds = $ownCompanyIds->isNotEmpty()
+                ? SuperAdmin::whereIn('company_id', $ownCompanyIds)->pluck('id')->push($actor->id)->map(fn ($id) => (int) $id)->unique()->values()
+                : collect([(int) $actor->id]);
+
+            $query = Client::query();
+
+            if ($excludedCompanyIds->isNotEmpty()) {
+                $query->where(function ($q) use ($excludedCompanyIds) {
+                    $q->whereNull('company_id')
+                      ->orWhereNotIn('company_id', $excludedCompanyIds);
+                });
+            }
+
+            $allowLegacyUnowned = empty($actor->company_id);
+
+            $query->where(function ($q) use ($ownCompanyIds, $coOwnerSuperAdminIds, $ownMemberIds, $allowLegacyUnowned) {
+                if ($ownCompanyIds->isNotEmpty()) {
+                    $q->orWhereIn('company_id', $ownCompanyIds);
+                }
+                $q->orWhere(function ($sq) use ($coOwnerSuperAdminIds) {
+                    $sq->whereIn('created_by_type', [SuperAdmin::class, 'super_admin'])
+                       ->whereIn('created_by_id', $coOwnerSuperAdminIds);
+                });
+                if ($ownMemberIds->isNotEmpty()) {
+                    $q->orWhere(function ($mq) use ($ownMemberIds) {
+                        $mq->whereIn('created_by_type', [Member::class, 'member'])
+                           ->whereIn('created_by_id', $ownMemberIds);
+                    });
+                }
+                if ($allowLegacyUnowned) {
+                    $q->orWhere(function ($lq) {
+                        $lq->whereNull('created_by_id')
+                           ->where(function ($cq) {
+                               $cq->whereNull('company_id')
+                                  ->orWhereHas('company', fn ($cSub) => $cSub->whereNull('created_by_id'));
+                           });
+                    });
+                }
+            });
+
+            return $query->pluck('id')->map(fn ($id) => (int) $id)->values();
+        }
+
+        if ($actor instanceof Member) {
+            if ($this->isCompanyAdminActor($actor)) {
+                $companyId = $this->getAccessibleCompanyId($actor);
+                $query = Client::query();
+                if ($companyId) {
+                    $query->where('company_id', $companyId);
+                } else {
+                    $query->where('created_by_type', $actor::class)
+                          ->where('created_by_id', $actor->getKey());
+                }
+                return $query->pluck('id')->map(fn ($id) => (int) $id)->values();
+            }
+
+            return Project::whereIn('id', $this->getAccessibleProjectIds($actor))
+                ->whereNotNull('client_id')
+                ->pluck('client_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+        }
+
+        return collect();
+    }
+
+    protected function ensureProjectAccess(int|Project $project, ?Model $actor = null): Project
+    {
+        $actor = $actor ?? $this->constructionActor();
+        $projectModel = $project instanceof Project ? $project : Project::findOrFail($project);
+
+        abort_unless(
+            $this->getAccessibleProjectIds($actor)->contains((int) $projectModel->id),
+            403,
+            'Unauthorized. You do not have access to this project.'
+        );
+
+        return $projectModel;
+    }
+
+    protected function ensureCompanyAccess(int|Company $company, ?Model $actor = null): Company
+    {
+        $actor = $actor ?? $this->constructionActor();
+        $companyModel = $company instanceof Company ? $company : Company::findOrFail($company);
+
+        abort_unless(
+            $this->getOwnedCompanyIds($actor)->contains((int) $companyModel->id),
+            403,
+            'Unauthorized. You do not have access to this company.'
+        );
+
+        return $companyModel;
+    }
+
     protected function getAccessibleProjectIds(?Model $actor = null): \Illuminate\Support\Collection
     {
         $actor = $actor ?? $this->constructionActor();
@@ -133,28 +421,55 @@ trait ResolvesConstructionActor
             return collect();
         }
 
-        // 1. Platform Super Admin (SuperAdmin id == 1, is_project_owner == 1, or without company_id): always sees ALL projects
-        if ($this->isProjectOwner($actor)) {
-            return \App\Models\Project::pluck('id');
-        }
+        // 1. Any SuperAdmin (including Root Project Owner and company SuperAdmins): scoped strictly to their own account/companies
+        if ($actor instanceof SuperAdmin) {
+            $ownCompanyIds = $this->getOwnedCompanyIds($actor);
+            $excludedCompanyIds = $this->getOtherSuperAdminCompanyIds($actor);
+            $ownMemberIds = $this->getOwnedMemberIds($actor, $ownCompanyIds);
+            $coOwnerSuperAdminIds = !empty($actor->company_id) && $ownCompanyIds->isNotEmpty()
+                ? SuperAdmin::whereIn('company_id', $ownCompanyIds)->pluck('id')->push($actor->id)->map(fn ($id) => (int) $id)->unique()->values()
+                : collect([(int) $actor->id]);
 
-        // 2. Company Owner / Company SuperAdmin (SuperAdmin with company_id): always sees ALL projects of that company
-        if ($actor instanceof \App\Models\SuperAdmin) {
-            $companyId = $actor->company_id;
-            $query = \App\Models\Project::query();
-            if ($companyId) {
-                $query->where(function ($q) use ($companyId, $actor) {
-                    $q->where('company_id', $companyId)
-                      ->orWhere(function ($sq) use ($actor) {
-                          $sq->where('created_by_type', \App\Models\SuperAdmin::class)
-                             ->where('created_by_id', $actor->id);
-                      });
+            $query = Project::query();
+
+            if ($excludedCompanyIds->isNotEmpty()) {
+                $query->where(function ($q) use ($excludedCompanyIds) {
+                    $q->whereNull('company_id')
+                      ->orWhereNotIn('company_id', $excludedCompanyIds);
                 });
-            } else {
-                $query->where('created_by_type', \App\Models\SuperAdmin::class)
-                      ->where('created_by_id', $actor->id);
             }
-            return $query->pluck('id');
+
+            $allowLegacyUnowned = empty($actor->company_id);
+
+            $query->where(function ($q) use ($ownCompanyIds, $coOwnerSuperAdminIds, $ownMemberIds, $allowLegacyUnowned) {
+                if ($ownCompanyIds->isNotEmpty()) {
+                    $q->orWhereIn('company_id', $ownCompanyIds);
+                }
+
+                $q->orWhere(function ($sq) use ($coOwnerSuperAdminIds) {
+                    $sq->whereIn('created_by_type', [SuperAdmin::class, 'super_admin'])
+                       ->whereIn('created_by_id', $coOwnerSuperAdminIds);
+                });
+
+                if ($ownMemberIds->isNotEmpty()) {
+                    $q->orWhere(function ($mq) use ($ownMemberIds) {
+                        $mq->whereIn('created_by_type', [Member::class, 'member'])
+                           ->whereIn('created_by_id', $ownMemberIds);
+                    });
+                }
+
+                if ($allowLegacyUnowned) {
+                    $q->orWhere(function ($lq) {
+                        $lq->whereNull('created_by_id')
+                           ->where(function ($cq) {
+                               $cq->whereNull('company_id')
+                                  ->orWhereHas('company', fn ($cSub) => $cSub->whereNull('created_by_id'));
+                           });
+                    });
+                }
+            });
+
+            return $query->pluck('id')->map(fn ($id) => (int) $id)->values();
         }
 
         // 3. Company Admin (Admin guard or Member with Admin role): always sees ALL projects of that company

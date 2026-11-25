@@ -417,14 +417,16 @@ export default function AuthenticatedLayout({ header, children }) {
                                             )}
                                         </button>
 
-                                        {/* <div className="shrink-0 items-center hidden sm:flex">
-                                            <Link href={route("super.dashboard")}>
-                                                <ApplicationLogo
-                                                    props={settings}
-                                                    className="block w-auto h-8 fill-current"
-                                                />
-                                            </Link>
-                                        </div> */}
+                                        {!sidebarOpen && (
+                                            <div className="shrink-0 items-center hidden sm:flex">
+                                                <Link href={route("super.dashboard")}>
+                                                    <ApplicationLogo
+                                                        props={settings}
+                                                        className="block w-auto"
+                                                    />
+                                                </Link>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* MIDDLE SECTION: QuickPills */}

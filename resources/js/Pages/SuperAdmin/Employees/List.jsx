@@ -110,7 +110,8 @@ export default function List({ employees, departmentOptions, designationOptions,
     useEffect(() => {
         if (currentEmployee) {
             const member = currentEmployee.member || {};
-            const roles = member.assigned_roles || [];
+            const rawRoles = Array.isArray(member.assigned_roles) ? member.assigned_roles : [];
+            const roles = rawRoles.filter((role) => String(role).toLowerCase() !== "member");
             const hasDriverRole = roles.some((role) => ["driver", "vehicle driver", "vehicle_driver", "6"].includes(String(role).toLowerCase()));
             const memberDept = hasDriverRole
                 ? "Operations"
@@ -118,20 +119,23 @@ export default function List({ employees, departmentOptions, designationOptions,
             const memberDesig = hasDriverRole
                 ? "Driver"
                 : member.designation ? (Array.isArray(member.designation) ? member.designation[0] : member.designation) : "";
-            const employeeCompanyName = member.company?.name || member.company_name || "";
-            const employeeCompany = companies.find((company) => company.name === employeeCompanyName);
+            const employeeCompanyName = String(member.company?.name || member.company_name || "").trim().toLowerCase();
+            const employeeCompany = companies.find(
+                (company) => String(company.name || "").trim().toLowerCase() === employeeCompanyName
+            );
+            const normalizedDob = member.dob ? String(member.dob).slice(0, 10) : "";
             setFormData({
                 full_name: member.name || "",
                 email: member.email || "",
                 phone: member.phone || "",
                 password: "",
                 confirm_password: "",
-                role: member.role_slug || "member",
+                role: "member",
                 roles,
                 department: memberDept || "",
                 designation: memberDesig || "",
                 gender: member.gender || "",
-                dob: member.dob || "",
+                dob: normalizedDob,
                 status: member.status == 1 ? "active" : "inactive",
                 profile_photo: null,
                 alternate_number: currentEmployee.alternate_number || "",
@@ -248,15 +252,22 @@ export default function List({ employees, departmentOptions, designationOptions,
             : route("super.employees.store");
 
         router.post(endpoint, formDataObj, {
-            onSuccess: () => {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const flashError = page?.props?.flash?.error;
+                const envelopes = page?.props?.messages?.envelopes || [];
+                const hasErrorEnvelope = envelopes.some((env) => env?.type === "error");
+                setIsSubmitting(false);
+                if (flashError || hasErrorEnvelope) {
+                    return;
+                }
                 setErrors({});
                 setProfilePreview(null);
-                setIsSubmitting(false);
                 handleClose();
                 updateUrl(employees.current_page);
             },
             onError: (err) => {
-                setErrors(err);
+                setErrors(err || {});
                 setIsSubmitting(false);
             },
         });

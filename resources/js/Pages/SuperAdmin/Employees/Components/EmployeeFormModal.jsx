@@ -53,12 +53,46 @@ export default function EmployeeFormModal({
         ? (deptMap[formData.department] || designationOptions)
         : [];
 
+    const roleErrorMessages = Object.entries(errors || {})
+        .filter(([key]) => key === "roles" || key.startsWith("roles."))
+        .map(([, msg]) => msg)
+        .filter(Boolean);
+
+    const renderedFieldKeys = new Set([
+        "company_id",
+        "full_name",
+        "email",
+        "phone",
+        "password",
+        "confirm_password",
+        "gender",
+        "dob",
+        "department",
+        "designation",
+        "alternate_number",
+        "aadhaar_number",
+        "pan_number",
+        "roles",
+    ]);
+
+    const extraErrorMessages = Object.entries(errors || {})
+        .filter(([key, msg]) => !renderedFieldKeys.has(key) && !key.startsWith("roles.") && Boolean(msg))
+        .map(([, msg]) => msg);
+
     return (
         <Modal show={isOpen} onClose={onClose} maxWidth="4xl" topCloseButton={true} handleTopClose={onClose}>
             <div className="p-2 md:p-4 dark:bg-[#080626]">
                 <h2 className="text-xl font-bold mb-6 dark:text-white">
                     {currentEmployee ? "Edit Employee" : "Add Employee"}
                 </h2>
+
+                {extraErrorMessages.length > 0 && (
+                    <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+                        {extraErrorMessages.map((msg, idx) => (
+                            <p key={idx}>{msg}</p>
+                        ))}
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} encType="multipart/form-data">
                     {/* Profile Photo */}
@@ -348,7 +382,13 @@ export default function EmployeeFormModal({
                                     );
                                 })}
                             </div>
-                            {errors.roles && <p className="text-red-500 text-xs mt-1">{errors.roles}</p>}
+                            {roleErrorMessages.length > 0 && (
+                                <div className="mt-1 space-y-0.5">
+                                    {roleErrorMessages.map((msg, idx) => (
+                                        <p key={idx} className="text-red-500 text-xs">{msg}</p>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 

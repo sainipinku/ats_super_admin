@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\ResolvesConstructionActor;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Company;
@@ -26,6 +27,8 @@ use Illuminate\Validation\ValidationException;
  */
 class ProjectApiController extends Controller
 {
+    use ResolvesConstructionActor;
+
     public function __construct(
         protected readonly ConstructionAuthorizationService $authz,
         protected readonly ConstructionTeamAssignmentService $teamService,
@@ -56,6 +59,11 @@ class ProjectApiController extends Controller
         return null;
     }
 
+    private function apiActor(Request $request): ?\Illuminate\Database\Eloquent\Model
+    {
+        return $request->user() ?? $this->constructionActor();
+    }
+
     /**
      * List Projects (Paginated)
      *
@@ -63,7 +71,11 @@ class ProjectApiController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Project::with(['company', 'client', 'latestBudget']);
+        $actor = $this->apiActor($request);
+        $accessibleProjectIds = $this->getAccessibleProjectIds($actor);
+
+        $query = Project::with(['company', 'client', 'latestBudget'])
+            ->whereIn('id', $accessibleProjectIds);
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -114,8 +126,10 @@ class ProjectApiController extends Controller
      *
      * Retrieves full project details including client, company, budgets, team, surveys, vehicles, and equipment.
      */
-    public function show(Project $project)
+    public function show(Request $request, Project $project)
     {
+        $this->ensureProjectAccess($project, $this->apiActor($request));
+
         $project->load([
             'company',
             'client',
@@ -147,7 +161,7 @@ class ProjectApiController extends Controller
      */
     public function store(Request $request)
     {
-        $actor = $request->user();
+        $actor = $this->apiActor($request);
 
         $validated = $request->validate([
             'company_id' => ['required', 'exists:construction_companies,id'],
@@ -162,6 +176,21 @@ class ProjectApiController extends Controller
             'expected_end_date' => ['nullable', 'date'],
             'priority' => ['required', 'in:low,medium,high,critical'],
         ]);
+
+        if ($actor instanceof \App\Models\SuperAdmin) {
+            abort_if(
+                $this->getOtherSuperAdminCompanyIds($actor)->contains((int) $validated['company_id']),
+                403,
+                'Unauthorized. You cannot create projects for another company account.'
+            );
+        } elseif ($actor instanceof Member) {
+            $accessibleCompanyId = $this->getAccessibleCompanyId($actor);
+            abort_if(
+                $accessibleCompanyId && (int) $validated['company_id'] !== (int) $accessibleCompanyId,
+                403,
+                'Unauthorized. You cannot create projects for another company account.'
+            );
+        }
 
         if (array_key_exists('client_id', $validated) && empty($validated['client_id'])) {
             $validated['client_id'] = null;
@@ -191,6 +220,8 @@ class ProjectApiController extends Controller
      */
     public function update(Request $request, Project $project)
     {
+        $this->ensureProjectAccess($project, $this->apiActor($request));
+
         $validated = $request->validate([
             'company_id' => ['sometimes', 'exists:construction_companies,id'],
             'client_id' => ['sometimes', 'nullable', 'exists:construction_clients,id'],
@@ -221,8 +252,10 @@ class ProjectApiController extends Controller
      *
      * Deletes a project and its associated cascade records safely in a transaction.
      */
-    public function destroy(Project $project)
+    public function destroy(Request $request, Project $project)
     {
+        $this->ensureProjectAccess($project, $this->apiActor($request));
+
         try {
             DB::transaction(function () use ($project) {
                 $projectId = $project->id;
@@ -295,6 +328,8 @@ class ProjectApiController extends Controller
      */
     public function updateStatus(Request $request, Project $project)
     {
+        $this->ensureProjectAccess($project, $this->apiActor($request));
+
         $validated = $request->validate([
             'status' => ['required', 'in:draft,active,on_hold,completed,cancelled'],
             'current_stage' => ['sometimes', 'nullable', 'string'],
@@ -320,6 +355,7 @@ class ProjectApiController extends Controller
     public function storeBudget(Request $request, Project $project)
     {
         $actor = $request->user();
+        $this->ensureProjectAccess($project, $actor);
 
         $validated = $request->validate([
             'estimated_amount' => ['required', 'numeric', 'min:0'],
@@ -375,8 +411,10 @@ class ProjectApiController extends Controller
      *
      * Retrieves all historical budget versions submitted for the specified project.
      */
-    public function budgets(Project $project)
+    public function budgets(Request $request, Project $project)
     {
+        $this->ensureProjectAccess($project, $this->apiActor($request));
+
         $budgets = $project->budgets()->latest('version_no')->get();
 
         return response()->json([
@@ -393,6 +431,7 @@ class ProjectApiController extends Controller
     public function assignTeam(Request $request, Project $project): JsonResponse
     {
         $actor = $request->user();
+        $this->ensureProjectAccess($project, $actor);
 
         $denial = $this->denyUnlessCanManageTeam($project, $actor);
         if ($denial !== null) {
@@ -460,7 +499,7 @@ class ProjectApiController extends Controller
             'assignments.*.status' => ['nullable', 'in:active,inactive'],
         ]);
 
-        $project = Project::query()->findOrFail((int) $validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
 
         $denial = $this->denyUnlessCanManageTeam($project, $actor);
         if ($denial !== null) {
@@ -543,8 +582,10 @@ class ProjectApiController extends Controller
      *
      * Retrieves all assigned staff, roles, and schedules for the specified project.
      */
-    public function team(Project $project)
+    public function team(Request $request, Project $project)
     {
+        $this->ensureProjectAccess($project, $this->apiActor($request));
+
         $team = $project->teamMembers()->with(['member', 'role'])->get();
 
         return response()->json([
@@ -561,6 +602,7 @@ class ProjectApiController extends Controller
     public function removeTeamMember(Request $request, Project $project, $teamMemberId): JsonResponse
     {
         $actor = $request->user();
+        $this->ensureProjectAccess($project, $actor);
 
         $denial = $this->denyUnlessCanManageTeam($project, $actor);
         if ($denial !== null) {
@@ -601,26 +643,33 @@ class ProjectApiController extends Controller
      *
      * Returns total counts broken down by project stage, priority, and completion status.
      */
-    public function stats()
+    public function stats(Request $request)
     {
-        $total = Project::count();
-        $draft = Project::where('status', 'draft')->count();
-        $active = Project::where('status', 'active')->count();
-        $onHold = Project::where('status', 'on_hold')->count();
-        $completed = Project::where('status', 'completed')->count();
-        $cancelled = Project::where('status', 'cancelled')->count();
+        $actor = $this->apiActor($request);
+        $projectIds = $this->getAccessibleProjectIds($actor);
 
-        $byStage = Project::selectRaw('current_stage, COUNT(*) as count')
+        $baseQuery = Project::whereIn('id', $projectIds);
+
+        $total = (clone $baseQuery)->count();
+        $draft = (clone $baseQuery)->where('status', 'draft')->count();
+        $active = (clone $baseQuery)->where('status', 'active')->count();
+        $onHold = (clone $baseQuery)->where('status', 'on_hold')->count();
+        $completed = (clone $baseQuery)->where('status', 'completed')->count();
+        $cancelled = (clone $baseQuery)->where('status', 'cancelled')->count();
+
+        $byStage = (clone $baseQuery)->selectRaw('current_stage, COUNT(*) as count')
             ->groupBy('current_stage')
             ->pluck('count', 'current_stage')
             ->toArray();
 
-        $byPriority = Project::selectRaw('priority, COUNT(*) as count')
+        $byPriority = (clone $baseQuery)->selectRaw('priority, COUNT(*) as count')
             ->groupBy('priority')
             ->pluck('count', 'priority')
             ->toArray();
 
-        $totalBudget = ProjectBudget::where('status', 'approved')->sum('approved_amount') ?? 0;
+        $totalBudget = ProjectBudget::whereIn('project_id', $projectIds)
+            ->where('status', 'approved')
+            ->sum('approved_amount') ?? 0;
 
         return response()->json([
             'success' => true,

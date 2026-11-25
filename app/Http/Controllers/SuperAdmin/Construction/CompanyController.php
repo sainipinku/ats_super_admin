@@ -17,8 +17,11 @@ class CompanyController extends Controller
 
     public function index(): Response
     {
+        $actor = $this->constructionActor();
+        $companyIds = $this->getOwnedCompanyIds($actor);
+
         return Inertia::render('SuperAdmin/Construction/Companies/Index', [
-            'companies' => Company::latest()->get(),
+            'companies' => Company::whereIn('id', $companyIds)->latest()->get(),
         ]);
     }
 
@@ -64,6 +67,7 @@ class CompanyController extends Controller
     public function update(Request $request, Company $company, ConstructionActivityService $activityService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureCompanyAccess($company, $actor);
 
         if ($request->filled('phone')) {
             $request->merge(['phone' => substr(preg_replace('/\D/', '', (string) $request->input('phone')), 0, 10)]);

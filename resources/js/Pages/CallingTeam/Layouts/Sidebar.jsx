@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "@inertiajs/react";
+import SidebarBrandLogo from "@/Components/SidebarBrandLogo";
 
 const linkClass = (active) =>
     `flex items-center gap-[6px] px-[10px] py-[10px] text-[15px] rounded ${
@@ -15,41 +16,11 @@ export default function Sidebar({ isOpen, onClose }) {
                 isOpen ? "translate-x-0" : "-translate-x-full"
             }`}
         >
-            <div className="p-4 text-lg font-bold border-b border-gray-200 dark:border-b-[#5146e64a]">
-                <div className="block dark:hidden ">
-                    <img
-                        className="max-w-[120px]"
-                        src="/images/logo.png"
-                        alt="Logo"
-                    />
-                </div>
-                <div className="hidden dark:block ">
-                    <img
-                        className="max-w-[120px]"
-                        src="/images/logo-dark.png"
-                        alt="Logo"
-                    />
-                </div>
-
-                <button
-                    onClick={onClose}
-                    className="absolute right-[5px] top-[16px] flex xl:hidden items-center justify-center bg-white dark:bg-[#61CC681A] w-[48px] h-[38px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[8px] transition md:flex text-[#000] dark:text-[#fff] focus:outline-none"
-                >
-                    <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                        />
-                    </svg>
-                </button>
-            </div>
+            <SidebarBrandLogo
+                subtitle="Calling Team"
+                onClose={onClose}
+                closeButtonClassName="flex xl:hidden items-center justify-center bg-white dark:bg-[#61CC681A] w-[42px] h-[38px] border-[1px] border-[#0000001A] dark:border-[#61CC681A] rounded-[8px] transition md:flex text-[#000] dark:text-[#fff] focus:outline-none shrink-0"
+            />
 
             <ul className="px-[5px] py-[8px]">
                 <li className="border-b-[1px] border-b-gray-200 dark:border-b-[#5146e64a]">

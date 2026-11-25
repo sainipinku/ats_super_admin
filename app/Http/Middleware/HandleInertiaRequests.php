@@ -128,7 +128,7 @@ class HandleInertiaRequests extends Middleware
         $constructionPermissions = $constructionAuthorization->permissionsFor($user);
         $genericPermissions = [];
 
-        $isRestrictedRole = $activeRole && !in_array($activeRole['slug'] ?? '', ['super_admin', 'superadmin', 'admin', 'project_admin']);
+        $isRestrictedRole = $activeRole && !in_array($activeRole['slug'] ?? '', ['super_admin', 'superadmin', 'crm_super_admin', 'project_owner', 'admin', 'project_admin']);
         if (!$isRestrictedRole && $user && method_exists($user, 'getAllPermissions')) {
             $genericPermissions = $user->getAllPermissions()->pluck('name')->all();
         }

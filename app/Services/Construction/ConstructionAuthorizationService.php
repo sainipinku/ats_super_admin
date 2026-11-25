@@ -54,7 +54,7 @@ class ConstructionAuthorizationService
 
         if ($actor instanceof SuperAdmin) {
             $activeRoleSlug = session('active_role') ?? request()?->query('role');
-            if ($activeRoleSlug && !in_array($activeRoleSlug, ['super_admin', 'superadmin'])) {
+            if ($activeRoleSlug && !in_array($activeRoleSlug, ['super_admin', 'superadmin', 'crm_super_admin', 'project_owner'])) {
                 return false;
             }
 
@@ -96,7 +96,7 @@ class ConstructionAuthorizationService
         // 2. Direct project owner check on actor model
         if ($actor instanceof SuperAdmin) {
             $activeRoleSlug = session('active_role') ?? request()?->query('role');
-            if ($activeRoleSlug && !in_array($activeRoleSlug, ['super_admin', 'superadmin'])) {
+            if ($activeRoleSlug && !in_array($activeRoleSlug, ['super_admin', 'superadmin', 'crm_super_admin', 'project_owner'])) {
                 return false;
             }
 

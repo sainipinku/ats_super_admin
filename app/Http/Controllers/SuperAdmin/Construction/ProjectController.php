@@ -174,9 +174,20 @@ class ProjectController extends Controller
         });
 
         $userCompanyId = $this->getAccessibleCompanyId($actor);
+        $ownedCompanyIds = $this->getOwnedCompanyIds($actor);
 
-        $companies = Company::orderBy('name')->get(['id', 'name']);
-        $clientsQuery = Client::orderBy('name');
+        $companiesQuery = Company::orderBy('name');
+        if ($actor instanceof SuperAdmin) {
+            $companiesQuery->whereIn('id', $ownedCompanyIds);
+        } elseif ($userCompanyId) {
+            $companiesQuery->where('id', $userCompanyId);
+        } else {
+            $companiesQuery->whereIn('id', $ownedCompanyIds);
+        }
+        $companies = $companiesQuery->get(['id', 'name']);
+
+        $clientIds = $this->getAccessibleClientIds($actor);
+        $clientsQuery = Client::whereIn('id', $clientIds)->orderBy('name');
         if ($userCompanyId) {
             $clientsQuery->where('company_id', $userCompanyId);
         }
@@ -510,6 +521,12 @@ class ProjectController extends Controller
 
         if ($userCompanyId) {
             $request->merge(['company_id' => $userCompanyId]);
+        } elseif ($actor instanceof SuperAdmin && $request->filled('company_id')) {
+            abort_if(
+                $this->getOtherSuperAdminCompanyIds($actor)->contains((int) $request->input('company_id')),
+                403,
+                'Unauthorized. You cannot create projects for another company account.'
+            );
         }
 
         $validated = $request->validate([
@@ -673,18 +690,19 @@ class ProjectController extends Controller
         // Company admins are strictly prohibited from updating projects
         abort_if(!$isGlobalSuperAdmin && !$isCompanySuperAdmin, 403, 'Company admins are not permitted to edit projects.');
 
-        // Company super admins can only update their own company's projects
-        if ($isCompanySuperAdmin) {
-            $actorCompanyId = (int) $actor->company_id;
-            if ($project->company_id && (int) $project->company_id !== $actorCompanyId) {
-                abort(403, 'Unauthorized. You can only edit projects belonging to your company.');
-            }
-        }
+        // SuperAdmins (including Project Owner) can only update projects accessible to their own account/company
+        $this->ensureProjectAccess($project, $actor);
 
         $userCompanyId = $this->getAccessibleCompanyId($actor);
 
         if ($userCompanyId && !$isProjectOwner) {
             $request->merge(['company_id' => $userCompanyId]);
+        } elseif ($actor instanceof SuperAdmin && $request->filled('company_id')) {
+            abort_if(
+                $this->getOtherSuperAdminCompanyIds($actor)->contains((int) $request->input('company_id')),
+                403,
+                'Unauthorized. You cannot assign a project to another company account.'
+            );
         }
 
         $validated = $request->validate([
@@ -821,13 +839,7 @@ class ProjectController extends Controller
         ConstructionActivityService $activityService
     ) {
         $actor = $this->constructionActor();
-        $isProjectOwner = $this->isProjectOwner($actor);
-        $isGlobalSuperAdmin = ($actor instanceof SuperAdmin && empty($actor->company_id)) || $isProjectOwner;
-        $actorCompanyId = $this->getAccessibleCompanyId($actor);
-
-        if (! $isGlobalSuperAdmin && $actorCompanyId && $project->company_id && (int) $project->company_id !== (int) $actorCompanyId) {
-            abort(403, 'Unauthorized. You can only edit scope of work for projects belonging to your company.');
-        }
+        $this->ensureProjectAccess($project, $actor);
 
         $validated = $request->validate([
             'scope_of_work' => ['nullable', 'string', 'max:5000'],

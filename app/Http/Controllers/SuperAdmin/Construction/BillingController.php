@@ -19,12 +19,18 @@ class BillingController extends Controller
 
     public function index(ConstructionBillingService $billingService): Response
     {
+        $actor = $this->constructionActor();
+        $projectIds = $this->getAccessibleProjectIds($actor);
+
         $projects = Project::with([
             'client:id,client_code,name,company_id,contact_person,email,phone,alternate_phone,gst_number,billing_address,site_address',
             'company:id,name',
             'draftingJobs:id,project_id,khasra_number,site_area',
             'clientInvoices' => fn ($q) => $q->latest(),
-        ])->orderByDesc('id')->get();
+        ])
+            ->whereIn('id', $projectIds)
+            ->orderByDesc('id')
+            ->get();
 
         $projectsDirectory = $billingService->getProjectsBillingDirectory($projects);
 
@@ -32,10 +38,12 @@ class BillingController extends Controller
             'projects' => $projectsDirectory,
             'raw_projects' => $projects->map(fn ($p) => ['id' => $p->id, 'project_code' => $p->project_code, 'name' => $p->name])->all(),
             'invoices' => ClientInvoice::with(['project', 'items', 'payments'])
+                ->whereIn('project_id', $projectIds)
                 ->latest()
                 ->take(60)
                 ->get(),
             'payments' => ClientPayment::with(['project', 'invoice'])
+                ->whereIn('project_id', $projectIds)
                 ->latest()
                 ->take(80)
                 ->get(),
@@ -44,6 +52,8 @@ class BillingController extends Controller
 
     public function exportCsv(Request $request, ConstructionBillingService $billingService): \Symfony\Component\HttpFoundation\StreamedResponse
     {
+        $actor = $this->constructionActor();
+        $projectIds = $this->getAccessibleProjectIds($actor);
         $startDate = $request->input('start_date') ?: $request->input('from_date');
         $endDate = $request->input('end_date') ?: $request->input('to_date');
 
@@ -52,7 +62,9 @@ class BillingController extends Controller
             'company:id,name',
             'draftingJobs:id,project_id,khasra_number,site_area',
             'clientInvoices' => fn ($q) => $q->latest(),
-        ])->orderByDesc('id');
+        ])
+            ->whereIn('id', $projectIds)
+            ->orderByDesc('id');
 
         if ($startDate && $endDate) {
             $query->where(function ($q) use ($startDate, $endDate) {
@@ -133,7 +145,7 @@ class BillingController extends Controller
             'items.*.gst_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
         $billingService->createInvoice($project, $validated, $actor, $request);
 
         return back()->with('success', 'Invoice saved successfully.');
@@ -142,6 +154,7 @@ class BillingController extends Controller
     public function updateInvoice(ClientInvoice $invoice, Request $request, ConstructionBillingService $billingService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $invoice->project_id, $actor);
 
         $validated = $request->validate([
             'invoice_date' => ['required', 'date'],
@@ -176,7 +189,18 @@ class BillingController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
+
+        if (!empty($validated['invoice_id'])) {
+            abort_unless(
+                ClientInvoice::where('id', (int) $validated['invoice_id'])
+                    ->where('project_id', $project->id)
+                    ->exists(),
+                403,
+                'Unauthorized. Invoice does not belong to this project.'
+            );
+        }
+
         $billingService->recordPayment($project, $validated, $actor, $request);
 
         return back()->with('success', 'Payment recorded successfully.');
