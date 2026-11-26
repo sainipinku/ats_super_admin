@@ -22466,7 +22466,7 @@
         "/pages/privacy-policy": {
             "get": {
                 "operationId": "memberDashboard.privacyPolicy",
-                "description": "Retrieves current terms and privacy policy HTML and plain text for mobile and web views.",
+                "description": "Publicly retrieves current terms and privacy policy HTML and plain text for mobile and web views.",
                 "summary": "Get Privacy Policy",
                 "tags": [
                     "System & Legal Policies"
@@ -22525,9 +22525,6 @@
                                 }
                             }
                         }
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/AuthenticationException"
                     }
                 }
             },
@@ -22617,7 +22614,7 @@
         "/pages/terms-and-conditions": {
             "get": {
                 "operationId": "memberDashboard.termsAndConditions",
-                "description": "Retrieves terms and conditions content.",
+                "description": "Publicly retrieves terms and conditions content.",
                 "summary": "Get Terms & Conditions",
                 "tags": [
                     "System & Legal Policies"
@@ -22676,9 +22673,6 @@
                                 }
                             }
                         }
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/AuthenticationException"
                     }
                 }
             },

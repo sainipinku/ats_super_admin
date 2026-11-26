@@ -54,6 +54,9 @@ Route::get('/signed/documents/{document}/view', [
     ->middleware('signed')
     ->name('api.signed_documents.view');
 
+Route::get('/pages/privacy-policy', [MemberDashboardController::class, 'privacyPolicy']);
+Route::get('/pages/terms-and-conditions', [MemberDashboardController::class, 'termsAndConditions']);
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
 
@@ -181,10 +184,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/account/delete', [MemberDashboardController::class, 'deleteAccount']);
     });
 
-    Route::get('/pages/privacy-policy', [MemberDashboardController::class, 'privacyPolicy']);
     Route::post('/pages/privacy-policy', [MemberDashboardController::class, 'storePrivacyPolicy']);
 
-    Route::get('/pages/terms-and-conditions', [MemberDashboardController::class, 'termsAndConditions']);
     Route::post('/pages/terms-and-conditions', [MemberDashboardController::class, 'storeTermsAndConditions']);
 
     Route::prefix('admin')->name('admin.')->group(function () {
