@@ -203,13 +203,13 @@ class ProfileController extends Controller
     {
         $member = $request->user();
 
-        $this->validateFileUpload($request, 'photo', 4096);
+        $this->validateFileUpload($request, 'photo', 10240);
 
         $validated = $request->validate([
-            'photo' => ['required', 'file', 'mimes:jpeg,png,jpg,webp', 'max:4096'],
+            'photo' => ['required', 'file', 'mimes:jpeg,png,jpg,webp', 'max:10240'],
         ], [
-            'photo.uploaded' => 'The photo failed to upload. The file size may exceed the server upload limit (maximum 4MB).',
-            'photo.max' => 'The photo size must not exceed 4MB.',
+            'photo.uploaded' => 'The photo failed to upload. The file size may exceed the server upload limit (maximum 10MB).',
+            'photo.max' => 'The photo size must not exceed 10MB.',
             'photo.mimes' => 'The photo must be a valid JPG, JPEG, PNG, or WEBP file.',
         ]);
 
