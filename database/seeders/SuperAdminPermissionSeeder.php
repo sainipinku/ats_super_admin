@@ -21,9 +21,6 @@ class SuperAdminPermissionSeeder extends Seeder
             // Overview Module
             ['name' => 'View ERP Dashboard', 'slug' => 'dashboard.view', 'module' => 'Overview', 'description' => 'View ERP Dashboard analytics and summary widgets'],
             ['name' => 'Export ERP Analytics', 'slug' => 'dashboard.export', 'module' => 'Overview', 'description' => 'Export dashboard metrics and system reports'],
-            ['name' => 'View Permission Requests', 'slug' => 'approval_request.view', 'module' => 'Overview', 'description' => 'View pending role and permission requests'],
-            ['name' => 'Approve Permission Request', 'slug' => 'approval_request.approve', 'module' => 'Overview', 'description' => 'Approve user requested permissions'],
-            ['name' => 'Reject Permission Request', 'slug' => 'approval_request.reject', 'module' => 'Overview', 'description' => 'Reject user requested permissions'],
             ['name' => 'View Super Admins & Admins', 'slug' => 'super_admin.view', 'module' => 'Overview', 'description' => 'View Super Admin and Admin account listing'],
             ['name' => 'Create Admin Account', 'slug' => 'super_admin.create', 'module' => 'Overview', 'description' => 'Create new Super Admin or Admin account'],
             ['name' => 'Edit Admin Account', 'slug' => 'super_admin.edit', 'module' => 'Overview', 'description' => 'Edit Super Admin or Admin profile details'],
@@ -85,6 +82,7 @@ class SuperAdminPermissionSeeder extends Seeder
             ['name' => 'Edit Drawing Entry', 'slug' => 'drawing_approval.edit', 'module' => 'Project Lifecycle', 'description' => 'Edit drawing entry metadata'],
             ['name' => 'Delete Drawing Entry', 'slug' => 'drawing_approval.delete', 'module' => 'Project Lifecycle', 'description' => 'Delete drawing entry'],
             ['name' => 'Approve Drawing', 'slug' => 'drawing_approval.approve', 'module' => 'Project Lifecycle', 'description' => 'Approve CAD drawing'],
+            ['name' => 'Assign CAD Approval to Admin', 'slug' => 'drawing_approval.assign_admin', 'module' => 'Project Lifecycle', 'description' => 'Assign submitted CAD drawing approvals to an admin or super admin of the company'],
 
             ['name' => 'View Site Execution', 'slug' => 'execution.view', 'module' => 'Project Lifecycle', 'description' => 'View site execution workspace'],
             ['name' => 'Create Execution Task', 'slug' => 'execution.create', 'module' => 'Project Lifecycle', 'description' => 'Create site execution task'],
@@ -198,8 +196,10 @@ class SuperAdminPermissionSeeder extends Seeder
             ['name' => 'View Activity Logs', 'slug' => 'activity_log.view', 'module' => 'Finance & Closure', 'description' => 'View audit trail and activity logs'],
         ];
 
-        // Remove standalone company creation/management permissions
-        Permission::where('slug', 'like', 'company.%')->delete();
+        // Remove standalone company creation/management and deprecated approval request permissions
+        Permission::where('slug', 'like', 'company.%')
+            ->orWhere('slug', 'like', 'approval_request.%')
+            ->delete();
 
         foreach ($permissions as $permData) {
             Permission::updateOrCreate(['slug' => $permData['slug']], $permData);
@@ -257,7 +257,7 @@ class SuperAdminPermissionSeeder extends Seeder
             }
         }
 
-        // 4b. Also attach fuel, attendance, project, and dashboard permissions to all Admin & Project Admin roles
+        // 4b. Also attach fuel, attendance, project, dashboard, and CAD approval assignment permissions to all Admin & Project Admin roles
         $adminRoles = ConstructionRole::whereIn('slug', ['admin', 'project_admin'])->get();
         $adminPermIds = Permission::where(function ($q) {
             $q->where('slug', 'like', 'fuel_entry.%')
@@ -265,7 +265,12 @@ class SuperAdminPermissionSeeder extends Seeder
               ->orWhere('slug', 'like', 'project.%')
               ->orWhere('slug', 'like', 'vehicle.%')
               ->orWhere('slug', 'like', 'vehicle_tracking.%')
-              ->orWhere('slug', 'like', 'dashboard.%');
+              ->orWhere('slug', 'like', 'dashboard.%')
+              ->orWhereIn('slug', [
+                  'drawing_approval.assign_admin',
+                  'drawing_approval.view',
+                  'drawing_approval.approve',
+              ]);
         })->pluck('id')->toArray();
 
         foreach ($adminRoles as $aRole) {

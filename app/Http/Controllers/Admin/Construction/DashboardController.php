@@ -47,13 +47,13 @@ class DashboardController extends Controller
         $monthStart = $now->copy()->startOfMonth();
         $today = $now->copy()->toDateString();
 
-        // 1. Projects scoping
-        $projectsQuery = Project::query();
-        if ($effectiveCompanyId) {
+        $isAdminScope = $isProjectOwner || $this->isFullAdminActor($actor);
+        $accessibleBaseIds = $this->getAccessibleProjectIds($actor);
+
+        // 1. Projects scoping (always constrained by getAccessibleProjectIds for non-admin employees)
+        $projectsQuery = Project::whereIn('id', $accessibleBaseIds);
+        if ($effectiveCompanyId && $isAdminScope) {
             $projectsQuery->where('company_id', $effectiveCompanyId);
-        } elseif (!$isProjectOwner) {
-            $projectIds = $this->getAccessibleProjectIds($actor);
-            $projectsQuery->whereIn('id', $projectIds);
         }
         $accessibleProjectIds = $projectsQuery->pluck('id');
 
@@ -88,7 +88,7 @@ class DashboardController extends Controller
 
         // 2. Employees scoping
         $membersQuery = Member::query();
-        if ($effectiveCompanyId) {
+        if ($effectiveCompanyId && $isAdminScope) {
             $company = Company::find($effectiveCompanyId);
             $companySuperAdminIds = \App\Models\SuperAdmin::where('company_id', $effectiveCompanyId)->pluck('id')->toArray();
             $teamMemberIds = \App\Models\ProjectTeamMember::whereIn('project_id', $accessibleProjectIds)->pluck('member_id')->toArray();
@@ -126,7 +126,7 @@ class DashboardController extends Controller
 
         // 3. Vehicles scoping
         $vehiclesQuery = ConstructionVehicle::query();
-        if ($effectiveCompanyId) {
+        if ($effectiveCompanyId && $isAdminScope) {
             $companySuperAdminIds = \App\Models\SuperAdmin::where('company_id', $effectiveCompanyId)->pluck('id')->toArray();
             $vehiclesQuery->where(function ($q) use ($effectiveCompanyId, $accessibleProjectIds, $companySuperAdminIds) {
                 if ($accessibleProjectIds->isNotEmpty()) {
@@ -150,7 +150,7 @@ class DashboardController extends Controller
 
         // 4. Equipment scoping
         $equipmentQuery = ConstructionEquipment::query();
-        if ($effectiveCompanyId) {
+        if ($effectiveCompanyId && $isAdminScope) {
             $companySuperAdminIds = \App\Models\SuperAdmin::where('company_id', $effectiveCompanyId)->pluck('id')->toArray();
             $equipmentQuery->where(function ($q) use ($effectiveCompanyId, $accessibleProjectIds, $companySuperAdminIds) {
                 if ($accessibleProjectIds->isNotEmpty()) {
@@ -176,7 +176,7 @@ class DashboardController extends Controller
 
         // 5. Clients scoping
         $clientsQuery = Client::query();
-        if ($effectiveCompanyId) {
+        if ($effectiveCompanyId && $isAdminScope) {
             $clientsQuery->where('company_id', $effectiveCompanyId);
         } elseif (!$isProjectOwner) {
             $clientIds = Project::whereIn('id', $accessibleProjectIds)->whereNotNull('client_id')->pluck('client_id');
@@ -228,7 +228,7 @@ class DashboardController extends Controller
 
         // 10. Activity logs scoping
         $activityQuery = ConstructionActivityLog::with(['project'])->latest('created_at');
-        if ($effectiveCompanyId) {
+        if ($effectiveCompanyId && $isAdminScope) {
             $activityQuery->where(function ($q) use ($effectiveCompanyId, $accessibleProjectIds) {
                 $q->where('company_id', $effectiveCompanyId);
                 if ($accessibleProjectIds->isNotEmpty()) {

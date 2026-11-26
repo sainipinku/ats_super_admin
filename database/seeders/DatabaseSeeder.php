@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             MemberSeeder::class,
             AttendancePermissionSeeder::class,
             FuelPermissionSeeder::class,
+            DrawingApprovalAssignPermissionSeeder::class,
         ]);
     }
 }

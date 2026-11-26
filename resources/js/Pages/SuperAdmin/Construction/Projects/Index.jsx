@@ -1,4 +1,5 @@
 import { Link, useForm, router, usePage } from "@inertiajs/react";
+import PendingCadApprovalAlertBanner from "@/Pages/Construction/Components/PendingCadApprovalAlertBanner";
 import ConstructionShell from "@/Pages/Construction/Components/ConstructionShell";
 import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
@@ -445,6 +446,10 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
                 </div>
             </div>
 
+            <PendingCadApprovalAlertBanner
+                approvals={usePage().props?.pending_assigned_cad_approvals || []}
+                className="cad-action-blink-border"
+            />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-6">
                 <StatCard label="Total Projects" value={counts.total} hint="All-time registered" icon={FaProjectDiagram} color="indigo" />
                 <StatCard label="Running Projects" value={counts.running} hint="In any active stage" icon={FaPlayCircle} color="emerald" />
@@ -568,10 +573,26 @@ export default function ProjectsIndex({ projects, companies, clients, user_compa
                                     const clientReviewBadge = project.client_review_status
                                         ? project.client_review_status.replace(/_/g, " ")
                                         : null;
+                                    const pendingCadSet = new Set(
+                                        (usePage().props?.pending_assigned_cad_approvals || []).map((item) => Number(item.project_id))
+                                    );
+                                    const hasPendingCadAction = pendingCadSet.has(Number(project.id));
                                     return (
-                                        <tr key={project.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-colors align-top">
+                                        <tr
+                                            key={project.id}
+                                            className={`transition-colors align-top ${
+                                                hasPendingCadAction
+                                                    ? "cad-action-blink-border bg-rose-50/50 dark:bg-rose-950/25"
+                                                    : "hover:bg-slate-50/40 dark:hover:bg-slate-900/40"
+                                            }`}
+                                        >
                                             <td className="px-3 py-3 max-w-[220px] sm:max-w-none">
                                                 <div className="font-semibold text-slate-900 dark:text-white truncate">{project.name}</div>
+                                                {hasPendingCadAction && (
+                                                    <span className="mt-1 inline-flex items-center rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                                                        Action Needed: CAD Approval
+                                                    </span>
+                                                )}
                                                 <div className="text-[11px] text-slate-500 dark:text-slate-400">
                                                     {project.project_code || "—"} · {project.priority || "medium"} · {project.category || "Uncategorized"}
                                                 </div>

@@ -5,6 +5,7 @@ import SectionCard from "@/Pages/Construction/Components/SectionCard";
 import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
 import DeleteActionButton from "@/Components/DeleteActionButton";
+import PendingCadApprovalAlertBanner from "@/Pages/Construction/Components/PendingCadApprovalAlertBanner";
 import {
     FaProjectDiagram,
     FaPlayCircle,
@@ -51,6 +52,9 @@ const formatCurrency = (value) => {
 export default function Dashboard({ stats, recentProjects, recentActivity, companies = [], selected_company_id, is_project_owner }) {
     const { props } = usePage();
     const auth = props?.auth;
+    const pendingCadApprovals = Array.isArray(props?.pending_assigned_cad_approvals)
+        ? props.pending_assigned_cad_approvals
+        : [];
     const isImpersonating = Boolean(props?.is_impersonating || auth?.is_impersonating);
     const isSuperAdmin = !isImpersonating && (
         auth?.guard === "superadmin" ||
@@ -180,6 +184,10 @@ export default function Dashboard({ stats, recentProjects, recentActivity, compa
             </div>
 
             <div className="space-y-8">
+                <PendingCadApprovalAlertBanner
+                    approvals={pendingCadApprovals}
+                    className="cad-action-blink-border"
+                />
                 <SectionGroupHeader title="Projects" subtitle="Live portfolio health across every construction stage" href={route("super.construction.projects.index")} hrefLabel="View Projects" />
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <StatCard

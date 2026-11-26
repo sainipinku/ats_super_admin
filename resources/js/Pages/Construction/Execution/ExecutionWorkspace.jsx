@@ -172,7 +172,6 @@ export default function ExecutionWorkspace({
     const assignmentForm = useForm({
         execution_task_id: initialTaskId,
         member_id: "",
-        assignment_role: "worker",
         assigned_from: "",
         assigned_to: "",
         is_primary: false,
@@ -453,7 +452,6 @@ export default function ExecutionWorkspace({
                                 ]}
                                 error={assignmentForm.errors.member_id}
                             />
-                            <TextInput label="Assignment Role" value={assignmentForm.data.assignment_role} onChange={(value) => assignmentForm.setData("assignment_role", value)} error={assignmentForm.errors.assignment_role} />
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <TextInput label="Assigned From" type="date" value={assignmentForm.data.assigned_from} onChange={(value) => assignmentForm.setData("assigned_from", value)} error={assignmentForm.errors.assigned_from} />
                                 <TextInput label="Assigned To" type="date" value={assignmentForm.data.assigned_to} onChange={(value) => assignmentForm.setData("assigned_to", value)} error={assignmentForm.errors.assigned_to} />
@@ -695,7 +693,7 @@ export default function ExecutionWorkspace({
                                         <div className="mt-4 flex flex-wrap gap-2">
                                             {task.assignees.map((assignee) => (
                                                 <span key={assignee.id} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 dark:bg-slate-950 dark:text-slate-200">
-                                                    {assignee.member?.name || "Unknown"} • {assignee.assignment_role}
+                                                    {assignee.member?.name || "Unknown"}{assignee.assignment_role ? ` • ${assignee.assignment_role}` : ""}
                                                 </span>
                                             ))}
                                         </div>

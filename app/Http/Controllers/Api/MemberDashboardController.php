@@ -37,6 +37,7 @@ use App\Models\TaskAssignment;
 use App\Models\VehicleAssignment;
 use App\Services\Construction\ConstructionAuthorizationService;
 use App\Services\Construction\SurveyDataService;
+use App\Services\Construction\TaskMirrorSyncService;
 use App\Support\Construction\SurveyStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -167,167 +168,56 @@ class MemberDashboardController extends Controller
      *
      * @return array{task:ExecutionTask, unifiedTask:Task|null}
      */
-    private function resolveTaskAcrossTables(int $taskId): ?array
+    private function taskMirrorSync(): TaskMirrorSyncService
     {
+        return app(TaskMirrorSyncService::class);
+    }
+
+    private function resolveTaskAcrossTables(
+        int $taskId,
+        ?Member $member = null,
+        ?string $preferredSource = null
+    ): ?array {
+        $sync = $this->taskMirrorSync();
+        $pair = $sync->resolvePairForMember($taskId, $member, $preferredSource);
+
         /** @var ExecutionTask|null $legacyTask */
-        $legacyTask = ExecutionTask::query()
-            ->with('project')
-            ->find($taskId);
-
+        $legacyTask = $pair['legacy'];
         /** @var Task|null $unifiedTask */
-        $unifiedTask = Task::query()
-            ->with(['project', 'checklistItems'])
-            ->find($taskId);
-
-        // If legacy task not found by ID, match by task_code or project_id + title
-        if ($legacyTask === null && $unifiedTask !== null) {
-            if (!empty($unifiedTask->task_code)) {
-                $legacyTask = ExecutionTask::query()
-                    ->with('project')
-                    ->where('task_code', $unifiedTask->task_code)
-                    ->first();
-            }
-            if ($legacyTask === null && !empty($unifiedTask->title) && !empty($unifiedTask->project_id)) {
-                $legacyTask = ExecutionTask::query()
-                    ->with('project')
-                    ->where('project_id', $unifiedTask->project_id)
-                    ->where('title', $unifiedTask->title)
-                    ->first();
-            }
-        }
-
-        // If unified task not found by ID, match by task_code or project_id + title
-        if ($legacyTask !== null && $unifiedTask === null) {
-            if (!empty($legacyTask->task_code)) {
-                $unifiedTask = Task::query()
-                    ->with(['project', 'checklistItems'])
-                    ->where('task_code', $legacyTask->task_code)
-                    ->first();
-            }
-            if ($unifiedTask === null && !empty($legacyTask->title) && !empty($legacyTask->project_id)) {
-                $unifiedTask = Task::query()
-                    ->with(['project', 'checklistItems'])
-                    ->where('project_id', $legacyTask->project_id)
-                    ->where('title', $legacyTask->title)
-                    ->first();
-            }
-        }
+        $unifiedTask = $pair['unified'];
 
         if ($legacyTask === null && $unifiedTask === null) {
             return null;
         }
 
         if ($legacyTask !== null) {
+            $legacyTask->loadMissing('project');
             if ($unifiedTask !== null) {
+                $unifiedTask->loadMissing(['project', 'checklistItems']);
+                $sync->syncTaskCodeIfMissing($legacyTask, $unifiedTask);
                 try {
                     $this->mirrorChecklistItemsToLegacy($unifiedTask, $legacyTask);
                 } catch (\Throwable $e) {
                     report($e);
                 }
             }
+
             return [
                 'task' => $legacyTask,
                 'unifiedTask' => $unifiedTask,
             ];
         }
 
-        // Create a mirror ExecutionTask so construction_task_checklists FK stays valid.
-        $planId = $this->resolveOrCreateExecutionPlanIdForProject((int) $unifiedTask->project_id);
-
-        $targetCode = $unifiedTask->task_code;
-        if (empty($targetCode) || ExecutionTask::where('task_code', $targetCode)->exists()) {
-            $existing = !empty($targetCode)
-                ? ExecutionTask::with('project')->where('task_code', $targetCode)->first()
-                : null;
-            if ($existing) {
-                if ($unifiedTask !== null) {
-                    try {
-                        $this->mirrorChecklistItemsToLegacy($unifiedTask, $existing);
-                    } catch (\Throwable $e) {
-                        report($e);
-                    }
-                }
-                return [
-                    'task' => $existing,
-                    'unifiedTask' => $unifiedTask,
-                ];
-            }
-            $baseCode = $targetCode ?: ('TSK-' . str_pad((string) $taskId, 5, '0', STR_PAD_LEFT));
-            $counter = 1;
-            $newCode = $baseCode;
-            while (ExecutionTask::where('task_code', $newCode)->exists()) {
-                $newCode = $baseCode . '-M' . $counter;
-                $counter++;
-            }
-            $targetCode = $newCode;
-        }
-
-        $idPayload = ExecutionTask::where('id', $taskId)->exists() ? [] : ['id' => $taskId];
-
+        $unifiedTask->loadMissing(['project', 'checklistItems']);
+        $legacyTask = $sync->ensureLegacyMirror($unifiedTask, $taskId);
         try {
-            $legacyTask = DB::transaction(function () use ($unifiedTask, $planId, $targetCode, $idPayload) {
-                $createData = array_merge($idPayload, [
-                    'task_code' => $targetCode,
-                    'title' => $unifiedTask->title,
-                    'description' => $unifiedTask->description,
-                    'project_id' => $unifiedTask->project_id,
-                    'execution_plan_id' => $planId,
-                    'priority' => in_array($unifiedTask->priority, ['low','medium','high','critical'], true)
-                        ? $unifiedTask->priority
-                        : 'medium',
-                    'planned_start_date' => $unifiedTask->start_date ?? now(),
-                    'planned_end_date' => $unifiedTask->end_date ?? now()->addDays(1),
-                    'supervisor_member_id' => $unifiedTask->assigned_supervisor_member_id
-                        ?? $unifiedTask->member_id
-                        ?? null,
-                    'status' => $this->mapUnifiedStatusToLegacy((string) $unifiedTask->status),
-                    'progress_percent' => (int) ($unifiedTask->progress_percent ?? 0),
-                ]);
-
-                $mirror = ExecutionTask::create($createData);
-
-                $memberId = $unifiedTask->assigned_supervisor_member_id
-                    ?? $unifiedTask->member_id
-                    ?? null;
-                if ($memberId !== null && $unifiedTask->project_id !== null) {
-                    try {
-                        ExecutionTaskAssignee::updateOrCreate(
-                            [
-                                'execution_task_id' => $mirror->id,
-                                'project_id' => (int) $unifiedTask->project_id,
-                                'member_id' => (int) $memberId,
-                            ],
-                            [
-                                'assigned_at' => now(),
-                                'status' => 'active',
-                            ]
-                        );
-                    } catch (\Throwable $e) {
-                        report($e);
-                    }
-                }
-
-                $this->mirrorChecklistItemsToLegacy($unifiedTask, $mirror);
-
-                return $mirror;
-            });
-        } catch (\Illuminate\Database\UniqueConstraintViolationException|\Illuminate\Database\QueryException $e) {
+            $this->mirrorChecklistItemsToLegacy($unifiedTask, $legacyTask);
+        } catch (\Throwable $e) {
             report($e);
-            $recovered = ExecutionTask::with('project')
-                ->where('task_code', $targetCode)
-                ->orWhere('id', $taskId)
-                ->first();
-            if ($recovered) {
-                return [
-                    'task' => $recovered,
-                    'unifiedTask' => $unifiedTask,
-                ];
-            }
-            throw $e;
         }
 
         return [
-            'task' => $legacyTask->load('project'),
+            'task' => $legacyTask->loadMissing('project'),
             'unifiedTask' => $unifiedTask,
         ];
     }
@@ -391,15 +281,20 @@ class MemberDashboardController extends Controller
         }
 
         foreach ($items as $item) {
+            $dayNum = (int) ($item->day_number ?? 0);
+            if ($dayNum <= 0) {
+                $sortNum = (int) ($item->sort_order ?? 0);
+                $dayNum = $sortNum > 0 ? $sortNum : 1;
+            }
             TaskChecklist::query()->firstOrCreate(
                 [
                     'execution_task_id' => $legacyTask->id,
-                    'item_title' => $item->title ?? $item->item_title ?? 'Checklist item',
+                    'item_title' => $item->item_title ?? $item->title ?? 'Checklist item',
                 ],
                 [
-                    'day_number' => $item->sort_order ?? 1,
+                    'day_number' => $dayNum,
                     'is_completed' => (bool) ($item->is_completed ?? false),
-                    'completed_by_member_id' => $item->completed_by ?? null,
+                    'completed_by_member_id' => $item->completed_by_member_id ?? $item->completed_by ?? null,
                     'completed_at' => $item->completed_at ?? null,
                 ]
             );
@@ -1743,32 +1638,56 @@ $completed = SurveyPlan::whereHas(
         $merged = collect();
         $seenCodes = [];
         $seenTitleProject = [];
+        $seenVisitIds = [];
+        $sync = $this->taskMirrorSync();
 
         // 1. Process UNIFIED rows FIRST (Primary source of truth with checklists)
         foreach ($unifiedRows as $t) {
-            $rawCode = !empty($t->task_code) ? strtolower(trim((string) $t->task_code)) : null;
-            $computedCode = strtolower('tsk-' . str_pad((string) $t->id, 5, '0', STR_PAD_LEFT));
+            $rawCode = $sync->normalizeCode($t->task_code);
+            $computedCode = $sync->expectedFallbackCodeForUnifiedId((int) $t->id);
             if ($rawCode) {
                 $seenCodes[$rawCode] = true;
+                $seenCodes[$sync->stripMirrorSuffix($rawCode)] = true;
             }
             $seenCodes[$computedCode] = true;
 
-            $key = ($t->project_id ?? 0) . ':' . trim(strtolower((string) ($t->title ?? '')));
+            $key = ($t->project_id ?? 0) . ':' . $sync->normalizeTitle($t->title);
             $seenTitleProject[$key] = true;
+
+            if ($t->relationLoaded('surveyVisits') && $t->surveyVisits) {
+                foreach ($t->surveyVisits as $visit) {
+                    if ($visit->id) {
+                        $seenVisitIds[(int) $visit->id] = true;
+                    }
+                }
+            }
 
             $merged->push($this->normalizeUnifiedTaskListItem($t, false));
         }
 
         // 2. Process LEGACY rows SECOND (Only include if not already represented in unified)
         foreach ($legacyRows as $t) {
-            $rawCode = !empty($t->task_code) ? strtolower(trim((string) $t->task_code)) : null;
-            $computedCode = strtolower('tsk-' . str_pad((string) $t->id, 5, '0', STR_PAD_LEFT));
-            $isSeenCode = ($rawCode && isset($seenCodes[$rawCode])) || isset($seenCodes[$computedCode]);
+            $rawCode = $sync->normalizeCode($t->task_code);
+            $strippedRawCode = $sync->stripMirrorSuffix($t->task_code);
+            $computedCode = $sync->expectedFallbackCodeForUnifiedId((int) $t->id);
+            $isSeenCode = ($rawCode && isset($seenCodes[$rawCode]))
+                || ($strippedRawCode && isset($seenCodes[$strippedRawCode]))
+                || isset($seenCodes[$computedCode]);
 
-            $key = ($t->project_id ?? 0) . ':' . trim(strtolower((string) ($t->title ?? '')));
+            $key = ($t->project_id ?? 0) . ':' . $sync->normalizeTitle($t->title);
             $isSeenTitleProject = isset($seenTitleProject[$key]);
 
-            if ($isSeenCode || $isSeenTitleProject) {
+            $isSeenVisit = false;
+            if ($t->relationLoaded('surveyVisits') && $t->surveyVisits) {
+                foreach ($t->surveyVisits as $visit) {
+                    if ($visit->id && isset($seenVisitIds[(int) $visit->id])) {
+                        $isSeenVisit = true;
+                        break;
+                    }
+                }
+            }
+
+            if ($isSeenCode || $isSeenTitleProject || $isSeenVisit) {
                 continue;
             }
 
@@ -2117,17 +2036,19 @@ $completed = SurveyPlan::whereHas(
         $seenCodes = [];
         $seenTitleProject = [];
         $dedupedTasks = collect();
+        $sync = $this->taskMirrorSync();
 
         // 1. Process UNIFIED tasks first (Primary source of truth with checklists)
         foreach ($unified as $t) {
-            $rawCode = !empty($t->task_code) ? strtolower(trim((string) $t->task_code)) : null;
-            $computedCode = strtolower('tsk-' . str_pad((string) $t->id, 5, '0', STR_PAD_LEFT));
+            $rawCode = $sync->normalizeCode($t->task_code);
+            $computedCode = $sync->expectedFallbackCodeForUnifiedId((int) $t->id);
             if ($rawCode) {
                 $seenCodes[$rawCode] = true;
+                $seenCodes[$sync->stripMirrorSuffix($rawCode)] = true;
             }
             $seenCodes[$computedCode] = true;
 
-            $key = ($t->project_id ?? 0) . ':' . trim(strtolower((string) ($t->title ?? '')));
+            $key = ($t->project_id ?? 0) . ':' . $sync->normalizeTitle($t->title);
             $seenTitleProject[$key] = true;
 
             $dedupedTasks->push($t);
@@ -2135,11 +2056,14 @@ $completed = SurveyPlan::whereHas(
 
         // 2. Process LEGACY tasks second (Skip mirrors of unified tasks)
         foreach ($legacy as $t) {
-            $rawCode = !empty($t->task_code) ? strtolower(trim((string) $t->task_code)) : null;
-            $computedCode = strtolower('tsk-' . str_pad((string) $t->id, 5, '0', STR_PAD_LEFT));
-            $isSeenCode = ($rawCode && isset($seenCodes[$rawCode])) || isset($seenCodes[$computedCode]);
+            $rawCode = $sync->normalizeCode($t->task_code);
+            $strippedRawCode = $sync->stripMirrorSuffix($t->task_code);
+            $computedCode = $sync->expectedFallbackCodeForUnifiedId((int) $t->id);
+            $isSeenCode = ($rawCode && isset($seenCodes[$rawCode]))
+                || ($strippedRawCode && isset($seenCodes[$strippedRawCode]))
+                || isset($seenCodes[$computedCode]);
 
-            $key = ($t->project_id ?? 0) . ':' . trim(strtolower((string) ($t->title ?? '')));
+            $key = ($t->project_id ?? 0) . ':' . $sync->normalizeTitle($t->title);
             $isSeenTitleProject = isset($seenTitleProject[$key]);
 
             if ($isSeenCode || $isSeenTitleProject) {
@@ -2841,7 +2765,11 @@ $completed = SurveyPlan::whereHas(
      */
     public function toggleTask(Request $request, int $task)
     {
-        $resolved = $this->resolveTaskAcrossTables($task);
+        $resolved = $this->resolveTaskAcrossTables(
+            $task,
+            $request->user(),
+            $request->input('task_source') ?? $request->input('source')
+        );
         if ($resolved === null) {
             return $this->taskNotFoundResponse();
         }
@@ -2884,7 +2812,11 @@ $completed = SurveyPlan::whereHas(
      */
     public function updateTaskStatus(Request $request, int $task)
     {
-        $resolved = $this->resolveTaskAcrossTables($task);
+        $resolved = $this->resolveTaskAcrossTables(
+            $task,
+            $request->user(),
+            $request->input('task_source') ?? $request->input('source')
+        );
         if ($resolved === null) {
             return $this->taskNotFoundResponse();
         }
@@ -2936,7 +2868,11 @@ $completed = SurveyPlan::whereHas(
      */
     public function updateTask(Request $request, int $task)
     {
-        $resolved = $this->resolveTaskAcrossTables($task);
+        $resolved = $this->resolveTaskAcrossTables(
+            $task,
+            $request->user(),
+            $request->input('task_source') ?? $request->input('source')
+        );
         if ($resolved === null) {
             return $this->taskNotFoundResponse();
         }
@@ -6411,7 +6347,11 @@ $completed = SurveyPlan::whereHas(
                 ], 422);
             }
 
-            $resolvedTaskData = $this->resolveTaskAcrossTables((int) $taskId);
+            $resolvedTaskData = $this->resolveTaskAcrossTables(
+                (int) $taskId,
+                $request->user(),
+                $request->input('task_source') ?? $request->input('source')
+            );
             if (!$resolvedTaskData) {
                 return response()->json([
                     'success' => false,
@@ -6476,7 +6416,6 @@ $completed = SurveyPlan::whereHas(
             }
 
             // 1. Checklist processing (Image 1: Work checklist done)
-            $this->surveyData->ensureDefaultTaskChecklists($legacyTask, $currentDay);
             if ($unifiedTask) {
                 try {
                     $this->mirrorChecklistItemsToLegacy($unifiedTask, $legacyTask);
@@ -6484,6 +6423,7 @@ $completed = SurveyPlan::whereHas(
                     report($e);
                 }
             }
+            $this->surveyData->ensureDefaultTaskChecklists($legacyTask, $currentDay);
             $allChecklists = TaskChecklist::where('execution_task_id', $legacyTask->id)->get();
 
             $rawChecklistIds = $request->input('checklist_ids', []);
@@ -6945,7 +6885,11 @@ $completed = SurveyPlan::whereHas(
                 ], 422);
             }
 
-            $resolvedTaskData = $this->resolveTaskAcrossTables((int) $taskId);
+            $resolvedTaskData = $this->resolveTaskAcrossTables(
+                (int) $taskId,
+                $request->user(),
+                $request->input('task_source') ?? $request->input('source')
+            );
             if (!$resolvedTaskData) {
                 return response()->json([
                     'success' => false,

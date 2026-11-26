@@ -19,6 +19,7 @@ use App\Models\Task;
 use App\Models\TaskAssignment;
 use App\Services\Construction\ConstructionActivityService;
 use App\Services\Construction\TaskManagementService;
+use App\Services\Construction\TaskMirrorSyncService;
 use App\Support\Construction\SurveyStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -211,7 +212,8 @@ class ProjectTaskController extends Controller implements HasMiddleware
 
         try {
             $patch = $this->mapEditorToService($request, $project);
-            $this->tasks->update($task, $patch, $actor, $request);
+            $updated = $this->tasks->update($task, $patch, $actor, $request);
+            app(TaskMirrorSyncService::class)->syncUnifiedToLegacy($updated);
             return Redirect::back()->with('success', 'Task updated.');
         } catch (ValidationException $e) {
             return Redirect::back()->withErrors($e->errors())->withInput();
@@ -230,7 +232,12 @@ class ProjectTaskController extends Controller implements HasMiddleware
         }
 
         try {
+            $sync = app(TaskMirrorSyncService::class);
+            $legacyCounterpart = $sync->findMatchingLegacyForUnified($task);
             $this->tasks->deleteTask($task, $actor, $request);
+            if ($legacyCounterpart) {
+                $sync->deleteLegacyCounterpart($legacyCounterpart);
+            }
         } catch (Throwable $e) {
             report($e);
             return Redirect::back()->with('error', config('app.debug') ? $e->getMessage() : 'Failed to delete task.');
@@ -317,26 +324,39 @@ class ProjectTaskController extends Controller implements HasMiddleware
             ]);
         }
 
-        $roleInput = strtolower(trim((string) ($validated['assignment_role'] ?? 'executor')));
+        $rawRole = $validated['assignment_role'] ?? null;
+        $roleInput = ($rawRole !== null && trim((string) $rawRole) !== '')
+            ? strtolower(trim((string) $rawRole))
+            : null;
         $dueDate = $this->parseInputDate($validated['due_date'] ?? null);
         $notes = !empty($validated['notes']) ? trim((string) $validated['notes']) : null;
-        $shouldCreateDraftingJob = !empty($validated['create_drafting_job']) || in_array($roleInput, ['draft_person', 'drafting', 'drafter', 'draftsman'], true);
+        $shouldCreateDraftingJob = !empty($validated['create_drafting_job'])
+            || ($roleInput !== null && in_array($roleInput, ['draft_person', 'drafting', 'drafter', 'draftsman'], true));
 
         $taskId = (int) $taskId;
-        $legacyTask = ExecutionTask::where('project_id', $project->id)->find($taskId);
-        $unifiedTask = Task::where('project_id', $project->id)->find($taskId);
+        $sync = app(TaskMirrorSyncService::class);
+        $pair = $sync->resolvePair(
+            $taskId,
+            $project->id,
+            $request->input('task_source'),
+            $request->filled('legacy_task_id') ? (int) $request->input('legacy_task_id') : null,
+            $request->filled('unified_task_id') ? (int) $request->input('unified_task_id') : null
+        );
+        $legacyTask = $pair['legacy'];
+        $unifiedTask = $pair['unified'];
 
         if (!$legacyTask && !$unifiedTask) {
-            $legacyTask = ExecutionTask::find($taskId);
-            $unifiedTask = Task::find($taskId);
-            if (($legacyTask && (int) $legacyTask->project_id !== (int) $project->id) ||
-                ($unifiedTask && (int) $unifiedTask->project_id !== (int) $project->id)) {
+            $wrongLegacy = ExecutionTask::find($taskId);
+            $wrongUnified = Task::find($taskId);
+            if (($wrongLegacy && (int) $wrongLegacy->project_id !== (int) $project->id) ||
+                ($wrongUnified && (int) $wrongUnified->project_id !== (int) $project->id)) {
                 return Redirect::back()->with('error', 'Task does not belong to this project.');
             }
+            return Redirect::back()->with('error', 'Task not found in this project.');
         }
 
-        if (!$legacyTask && !$unifiedTask) {
-            return Redirect::back()->with('error', 'Task not found in this project.');
+        if ($legacyTask && $unifiedTask) {
+            $sync->syncTaskCodeIfMissing($legacyTask, $unifiedTask);
         }
 
         if ($shouldCreateDraftingJob) {
@@ -384,15 +404,17 @@ class ProjectTaskController extends Controller implements HasMiddleware
                         ],
                         [
                             'project_id' => $project->id,
-                            'assignment_role' => match ($roleInput) {
-                                'driver', 'vehicle_driver', 'vehicle driver' => 'driver',
-                                'draft_person', 'drafting', 'drafter', 'draftsman' => 'draft_person',
-                                'surveyor' => 'surveyor',
-                                'supervisor' => 'supervisor',
-                                'operator' => 'operator',
-                                'worker' => 'worker',
-                                default => 'executor',
-                            },
+                            'assignment_role' => $roleInput !== null
+                                ? match ($roleInput) {
+                                    'driver', 'vehicle_driver', 'vehicle driver' => 'driver',
+                                    'draft_person', 'drafting', 'drafter', 'draftsman' => 'draft_person',
+                                    'surveyor' => 'surveyor',
+                                    'supervisor' => 'supervisor',
+                                    'operator' => 'operator',
+                                    'worker' => 'worker',
+                                    default => 'executor',
+                                }
+                                : null,
                             'is_primary' => true,
                             'assigned_from' => now()->toDateString(),
                             'assigned_to' => $dueDate?->toDateString(),
@@ -437,7 +459,9 @@ class ProjectTaskController extends Controller implements HasMiddleware
                         ],
                         [
                             'project_id' => $project->id,
-                            'assignment_role' => in_array($roleInput, ['owner', 'executor', 'reviewer', 'checker', 'verifier'], true) ? $roleInput : 'executor',
+                            'assignment_role' => $roleInput !== null
+                                ? (in_array($roleInput, ['owner', 'executor', 'reviewer', 'checker', 'verifier', 'surveyor', 'draft_person'], true) ? $roleInput : 'executor')
+                                : null,
                             'is_primary' => true,
                             'assigned_from' => now(),
                             'assigned_until' => $dueDate,
@@ -551,38 +575,25 @@ class ProjectTaskController extends Controller implements HasMiddleware
         $actor = $this->constructionActor() ?? $request->user();
 
         $taskId = (int) $taskId;
-        $legacyTask = ExecutionTask::find($taskId);
-        $unifiedTask = Task::find($taskId);
-
-        if ($legacyTask === null && $unifiedTask !== null) {
-            if (!empty($unifiedTask->task_code)) {
-                $legacyTask = ExecutionTask::where('task_code', $unifiedTask->task_code)->first();
-            }
-            if ($legacyTask === null && !empty($unifiedTask->title) && !empty($unifiedTask->project_id)) {
-                $legacyTask = ExecutionTask::where('project_id', $unifiedTask->project_id)
-                    ->where('title', $unifiedTask->title)
-                    ->first();
-            }
-        } elseif ($unifiedTask === null && $legacyTask !== null) {
-            if (!empty($legacyTask->task_code)) {
-                $unifiedTask = Task::where('task_code', $legacyTask->task_code)->first();
-            }
-            if ($unifiedTask === null && !empty($legacyTask->title) && !empty($legacyTask->project_id)) {
-                $unifiedTask = Task::where('project_id', $legacyTask->project_id)
-                    ->where('title', $legacyTask->title)
-                    ->first();
-            }
-        }
+        $sync = app(TaskMirrorSyncService::class);
+        $pair = $sync->resolvePair(
+            $taskId,
+            $project->id,
+            $request->input('task_source'),
+            $request->filled('legacy_task_id') ? (int) $request->input('legacy_task_id') : null,
+            $request->filled('unified_task_id') ? (int) $request->input('unified_task_id') : null
+        );
+        $legacyTask = $pair['legacy'];
+        $unifiedTask = $pair['unified'];
 
         if (!$legacyTask && !$unifiedTask) {
+            $wrongLegacy = ExecutionTask::find($taskId);
+            $wrongUnified = Task::find($taskId);
+            if (($wrongLegacy && (int) $wrongLegacy->project_id !== (int) $project->id) ||
+                ($wrongUnified && (int) $wrongUnified->project_id !== (int) $project->id)) {
+                abort(403, 'Task does not belong to this project.');
+            }
             return Redirect::back()->with('error', 'Task not found.');
-        }
-
-        if ($legacyTask && (int) $legacyTask->project_id !== (int) $project->id) {
-            abort(403, 'Task does not belong to this project.');
-        }
-        if ($unifiedTask && (int) $unifiedTask->project_id !== (int) $project->id) {
-            abort(403, 'Task does not belong to this project.');
         }
 
         try {
@@ -717,25 +728,16 @@ class ProjectTaskController extends Controller implements HasMiddleware
         };
 
         $taskId = (int) $taskId;
-        $legacyTask = ExecutionTask::find($taskId);
-        $unifiedTask = Task::find($taskId);
-
-        if ($legacyTask === null && $unifiedTask !== null) {
-            if (!empty($unifiedTask->task_code)) {
-                $legacyTask = ExecutionTask::where('task_code', $unifiedTask->task_code)->first();
-            }
-            if ($legacyTask === null && !empty($unifiedTask->title)) {
-                $legacyTask = ExecutionTask::where('project_id', $project->id)->where('title', $unifiedTask->title)->first();
-            }
-        }
-        if ($unifiedTask === null && $legacyTask !== null) {
-            if (!empty($legacyTask->task_code)) {
-                $unifiedTask = Task::where('task_code', $legacyTask->task_code)->first();
-            }
-            if ($unifiedTask === null && !empty($legacyTask->title)) {
-                $unifiedTask = Task::where('project_id', $project->id)->where('title', $legacyTask->title)->first();
-            }
-        }
+        $sync = app(TaskMirrorSyncService::class);
+        $pair = $sync->resolvePair(
+            $taskId,
+            $project->id,
+            $request->input('task_source'),
+            $request->filled('legacy_task_id') ? (int) $request->input('legacy_task_id') : null,
+            $request->filled('unified_task_id') ? (int) $request->input('unified_task_id') : null
+        );
+        $legacyTask = $pair['legacy'];
+        $unifiedTask = $pair['unified'];
 
         $taskIds = array_values(array_unique(array_filter([$taskId, $legacyTask?->id, $unifiedTask?->id])));
         $hasExecCol = \Illuminate\Support\Facades\Schema::hasTable('construction_survey_visits')
@@ -1159,6 +1161,8 @@ class ProjectTaskController extends Controller implements HasMiddleware
     public function reviewDraftingJob(Request $request, Project $project, DraftingJob $draftingJob): RedirectResponse
     {
         $actor = $this->constructionActor() ?? $request->user();
+        $this->ensureProjectAccess($project, $actor);
+        abort_unless((int) $draftingJob->project_id === (int) $project->id, 404);
 
         $validated = $request->validate([
             'decision' => ['required', 'in:approved,revision_requested,rejected'],

@@ -17,9 +17,6 @@ class PermissionSeeder extends Seeder
             // ==========================================
             ['name' => 'View ERP Dashboard', 'slug' => 'dashboard.view', 'module' => 'Overview', 'description' => 'View ERP Dashboard analytics and summary widgets'],
             ['name' => 'Export ERP Analytics', 'slug' => 'dashboard.export', 'module' => 'Overview', 'description' => 'Export dashboard metrics and system reports'],
-            ['name' => 'View Permission Requests', 'slug' => 'approval_request.view', 'module' => 'Overview', 'description' => 'View pending role and permission requests'],
-            ['name' => 'Approve Permission Request', 'slug' => 'approval_request.approve', 'module' => 'Overview', 'description' => 'Approve user requested permissions'],
-            ['name' => 'Reject Permission Request', 'slug' => 'approval_request.reject', 'module' => 'Overview', 'description' => 'Reject user requested permissions'],
             ['name' => 'View Super Admins & Admins', 'slug' => 'super_admin.view', 'module' => 'Overview', 'description' => 'View Super Admin and Admin account listing'],
             ['name' => 'Create Admin Account', 'slug' => 'super_admin.create', 'module' => 'Overview', 'description' => 'Create new Super Admin or Admin account'],
             ['name' => 'Edit Admin Account', 'slug' => 'super_admin.edit', 'module' => 'Overview', 'description' => 'Edit Super Admin or Admin profile details'],
@@ -90,6 +87,7 @@ class PermissionSeeder extends Seeder
             ['name' => 'Edit Drawing Entry', 'slug' => 'drawing_approval.edit', 'module' => 'Project Lifecycle', 'description' => 'Edit drawing entry metadata'],
             ['name' => 'Delete Drawing Entry', 'slug' => 'drawing_approval.delete', 'module' => 'Project Lifecycle', 'description' => 'Delete drawing entry'],
             ['name' => 'Approve Drawing', 'slug' => 'drawing_approval.approve', 'module' => 'Project Lifecycle', 'description' => 'Approve CAD drawing'],
+            ['name' => 'Assign CAD Approval to Admin', 'slug' => 'drawing_approval.assign_admin', 'module' => 'Project Lifecycle', 'description' => 'Assign submitted CAD drawing approvals to an admin or super admin of the company'],
 
             ['name' => 'View Site Execution', 'slug' => 'execution.view', 'module' => 'Project Lifecycle', 'description' => 'View site execution workspace'],
             ['name' => 'Create Execution Task', 'slug' => 'execution.create', 'module' => 'Project Lifecycle', 'description' => 'Create site execution task'],
@@ -211,6 +209,8 @@ class PermissionSeeder extends Seeder
             ['name' => 'View Activity Logs', 'slug' => 'activity_log.view', 'module' => 'Finance & Closure', 'description' => 'View audit trail and activity logs'],
         ];
 
+        Permission::where('slug', 'like', 'approval_request.%')->delete();
+
         foreach ($permissions as $permData) {
             Permission::updateOrCreate(['slug' => $permData['slug']], $permData);
         }
@@ -237,6 +237,20 @@ class PermissionSeeder extends Seeder
                 ['role_id' => $projectAdminRole->id, 'permission_id' => $permId],
                 ['surface' => 'both', 'created_at' => now(), 'updated_at' => now()]
             );
+        }
+
+        $assignAdminPerms = Permission::whereIn('slug', [
+            'drawing_approval.assign_admin',
+            'drawing_approval.view',
+            'drawing_approval.approve',
+        ])->pluck('id');
+        foreach (ConstructionRole::where('slug', 'admin')->get() as $adminRole) {
+            foreach ($assignAdminPerms as $permId) {
+                DB::table('construction_role_permissions')->updateOrInsert(
+                    ['role_id' => $adminRole->id, 'permission_id' => $permId],
+                    ['surface' => 'both', 'created_at' => now(), 'updated_at' => now()]
+                );
+            }
         }
     }
 }

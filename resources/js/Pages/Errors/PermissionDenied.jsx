@@ -1,26 +1,13 @@
-import React, { useState } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
-import { FaShieldAlt, FaLock, FaPaperPlane, FaArrowLeft } from "react-icons/fa";
-import Modal from "@/Components/Modal";
-import { toast } from "react-hot-toast";
+import React from "react";
+import { Head, Link, usePage } from "@inertiajs/react";
+import { FaLock, FaArrowLeft } from "react-icons/fa";
 
 export default function PermissionDenied({
     required_permission,
     permission_name,
     module_name,
-    requested_url,
-    message,
 }) {
     const { auth } = usePage().props;
-    const user = auth?.user;
-    const [requestModalOpen, setRequestModalOpen] = useState(false);
-    const [reason, setReason] = useState("");
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const handleOpenModal = () => {
-        setReason("");
-        setRequestModalOpen(true);
-    };
 
     const getDashboardUrl = () => {
         try {
@@ -32,34 +19,6 @@ export default function PermissionDenied({
         } catch (err) {
             return "/";
         }
-    };
-
-    const handleSubmitRequest = (e) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-
-        router.post(
-            route("super.permission.request.submit"),
-            {
-                permission_slug: required_permission,
-                permission_name: permission_name,
-                module_name: module_name,
-                requested_url: requested_url,
-                reason: reason,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    toast.success("Permission request submitted to Super Admin!");
-                    setRequestModalOpen(false);
-                    setIsSubmitting(false);
-                },
-                onError: (err) => {
-                    toast.error("Failed to submit permission request.");
-                    setIsSubmitting(false);
-                },
-            }
-        );
     };
 
     return (
@@ -101,15 +60,6 @@ export default function PermissionDenied({
 
                 {/* Action Buttons */}
                 <div className="flex flex-col gap-3">
-                    <button
-                        type="button"
-                        onClick={handleOpenModal}
-                        className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-600/30 transition transform active:scale-98"
-                    >
-                        <FaPaperPlane size={14} />
-                        Request Permission from Super Admin
-                    </button>
-
                     <Link
                         href={getDashboardUrl()}
                         className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-700/60 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-600/60 transition"
@@ -119,74 +69,6 @@ export default function PermissionDenied({
                     </Link>
                 </div>
             </div>
-
-            {/* Request Permission Modal */}
-            <Modal
-                show={requestModalOpen}
-                onClose={() => setRequestModalOpen(false)}
-                maxWidth="md"
-                topCloseButton={true}
-                handleTopClose={() => setRequestModalOpen(false)}
-            >
-                <div className="p-2 md:p-4 text-left">
-                    <div className="flex items-center gap-3 border-b pb-3 mb-4 dark:border-gray-700">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
-                            <FaShieldAlt size={20} />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                                Request Permission Access
-                            </h3>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                Send an access request directly to Super Admin
-                            </p>
-                        </div>
-                    </div>
-
-                    <form onSubmit={handleSubmitRequest} className="space-y-4">
-                        <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-1">
-                            <p className="text-slate-600 dark:text-slate-400">
-                                <strong>Target Permission:</strong> {permission_name} ({required_permission})
-                            </p>
-                            <p className="text-slate-600 dark:text-slate-400">
-                                <strong>Module:</strong> {module_name}
-                            </p>
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                                Reason for Request <span className="text-red-500">*</span>
-                            </label>
-                            <textarea
-                                value={reason}
-                                onChange={(e) => setReason(e.target.value)}
-                                rows={3}
-                                required
-                                placeholder="Explain why you need access to this feature..."
-                                className="w-full text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white p-3 focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-
-                        <div className="flex items-center justify-end gap-3 border-t pt-3 dark:border-gray-700">
-                            <button
-                                type="button"
-                                onClick={() => setRequestModalOpen(false)}
-                                className="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-300 transition"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={isSubmitting}
-                                className="flex items-center gap-2 px-5 py-2 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition disabled:opacity-50"
-                            >
-                                <FaPaperPlane size={12} />
-                                {isSubmitting ? "Sending Request..." : "Submit Request"}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </Modal>
         </div>
     );
 }

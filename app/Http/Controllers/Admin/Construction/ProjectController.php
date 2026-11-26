@@ -12,6 +12,7 @@ use App\Models\TaskChecklist;
 use App\Services\Construction\ConstructionActivityService;
 use App\Services\Construction\SurveyDataService;
 use App\Services\Construction\TaskManagementService;
+use App\Services\Construction\TaskMirrorSyncService;
 use App\Models\ExecutionTask;
 use App\Models\Task;
 use Illuminate\Http\Request;
@@ -79,17 +80,29 @@ class ProjectController extends Controller
             'surveySubmissions.reviewedBy',
             'surveySubmissions.surveyVisit.checkedInBy',
             'draftingJobs.assignedTo',
+            'draftingJobs.surveySubmission',
             'draftingJobs.drawingRevisions.uploadedBy',
             'draftingJobs.drawingRevisions.dwgDocument',
             'draftingJobs.drawingRevisions.pdfDocument',
             'draftingJobs.drawingRevisions.approvals.approvedBy',
-            'drawingApprovals.drawingRevision',
+            'draftingJobs.drawingRevisions.approvals.assignedTo',
+            'draftingJobs.drawingRevisions.approvals.assignedBy',
+            'drawingApprovals.drawingRevision.draftingJob',
+            'drawingApprovals.assignedTo',
+            'drawingApprovals.assignedBy',
             'executionTasks.supervisor',
             'executionTasks.assignees.member',
             'executionTasks.checklists.completedBy',
+            'executionTasks.surveyVisits.checkedInBy',
+            'executionTasks.surveyVisits.submission.submittedBy',
+            'executionTasks.surveyVisits.submission.reviewedBy',
             'executionTasks.progressReports.submittedBy',
             'executionTasks.progressReports.reviewedBy',
             'tasks.checklistItems.completedBy',
+            'tasks.surveyVisits.checkedInBy',
+            'tasks.surveyVisits.submission.submittedBy',
+            'tasks.surveyVisits.submission.reviewedBy',
+            'tasks.assignments.assignee',
             'tasks.supervisor',
             'tasks.assignedMembers',
             'dailyProgressReports.submittedBy',
@@ -114,10 +127,14 @@ class ProjectController extends Controller
         ]);
 
         $companyDraftsmen = $this->resolveCompanyDraftsmen($project);
+        $cadApprovalAssignment = app(\App\Services\Construction\CadApprovalAssignmentService::class);
+        $cadActor = $this->constructionActor();
 
         return Inertia::render('Admin/Construction/Projects/Show', [
             'project' => $project,
             'companyDraftsmen' => $companyDraftsmen,
+            'companyApprovalAdmins' => $cadApprovalAssignment->getCompanyAdminApprovers($project),
+            'canAssignApprovalAdmin' => $cadApprovalAssignment->canManageApprovalAssignment($cadActor, $project),
             'activityLog' => ConstructionActivityLog::with('actor')
                 ->where('project_id', $project->id)
                 ->latest('created_at')
@@ -138,44 +155,11 @@ class ProjectController extends Controller
                     $project->surveyPlans->first(),
                     $project
                 ),
-                'task_counts' => [
-                    'total' => $project->executionTasks->count() + $project->tasks->count(),
-                    'completed' => $project->executionTasks
-                            ->where(fn ($t) => $t->status === 'completed')
-                            ->count()
-                        + $project->tasks
-                            ->where(fn ($t) => $t->status === 'completed')
-                            ->count(),
-                    'in_progress' => $project->executionTasks
-                            ->where(fn ($t) => $t->status === 'in_progress')
-                            ->count()
-                        + $project->tasks
-                            ->where(fn ($t) => $t->status === 'in_progress')
-                            ->count(),
-                    'pending' => $project->executionTasks
-                            ->where(fn ($t) => !in_array($t->status, ['completed', 'in_progress']))
-                            ->count()
-                        + $project->tasks
-                            ->where(fn ($t) => !in_array($t->status, ['completed', 'in_progress']))
-                            ->count(),
-                ],
-                'checklist_counts' => [
-                    'total' => $project->executionTasks->flatMap(fn ($t) => $t->checklists ?? collect())->count()
-                        + $project->surveyPlans->flatMap(fn ($s) => $s->checklists ?? collect())->count()
-                        + $project->tasks->flatMap(fn ($t) => $t->checklistItems ?? collect())->count(),
-                    'completed' => $project->executionTasks
-                            ->flatMap(fn ($t) => $t->checklists ?? collect())
-                            ->where('is_completed', true)
-                            ->count()
-                        + $project->surveyPlans
-                            ->flatMap(fn ($s) => $s->checklists ?? collect())
-                            ->where('is_completed', true)
-                            ->count()
-                        + $project->tasks
-                            ->flatMap(fn ($t) => $t->checklistItems ?? collect())
-                            ->where('is_completed', true)
-                            ->count(),
-                ],
+                ...app(TaskMirrorSyncService::class)->computeProjectSummaryCounts(
+                    $project->executionTasks,
+                    $project->tasks,
+                    $project->surveyPlans
+                ),
             ],
         ]);
     }
@@ -379,6 +363,7 @@ class ProjectController extends Controller
 
         try {
             $updated = $tasks->update($unified, $patch, $actor, $request);
+            app(TaskMirrorSyncService::class)->syncUnifiedToLegacy($updated, $task);
         } catch (ValidationException $e) {
             return back()->withErrors($e->errors())->withInput();
         } catch (\Throwable $e) {
@@ -402,16 +387,11 @@ class ProjectController extends Controller
         $actor = $this->constructionActor();
         $unified = $this->resolveUnifiedTask($project, $task);
         $code = $unified?->task_code ?? ($task->task_code ?? (string) $task->id);
+        $sync = app(TaskMirrorSyncService::class);
 
         if (!$unified) {
             try {
-                DB::transaction(function () use ($task) {
-                    TaskChecklist::where('execution_task_id', $task->id)->delete();
-                    \App\Models\ExecutionTaskAssignee::where('execution_task_id', $task->id)->delete();
-                    \App\Models\DailyProgressReport::where('execution_task_id', $task->id)->update(['execution_task_id' => null]);
-                    \App\Models\ExecutionTask::where('parent_task_id', $task->id)->update(['parent_task_id' => null]);
-                    $task->delete();
-                });
+                $sync->deleteLegacyCounterpart($task);
             } catch (\Throwable $e) {
                 report($e);
                 return back()->with('error', 'Failed to delete task. ' . $e->getMessage());
@@ -420,7 +400,8 @@ class ProjectController extends Controller
         }
 
         try {
-            $tasks->deleteTask($unified, $actor, $request);
+            $tasks->deleteTask($unified, $actor, request());
+            $sync->deleteLegacyCounterpart($task);
         } catch (\Throwable $e) {
             report($e);
             return back()->with('error', 'Failed to delete task. ' . $e->getMessage());

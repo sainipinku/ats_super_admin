@@ -257,6 +257,7 @@ jobs:
             php artisan db:seed --class=SuperAdminPermissionSeeder --force --no-interaction || true
             php artisan db:seed --class=FuelPermissionSeeder --force --no-interaction || true
             php artisan db:seed --class=AttendancePermissionSeeder --force --no-interaction || true
+            php artisan db:seed --class=DrawingApprovalAssignPermissionSeeder --force --no-interaction || true
 
             # 7. Optimize & cache config, routes, views
             echo "⚡ Clearing and caching Laravel configuration..."

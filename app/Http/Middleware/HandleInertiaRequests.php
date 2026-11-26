@@ -176,12 +176,24 @@ class HandleInertiaRequests extends Middleware
 
         $impersonator = $request->session()->get('impersonator');
         $isImpersonating = !empty($impersonator);
-        $pendingApprovalCount = ($guard === 'superadmin') ? \App\Models\ActionApprovalRequest::pending()->count() : 0;
         $companyName = $user instanceof \App\Models\SuperAdmin && (int) $user->id !== 1
             ? $user->company?->name
             : null;
 
         $deleteApprovalRequestsMap = [];
+        $pendingAssignedCadApprovals = [];
+
+        if ($user) {
+            try {
+                if (class_exists(\App\Services\Construction\CadApprovalAssignmentService::class)) {
+                    $pendingAssignedCadApprovals = app(\App\Services\Construction\CadApprovalAssignmentService::class)
+                        ->pendingApprovalsForActor($user);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Pending CAD approvals share failed: ' . $e->getMessage());
+                $pendingAssignedCadApprovals = [];
+            }
+        }
 
         if ($user) {
             $approvalReqs = \App\Models\ActionApprovalRequest::where('action', 'delete')->get();
@@ -200,6 +212,7 @@ class HandleInertiaRequests extends Middleware
         return array_merge(parent::share($request), [
             'messages' => flash()->render('array'),
             'delete_approval_requests' => $deleteApprovalRequestsMap,
+            'pending_assigned_cad_approvals' => $pendingAssignedCadApprovals,
             'available_roles' => $userAvailableRoles,
             'google_maps_api_key' => (string) (config('services.google.maps_api_key') ?: env('GOOGLE_MAPS_API_KEY') ?: env('VITE_GOOGLE_MAPS_API_KEY') ?: ''),
             'mapbox_token' => (string) (config('services.mapbox.token') ?: env('MAPBOX_TOKEN') ?: env('VITE_MAPBOX_TOKEN') ?: ''),
@@ -214,7 +227,6 @@ class HandleInertiaRequests extends Middleware
                 'construction_permissions' => $constructionPermissions,
                 'is_impersonating' => $isImpersonating,
                 'impersonator' => $impersonator,
-                'pending_approval_requests_count' => $pendingApprovalCount,
                 'available_roles' => $userAvailableRoles,
                 'active_role' => $activeRole,
             ],

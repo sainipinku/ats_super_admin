@@ -5,10 +5,15 @@ import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import SectionCard from "@/Pages/Construction/Components/SectionCard";
 import StatCard from "@/Pages/Construction/Components/StatCard";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
+import PendingCadApprovalAlertBanner from "@/Pages/Construction/Components/PendingCadApprovalAlertBanner";
 
 export default function Dashboard({ stats, projects }) {
     const { props } = usePage();
     const auth = props?.auth;
+    const pendingCadApprovals = Array.isArray(props?.pending_assigned_cad_approvals)
+        ? props.pending_assigned_cad_approvals
+        : [];
+    const pendingProjectIds = new Set(pendingCadApprovals.map((item) => Number(item.project_id)));
 
     useEffect(() => {
         console.log("=== [DEBUG Admin Dashboard Props] ===");
@@ -23,6 +28,10 @@ export default function Dashboard({ stats, projects }) {
             description="Admin view focused only on assigned construction projects and their lifecycle from survey through execution."
             variant="admin"
         >
+            <PendingCadApprovalAlertBanner
+                approvals={pendingCadApprovals}
+                className="cad-action-blink-border"
+            />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <StatCard label="Assigned Projects" value={stats.assignedProjects} />
                 <StatCard label="Survey Workflow" value={stats.surveyPlans} />
@@ -78,11 +87,17 @@ export default function Dashboard({ stats, projects }) {
                 <SectionCard title="Assigned Projects" description="Direct access to the projects currently under your supervision.">
                     {projects.length ? (
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
-                            {projects.map((project) => (
+                            {projects.map((project) => {
+                                const hasPendingCadAction = pendingProjectIds.has(Number(project.id));
+                                return (
                                 <Link
                                     key={project.id}
                                     href={route("admin.construction.projects.show", project.id)}
-                                    className="rounded-2xl border border-slate-200 p-5 transition hover:border-indigo-300 dark:border-slate-800"
+                                    className={`rounded-2xl border p-5 transition hover:border-indigo-300 dark:border-slate-800 ${
+                                        hasPendingCadAction
+                                            ? "cad-action-blink-border bg-rose-50/40 dark:bg-rose-950/20"
+                                            : "border-slate-200"
+                                    }`}
                                 >
                                     <div className="flex items-center justify-between gap-3">
                                         <p className="font-semibold text-slate-900 dark:text-white">
@@ -90,6 +105,11 @@ export default function Dashboard({ stats, projects }) {
                                         </p>
                                         <StatusBadge value={project.current_stage} />
                                     </div>
+                                    {hasPendingCadAction && (
+                                        <span className="mt-2 inline-flex items-center rounded-full bg-rose-600 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                                            Action Needed: CAD Approval
+                                        </span>
+                                    )}
                                     <p className="mt-2 text-sm text-slate-500">
                                         {project.project_code}
                                     </p>
@@ -103,7 +123,8 @@ export default function Dashboard({ stats, projects }) {
                                             "-"}
                                     </p>
                                 </Link>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
                         <EmptyState

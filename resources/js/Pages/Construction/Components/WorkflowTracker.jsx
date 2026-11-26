@@ -10,7 +10,6 @@ import {
     FaUserCheck,
     FaCircleCheck,
     FaCheck,
-    FaBezierCurve,
 } from "react-icons/fa6";
 
 gsap.registerPlugin(MotionPathPlugin, MotionPathHelper);
@@ -31,8 +30,8 @@ const stageGlowColors = {
 const steps = [
     { key: "survey", label: "Survey Team", icon: FaLocationDot, color: "sky", subtext: "Site Data & Photos" },
     { key: "drafting", label: "Draft Team", icon: FaCompassDrafting, color: "indigo", subtext: "Map & DWG/PDF" },
+    { key: "admin", label: "Admin", icon: FaUserCheck, color: "violet", subtext: "Assigned Approval" },
     { key: "accounts", label: "Accounts Team", icon: FaFileInvoiceDollar, color: "amber", subtext: "Commercial Verify" },
-    { key: "supervisor", label: "Supervisor", icon: FaUserCheck, color: "violet", subtext: "Final Chain Review" },
     { key: "completed", label: "Completed", icon: FaCircleCheck, color: "emerald", subtext: "Approved & Locked" },
 ];
 
@@ -52,25 +51,32 @@ const internalStageMap = {
     // Drafting stage variants
     drafting: "drafting",
     drafting_in_progress: "drafting",
-    draft_ready_for_review: "drafting",
-    drawing_approval_pending: "drafting",
     revision_requested: "drafting",
-    drawing_approved: "drafting",
 
-    // Accounts stage variants
+    // Admin approval stage variants (assigned admin review after CAD submission)
+    admin: "admin",
+    admin_review: "admin",
+    admin_approval_pending: "admin",
+    awaiting_admin_review: "admin",
+    drawing_approval_pending: "admin",
+    draft_ready_for_review: "admin",
+
+    // Accounts stage variants (follows Admin approval)
     accounts: "accounts",
     accounts_pending: "accounts",
+    awaiting_accounts_verification: "accounts",
     billing_pending: "accounts",
-
-    // Supervisor stage variants
-    supervisor: "supervisor",
-    awaiting_supervisor_review: "supervisor",
-    supervisor_review: "supervisor",
+    drawing_approved: "accounts",
+    ready_for_construction: "accounts",
+    execution_planned: "accounts",
 
     // Completed stage variants
     completed: "completed",
     closed: "completed",
     approved: "completed",
+    awaiting_supervisor_review: "completed",
+    supervisor_review: "completed",
+    supervisor: "completed",
 };
 
 function buildWorkflowCurve(points) {
@@ -92,7 +98,7 @@ function buildWorkflowCurve(points) {
     return d;
 }
 
-export default function WorkflowTracker({ currentStage, isLocked = false }) {
+export default function WorkflowTracker({ currentStage, isLocked = false, assignedAdminName = null }) {
     const mapped = internalStageMap[currentStage] || "survey";
     const activeIndex = Math.max(steps.findIndex((step) => step.key === mapped), 0);
     const progressRatio = activeIndex / (steps.length - 1);
@@ -533,23 +539,10 @@ export default function WorkflowTracker({ currentStage, isLocked = false }) {
                         )}
                     </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
-                        Survey → Draft → Accounts → Supervisor → Completed
+                        Survey → Draft → Admin → Accounts → Completed
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setIsEditingPath((prev) => !prev)}
-                        title="Toggle GSAP MotionPathHelper curve editor"
-                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold transition ${
-                            isEditingPath
-                                ? "border-emerald-400 bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
-                                : "border-slate-200 bg-white/80 text-slate-500 hover:border-emerald-400/70 hover:text-emerald-600 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-400 dark:hover:text-emerald-300"
-                        }`}
-                    >
-                        <FaBezierCurve size={10} />
-                        <span>{isEditingPath ? "Done Path" : "Edit Path"}</span>
-                    </button>
                     <StatusBadge value={currentStage} />
                 </div>
             </div>
@@ -569,8 +562,8 @@ export default function WorkflowTracker({ currentStage, isLocked = false }) {
                             <linearGradient id={`wf-progress-grad-${uid}`} x1="0%" y1="0%" x2="100%" y2="0%">
                                 <stop offset="0%" stopColor="#0ea5e9" />
                                 <stop offset="35%" stopColor="#6366f1" />
-                                <stop offset="65%" stopColor="#f59e0b" />
-                                <stop offset="85%" stopColor="#8b5cf6" />
+                                <stop offset="65%" stopColor="#8b5cf6" />
+                                <stop offset="85%" stopColor="#f59e0b" />
                                 <stop offset="100%" stopColor="#0ae448" />
                             </linearGradient>
                         </defs>
@@ -680,7 +673,7 @@ export default function WorkflowTracker({ currentStage, isLocked = false }) {
                                     {step.label} {isDone ? "✓" : isActive && hasArrived ? "✦" : "○"}
                                 </p>
                                 <p className="mt-0.5 text-[9.5px] text-slate-500 dark:text-slate-500 truncate max-w-[115px]">
-                                    {step.subtext}
+                                    {step.key === "admin" && assignedAdminName ? `Assigned: ${assignedAdminName}` : step.subtext}
                                 </p>
                             </div>
                         );

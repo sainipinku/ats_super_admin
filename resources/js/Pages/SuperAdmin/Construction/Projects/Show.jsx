@@ -14,7 +14,10 @@ import DynamicChecklistManager from "@/Pages/Construction/Components/DynamicChec
 import FieldNotesDisplay from "@/Pages/Construction/Components/FieldNotesDisplay";
 import ProjectActivityLog from "@/Pages/Construction/Components/ProjectActivityLog";
 import { getMemberRoleBadges, formatMemberSelectOption, formatMemberOptionLabel } from "@/lib/memberBadges";
+import { mergeProjectExecutionTasks } from "@/lib/taskMerge";
 import AssignToDraftsmanButton from "@/Pages/Construction/Components/AssignToDraftsmanButton";
+import AssignApprovalAdminButton from "@/Pages/Construction/Components/AssignApprovalAdminButton";
+import PendingCadApprovalAlertBanner from "@/Pages/Construction/Components/PendingCadApprovalAlertBanner";
 
 const TASKS_PER_PAGE = 10;
 const EXECUTION_TASKS_TITLE_WORDS = ["Execution", "Tasks"];
@@ -280,7 +283,7 @@ const taskMatchesRole = (task, targetRoleKey, { members = [], projectTeamMembers
     return false;
 };
 
-export default function ProjectShow({ project, members, roles, activityLog, workflowSummary }) {
+export default function ProjectShow({ project, members, roles, activityLog, workflowSummary, companyApprovalAdmins = [], canAssignApprovalAdmin = false }) {
     const { auth } = usePage().props;
     const currentUser = auth?.user;
     const guard = auth?.guard;
@@ -1007,7 +1010,7 @@ export default function ProjectShow({ project, members, roles, activityLog, work
             submissions: project.survey_submissions?.length || 0,
             draftingJobs: project.drafting_jobs?.length || 0,
             approvals: project.drawing_approvals?.length || 0,
-            executionTasks: taskCounts.total || project.execution_tasks?.length || 0,
+            executionTasks: taskCounts.total ?? mergedTaskList.length ?? 0,
             dailyProgressReports: project.daily_progress_reports?.length || 0,
             attendanceRecords: project.attendance_records?.length || 0,
             materialStocks: project.material_stocks?.length || 0,
@@ -1017,9 +1020,20 @@ export default function ProjectShow({ project, members, roles, activityLog, work
         [project, taskCounts]
     );
 
+    const assignedCadAdminName = useMemo(() => {
+        const direct = project?.drawing_approvals || project?.drawingApprovals || [];
+        const jobApprovals = (project?.drafting_jobs || project?.draftingJobs || []).flatMap(
+            (job) => (job?.drawing_revisions || job?.drawingRevisions || []).flatMap((rev) => rev?.approvals || [])
+        );
+        const pending = [...direct, ...jobApprovals]
+            .reverse()
+            .find((a) => String(a?.decision || "").toLowerCase() === "pending" && a?.assigned_to?.name);
+        return pending?.assigned_to?.name || null;
+    }, [project]);
+
     return (
         <ConstructionShell title={project.name} description={`${project.project_code} • ${project.company?.name || ""}`} variant="super">
-            <WorkflowTracker currentStage={project.current_stage} isLocked={project.is_locked} />
+            <WorkflowTracker currentStage={project.current_stage} isLocked={project.is_locked} assignedAdminName={assignedCadAdminName} />
 
             {/* Role-Specific Drafter Banner */}
             {isDraftPersonUser && (
@@ -1689,6 +1703,12 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                 )}
 
                 <div>
+                    <PendingCadApprovalAlertBanner
+                        approvals={(usePage().props?.pending_assigned_cad_approvals || []).filter(
+                            (a) => Number(a.project_id) === Number(project.id)
+                        )}
+                        className="cad-action-blink-border"
+                    />
                     {visibleTaskList.length ? (
                         <div className="space-y-3">
                             <div className="grid gap-3 md:grid-cols-2">
@@ -1704,6 +1724,8 @@ export default function ProjectShow({ project, members, roles, activityLog, work
                                         canManageChecklist={canManageChecklist}
                                         canTransferTask={canTransferTask}
                                         canAssignDraftsman={isAdminUser && canTransferTask}
+                                        companyApprovalAdmins={companyApprovalAdmins}
+                                        canAssignApprovalAdmin={Boolean(canAssignApprovalAdmin)}
                                         onEdit={() => setEditingTask(task)}
                                         onPopEnter={handleTaskPopEnter}
                                         onPopLeave={handleTaskPopLeave}
@@ -2004,6 +2026,8 @@ function TaskRow({
     canManageChecklist: propCanManageChecklist,
     canTransferTask: propCanTransfer,
     canAssignDraftsman: propCanAssignDraftsman,
+    companyApprovalAdmins = [],
+    canAssignApprovalAdmin: propCanAssignApprovalAdmin = false,
 }) {
     const { auth } = usePage().props;
     const currentUser = auth?.user;
@@ -2258,6 +2282,10 @@ function TaskRow({
 
     const taskDraftingJob = useMemo(() => {
         const jobs = project.drafting_jobs || project.draftingJobs || [];
+        if (task.drafting_job_id) {
+            const byDirectId = jobs.find((j) => Number(j.id) === Number(task.drafting_job_id));
+            if (byDirectId) return byDirectId;
+        }
         const bySub = jobs.find((job) => {
             const sub = job.survey_submission || job.surveySubmission;
             if (!sub) return false;
@@ -2271,12 +2299,18 @@ function TaskRow({
         });
         if (bySub) return bySub;
 
-        const isDraftStatus = task.status === "drafting_in_progress" || (task.assignees || []).some((a) => isActiveAssignment(a) && a.assignment_role === "draft_person");
+        const isDraftStatus =
+            task.status === "drafting_in_progress" ||
+            task.status === "drawing_approval_pending" ||
+            (task.assignees || []).some((a) => isActiveAssignment(a) && a.assignment_role === "draft_person") ||
+            (task.assignments || []).some((a) => isActiveAssignment(a) && a.assignment_role === "draft_person");
         if (isDraftStatus && jobs.length > 0) {
-            const draftAssignee = (task.assignees || []).find((a) => isActiveAssignment(a) && a.assignment_role === "draft_person");
-            const targetDraftId = draftAssignee?.member_id || task.supervisor_member_id || task.supervisor?.id || task.member_id;
+            const draftAssignee =
+                (task.assignees || []).find((a) => isActiveAssignment(a) && a.assignment_role === "draft_person") ||
+                (task.assignments || []).find((a) => isActiveAssignment(a) && a.assignment_role === "draft_person");
+            const targetDraftId = draftAssignee?.member_id || draftAssignee?.assignee_id || task.supervisor_member_id || task.supervisor?.id || task.member_id;
             const matchingJob = jobs.find((j) => Number(j.assigned_to_member_id) === Number(targetDraftId));
-            return matchingJob || null;
+            return matchingJob || (jobs.length === 1 ? jobs[0] : null);
         }
         return null;
     }, [project.drafting_jobs, project.draftingJobs, task, taskVisits]);
@@ -2337,6 +2371,36 @@ function TaskRow({
     const isDrawingApproved = latestRevision?.status === "approved" || taskDraftingJob?.status === "approved";
     const isDrawingSubmitted = latestRevision?.status === "submitted" || taskDraftingJob?.status === "submitted";
     const isDrawingRevisionRequested = latestRevision?.status === "revision_requested" || taskDraftingJob?.status === "revision_requested";
+
+    const latestPendingApproval = useMemo(() => {
+        const revApprovals = latestRevision?.approvals || [];
+        const projectApprovals = (project.drawing_approvals || project.drawingApprovals || []).filter(
+            (a) => Number(a.drawing_revision_id) === Number(latestRevision?.id)
+        );
+        const pool = revApprovals.length ? revApprovals : projectApprovals;
+        return pool.find((a) => String(a?.decision || "").toLowerCase() === "pending")
+            || (pool.length ? pool[pool.length - 1] : null);
+    }, [latestRevision, project.drawing_approvals, project.drawingApprovals]);
+
+    const pendingAssignedApprovals = Array.isArray(pageProps?.pending_assigned_cad_approvals)
+        ? pageProps.pending_assigned_cad_approvals
+        : [];
+    const currentGuard = String(pageProps?.auth?.guard || "").toLowerCase();
+    const isAssignedToCurrentUserPendingApproval = Boolean(
+        latestPendingApproval &&
+        String(latestPendingApproval.decision || "").toLowerCase() === "pending" &&
+        !isDrawingApproved &&
+        (
+            pendingAssignedApprovals.some((item) => Number(item.approval_id) === Number(latestPendingApproval.id)) ||
+            (latestPendingApproval.assigned_to_id && currentUser && (
+                (currentGuard === "superadmin" && String(latestPendingApproval.assigned_to_type || "").includes("SuperAdmin") && Number(latestPendingApproval.assigned_to_id) === Number(currentUser.id)) ||
+                (currentGuard !== "superadmin" && String(latestPendingApproval.assigned_to_type || "").includes("Member") && Number(latestPendingApproval.assigned_to_id) === Number(currentUser.id))
+            ))
+        )
+    );
+    const hasAssignApprovalAdminPerm =
+        Boolean(propCanAssignApprovalAdmin) ||
+        (Array.isArray(pageProps?.auth?.permissions) && pageProps.auth.permissions.includes("drawing_approval.assign_admin") && Boolean(propCanAssignApprovalAdmin));
 
     const resolvedKhasraNumber = useMemo(() => {
         return taskDraftingJob?.khasra_number || project?.khasra_number || task?.khasra_number || "";
@@ -2429,20 +2493,24 @@ function TaskRow({
 
     const transferForm = useForm({
         member_id: "",
-        assignment_role: "executor",
         due_date: task.planned_end_date ? String(task.planned_end_date).split("T")[0] : "",
         notes: "",
         create_drafting_job: false,
+        task_source: task._source || "unified",
+        legacy_task_id: task.legacy_task_id ?? null,
+        unified_task_id: task.unified_task_id ?? null,
     });
 
     useEffect(() => {
         if (showTransferModal) {
             transferForm.setData({
                 member_id: "",
-                assignment_role: "executor",
                 due_date: task.planned_end_date ? String(task.planned_end_date).split("T")[0] : "",
                 notes: "",
                 create_drafting_job: false,
+                task_source: task._source || "unified",
+                legacy_task_id: task.legacy_task_id ?? null,
+                unified_task_id: task.unified_task_id ?? null,
             });
         }
     }, [showTransferModal]);
@@ -2471,7 +2539,11 @@ function TaskRow({
         setIsUnassigning(true);
         router.post(
             route("super.construction.projects.tasks-v2.unassign", [project.id, task.id]),
-            {},
+            {
+                task_source: task._source || "unified",
+                legacy_task_id: task.legacy_task_id ?? null,
+                unified_task_id: task.unified_task_id ?? null,
+            },
             {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -2500,6 +2572,9 @@ function TaskRow({
             {
                 decision,
                 remarks: revisionRemarks.trim() || undefined,
+                task_source: task._source || "unified",
+                legacy_task_id: task.legacy_task_id ?? null,
+                unified_task_id: task.unified_task_id ?? null,
             },
             {
                 preserveScroll: true,
@@ -2685,7 +2760,11 @@ function TaskRow({
                 data-et-index={taskIndex}
                 onMouseEnter={(e) => onPopEnter?.(e, { scale: 1.014, y: -3 })}
                 onMouseLeave={(e) => onPopLeave?.(e)}
-                className="et-task-card flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm transition-colors hover:border-indigo-300/80 hover:shadow-md hover:shadow-indigo-500/5 dark:border-slate-800 dark:bg-slate-950/95 dark:hover:border-indigo-500/40"
+                className={`et-task-card flex flex-col justify-between rounded-xl border bg-white p-3 shadow-sm transition-colors hover:shadow-md dark:bg-slate-950/95 ${
+                    isAssignedToCurrentUserPendingApproval
+                        ? "cad-action-blink-border border-rose-500 bg-rose-50/30 dark:bg-rose-950/20"
+                        : "border-slate-200/90 hover:border-indigo-300/80 hover:shadow-indigo-500/5 dark:border-slate-800 dark:hover:border-indigo-500/40"
+                }`}
             >
                 <div>
                     {/* 1. Compact Header: Task Code, Title, Badges & Administrative Actions */}
@@ -2699,6 +2778,11 @@ function TaskRow({
                                     <StatusBadge value={task.status} />
                                     <StatusBadge value={task.priority} />
                                 </div>
+                                {isAssignedToCurrentUserPendingApproval && (
+                                    <span className="inline-flex items-center rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                                        Action Needed: CAD Approval
+                                    </span>
+                                )}
                             </div>
                             <h4 className="et-task-title mt-1 truncate text-xs sm:text-sm font-bold text-slate-900 dark:text-white tracking-tight" title={task.title}>
                                 {task.title}
@@ -2863,6 +2947,15 @@ function TaskRow({
                             defaultDraftsmanId={defaultDraftsmanId}
                             hasSurveyVisits={taskVisits.length > 0}
                             authorized={Boolean(propCanAssignDraftsman)}
+                        />
+                        <AssignApprovalAdminButton
+                            projectId={project.id}
+                            draftingJob={taskDraftingJob}
+                            latestRevision={latestRevision}
+                            pendingApproval={latestPendingApproval}
+                            companyAdmins={companyApprovalAdmins}
+                            routeName="super.construction.projects.drawing-approvals.assign-admin"
+                            authorized={hasAssignApprovalAdminPerm}
                         />
                         <button
                             type="button"
@@ -3780,14 +3873,36 @@ function TaskRow({
 
                                             {/* Admin Drawing Approval Action Banner */}
                                             {!isCurrentUserDraftPerson && taskDraftingJob && (isDrawingSubmitted || isDrawingRevisionRequested) && (
-                                                <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50/90 p-3.5 dark:border-amber-700 dark:bg-amber-950/40">
-                                                    <h5 className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                                                        Admin Review for CAD Drawing
-                                                    </h5>
+                                                <div className={`mt-3 rounded-xl border p-3.5 ${
+                                                    isAssignedToCurrentUserPendingApproval
+                                                        ? "cad-action-blink-border bg-rose-50/90 dark:bg-rose-950/35"
+                                                        : "border-amber-300 bg-amber-50/90 dark:border-amber-700 dark:bg-amber-950/40"
+                                                }`}>
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <h5 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                                                            {isAssignedToCurrentUserPendingApproval
+                                                                ? "Action Needed: CAD Approval Assigned to You"
+                                                                : "Admin Review for CAD Drawing"}
+                                                        </h5>
+                                                        {latestPendingApproval?.assigned_to?.name && (
+                                                            <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-900/60 dark:text-amber-100">
+                                                                Assigned to: {latestPendingApproval.assigned_to.name}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
                                                         Approving this drawing will mark drafting as completed and advance the project stage to <strong>Construction Execution</strong>.
                                                     </p>
                                                     <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
+                                                        <AssignApprovalAdminButton
+                                                            projectId={project.id}
+                                                            draftingJob={taskDraftingJob}
+                                                            latestRevision={latestRevision}
+                                                            pendingApproval={latestPendingApproval}
+                                                            companyAdmins={companyApprovalAdmins}
+                                                            routeName="super.construction.projects.drawing-approvals.assign-admin"
+                                                            authorized={hasAssignApprovalAdminPerm}
+                                                        />
                                                         <button
                                                             type="button"
                                                             disabled={isSubmittingDraftReview}
@@ -4221,15 +4336,9 @@ function TaskRow({
                                         value={transferForm.data.member_id}
                                         onChange={(e) => {
                                             const mid = e.target.value;
-                                            const selected = assignableTeamMembers.find(
-                                                (member) => String(member.member_id) === String(mid)
-                                            );
                                             transferForm.setData((prev) => ({
                                                 ...prev,
                                                 member_id: mid,
-                                                assignment_role: selected?.is_driver
-                                                    ? "driver"
-                                                    : (prev.assignment_role === "driver" ? "executor" : prev.assignment_role),
                                                 create_drafting_job: false,
                                             }));
                                         }}
@@ -4254,42 +4363,16 @@ function TaskRow({
                                 )}
                             </div>
 
-                            {/* Assignment Role */}
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                                        Assignment Role
-                                    </label>
-                                    <select
-                                        value={transferForm.data.assignment_role}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            transferForm.setData((prev) => ({
-                                                ...prev,
-                                                assignment_role: val,
-                                                create_drafting_job: val === "draft_person" ? true : (val === "driver" ? false : prev.create_drafting_job),
-                                            }));
-                                        }}
-                                        className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                    >
-                                        <option value="driver">Driver (Vehicle Operation & Transport)</option>
-                                        <option value="executor">Field Executor (Site Work / Operations)</option>
-                                        <option value="supervisor">Supervisor (Site In-charge)</option>
-                                        <option value="reviewer">Reviewer / Quality Checker</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                                        Target Due Date
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={transferForm.data.due_date}
-                                        onChange={(e) => transferForm.setData("due_date", e.target.value)}
-                                        className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                    />
-                                </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                    Target Due Date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={transferForm.data.due_date}
+                                    onChange={(e) => transferForm.setData("due_date", e.target.value)}
+                                    className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                />
                             </div>
 
                             {/* Instructions & Scope */}
@@ -4857,152 +4940,7 @@ function LocationDisplay({ locationName, address, lat, lng, className = "" }) {
 }
 
 function mergedTasksForExecutionList(project) {
-    const legacyTasks = Array.isArray(project?.execution_tasks) ? project.execution_tasks : [];
-    const unifiedTasks = Array.isArray(project?.tasks) ? project.tasks : [];
-
-    const normalize = (task, sourceTag) => {
-        const legacyChecklists = Array.isArray(task.checklists) ? task.checklists : [];
-        const rawUnified = Array.isArray(task.checklist_items)
-            ? task.checklist_items
-            : (Array.isArray(task.checklistItems) ? task.checklistItems : []);
-        const unifiedChecklists = rawUnified.map((item) => ({
-            ...item,
-            is_completed: item.is_completed ?? item.completed_at ?? false,
-            item_title: item.item_title ?? item.title ?? "",
-        }));
-
-        // Find matching counterpart in other table
-        const partnerMatch = sourceTag === "unified"
-            ? legacyTasks.find((et) =>
-                et.id === task.id ||
-                (et.task_code && task.task_code && et.task_code === task.task_code) ||
-                (et.title && task.title && et.title.trim().toLowerCase() === task.title.trim().toLowerCase())
-            )
-            : unifiedTasks.find((ut) =>
-                ut.id === task.id ||
-                (ut.task_code && task.task_code && ut.task_code === task.task_code) ||
-                (ut.title && task.title && ut.title.trim().toLowerCase() === task.title.trim().toLowerCase())
-            );
-
-        // Cross-match if checklists were attached to the other table representation
-        let fallbackChecklists = [];
-        if (sourceTag === "unified" && legacyChecklists.length === 0 && unifiedChecklists.length === 0) {
-            if (partnerMatch && Array.isArray(partnerMatch.checklists)) {
-                fallbackChecklists = partnerMatch.checklists;
-            }
-        } else if (sourceTag === "legacy" && legacyChecklists.length === 0 && unifiedChecklists.length === 0) {
-            if (partnerMatch) {
-                const rawUt = Array.isArray(partnerMatch.checklist_items)
-                    ? partnerMatch.checklist_items
-                    : (Array.isArray(partnerMatch.checklistItems) ? partnerMatch.checklistItems : []);
-                fallbackChecklists = rawUt.map((item) => ({
-                    ...item,
-                    is_completed: item.is_completed ?? item.completed_at ?? false,
-                    item_title: item.item_title ?? item.title ?? "",
-                }));
-            }
-        }
-
-        const combinedChecklists = [...legacyChecklists, ...unifiedChecklists, ...fallbackChecklists];
-        const seenChecklist = new Set();
-        const mergedChecklists = [];
-        for (const it of combinedChecklists) {
-            const key = `${it.item_title || it.title || ""}-${it.day_number || 1}`;
-            if (!seenChecklist.has(key)) {
-                seenChecklist.add(key);
-                mergedChecklists.push(it);
-            }
-        }
-
-        // Cross-merge survey visits across legacy and unified mirrors
-        const selfVisits = Array.isArray(task.survey_visits) ? task.survey_visits : (Array.isArray(task.surveyVisits) ? task.surveyVisits : []);
-        const partnerVisits = partnerMatch ? (Array.isArray(partnerMatch.survey_visits) ? partnerMatch.survey_visits : (Array.isArray(partnerMatch.surveyVisits) ? partnerMatch.surveyVisits : [])) : [];
-        const combinedVisits = [...selfVisits, ...partnerVisits];
-        const seenVisitIds = new Set();
-        const mergedVisits = [];
-        for (const v of combinedVisits) {
-            if (v && v.id && !seenVisitIds.has(v.id)) {
-                seenVisitIds.add(v.id);
-                mergedVisits.push(v);
-            }
-        }
-        const fallbackCode = `${sourceTag.toUpperCase()}-${task.id}`;
-        const has = (k) => Object.prototype.hasOwnProperty.call(task, k);
-        const pick = (keys) => {
-            const out = {};
-            keys.forEach((k) => {
-                if (has(k)) out[k] = task[k];
-            });
-            return out;
-        };
-        const isLegacy = sourceTag === "legacy";
-        const plannedStart = isLegacy
-            ? (task.planned_start_date ?? "")
-            : (task.start_date ?? task.planned_start_date ?? "");
-        const plannedEnd = isLegacy
-            ? (task.planned_end_date ?? "")
-            : (task.end_date ?? task.planned_end_date ?? "");
-        const actualStart = isLegacy
-            ? (task.actual_start_date ?? "")
-            : (task.actual_start_date ?? task.start_date ?? "");
-        const actualEnd = isLegacy
-            ? (task.actual_end_date ?? "")
-            : (task.actual_end_date ?? task.end_date ?? "");
-        const plannedQty = isLegacy
-            ? (task.planned_quantity ?? "")
-            : (task.planned_qty ?? task.planned_quantity ?? "");
-        const completedQty = isLegacy
-            ? (task.completed_quantity ?? "")
-            : (task.completed_qty ?? task.completed_quantity ?? "");
-        const unitVal = isLegacy
-            ? (task.unit ?? "")
-            : (task.qty_unit ?? task.unit ?? "");
-        const supervisorId = isLegacy
-            ? (task.supervisor_member_id ?? "")
-            : (task.assigned_supervisor_member_id ?? task.supervisor_member_id ?? "");
-        return {
-            ...pick(Object.keys(task)),
-            checklists: mergedChecklists,
-            survey_visits: mergedVisits,
-            legacy_task_id: sourceTag === "unified" ? partnerMatch?.id : (task.legacy_task_id || task.id),
-            unified_task_id: sourceTag === "legacy" ? partnerMatch?.id : (task.unified_task_id || task.id),
-            task_code: task.task_code || fallbackCode,
-            status: task.status || task.status_key || "pending",
-            priority: task.priority || "medium",
-            supervisor: task.supervisor || task.assigned_supervisor_member || null,
-            sort_order: Number.isFinite(task.sort_order) ? task.sort_order : 0,
-            _sourceKey: `${sourceTag}-${task.id}`,
-            _source: sourceTag,
-            planned_start_date: formatDateForInput(plannedStart),
-            planned_end_date: formatDateForInput(plannedEnd),
-            actual_start_date: formatDateForInput(actualStart),
-            actual_end_date: formatDateForInput(actualEnd),
-            planned_quantity: plannedQty,
-            completed_quantity: completedQty,
-            unit: unitVal,
-            progress_percent: has("progress_percent") && task.progress_percent !== null && task.progress_percent !== undefined
-                ? task.progress_percent
-                : "",
-            supervisor_member_id: supervisorId,
-            requires_daily_update: !!(task.requires_daily_update ?? false),
-            requires_gps_verification: !!(task.requires_gps_verification ?? false),
-        };
-    };
-
-    const rows = [
-        ...legacyTasks.map((t) => normalize(t, "legacy")),
-        ...unifiedTasks.map((t) => normalize(t, "unified")),
-    ];
-
-    rows.sort((a, b) => {
-        const diff = (a.sort_order || 0) - (b.sort_order || 0);
-        if (diff !== 0) return diff;
-        const at = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return bt - at;
-    });
-
-    return rows;
+    return mergeProjectExecutionTasks(project);
 }
 
 function Field({ label, value, span = "" }) {

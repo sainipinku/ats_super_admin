@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\ForgotPasswordOtpRequest;
 use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\Member;
@@ -431,6 +432,170 @@ class AuthController extends Controller
     }
 
     /**
+     * Request Password Reset OTP
+     *
+     * Initiates the forgot-password flow by generating a static 6-digit `reset_otp` (`123456`) with a 2-minute expiration window and saving it on the member record.
+     *
+     * @tags Authentication
+     * @param ForgotPasswordOtpRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function forgotPassword(ForgotPasswordOtpRequest $request)
+    {
+        return $this->sendResetOtpResponse($request->validated(), 'Password reset OTP sent successfully.');
+    }
+
+    /**
+     * Resend Password Reset OTP
+     *
+     * Re-issues the static 6-digit `reset_otp` (`123456`) and resets the 2-minute expiration timer for an ongoing password reset request.
+     *
+     * @tags Authentication
+     * @param ForgotPasswordOtpRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function resendResetOtp(ForgotPasswordOtpRequest $request)
+    {
+        return $this->sendResetOtpResponse($request->validated(), 'Password reset OTP resent successfully.');
+    }
+
+    /**
+     * Verify Password Reset OTP
+     *
+     * Validates the submitted `reset_otp` (`otp`) against the stored value within the 2-minute expiry window and returns a short-lived `reset_token` to authorize password reset.
+     *
+     * @tags Authentication
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function verifyResetOtp(Request $request)
+    {
+        $validated = $request->validate([
+            'identifier' => ['required_without_all:email,phone', 'nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'otp' => ['required_without:reset_otp', 'nullable', 'string', 'max:10'],
+            'reset_otp' => ['nullable', 'string', 'max:10'],
+        ]);
+
+        $resolved = $this->resolveResetMemberFromValidated($validated);
+        if ($resolved instanceof \Illuminate\Http\JsonResponse) {
+            return $resolved;
+        }
+        $member = $resolved;
+
+        if (! $member->reset_otp || ! $member->reset_otp_expires_at || $member->reset_otp_expires_at->isPast()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Reset OTP expired. Please request a new OTP.',
+            ], 422);
+        }
+
+        $submittedOtp = (string) ($validated['otp'] ?? $validated['reset_otp'] ?? '');
+        if (! hash_equals((string) $member->reset_otp, $submittedOtp)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid reset OTP.',
+            ], 422);
+        }
+
+        $resetToken = Str::random(64);
+        $member->forceFill([
+            'reset_otp' => null,
+            'reset_otp_expires_at' => null,
+            'reset_otp_verified_at' => now(),
+            'reset_password_token' => $resetToken,
+            'reset_password_token_expires_at' => now()->addMinutes(10),
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Reset OTP verified successfully.',
+            'reset_token' => $resetToken,
+            'expires_in_seconds' => 600,
+        ]);
+    }
+
+    /**
+     * Reset Password (After OTP Verification)
+     *
+     * Sets a new password for a member whose reset OTP was verified. Requires `new_password` and matching `new_password_confirmation`.
+     *
+     * @tags Authentication
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function resetPassword(Request $request)
+    {
+        $validated = $request->validate([
+            'identifier' => ['required_without_all:email,phone', 'nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'reset_token' => ['nullable', 'string', 'max:255'],
+            'new_password' => ['required', 'string', 'confirmed', Password::min(6)],
+            'new_password_confirmation' => ['required', 'string', 'min:6'],
+        ]);
+
+        $resolved = $this->resolveResetMemberFromValidated($validated);
+        if ($resolved instanceof \Illuminate\Http\JsonResponse) {
+            return $resolved;
+        }
+        $member = $resolved;
+
+        $isVerifiedWindowValid = $member->reset_otp_verified_at !== null
+            && $member->reset_otp_verified_at->greaterThanOrEqualTo(now()->subMinutes(10));
+
+        if (! $isVerifiedWindowValid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Reset OTP has not been verified or verification has expired.',
+            ], 422);
+        }
+
+        if (! empty($validated['reset_token'])) {
+            $tokenValid = $member->reset_password_token
+                && $member->reset_password_token_expires_at
+                && ! $member->reset_password_token_expires_at->isPast()
+                && hash_equals((string) $member->reset_password_token, (string) $validated['reset_token']);
+
+            if (! $tokenValid) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid or expired reset token.',
+                ], 422);
+            }
+        }
+
+        $member->forceFill([
+            'password' => Hash::make($validated['new_password']),
+            'must_change_password' => false,
+            'reset_otp' => null,
+            'reset_otp_expires_at' => null,
+            'reset_otp_verified_at' => null,
+            'reset_password_token' => null,
+            'reset_password_token_expires_at' => null,
+        ])->save();
+
+        // Invalidate old Sanctum tokens so leaked credentials cannot persist across password resets
+        $member->tokens()->delete();
+
+        ActivityLog::create([
+            'user_id'     => $member->id,
+            'user_role'   => 'doer',
+            'action_type' => ActionTypeEnum::LOGIN,
+            'description' => 'Member reset password via Forgot Password OTP API',
+            'ip_address'  => $request->ip(),
+            'user_agent'  => $request->userAgent(),
+            'action_time' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password reset successfully. You can now log in with your new password.',
+        ]);
+    }
+
+    /**
      * Get Authenticated Member Profile
      *
      * Returns the currently authenticated member's details, roles, employee ID, and approval status.
@@ -500,6 +665,82 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Logged out successfully.',
         ]);
+    }
+
+    private function sendResetOtpResponse(array $validated, string $successMessage): \Illuminate\Http\JsonResponse
+    {
+        $resolved = $this->resolveResetMemberFromValidated($validated);
+        if ($resolved instanceof \Illuminate\Http\JsonResponse) {
+            return $resolved;
+        }
+        $member = $resolved;
+
+        $expiresAt = now()->addMinutes(2);
+        $member->forceFill([
+            'reset_otp' => '123456',
+            'reset_otp_expires_at' => $expiresAt,
+            'reset_otp_verified_at' => null,
+            'reset_password_token' => null,
+            'reset_password_token_expires_at' => null,
+        ])->save();
+
+        $payload = [
+            'success' => true,
+            'message' => $successMessage,
+            'otp_expires_at' => $expiresAt->toISOString(),
+            'expires_in_seconds' => 120,
+        ];
+
+        if (config('app.debug')) {
+            $payload['otp'] = '123456';
+        }
+
+        return response()->json($payload);
+    }
+
+    private function resolveResetMemberFromValidated(array $validated): Member|\Illuminate\Http\JsonResponse
+    {
+        $identifier = trim((string) ($validated['identifier'] ?? $validated['email'] ?? $validated['phone'] ?? ''));
+
+        $member = Member::query()
+            ->where(function ($q) use ($identifier) {
+                $q->where('email', $identifier)
+                    ->orWhere('phone', $identifier)
+                    ->orWhere('username', $identifier);
+            })
+            ->first();
+
+        if (! $member) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No account found for the provided email, phone, or username.',
+            ], 404);
+        }
+
+        if ($member->isPending()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account is pending admin approval.',
+                'error_code' => 'PENDING_APPROVAL',
+            ], 403);
+        }
+
+        if ($member->isRejected()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your registration was not approved.',
+                'error_code' => 'ACCOUNT_REJECTED',
+            ], 403);
+        }
+
+        if (! $member->isActive()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account is inactive. Please contact admin.',
+            ], 403);
+        }
+
+        return $member;
     }
 
     private function issueOtp(Member $member): void

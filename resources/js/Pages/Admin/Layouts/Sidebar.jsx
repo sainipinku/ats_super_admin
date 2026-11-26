@@ -5,7 +5,6 @@ import {
     FaBuilding,
     FaUsers,
     FaProjectDiagram,
-    FaClipboardList,
     FaBoxes,
     FaTruck,
     FaCogs,
@@ -49,13 +48,6 @@ const navigation = [
                 getHref: () => safeRoute("admin.audit_logs.index", "#"),
                 active: ["admin.audit_logs.*"],
                 icon: FaHistory,
-            },
-            {
-                label: "Permission Requests",
-                permissions: ["approval_request.manage", "approval_request.view"],
-                getHref: () => safeRoute("super.approval_requests.index"),
-                active: ["super.approval_requests.*", "admin.approval_requests.*"],
-                icon: FaClipboardList,
             },
             {
                 label: "Admin & Super Admins",

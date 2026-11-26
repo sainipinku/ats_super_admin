@@ -56,14 +56,18 @@ class TaskSubmissionDetailsFeatureTest extends TestCase
     public function test_show_jsx_has_adaptive_labels_and_cross_table_visit_resolution(): void
     {
         $showPath = resource_path('js/Pages/SuperAdmin/Construction/Projects/Show.jsx');
+        $mergeHelperPath = resource_path('js/lib/taskMerge.js');
         $this->assertFileExists($showPath);
+        $this->assertFileExists($mergeHelperPath);
 
         $code = file_get_contents($showPath);
+        $mergeCode = $code . "\n" . file_get_contents($mergeHelperPath);
 
-        // mergedTasksForExecutionList cross-merges visits
-        $this->assertStringContainsString('partnerMatch', $code);
-        $this->assertStringContainsString('combinedVisits', $code);
-        $this->assertStringContainsString('mergedVisits', $code);
+        // mergedTasksForExecutionList cross-merges visits via shared taskMerge helper
+        $this->assertStringContainsString('mergeProjectExecutionTasks', $code);
+        $this->assertStringContainsString('partnerMatch', $mergeCode);
+        $this->assertStringContainsString('combinedVisits', $mergeCode);
+        $this->assertStringContainsString('mergedVisits', $mergeCode);
 
         // taskVisits searches execution_task_id and legacy_task_id
         $this->assertStringContainsString('v.execution_task_id', $code);

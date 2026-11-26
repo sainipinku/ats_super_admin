@@ -38,7 +38,9 @@ class SurveyorToDraftsmanAssignmentService
         Model $actor,
         ?Request $request = null
     ): Model {
-        return DB::transaction(function () use ($project, $taskSource, $taskId, $memberId, $dueDate, $actor, $request) {
+        $sync = app(TaskMirrorSyncService::class);
+
+        return DB::transaction(function () use ($project, $taskSource, $taskId, $memberId, $dueDate, $actor, $request, $sync) {
             $task = match ($taskSource) {
                 'execution' => ExecutionTask::query()
                     ->where('project_id', $project->id)
@@ -57,13 +59,26 @@ class SurveyorToDraftsmanAssignmentService
                 ]);
             }
 
-            if (!$this->isReadyForDraftsmanAssignment($task)) {
+            $counterpart = $task instanceof ExecutionTask
+                ? $sync->findMatchingUnifiedForLegacy($task)
+                : $sync->findMatchingLegacyForUnified($task);
+
+            if ($this->hasActiveDraftsmanAssignment($task)
+                || ($counterpart && $this->hasActiveDraftsmanAssignment($counterpart))) {
+                throw ValidationException::withMessages([
+                    'member_id' => ['This task already has an active Draftsman assignment.'],
+                ]);
+            }
+
+            if (!$this->isReadyForDraftsmanAssignment($task)
+                && (!$counterpart || !$this->isReadyForDraftsmanAssignment($counterpart))) {
                 throw ValidationException::withMessages([
                     'task_id' => ['A Surveyor task must be completed before it can be assigned to a Draftsman.'],
                 ]);
             }
 
-            if (!$this->hasSurveyorAssignment($task, $project)) {
+            if (!$this->hasSurveyorAssignment($task, $project)
+                && (!$counterpart || !$this->hasSurveyorAssignment($counterpart, $project))) {
                 throw ValidationException::withMessages([
                     'task_id' => ['The completed task must have an assigned Surveyor before Draftsman assignment.'],
                 ]);
@@ -84,8 +99,28 @@ class SurveyorToDraftsmanAssignmentService
                 $this->assignUnifiedTask($task, $draftsman, $dueDate, $actor, $project, $request);
             }
 
+            $sync->syncDraftsmanAssignmentToCounterpart($task, $draftsman, $dueDate, $actor, (int) $project->id);
+
             return $task->refresh();
         });
+    }
+
+    private function hasActiveDraftsmanAssignment(ExecutionTask|Task $task): bool
+    {
+        if (strtolower(trim((string) $task->status)) === 'drafting_in_progress') {
+            return true;
+        }
+
+        if ($task instanceof ExecutionTask) {
+            return $task->assignees()
+                ->where('status', 'active')
+                ->whereIn('assignment_role', self::DRAFTSMAN_ROLE_SLUGS)
+                ->exists();
+        }
+
+        return $task->activeAssignments()
+            ->whereIn('assignment_role', self::DRAFTSMAN_ROLE_SLUGS)
+            ->exists();
     }
 
     private function isReadyForDraftsmanAssignment(ExecutionTask|Task $task): bool
@@ -314,13 +349,30 @@ class SurveyorToDraftsmanAssignmentService
         Model $actor,
         Project $project
     ): void {
-        $taskColumn = $task instanceof ExecutionTask ? 'execution_task_id' : 'task_id';
+        $sync = app(TaskMirrorSyncService::class);
+        $counterpart = $task instanceof ExecutionTask
+            ? $sync->findMatchingUnifiedForLegacy($task)
+            : $sync->findMatchingLegacyForUnified($task);
+
+        $legacyId = $task instanceof ExecutionTask ? $task->id : $counterpart?->id;
+        $unifiedId = $task instanceof Task ? $task->id : $counterpart?->id;
+
         $surveyorMemberId = (int) ($surveyorMemberIds[0]
-            ?? ($task instanceof ExecutionTask ? $task->supervisor_member_id : $task->assigned_supervisor_member_id));
+            ?? ($task instanceof ExecutionTask ? $task->supervisor_member_id : $task->assigned_supervisor_member_id)
+            ?? ($counterpart instanceof ExecutionTask ? $counterpart->supervisor_member_id : $counterpart?->assigned_supervisor_member_id));
 
         $surveyVisit = SurveyVisit::query()
             ->where('project_id', $project->id)
-            ->where($taskColumn, $task->id)
+            ->where(function ($query) use ($legacyId, $unifiedId) {
+                if ($legacyId !== null) {
+                    $query->orWhere('execution_task_id', $legacyId)
+                        ->orWhere('task_id', $legacyId);
+                }
+                if ($unifiedId !== null) {
+                    $query->orWhere('task_id', $unifiedId)
+                        ->orWhere('execution_task_id', $unifiedId);
+                }
+            })
             ->lockForUpdate()
             ->latest('id')
             ->first();
@@ -329,8 +381,8 @@ class SurveyorToDraftsmanAssignmentService
             $surveyVisit = SurveyVisit::create([
                 'project_id' => $project->id,
                 'survey_plan_id' => null,
-                'task_id' => $task instanceof Task ? $task->id : null,
-                'execution_task_id' => $task instanceof ExecutionTask ? $task->id : null,
+                'task_id' => $unifiedId,
+                'execution_task_id' => $legacyId,
                 'member_id' => $surveyorMemberId,
                 'checked_in_by_member_id' => $surveyorMemberId,
                 'check_in_at' => now(),
@@ -338,6 +390,17 @@ class SurveyorToDraftsmanAssignmentService
                 'submitted_at' => now(),
                 'status' => SurveyStatus::APPROVED,
             ]);
+        } else {
+            $visitPatch = [];
+            if ($unifiedId !== null && (int) ($surveyVisit->task_id ?? 0) !== (int) $unifiedId) {
+                $visitPatch['task_id'] = $unifiedId;
+            }
+            if ($legacyId !== null && (int) ($surveyVisit->execution_task_id ?? 0) !== (int) $legacyId) {
+                $visitPatch['execution_task_id'] = $legacyId;
+            }
+            if ($visitPatch !== []) {
+                $surveyVisit->update($visitPatch);
+            }
         }
 
         $surveySubmission = SurveySubmission::query()

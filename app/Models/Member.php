@@ -53,6 +53,9 @@ class Member extends Authenticatable
         'remember_token',
         'reset_password_token',
         'reset_password_token_expires_at',
+        'reset_otp',
+        'reset_otp_expires_at',
+        'reset_otp_verified_at',
         'company_name',
         'state',
         'city',
@@ -71,6 +74,8 @@ class Member extends Authenticatable
         'dob' => 'date',
         'phone_verify_at' => 'datetime',
         'reset_password_token_expires_at' => 'datetime',
+        'reset_otp_expires_at' => 'datetime',
+        'reset_otp_verified_at' => 'datetime',
         'password' => 'hashed',
         'candidate_profile' => 'array',
         'resume_uploaded_at' => 'datetime',
@@ -386,6 +391,9 @@ class Member extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'otp',
+        'reset_otp',
+        'reset_password_token',
     ];
 
     public function roles()

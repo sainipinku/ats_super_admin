@@ -839,13 +839,18 @@ class TaskManagementService
         $start = $row['assigned_from'] ?? $row['start_date'] ?? $task->start_date ?? null;
         $end = $row['assigned_until'] ?? $row['end_date'] ?? $task->end_date ?? null;
 
+        $rawRole = $row['assignment_role'] ?? null;
+        $normalizedRole = $rawRole !== null ? strtolower(trim((string) $rawRole)) : null;
+        $allowedRoles = ['owner', 'executor', 'reviewer', 'checker', 'verifier', 'surveyor', 'draft_person'];
+        $assignmentRole = ($normalizedRole !== null && $normalizedRole !== '')
+            ? (in_array($normalizedRole, $allowedRoles, true) ? $normalizedRole : (TaskAssignmentRole::EXECUTOR->value ?? 'executor'))
+            : null;
+
         $payload = [
             'task_id' => $task->id,
             'project_id' => $task->project_id,
             'assigned_to' => (int) $row['member_id'],
-            'assignment_role' => in_array($row['assignment_role'] ?? null, ['owner','executor','reviewer','checker','verifier'], true)
-                ? $row['assignment_role']
-                : (TaskAssignmentRole::EXECUTOR->value ?? 'executor'),
+            'assignment_role' => $assignmentRole,
             'is_primary' => !empty($row['is_primary']),
             'assigned_from' => $start ? $this->toCarbon($start, '09:00:00')?->format('Y-m-d H:i:s') : null,
             'assigned_until' => $end ? $this->toCarbon($end, '18:00:00')?->format('Y-m-d H:i:s') : null,
@@ -942,7 +947,7 @@ class TaskManagementService
                     ->all();
                 $missing = array_diff($planMembers, $existing);
                 if ($missing) {
-                    $rows = array_values(array_map(static fn (int $mid) => ['member_id' => $mid, 'assignment_role' => 'executor'], $missing));
+                    $rows = array_values(array_map(static fn (int $mid) => ['member_id' => $mid], $missing));
                     $this->replaceAssignments($task, array_merge(iterator_to_array($this->currentActiveAssigneeRows($task)), $rows), $this->resolveSystemActor());
                 }
             }
@@ -962,7 +967,7 @@ class TaskManagementService
             ->get(['assigned_to','assignment_role','is_primary'])
             ->map(static fn (TaskAssignment $a) => [
                 'member_id' => (int) $a->assigned_to,
-                'assignment_role' => (string) ($a->assignment_role?->value ?? $a->assignment_role),
+                'assignment_role' => $a->assignment_role?->value ?? ($a->assignment_role !== null ? (string) $a->assignment_role : null),
                 'is_primary' => (bool) $a->is_primary,
             ]);
     }

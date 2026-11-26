@@ -564,3 +564,28 @@ table tr td{@apply border-b-[1px] border-b-[#00000014] dark:border-b-[#5246e64d]
 .submit_checkbutton:hover::before {
  width: 9em;
 }
+
+@keyframes cad-action-blink-border {
+    0%, 100% {
+        border-color: #f43f5e;
+        box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.35), 0 0 18px rgba(244, 63, 94, 0.25);
+    }
+    50% {
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.28), 0 0 22px rgba(245, 158, 11, 0.18);
+    }
+}
+
+.cad-action-blink-border {
+    border-width: 2px !important;
+    border-style: solid !important;
+    animation: cad-action-blink-border 1.15s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cad-action-blink-border {
+        animation: none;
+        border-color: #f43f5e !important;
+        box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.28);
+    }
+}

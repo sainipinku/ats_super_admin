@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Concerns;
 use App\Models\ExecutionPlan;
 use App\Models\ExecutionTask;
 use App\Models\Task;
+use App\Services\Construction\TaskMirrorSyncService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -114,16 +115,20 @@ trait ResolvesProjectDynamicTasks
         }
 
         // Identify unified tasks that do not yet have an ExecutionTask mirror
+        $sync = app(TaskMirrorSyncService::class);
         $unifiedTasksNeedingMirror = [];
         foreach ($unifiedTasks as $ut) {
-            $codeKey = !empty($ut->task_code) ? ($ut->project_id . ':' . strtolower(trim((string) $ut->task_code))) : null;
-            $titleKey = !empty($ut->title) ? ($ut->project_id . ':' . strtolower(trim((string) $ut->title))) : null;
-
-            $matched = ($codeKey && isset($execByCode[$codeKey]))
-                ? $execByCode[$codeKey]
-                : (($titleKey && isset($execByTitle[$titleKey])) ? $execByTitle[$titleKey] : null);
+            $matched = $sync->findMatchingLegacyForUnified($ut);
+            if ($matched === null) {
+                $codeKey = !empty($ut->task_code) ? ($ut->project_id . ':' . strtolower(trim((string) $ut->task_code))) : null;
+                $titleKey = !empty($ut->title) ? ($ut->project_id . ':' . strtolower(trim((string) $ut->title))) : null;
+                $matched = ($codeKey && isset($execByCode[$codeKey]))
+                    ? $execByCode[$codeKey]
+                    : (($titleKey && isset($execByTitle[$titleKey])) ? $execByTitle[$titleKey] : null);
+            }
 
             if ($matched) {
+                $sync->syncTaskCodeIfMissing($matched, $ut);
                 // If unified task has a nicer task_code or updated status, synchronize mirror
                 $needsSave = false;
                 if (empty($matched->task_code) && !empty($ut->task_code)) {
@@ -145,58 +150,11 @@ trait ResolvesProjectDynamicTasks
             }
         }
 
-        // Safely mirror missing unified tasks into ExecutionTask
+        // Safely mirror missing unified tasks into ExecutionTask via shared sync service
         if (!empty($unifiedTasksNeedingMirror)) {
-            $plansByProject = [];
             foreach ($unifiedTasksNeedingMirror as $ut) {
-                $pId = (int) $ut->project_id;
-                if (!isset($plansByProject[$pId])) {
-                    $plan = ExecutionPlan::where('project_id', $pId)->first();
-                    if (!$plan) {
-                        try {
-                            $planCode = 'EXP-' . $pId . '-' . str_pad((string) (ExecutionPlan::where('project_id', $pId)->count() + 1), 4, '0', STR_PAD_LEFT);
-                            $plan = ExecutionPlan::create([
-                                'project_id' => $pId,
-                                'plan_code' => $planCode,
-                                'title' => 'Project Execution Plan',
-                                'status' => 'active',
-                                'planned_start_date' => now(),
-                                'planned_end_date' => now()->addYear(),
-                            ]);
-                        } catch (\Throwable $e) {
-                            report($e);
-                            $plan = ExecutionPlan::where('project_id', $pId)->first();
-                        }
-                    }
-                    $plansByProject[$pId] = $plan?->id;
-                }
-
-                $baseCode = $this->stringifyTaskField($ut->task_code) ?: ('TSK-' . str_pad((string) $ut->id, 5, '0', STR_PAD_LEFT));
-                $targetCode = $baseCode;
-                $counter = 1;
-                while (ExecutionTask::where('task_code', $targetCode)->exists()) {
-                    $targetCode = $baseCode . '-' . $counter;
-                    $counter++;
-                }
-
-                $priority = $this->normalizeTaskPriority($ut->priority, 'medium');
-                $utStatus = $this->stringifyTaskField($ut->status, 'planned');
-
                 try {
-                    $mirror = ExecutionTask::create([
-                        'task_code' => $targetCode,
-                        'title' => $this->stringifyTaskField($ut->title),
-                        'description' => $ut->description ?? null,
-                        'project_id' => $ut->project_id,
-                        'execution_plan_id' => $plansByProject[$pId] ?? null,
-                        'priority' => $priority,
-                        'planned_start_date' => $ut->start_date ?? now(),
-                        'planned_end_date' => $ut->end_date ?? now()->addDays(1),
-                        'supervisor_member_id' => $ut->assigned_supervisor_member_id ?? $ut->member_id ?? null,
-                        'status' => $utStatus,
-                        'progress_percent' => (int) ($ut->progress_percent ?? 0),
-                    ]);
-
+                    $mirror = $sync->ensureLegacyMirror($ut);
                     $codeKey = $mirror->project_id . ':' . strtolower(trim((string) $mirror->task_code));
                     $titleKey = $mirror->project_id . ':' . strtolower(trim((string) $mirror->title));
                     $execByCode[$codeKey] = $mirror;
@@ -204,10 +162,7 @@ trait ResolvesProjectDynamicTasks
                     $executionTasks->push($mirror);
                 } catch (\Throwable $e) {
                     report($e);
-                    $existing = ExecutionTask::where('project_id', $ut->project_id)
-                        ->where(function ($q) use ($targetCode, $ut) {
-                            $q->where('task_code', $targetCode)->orWhere('title', $ut->title);
-                        })->first();
+                    $existing = $sync->findMatchingLegacyForUnified($ut);
                     if ($existing) {
                         $executionTasks->push($existing);
                     }
@@ -273,65 +228,7 @@ trait ResolvesProjectDynamicTasks
             // 2. Check unified Task match on project
             $ut = Task::where('id', $taskId)->where('project_id', $projectId)->first();
             if ($ut) {
-                // Find matching mirror ExecutionTask
-                $mirror = ExecutionTask::where('project_id', $projectId)
-                    ->where(function ($q) use ($ut) {
-                        if (!empty($ut->task_code)) {
-                            $q->where('task_code', $ut->task_code);
-                        }
-                        if (!empty($ut->title)) {
-                            $q->orWhere('title', $ut->title);
-                        }
-                    })->first();
-
-                if ($mirror) {
-                    return $mirror->id;
-                }
-
-                // Create mirror if not exists
-                $plan = ExecutionPlan::where('project_id', $projectId)->first();
-                $planId = $plan?->id;
-                if (!$planId) {
-                    try {
-                        $planCode = 'EXP-' . $projectId . '-' . str_pad((string) (ExecutionPlan::where('project_id', $projectId)->count() + 1), 4, '0', STR_PAD_LEFT);
-                        $plan = ExecutionPlan::create([
-                            'project_id' => $projectId,
-                            'plan_code' => $planCode,
-                            'title' => 'Project Execution Plan',
-                            'status' => 'active',
-                            'planned_start_date' => now(),
-                            'planned_end_date' => now()->addYear(),
-                        ]);
-                        $planId = $plan->id;
-                    } catch (\Throwable $e) {
-                        report($e);
-                        $planId = ExecutionPlan::where('project_id', $projectId)->value('id');
-                    }
-                }
-
-                $baseCode = $this->stringifyTaskField($ut->task_code) ?: ('TSK-' . str_pad((string) $ut->id, 5, '0', STR_PAD_LEFT));
-                $targetCode = $baseCode;
-                $counter = 1;
-                while (ExecutionTask::where('task_code', $targetCode)->exists()) {
-                    $targetCode = $baseCode . '-' . $counter;
-                    $counter++;
-                }
-
-                $created = ExecutionTask::create([
-                    'task_code' => $targetCode,
-                    'title' => $this->stringifyTaskField($ut->title),
-                    'description' => $ut->description ?? null,
-                    'project_id' => $projectId,
-                    'execution_plan_id' => $planId,
-                    'priority' => $this->normalizeTaskPriority($ut->priority, 'medium'),
-                    'planned_start_date' => $ut->start_date ?? now(),
-                    'planned_end_date' => $ut->end_date ?? now()->addDays(1),
-                    'supervisor_member_id' => $ut->assigned_supervisor_member_id ?? $ut->member_id ?? null,
-                    'status' => $this->stringifyTaskField($ut->status, 'planned'),
-                    'progress_percent' => (int) ($ut->progress_percent ?? 0),
-                ]);
-
-                return $created->id;
+                return app(TaskMirrorSyncService::class)->ensureLegacyMirror($ut)->id;
             }
         } catch (\Throwable $e) {
             report($e);

@@ -5,7 +5,6 @@ import {
     FaBuilding,
     FaUsers,
     FaProjectDiagram,
-    FaClipboardList,
     FaBoxes,
     FaTruck,
     FaCogs,
@@ -48,13 +47,6 @@ const navigation = [
                 href: route("super.location_tracking"),
                 active: ["super.location_tracking"],
                 icon: FaMapMarkerAlt,
-            },
-            {
-                label: "Permission Requests",
-                permissions: ["approval_request.manage", "approval_request.view"],
-                href: route("super.approval_requests.index"),
-                active: ["super.approval_requests.*"],
-                icon: FaClipboardList,
             },
             {
                 label: "Admin & Super Admins",

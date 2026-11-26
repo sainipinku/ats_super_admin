@@ -52,20 +52,96 @@ trait ResolvesConstructionActor
         return null;
     }
 
+    protected function isActingInNonAdminRole(?Model $actor = null): bool
+    {
+        $resolved = $this->constructionActor();
+        if (
+            $actor !== null
+            && $resolved !== null
+            && ! ($actor->getMorphClass() === $resolved->getMorphClass() && (int) $actor->getKey() === (int) $resolved->getKey())
+        ) {
+            return false;
+        }
+
+        $activeRole = strtolower(trim((string) (session('active_role') ?? request()?->query('role') ?? '')));
+        if ($activeRole === '') {
+            return false;
+        }
+
+        return ! in_array($activeRole, [
+            'super_admin',
+            'superadmin',
+            'crm_super_admin',
+            'project_owner',
+            'admin',
+            'project_admin',
+        ], true);
+    }
+
+    protected function memberHasCompanyWideAdminRole(\App\Models\Member $member): bool
+    {
+        if (isset($member->is_project_owner) && (int) $member->is_project_owner === 1) {
+            return true;
+        }
+
+        $memberSlug = strtolower(trim((string) ($member->slug ?? '')));
+        if (in_array($memberSlug, ['admin', 'super-admin', 'super_admin', 'superadmin'], true)) {
+            return true;
+        }
+
+        $adminSlugs = ['admin', 'project_admin', 'super_admin', 'superadmin', 'super-admin'];
+
+        // Active company-wide (project_id IS NULL) role assignments take precedence cleanly over project-scoped roles
+        $hasCompanyWideAdmin = \App\Models\MemberRoleAssignment::query()
+            ->where('member_id', $member->getKey())
+            ->where('status', 1)
+            ->whereNull('project_id')
+            ->whereHas('role', function ($q) use ($adminSlugs) {
+                $q->where('status', 'active')
+                    ->whereNull('deleted_at')
+                    ->whereIn('slug', $adminSlugs);
+            })
+            ->exists();
+
+        if ($hasCompanyWideAdmin) {
+            return true;
+        }
+
+        $rawRoles = is_array($member->roles)
+            ? $member->roles
+            : (json_decode((string) $member->getRawOriginal('roles'), true) ?: []);
+
+        if (! empty($rawRoles)) {
+            $numericIds = array_values(array_filter(array_map('intval', array_filter($rawRoles, 'is_numeric'))));
+            if (! empty($numericIds)) {
+                $hasLegacyAdminId = \App\Models\Role::whereIn('id', $numericIds)
+                    ->whereIn('slug', $adminSlugs)
+                    ->exists();
+                if ($hasLegacyAdminId) {
+                    return true;
+                }
+            }
+
+            foreach ($rawRoles as $r) {
+                if (is_string($r) && in_array(strtolower(trim($r)), $adminSlugs, true)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     protected function isCompanyAdminActor(?Model $actor = null): bool
     {
         $actor = $actor ?? $this->constructionActor();
 
-        if (!$actor) {
+        if (!$actor || $this->isActingInNonAdminRole($actor)) {
             return false;
         }
 
-        if (Auth::guard('admin')->check()) {
-            return true;
-        }
-
         if ($actor instanceof \App\Models\Member) {
-            return $actor->isAdmin();
+            return $this->memberHasCompanyWideAdminRole($actor);
         }
 
         return false;
@@ -75,7 +151,7 @@ trait ResolvesConstructionActor
     {
         $actor = $actor ?? $this->constructionActor();
 
-        if (!$actor) {
+        if (!$actor || $this->isActingInNonAdminRole($actor)) {
             return false;
         }
 
@@ -84,21 +160,17 @@ trait ResolvesConstructionActor
                 return true;
             }
             if ($actor instanceof \App\Models\Member) {
-                return $actor->isAdmin();
+                return $this->memberHasCompanyWideAdminRole($actor);
             }
             return false;
         }
 
-        if ($actor instanceof \App\Models\SuperAdmin || Auth::guard('superadmin')->check()) {
+        if ($actor instanceof \App\Models\SuperAdmin) {
             return true;
         }
 
-        if (Auth::guard('admin')->check()) {
-            return true;
-        }
-
-        if ($actor instanceof \App\Models\Member && $actor->isAdmin()) {
-            return true;
+        if ($actor instanceof \App\Models\Member) {
+            return $this->memberHasCompanyWideAdminRole($actor);
         }
 
         return false;
@@ -469,10 +541,23 @@ trait ResolvesConstructionActor
                 }
             });
 
-            return $query->pluck('id')->map(fn ($id) => (int) $id)->values();
+            $companyProjects = $query->pluck('id')->map(fn ($id) => (int) $id)->values();
+
+            if ($this->isActingInNonAdminRole($actor)) {
+                $linkedMemberId = $this->resolveActorMemberId($actor);
+                if (!$linkedMemberId) {
+                    return collect();
+                }
+
+                $memberAssignedIds = $this->getAssignedProjectIdsForMemberId($linkedMemberId);
+
+                return $companyProjects->intersect($memberAssignedIds)->values();
+            }
+
+            return $companyProjects;
         }
 
-        // 3. Company Admin (Admin guard or Member with Admin role): always sees ALL projects of that company
+        // 3. Company Admin (Member with company-wide Admin role, not switched to a worker role): sees ALL projects of that company
         if ($this->isCompanyAdminActor($actor)) {
             $companyId = $this->getAccessibleCompanyId($actor);
             $query = \App\Models\Project::query();
@@ -485,39 +570,44 @@ trait ResolvesConstructionActor
             return $query->pluck('id');
         }
 
-        // 4. Regular Member / Employee: ONLY sees projects they are explicitly assigned to or have tasks/duties on
-        $assignedProjectIds = \App\Models\ProjectTeamMember::where('member_id', $actor->getKey())
+        // 4. Regular Member / Employee (or Admin switched into a worker role): ONLY sees projects where added to project team / assigned
+        return $this->getAssignedProjectIdsForMemberId((int) $actor->getKey());
+    }
+
+    protected function getAssignedProjectIdsForMemberId(int $memberId): \Illuminate\Support\Collection
+    {
+        $assignedProjectIds = \App\Models\ProjectTeamMember::where('member_id', $memberId)
             ->where(function ($q) {
-                $q->whereNull('status')->orWhere('status', '!=', 'inactive');
+                $q->whereNull('status')->orWhereNotIn('status', ['inactive', 'removed', 'disabled']);
             })
             ->pluck('project_id')
             ->merge(
-                \App\Models\MemberRoleAssignment::where('member_id', $actor->getKey())
+                \App\Models\MemberRoleAssignment::where('member_id', $memberId)
                     ->where('status', 1)
                     ->whereNotNull('project_id')
                     ->pluck('project_id')
             )
             ->merge(
-                \App\Models\ExecutionTask::where('supervisor_member_id', $actor->getKey())
+                \App\Models\ExecutionTask::where('supervisor_member_id', $memberId)
                     ->whereNotNull('project_id')
                     ->pluck('project_id')
             )
             ->merge(
                 \Illuminate\Support\Facades\DB::table('construction_execution_task_assignees')
-                    ->where('member_id', $actor->getKey())
+                    ->where('member_id', $memberId)
                     ->whereNotNull('project_id')
                     ->pluck('project_id')
             )
             ->merge(
                 \Illuminate\Support\Facades\DB::table('task_assignments')
-                    ->where('assigned_to', $actor->getKey())
+                    ->where('assigned_to', $memberId)
                     ->whereNotNull('project_id')
                     ->pluck('project_id')
             )
             ->merge(
-                \App\Models\Task::where(function ($q) use ($actor) {
-                    $q->where('member_id', $actor->getKey())
-                      ->orWhere('assigned_supervisor_member_id', $actor->getKey());
+                \App\Models\Task::where(function ($q) use ($memberId) {
+                    $q->where('member_id', $memberId)
+                      ->orWhere('assigned_supervisor_member_id', $memberId);
                 })
                     ->whereNotNull('project_id')
                     ->pluck('project_id')
@@ -525,25 +615,25 @@ trait ResolvesConstructionActor
             ->merge(
                 \Illuminate\Support\Facades\DB::table('construction_survey_plan_members')
                     ->join('construction_survey_plans', 'construction_survey_plans.id', '=', 'construction_survey_plan_members.survey_plan_id')
-                    ->where('construction_survey_plan_members.member_id', $actor->getKey())
+                    ->where('construction_survey_plan_members.member_id', $memberId)
                     ->whereNotNull('construction_survey_plans.project_id')
                     ->pluck('construction_survey_plans.project_id')
             )
             ->merge(
                 \Illuminate\Support\Facades\DB::table('construction_drafting_jobs')
-                    ->where('assigned_to_member_id', $actor->getKey())
+                    ->where('assigned_to_member_id', $memberId)
                     ->whereNotNull('project_id')
                     ->pluck('project_id')
             )
             ->merge(
-                \App\Models\VehicleAssignment::where('driver_member_id', $actor->getKey())
+                \App\Models\VehicleAssignment::where('driver_member_id', $memberId)
                     ->where('status', 'active')
                     ->whereNotNull('project_id')
                     ->pluck('project_id')
             )
             ->merge(
                 \Illuminate\Support\Facades\DB::table('construction_equipment_allocations')
-                    ->where('assigned_to_member_id', $actor->getKey())
+                    ->where('assigned_to_member_id', $memberId)
                     ->where('status', 'active')
                     ->whereNotNull('project_id')
                     ->pluck('project_id')

@@ -16,6 +16,11 @@ class DrawingApproval extends Model
         'requested_by_type',
         'requested_by_id',
         'requested_at',
+        'assigned_to_type',
+        'assigned_to_id',
+        'assigned_by_type',
+        'assigned_by_id',
+        'assigned_at',
         'approved_by_type',
         'approved_by_id',
         'approved_at',
@@ -27,9 +32,20 @@ class DrawingApproval extends Model
 
     protected $casts = [
         'requested_at' => 'datetime',
+        'assigned_at' => 'datetime',
         'approved_at' => 'datetime',
         'skip_junior_review' => 'boolean',
     ];
+
+    public function assignedTo(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    {
+        return $this->morphTo(__FUNCTION__, 'assigned_to_type', 'assigned_to_id');
+    }
+
+    public function assignedBy(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    {
+        return $this->morphTo(__FUNCTION__, 'assigned_by_type', 'assigned_by_id');
+    }
 
     public function project(): BelongsTo
     {

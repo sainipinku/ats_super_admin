@@ -6,18 +6,17 @@ use Tests\TestCase;
 
 class TaskDriverAssignmentFeatureTest extends TestCase
 {
-    public function test_react_projects_show_has_driver_in_assignment_role_select(): void
+    public function test_react_projects_show_removes_assignment_role_select_while_retaining_driver_detection(): void
     {
         $filePath = resource_path('js/Pages/SuperAdmin/Construction/Projects/Show.jsx');
         $this->assertFileExists($filePath);
 
         $content = file_get_contents($filePath);
 
-        // Verify driver option exists in Assignment Role select dropdown
-        $this->assertMatchesRegularExpression(
-            '/<option\s+value="driver">/i',
+        $this->assertStringNotContainsString(
+            'Assignment Role',
             $content,
-            'SuperAdmin Projects Show.jsx must have <option value="driver"> in Assignment Role select box'
+            'SuperAdmin Projects Show.jsx must not render Assignment Role select box in transfer modal'
         );
     }
 

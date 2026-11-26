@@ -100,7 +100,7 @@ class CompanyRoleProvisioningService
                 $templatePermissionIds = Permission::pluck('id')->toArray();
             }
 
-            // Project Admin and Admin of a company must ALWAYS receive core fuel, attendance, project, and vehicle permissions
+            // Project Admin and Admin of a company must ALWAYS receive core fuel, attendance, project, vehicle, and CAD approval assignment permissions
             if (in_array($slug, ['project_admin', 'admin'], true)) {
                 $corePermIds = Permission::where(function ($q) {
                     $q->where('slug', 'like', 'fuel_entry.%')
@@ -108,7 +108,12 @@ class CompanyRoleProvisioningService
                       ->orWhere('slug', 'like', 'project.%')
                       ->orWhere('slug', 'like', 'vehicle.%')
                       ->orWhere('slug', 'like', 'vehicle_tracking.%')
-                      ->orWhere('slug', 'like', 'dashboard.%');
+                      ->orWhere('slug', 'like', 'dashboard.%')
+                      ->orWhereIn('slug', [
+                          'drawing_approval.assign_admin',
+                          'drawing_approval.view',
+                          'drawing_approval.approve',
+                      ]);
                 })->pluck('id')->toArray();
                 $templatePermissionIds = array_values(array_unique(array_merge($templatePermissionIds, $corePermIds)));
             }
@@ -170,7 +175,12 @@ class CompanyRoleProvisioningService
               ->orWhere('slug', 'like', 'project.%')
               ->orWhere('slug', 'like', 'vehicle.%')
               ->orWhere('slug', 'like', 'vehicle_tracking.%')
-              ->orWhere('slug', 'like', 'dashboard.%');
+              ->orWhere('slug', 'like', 'dashboard.%')
+              ->orWhereIn('slug', [
+                  'drawing_approval.assign_admin',
+                  'drawing_approval.view',
+                  'drawing_approval.approve',
+              ]);
         })->pluck('id')->toArray();
 
         foreach ($adminRoles as $role) {

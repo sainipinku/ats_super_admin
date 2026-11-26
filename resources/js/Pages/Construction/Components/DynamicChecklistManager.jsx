@@ -4,6 +4,7 @@ import { toast } from "react-hot-toast";
 import gsap from "gsap";
 import EmptyState from "@/Pages/Construction/Components/EmptyState";
 import StatusBadge from "@/Pages/Construction/Components/StatusBadge";
+import { mergeProjectExecutionTasks } from "@/lib/taskMerge";
 
 const prefersReducedMotion = () =>
     typeof window !== "undefined" &&
@@ -82,19 +83,15 @@ const buildGroupsFromProject = (project) => {
         });
     });
 
-    (project?.execution_tasks || []).forEach((task) => {
+    mergeProjectExecutionTasks(project).forEach((task) => {
         const heading = `${task.task_code || "TASK#" + task.id} ${task.title || ""}`.trim();
+        const isUnified = task._source === "unified";
+        const groupKind = isUnified ? "Dynamic Task" : "Execution Task";
+        const defaultScope = isUnified ? "unified_task" : "execution_task";
         (task.checklists || []).forEach((it) => {
-            const n = normalizeItem(it, "execution_task", heading);
-            if (n) entries.push({ groupKind: "Execution Task", groupLabel: heading, item: n });
-        });
-    });
-
-    (project?.tasks || []).forEach((task) => {
-        const heading = `${task.task_code || "UTASK#" + task.id} ${task.title || ""}`.trim();
-        (task.checklist_items || task.checklistItems || []).forEach((it) => {
-            const n = normalizeItem(it, "unified_task", heading);
-            if (n) entries.push({ groupKind: "Dynamic Task", groupLabel: heading, item: n });
+            const itemScope = it.task_id ? "unified_task" : (it.execution_task_id ? "execution_task" : defaultScope);
+            const n = normalizeItem(it, itemScope, heading);
+            if (n) entries.push({ groupKind, groupLabel: heading, item: n });
         });
     });
 
@@ -231,31 +228,20 @@ export default function DynamicChecklistManager({
     const [editImg1Preview, setEditImg1Preview] = useState(null);
     const [editImg2Preview, setEditImg2Preview] = useState(null);
 
-    // Extract all project tasks (execution tasks, survey plans, unified tasks)
+    // Extract all project tasks (deduplicated across execution_tasks & unified tasks, plus survey plans)
     const taskOptions = useMemo(() => {
         const list = [];
 
-        (project?.execution_tasks || []).forEach((t) => {
+        mergeProjectExecutionTasks(project).forEach((t) => {
+            const isUnified = t._source === "unified";
+            const targetId = isUnified ? (t.unified_task_id || t.id) : (t.legacy_task_id || t.id);
             list.push({
-                key: `exec-${t.id}`,
-                scope: "execution_task",
-                id: t.id,
-                code: t.task_code || `TASK#${t.id}`,
+                key: t._sourceKey || `${t._source}-${t.id}`,
+                scope: isUnified ? "unified_task" : "execution_task",
+                id: targetId,
+                code: t.task_code || `TASK#${targetId}`,
                 title: t.title,
-                label: `[Execution Task] ${t.task_code || "TASK#" + t.id} - ${t.title}`,
-                supervisor: t.supervisor?.name,
-                status: t.status,
-            });
-        });
-
-        (project?.tasks || []).forEach((t) => {
-            list.push({
-                key: `unified-${t.id}`,
-                scope: "unified_task",
-                id: t.id,
-                code: t.task_code || `UTASK#${t.id}`,
-                title: t.title,
-                label: `[Dynamic Task] ${t.task_code || "UTASK#" + t.id} - ${t.title}`,
+                label: `[${isUnified ? "Dynamic Task" : "Execution Task"}] ${t.task_code || "TASK#" + targetId} - ${t.title}`,
                 supervisor: t.supervisor?.name,
                 status: t.status,
             });

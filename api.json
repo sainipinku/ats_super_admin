@@ -2517,6 +2517,226 @@
                 "security": []
             }
         },
+        "/auth/forgot-password": {
+            "post": {
+                "operationId": "auth.forgotPassword",
+                "description": "Initiates the forgot-password flow by generating a static 6-digit `reset_otp` (`123456`) with a 2-minute expiration window and saving it on the member record.",
+                "summary": "Request Password Reset OTP",
+                "tags": [
+                    "Authentication"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ForgotPasswordOtpRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/auth/forgot-password/resend-otp": {
+            "post": {
+                "operationId": "auth.resendResetOtp",
+                "description": "Re-issues the static 6-digit `reset_otp` (`123456`) and resets the 2-minute expiration timer for an ongoing password reset request.",
+                "summary": "Resend Password Reset OTP",
+                "tags": [
+                    "Authentication"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ForgotPasswordOtpRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/auth/forgot-password/verify-otp": {
+            "post": {
+                "operationId": "auth.verifyResetOtp",
+                "description": "Validates the submitted `reset_otp` (`otp`) against the stored value within the 2-minute expiry window and returns a short-lived `reset_token` to authorize password reset.",
+                "summary": "Verify Password Reset OTP",
+                "tags": [
+                    "Authentication"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "identifier": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 255
+                                    },
+                                    "email": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "format": "email",
+                                        "maxLength": 255
+                                    },
+                                    "phone": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 20
+                                    },
+                                    "otp": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 10
+                                    },
+                                    "reset_otp": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 10
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/auth/reset-password": {
+            "post": {
+                "operationId": "auth.resetPassword",
+                "description": "Sets a new password for a member whose reset OTP was verified. Requires `new_password` and matching `new_password_confirmation`.",
+                "summary": "Reset Password (After OTP Verification)",
+                "tags": [
+                    "Authentication"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "identifier": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 255
+                                    },
+                                    "email": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "format": "email",
+                                        "maxLength": 255
+                                    },
+                                    "phone": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 20
+                                    },
+                                    "reset_token": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 255
+                                    },
+                                    "new_password": {
+                                        "type": "string"
+                                    },
+                                    "new_password_confirmation": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "new_password",
+                                    "new_password_confirmation"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
         "/auth/logout": {
             "post": {
                 "operationId": "auth.logout",
@@ -3886,6 +4106,28 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                "Unauthorized. You cannot create projects for another company account."
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
                     },
@@ -3995,9 +4237,6 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
-                    },
-                    "404": {
-                        "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
@@ -4779,7 +5018,7 @@
         },
         "/construction/mobile/construction/documents/{document}/view": {
             "get": {
-                "operationId": "construction.document.view_164",
+                "operationId": "construction.document.view_168",
                 "description": "Streams an authenticated inline preview of a project document or attachment.",
                 "summary": "View Construction Document",
                 "tags": [
@@ -6078,7 +6317,7 @@
                                         "type": "string",
                                         "format": "binary",
                                         "contentMediaType": "application/octet-stream",
-                                        "description": "Maximum file size: 10240 kilobytes (10 MB)."
+                                        "description": "Maximum file size: 10240 kilobytes."
                                     }
                                 },
                                 "required": [
@@ -7634,9 +7873,307 @@
                 }
             }
         },
+        "/pages/privacy-policy": {
+            "get": {
+                "operationId": "memberDashboard.privacyPolicy",
+                "description": "Retrieves current terms and privacy policy HTML and plain text for mobile and web views.",
+                "summary": "Get Privacy Policy",
+                "tags": [
+                    "System & Legal Policies"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "title": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "Privacy Policy"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "content_html": {
+                                            "type": "string"
+                                        },
+                                        "content": {
+                                            "type": "string"
+                                        },
+                                        "last_updated": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "2026-08-01 00:00:00"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "title",
+                                        "content_html",
+                                        "content",
+                                        "last_updated"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            },
+            "post": {
+                "operationId": "memberDashboard.storePrivacyPolicy",
+                "description": "Updates privacy policy content.",
+                "summary": "Update Privacy Policy",
+                "tags": [
+                    "System & Legal Policies"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "content": {
+                                        "type": "string"
+                                    },
+                                    "title": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 255
+                                    }
+                                },
+                                "required": [
+                                    "content"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Privacy Policy HTML page saved successfully."
+                                        },
+                                        "title": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "Privacy Policy"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "content_html": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "title",
+                                        "content_html"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/pages/terms-and-conditions": {
+            "get": {
+                "operationId": "memberDashboard.termsAndConditions",
+                "description": "Retrieves terms and conditions content.",
+                "summary": "Get Terms & Conditions",
+                "tags": [
+                    "System & Legal Policies"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "title": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "Terms & Conditions"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "content_html": {
+                                            "type": "string"
+                                        },
+                                        "content": {
+                                            "type": "string"
+                                        },
+                                        "last_updated": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "2026-08-01 00:00:00"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "title",
+                                        "content_html",
+                                        "content",
+                                        "last_updated"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            },
+            "post": {
+                "operationId": "memberDashboard.storeTermsAndConditions",
+                "description": "Updates terms and conditions content.",
+                "summary": "Update Terms & Conditions",
+                "tags": [
+                    "System & Legal Policies"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "content": {
+                                        "type": "string"
+                                    },
+                                    "title": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 255
+                                    }
+                                },
+                                "required": [
+                                    "content"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Terms & Conditions HTML page saved successfully."
+                                        },
+                                        "title": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "Terms & Conditions"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "content_html": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message",
+                                        "title",
+                                        "content_html"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/tasks/{task}/submit": {
             "post": {
-                "operationId": "memberDashboard.submitTaskData_29",
+                "operationId": "memberDashboard.submitTaskData_35",
                 "description": "Submits completed checklist items, site photos (up to 10), categorized survey files (CSV/RAW/KML), sketches, reference documents, and site status / obstruction reports for supervisor review.",
                 "summary": "Submit Day Task Work Data & Files",
                 "tags": [
@@ -7909,7 +8446,7 @@
                                                     "type": "object",
                                                     "properties": {
                                                         "task_id": {
-                                                            "type": "integer"
+                                                            "type": "string"
                                                         },
                                                         "reference": {
                                                             "type": "string"
@@ -8035,7 +8572,7 @@
         },
         "/tasks/{task}/revision-reply": {
             "post": {
-                "operationId": "memberDashboard.submitRevisionReply_30",
+                "operationId": "memberDashboard.submitRevisionReply_36",
                 "description": "Allows field surveyors / assignees to submit a reply/clarification to a requested survey revision,\nupload additional photos or files, update checklist statuses, and return task to review state.",
                 "summary": "Submit Field Team Revision Reply",
                 "tags": [
@@ -8208,10 +8745,13 @@
                                             "type": "object",
                                             "properties": {
                                                 "id": {
-                                                    "type": "integer"
+                                                    "type": "string"
                                                 },
                                                 "task_code": {
-                                                    "type": "string"
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
                                                 },
                                                 "title": {
                                                     "type": "string"
@@ -8505,7 +9045,7 @@
         },
         "/attendance": {
             "get": {
-                "operationId": "memberDashboard.myAttendance_34",
+                "operationId": "memberDashboard.myAttendance_40",
                 "description": "Retrieves historical attendance records for the authenticated member, including check-in/out timestamps, hours worked, and project tags.",
                 "summary": "Get Member Attendance History",
                 "tags": [
@@ -8632,7 +9172,7 @@
         },
         "/attendance/check-in": {
             "post": {
-                "operationId": "memberDashboard.checkIn_35",
+                "operationId": "memberDashboard.checkIn_41",
                 "description": "Records member daily check-in with GPS coordinates, address, and selfie photo.",
                 "summary": "Member Daily Check-In",
                 "tags": [
@@ -8840,7 +9380,7 @@
         },
         "/attendance/check-out": {
             "post": {
-                "operationId": "memberDashboard.checkOut_36",
+                "operationId": "memberDashboard.checkOut_42",
                 "description": "Records member daily check-out, calculates worked hours, and attaches exit location.",
                 "summary": "Member Daily Check-Out",
                 "tags": [
@@ -9098,7 +9638,7 @@
         },
         "/attendance/{attendance}/check-out": {
             "post": {
-                "operationId": "memberDashboard.checkOut_37",
+                "operationId": "memberDashboard.checkOut_43",
                 "description": "Records member daily check-out, calculates worked hours, and attaches exit location.",
                 "summary": "Member Daily Check-Out",
                 "tags": [
@@ -9317,7 +9857,7 @@
         },
         "/member/location": {
             "post": {
-                "operationId": "memberDashboard.recordLocation_38",
+                "operationId": "memberDashboard.recordLocation_44",
                 "description": "Periodically tracks and updates the authenticated member's location coordinates.\nSupports single ping (latitude, longitude, accuracy, captured_at) or batch sync.",
                 "summary": "Record Member GPS Location Ping (Every 20 minutes)",
                 "tags": [
@@ -9649,7 +10189,7 @@
         },
         "/member/track-location": {
             "post": {
-                "operationId": "memberDashboard.recordLocation_39",
+                "operationId": "memberDashboard.recordLocation_45",
                 "description": "Periodically tracks and updates the authenticated member's location coordinates.\nSupports single ping (latitude, longitude, accuracy, captured_at) or batch sync.",
                 "summary": "Record Member GPS Location Ping (Every 20 minutes)",
                 "tags": [
@@ -9927,7 +10467,7 @@
         },
         "/member/locations": {
             "post": {
-                "operationId": "memberDashboard.recordLocation_40",
+                "operationId": "memberDashboard.recordLocation_46",
                 "description": "Periodically tracks and updates the authenticated member's location coordinates.\nSupports single ping (latitude, longitude, accuracy, captured_at) or batch sync.",
                 "summary": "Record Member GPS Location Ping (Every 20 minutes)",
                 "tags": [
@@ -10205,7 +10745,7 @@
         },
         "/vehicles/history": {
             "get": {
-                "operationId": "memberDashboard.vehicleHistory_41",
+                "operationId": "memberDashboard.vehicleHistory_47",
                 "description": "Retrieves all vehicles assigned to or used by the authenticated token-holding member,\nincluding assignment periods, project details, and statuses.",
                 "summary": "Get Used Vehicle History",
                 "tags": [
@@ -10373,7 +10913,49 @@
                                                         "type": "string"
                                                     },
                                                     "assignment_type": {
-                                                        "type": "string"
+                                                        "anyOf": [
+                                                            {
+                                                                "type": "string"
+                                                            },
+                                                            {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "general"
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    "task_id": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "task": {
+                                                        "type": [
+                                                            "object",
+                                                            "null"
+                                                        ],
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "task_code": {
+                                                                "type": "string"
+                                                            },
+                                                            "title": {
+                                                                "type": "string"
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "task_code",
+                                                            "title",
+                                                            "status"
+                                                        ]
                                                     },
                                                     "status": {
                                                         "type": "string"
@@ -10491,6 +11073,8 @@
                                                     "model",
                                                     "vehicle_type",
                                                     "assignment_type",
+                                                    "task_id",
+                                                    "task",
                                                     "status",
                                                     "is_active",
                                                     "assigned_from",
@@ -10522,7 +11106,7 @@
         },
         "/vehicle-history": {
             "get": {
-                "operationId": "memberDashboard.vehicleHistory_42",
+                "operationId": "memberDashboard.vehicleHistory_48",
                 "description": "Retrieves all vehicles assigned to or used by the authenticated token-holding member,\nincluding assignment periods, project details, and statuses.",
                 "summary": "Get Used Vehicle History",
                 "tags": [
@@ -10676,7 +11260,49 @@
                                                         "type": "string"
                                                     },
                                                     "assignment_type": {
-                                                        "type": "string"
+                                                        "anyOf": [
+                                                            {
+                                                                "type": "string"
+                                                            },
+                                                            {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "general"
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    "task_id": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "task": {
+                                                        "type": [
+                                                            "object",
+                                                            "null"
+                                                        ],
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "task_code": {
+                                                                "type": "string"
+                                                            },
+                                                            "title": {
+                                                                "type": "string"
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "task_code",
+                                                            "title",
+                                                            "status"
+                                                        ]
                                                     },
                                                     "status": {
                                                         "type": "string"
@@ -10794,6 +11420,8 @@
                                                     "model",
                                                     "vehicle_type",
                                                     "assignment_type",
+                                                    "task_id",
+                                                    "task",
                                                     "status",
                                                     "is_active",
                                                     "assigned_from",
@@ -10825,7 +11453,7 @@
         },
         "/equipment/history": {
             "get": {
-                "operationId": "memberDashboard.equipmentHistory_43",
+                "operationId": "memberDashboard.equipmentHistory_49",
                 "description": "Retrieves all equipment allocated to or used by the authenticated token-holding member,\nincluding allocation periods, hours used, equipment details, and return statuses.",
                 "summary": "Get Used Equipment History",
                 "tags": [
@@ -10986,7 +11614,7 @@
         },
         "/equipment-history": {
             "get": {
-                "operationId": "memberDashboard.equipmentHistory_44",
+                "operationId": "memberDashboard.equipmentHistory_50",
                 "description": "Retrieves all equipment allocated to or used by the authenticated token-holding member,\nincluding allocation periods, hours used, equipment details, and return statuses.",
                 "summary": "Get Used Equipment History",
                 "tags": [
@@ -11529,30 +12157,41 @@
                                             "type": "object",
                                             "properties": {
                                                 "distance": {
-                                                    "type": "string",
-                                                    "const": "0.0 km"
+                                                    "type": "string"
+                                                },
+                                                "distance_km": {
+                                                    "type": "number"
                                                 },
                                                 "work_hours": {
                                                     "type": "string"
                                                 },
+                                                "work_hours_numeric": {
+                                                    "type": "number"
+                                                },
                                                 "current_location": {
-                                                    "type": "string",
-                                                    "enum": [
-                                                        "Site",
-                                                        "Not Checked In"
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "string"
+                                                        },
+                                                        {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "Site",
+                                                                "Not Checked In"
+                                                            ]
+                                                        }
                                                     ]
                                                 },
                                                 "site_visit_status": {
                                                     "type": "string",
-                                                    "enum": [
-                                                        "Verified",
-                                                        "Pending"
-                                                    ]
+                                                    "const": "In Progress"
                                                 }
                                             },
                                             "required": [
                                                 "distance",
+                                                "distance_km",
                                                 "work_hours",
+                                                "work_hours_numeric",
                                                 "current_location",
                                                 "site_visit_status"
                                             ]
@@ -11563,17 +12202,37 @@
                                                 "attendance_rate": {
                                                     "type": "string"
                                                 },
+                                                "attendance_percentage": {
+                                                    "type": "integer"
+                                                },
+                                                "attendance": {
+                                                    "type": "integer"
+                                                },
                                                 "task_completion_rate": {
                                                     "type": "string"
                                                 },
+                                                "task_completion_percentage": {
+                                                    "type": "integer"
+                                                },
+                                                "task_completion": {
+                                                    "type": "integer"
+                                                },
                                                 "working_hours": {
                                                     "type": "string"
+                                                },
+                                                "working_hours_numeric": {
+                                                    "type": "number"
                                                 }
                                             },
                                             "required": [
                                                 "attendance_rate",
+                                                "attendance_percentage",
+                                                "attendance",
                                                 "task_completion_rate",
-                                                "working_hours"
+                                                "task_completion_percentage",
+                                                "task_completion",
+                                                "working_hours",
+                                                "working_hours_numeric"
                                             ]
                                         },
                                         "notifications": {
@@ -12041,7 +12700,7 @@
         },
         "/member/dashboard/projects": {
             "get": {
-                "operationId": "memberDashboard.myProjects_46",
+                "operationId": "memberDashboard.myProjects_52",
                 "description": "Retrieves all construction projects where the authenticated member is assigned as a team member, supervisor, or surveyor. Supports date filtering by today or specific calendar date.",
                 "summary": "List Assigned Projects",
                 "tags": [
@@ -12377,7 +13036,7 @@
         },
         "/member/dashboard/surveys": {
             "get": {
-                "operationId": "memberDashboard.mySurveys_47",
+                "operationId": "memberDashboard.mySurveys_53",
                 "description": "Retrieves all field survey plans and duties assigned to the authenticated member, with optional status filtering.",
                 "summary": "List Assigned Surveys",
                 "tags": [
@@ -12478,7 +13137,7 @@
         },
         "/member/dashboard/tasks": {
             "get": {
-                "operationId": "memberDashboard.myTasks_48",
+                "operationId": "memberDashboard.myTasks_54",
                 "description": "Retrieves all assigned tasks across accessible projects. Pass date=today or a specific date (YYYY-MM-DD or DD/MM/YYYY) to limit results strictly to tasks scheduled for or active on that date.",
                 "summary": "List Member Assigned Tasks",
                 "tags": [
@@ -12932,7 +13591,7 @@
         },
         "/member/dashboard/todays-tasks": {
             "get": {
-                "operationId": "memberDashboard.todaysTasks_49",
+                "operationId": "memberDashboard.todaysTasks_55",
                 "description": "Retrieves all tasks scheduled specifically for today or active today for the authenticated member.",
                 "summary": "List Today's Scheduled Tasks",
                 "tags": [
@@ -13087,7 +13746,7 @@
         },
         "/member/dashboard/attendance": {
             "get": {
-                "operationId": "memberDashboard.myAttendance_50",
+                "operationId": "memberDashboard.myAttendance_56",
                 "description": "Retrieves historical attendance records for the authenticated member, including check-in/out timestamps, hours worked, and project tags.",
                 "summary": "Get Member Attendance History",
                 "tags": [
@@ -13582,7 +14241,7 @@
         },
         "/member/projects": {
             "get": {
-                "operationId": "memberDashboard.myProjects_52",
+                "operationId": "memberDashboard.myProjects_58",
                 "description": "Retrieves all construction projects where the authenticated member is assigned as a team member, supervisor, or surveyor. Supports date filtering by today or specific calendar date.",
                 "summary": "List Assigned Projects",
                 "tags": [
@@ -13918,7 +14577,7 @@
         },
         "/member/tasks": {
             "get": {
-                "operationId": "memberDashboard.myTasks_53",
+                "operationId": "memberDashboard.myTasks_59",
                 "description": "Retrieves all assigned tasks across accessible projects. Pass date=today or a specific date (YYYY-MM-DD or DD/MM/YYYY) to limit results strictly to tasks scheduled for or active on that date.",
                 "summary": "List Member Assigned Tasks",
                 "tags": [
@@ -14535,7 +15194,7 @@
         },
         "/member/todays-tasks": {
             "get": {
-                "operationId": "memberDashboard.todaysTasks_54",
+                "operationId": "memberDashboard.todaysTasks_60",
                 "description": "Retrieves all tasks scheduled specifically for today or active today for the authenticated member.",
                 "summary": "List Today's Scheduled Tasks",
                 "tags": [
@@ -14690,7 +15349,7 @@
         },
         "/member/tasks/{task}": {
             "put": {
-                "operationId": "memberDashboard.updateTask_56",
+                "operationId": "memberDashboard.updateTask_62",
                 "description": "Updates details, dates, remarks, or metadata of an existing assigned task.",
                 "summary": "Update Task Details",
                 "tags": [
@@ -14866,24 +15525,10 @@
                                             "const": "Task updated successfully."
                                         },
                                         "task": {
-                                            "anyOf": [
-                                                {
-                                                    "$ref": "#/components/schemas/ExecutionTask"
-                                                },
-                                                {
-                                                    "type": "null"
-                                                }
-                                            ]
+                                            "type": "string"
                                         },
                                         "data": {
-                                            "anyOf": [
-                                                {
-                                                    "$ref": "#/components/schemas/ExecutionTask"
-                                                },
-                                                {
-                                                    "type": "null"
-                                                }
-                                            ]
+                                            "type": "string"
                                         }
                                     },
                                     "required": [
@@ -14988,7 +15633,7 @@
         },
         "/member/tasks/{task}/update": {
             "post": {
-                "operationId": "memberDashboard.updateTask_57",
+                "operationId": "memberDashboard.updateTask_63",
                 "description": "Updates details, dates, remarks, or metadata of an existing assigned task.",
                 "summary": "Update Task Details",
                 "tags": [
@@ -15164,24 +15809,10 @@
                                             "const": "Task updated successfully."
                                         },
                                         "task": {
-                                            "anyOf": [
-                                                {
-                                                    "$ref": "#/components/schemas/ExecutionTask"
-                                                },
-                                                {
-                                                    "type": "null"
-                                                }
-                                            ]
+                                            "type": "string"
                                         },
                                         "data": {
-                                            "anyOf": [
-                                                {
-                                                    "$ref": "#/components/schemas/ExecutionTask"
-                                                },
-                                                {
-                                                    "type": "null"
-                                                }
-                                            ]
+                                            "type": "string"
                                         }
                                     },
                                     "required": [
@@ -15321,7 +15952,7 @@
                                             "type": "object",
                                             "properties": {
                                                 "id": {
-                                                    "type": "integer"
+                                                    "type": "string"
                                                 },
                                                 "status": {
                                                     "type": "string"
@@ -15466,7 +16097,7 @@
                                             "const": "Task status updated."
                                         },
                                         "task": {
-                                            "$ref": "#/components/schemas/ExecutionTask"
+                                            "type": "string"
                                         }
                                     },
                                     "required": [
@@ -15545,7 +16176,7 @@
         },
         "/member/attendance/check-in": {
             "post": {
-                "operationId": "memberDashboard.checkIn_60",
+                "operationId": "memberDashboard.checkIn_66",
                 "description": "Records member daily check-in with GPS coordinates, address, and selfie photo.",
                 "summary": "Member Daily Check-In",
                 "tags": [
@@ -15696,7 +16327,7 @@
         },
         "/member/attendance/check-out": {
             "post": {
-                "operationId": "memberDashboard.checkOut_61",
+                "operationId": "memberDashboard.checkOut_67",
                 "description": "Records member daily check-out, calculates worked hours, and attaches exit location.",
                 "summary": "Member Daily Check-Out",
                 "tags": [
@@ -15901,7 +16532,7 @@
         },
         "/member/attendance/{attendance}/check-out": {
             "post": {
-                "operationId": "memberDashboard.checkOut_62",
+                "operationId": "memberDashboard.checkOut_68",
                 "description": "Records member daily check-out, calculates worked hours, and attaches exit location.",
                 "summary": "Member Daily Check-Out",
                 "tags": [
@@ -16157,7 +16788,7 @@
         },
         "/member/ping-location": {
             "post": {
-                "operationId": "memberDashboard.recordLocation_64",
+                "operationId": "memberDashboard.recordLocation_70",
                 "description": "Periodically tracks and updates the authenticated member's location coordinates.\nSupports single ping (latitude, longitude, accuracy, captured_at) or batch sync.",
                 "summary": "Record Member GPS Location Ping (Every 20 minutes)",
                 "tags": [
@@ -16435,7 +17066,7 @@
         },
         "/member/survey-duty/status": {
             "get": {
-                "operationId": "memberDashboard.surveyDutyStatus_65",
+                "operationId": "memberDashboard.surveyDutyStatus_71",
                 "description": "Inquires the member's real-time survey duty status, active survey visit, shift timing, and current day check-in coordinates.",
                 "summary": "Get Survey Duty Status",
                 "tags": [
@@ -17343,7 +17974,11 @@
                                             "type": "object",
                                             "properties": {
                                                 "task_id": {
-                                                    "type": "integer"
+                                                    "type": [
+                                                        "integer",
+                                                        "string",
+                                                        "null"
+                                                    ]
                                                 },
                                                 "visit_id": {
                                                     "type": "integer"
@@ -17467,7 +18102,7 @@
         },
         "/member/driver-duty/status": {
             "get": {
-                "operationId": "memberDashboard.surveyDutyStatus_69",
+                "operationId": "memberDashboard.surveyDutyStatus_75",
                 "description": "Inquires the member's real-time survey duty status, active survey visit, shift timing, and current day check-in coordinates.",
                 "summary": "Get Survey Duty Status",
                 "tags": [
@@ -17630,7 +18265,7 @@
         },
         "/member/driver-duty/submit-data": {
             "post": {
-                "operationId": "memberDashboard.submitDriverTrip_70",
+                "operationId": "memberDashboard.submitDriverTrip_76",
                 "description": "Records vehicle trip details, start/destination locations, start/end odometer readings, status, POD proof photos, and trip receipts for drivers.",
                 "summary": "Submit Driver Trip Log",
                 "tags": [
@@ -17746,11 +18381,20 @@
                                                 "id": {
                                                     "type": "integer"
                                                 },
-                                                "task_id": {
-                                                    "type": "integer"
-                                                },
+                                                "task_id": {},
                                                 "task_status": {
-                                                    "type": "string"
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "string"
+                                                        },
+                                                        {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "completed",
+                                                                "in_progress"
+                                                            ]
+                                                        }
+                                                    ]
                                                 },
                                                 "task_progress_percent": {
                                                     "type": "integer"
@@ -17832,7 +18476,7 @@
         },
         "/member/tasks/{task}/driver-trip": {
             "post": {
-                "operationId": "memberDashboard.submitDriverTrip_71",
+                "operationId": "memberDashboard.submitDriverTrip_77",
                 "description": "Records vehicle trip details, start/destination locations, start/end odometer readings, status, POD proof photos, and trip receipts for drivers.",
                 "summary": "Submit Driver Trip Log",
                 "tags": [
@@ -17963,11 +18607,20 @@
                                                 "id": {
                                                     "type": "integer"
                                                 },
-                                                "task_id": {
-                                                    "type": "integer"
-                                                },
+                                                "task_id": {},
                                                 "task_status": {
-                                                    "type": "string"
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "string"
+                                                        },
+                                                        {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "completed",
+                                                                "in_progress"
+                                                            ]
+                                                        }
+                                                    ]
                                                 },
                                                 "task_progress_percent": {
                                                     "type": "integer"
@@ -18049,7 +18702,7 @@
         },
         "/member/driver-duty/fuel-entries": {
             "get": {
-                "operationId": "memberDashboard.driverFuelHistory_72",
+                "operationId": "memberDashboard.driverFuelHistory_78",
                 "description": "Retrieves all fuel submissions submitted by the driver with approval status, meter reading, and receipt slip.",
                 "summary": "List Driver Fuel Entries & History",
                 "tags": [
@@ -18139,7 +18792,7 @@
                 }
             },
             "post": {
-                "operationId": "memberDashboard.submitDriverFuel_73",
+                "operationId": "memberDashboard.submitDriverFuel_79",
                 "description": "Records vehicle fuel/petrol filling details, quantity, total cost, fuel date, odometer meter reading, and supporting bill/receipt image.",
                 "summary": "Submit Driver Fuel Entry",
                 "tags": [
@@ -18389,7 +19042,7 @@
         },
         "/member/fuel-entries": {
             "get": {
-                "operationId": "memberDashboard.driverFuelHistory_74",
+                "operationId": "memberDashboard.driverFuelHistory_80",
                 "description": "Retrieves all fuel submissions submitted by the driver with approval status, meter reading, and receipt slip.",
                 "summary": "List Driver Fuel Entries & History",
                 "tags": [
@@ -18479,7 +19132,7 @@
                 }
             },
             "post": {
-                "operationId": "memberDashboard.submitDriverFuel_75",
+                "operationId": "memberDashboard.submitDriverFuel_81",
                 "description": "Records vehicle fuel/petrol filling details, quantity, total cost, fuel date, odometer meter reading, and supporting bill/receipt image.",
                 "summary": "Submit Driver Fuel Entry",
                 "tags": [
@@ -18729,7 +19382,7 @@
         },
         "/member/vehicles/history": {
             "get": {
-                "operationId": "memberDashboard.vehicleHistory_78",
+                "operationId": "memberDashboard.vehicleHistory_84",
                 "description": "Retrieves all vehicles assigned to or used by the authenticated token-holding member,\nincluding assignment periods, project details, and statuses.",
                 "summary": "Get Used Vehicle History",
                 "tags": [
@@ -18883,7 +19536,49 @@
                                                         "type": "string"
                                                     },
                                                     "assignment_type": {
-                                                        "type": "string"
+                                                        "anyOf": [
+                                                            {
+                                                                "type": "string"
+                                                            },
+                                                            {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "general"
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    "task_id": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "task": {
+                                                        "type": [
+                                                            "object",
+                                                            "null"
+                                                        ],
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "task_code": {
+                                                                "type": "string"
+                                                            },
+                                                            "title": {
+                                                                "type": "string"
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "task_code",
+                                                            "title",
+                                                            "status"
+                                                        ]
                                                     },
                                                     "status": {
                                                         "type": "string"
@@ -19001,6 +19696,8 @@
                                                     "model",
                                                     "vehicle_type",
                                                     "assignment_type",
+                                                    "task_id",
+                                                    "task",
                                                     "status",
                                                     "is_active",
                                                     "assigned_from",
@@ -19032,7 +19729,7 @@
         },
         "/member/vehicle-history": {
             "get": {
-                "operationId": "memberDashboard.vehicleHistory_79",
+                "operationId": "memberDashboard.vehicleHistory_85",
                 "description": "Retrieves all vehicles assigned to or used by the authenticated token-holding member,\nincluding assignment periods, project details, and statuses.",
                 "summary": "Get Used Vehicle History",
                 "tags": [
@@ -19186,7 +19883,49 @@
                                                         "type": "string"
                                                     },
                                                     "assignment_type": {
-                                                        "type": "string"
+                                                        "anyOf": [
+                                                            {
+                                                                "type": "string"
+                                                            },
+                                                            {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "general"
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    "task_id": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "task": {
+                                                        "type": [
+                                                            "object",
+                                                            "null"
+                                                        ],
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "task_code": {
+                                                                "type": "string"
+                                                            },
+                                                            "title": {
+                                                                "type": "string"
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "task_code",
+                                                            "title",
+                                                            "status"
+                                                        ]
                                                     },
                                                     "status": {
                                                         "type": "string"
@@ -19304,6 +20043,8 @@
                                                     "model",
                                                     "vehicle_type",
                                                     "assignment_type",
+                                                    "task_id",
+                                                    "task",
                                                     "status",
                                                     "is_active",
                                                     "assigned_from",
@@ -19335,7 +20076,7 @@
         },
         "/member/equipment/history": {
             "get": {
-                "operationId": "memberDashboard.equipmentHistory_80",
+                "operationId": "memberDashboard.equipmentHistory_86",
                 "description": "Retrieves all equipment allocated to or used by the authenticated token-holding member,\nincluding allocation periods, hours used, equipment details, and return statuses.",
                 "summary": "Get Used Equipment History",
                 "tags": [
@@ -19482,7 +20223,7 @@
         },
         "/member/equipment-history": {
             "get": {
-                "operationId": "memberDashboard.equipmentHistory_81",
+                "operationId": "memberDashboard.equipmentHistory_87",
                 "description": "Retrieves all equipment allocated to or used by the authenticated token-holding member,\nincluding allocation periods, hours used, equipment details, and return statuses.",
                 "summary": "Get Used Equipment History",
                 "tags": [
@@ -19871,16 +20612,29 @@
                                             "type": "object",
                                             "properties": {
                                                 "id": {
-                                                    "type": "integer"
+                                                    "type": "string"
                                                 },
                                                 "task_code": {
-                                                    "type": "string"
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
                                                 },
                                                 "title": {
                                                     "type": "string"
                                                 },
                                                 "status": {
-                                                    "type": "string"
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "string"
+                                                        },
+                                                        {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "in_progress"
+                                                            ]
+                                                        }
+                                                    ]
                                                 },
                                                 "status_label": {
                                                     "type": "string"
@@ -19895,7 +20649,17 @@
                                                     "type": "string"
                                                 },
                                                 "instructions": {
-                                                    "type": "string"
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "string"
+                                                        },
+                                                        {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "Perform detailed topography survey using total station. Capture elevation points, boundaries and key features. Ensure accuracy and complete point coverage."
+                                                            ]
+                                                        }
+                                                    ]
                                                 },
                                                 "review_status": {
                                                     "type": "string"
@@ -20164,7 +20928,7 @@
         },
         "/member/tasks/{task}/submit": {
             "post": {
-                "operationId": "memberDashboard.submitTaskData_84",
+                "operationId": "memberDashboard.submitTaskData_90",
                 "description": "Submits completed checklist items, site photos (up to 10), categorized survey files (CSV/RAW/KML), sketches, reference documents, and site status / obstruction reports for supervisor review.",
                 "summary": "Submit Day Task Work Data & Files",
                 "tags": [
@@ -20408,7 +21172,7 @@
                                                     "type": "object",
                                                     "properties": {
                                                         "task_id": {
-                                                            "type": "integer"
+                                                            "type": "string"
                                                         },
                                                         "reference": {
                                                             "type": "string"
@@ -20534,7 +21298,7 @@
         },
         "/member/tasks/{task}/revision-reply": {
             "post": {
-                "operationId": "memberDashboard.submitRevisionReply_85",
+                "operationId": "memberDashboard.submitRevisionReply_91",
                 "description": "Allows field surveyors / assignees to submit a reply/clarification to a requested survey revision,\nupload additional photos or files, update checklist statuses, and return task to review state.",
                 "summary": "Submit Field Team Revision Reply",
                 "tags": [
@@ -20693,10 +21457,13 @@
                                             "type": "object",
                                             "properties": {
                                                 "id": {
-                                                    "type": "integer"
+                                                    "type": "string"
                                                 },
                                                 "task_code": {
-                                                    "type": "string"
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
                                                 },
                                                 "title": {
                                                     "type": "string"
@@ -21712,7 +22479,7 @@
         },
         "/member/sites": {
             "get": {
-                "operationId": "memberDashboard.myProjects_89",
+                "operationId": "memberDashboard.myProjects_95",
                 "description": "Retrieves all construction projects where the authenticated member is assigned as a team member, supervisor, or surveyor. Supports date filtering by today or specific calendar date.",
                 "summary": "List Assigned Projects",
                 "tags": [
@@ -22124,7 +22891,7 @@
         },
         "/member/attendance": {
             "get": {
-                "operationId": "memberDashboard.myAttendance_91",
+                "operationId": "memberDashboard.myAttendance_97",
                 "description": "Retrieves historical attendance records for the authenticated member, including check-in/out timestamps, hours worked, and project tags.",
                 "summary": "Get Member Attendance History",
                 "tags": [
@@ -22251,7 +23018,7 @@
         },
         "/member/surveys": {
             "get": {
-                "operationId": "memberDashboard.mySurveys_92",
+                "operationId": "memberDashboard.mySurveys_98",
                 "description": "Retrieves all field survey plans and duties assigned to the authenticated member, with optional status filtering.",
                 "summary": "List Assigned Surveys",
                 "tags": [
@@ -22456,302 +23223,6 @@
                                 }
                             }
                         }
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/AuthenticationException"
-                    }
-                }
-            }
-        },
-        "/pages/privacy-policy": {
-            "get": {
-                "operationId": "memberDashboard.privacyPolicy",
-                "description": "Publicly retrieves current terms and privacy policy HTML and plain text for mobile and web views.",
-                "summary": "Get Privacy Policy",
-                "tags": [
-                    "System & Legal Policies"
-                ],
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean"
-                                        },
-                                        "title": {
-                                            "anyOf": [
-                                                {
-                                                    "type": "string"
-                                                },
-                                                {
-                                                    "type": "string",
-                                                    "enum": [
-                                                        "Privacy Policy"
-                                                    ]
-                                                }
-                                            ]
-                                        },
-                                        "content_html": {
-                                            "type": "string"
-                                        },
-                                        "content": {
-                                            "type": "string"
-                                        },
-                                        "last_updated": {
-                                            "anyOf": [
-                                                {
-                                                    "type": "string"
-                                                },
-                                                {
-                                                    "type": "string",
-                                                    "enum": [
-                                                        "2026-08-01 00:00:00"
-                                                    ]
-                                                }
-                                            ]
-                                        }
-                                    },
-                                    "required": [
-                                        "success",
-                                        "title",
-                                        "content_html",
-                                        "content",
-                                        "last_updated"
-                                    ]
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "operationId": "memberDashboard.storePrivacyPolicy",
-                "description": "Updates privacy policy content.",
-                "summary": "Update Privacy Policy",
-                "tags": [
-                    "System & Legal Policies"
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "content": {
-                                        "type": "string"
-                                    },
-                                    "title": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ],
-                                        "maxLength": 255
-                                    }
-                                },
-                                "required": [
-                                    "content"
-                                ]
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "const": "Privacy Policy HTML page saved successfully."
-                                        },
-                                        "title": {
-                                            "anyOf": [
-                                                {
-                                                    "type": "string"
-                                                },
-                                                {
-                                                    "type": "string",
-                                                    "enum": [
-                                                        "Privacy Policy"
-                                                    ]
-                                                }
-                                            ]
-                                        },
-                                        "content_html": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "required": [
-                                        "success",
-                                        "message",
-                                        "title",
-                                        "content_html"
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/AuthenticationException"
-                    }
-                }
-            }
-        },
-        "/pages/terms-and-conditions": {
-            "get": {
-                "operationId": "memberDashboard.termsAndConditions",
-                "description": "Publicly retrieves terms and conditions content.",
-                "summary": "Get Terms & Conditions",
-                "tags": [
-                    "System & Legal Policies"
-                ],
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean"
-                                        },
-                                        "title": {
-                                            "anyOf": [
-                                                {
-                                                    "type": "string"
-                                                },
-                                                {
-                                                    "type": "string",
-                                                    "enum": [
-                                                        "Terms & Conditions"
-                                                    ]
-                                                }
-                                            ]
-                                        },
-                                        "content_html": {
-                                            "type": "string"
-                                        },
-                                        "content": {
-                                            "type": "string"
-                                        },
-                                        "last_updated": {
-                                            "anyOf": [
-                                                {
-                                                    "type": "string"
-                                                },
-                                                {
-                                                    "type": "string",
-                                                    "enum": [
-                                                        "2026-08-01 00:00:00"
-                                                    ]
-                                                }
-                                            ]
-                                        }
-                                    },
-                                    "required": [
-                                        "success",
-                                        "title",
-                                        "content_html",
-                                        "content",
-                                        "last_updated"
-                                    ]
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "operationId": "memberDashboard.storeTermsAndConditions",
-                "description": "Updates terms and conditions content.",
-                "summary": "Update Terms & Conditions",
-                "tags": [
-                    "System & Legal Policies"
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "content": {
-                                        "type": "string"
-                                    },
-                                    "title": {
-                                        "type": [
-                                            "string",
-                                            "null"
-                                        ],
-                                        "maxLength": 255
-                                    }
-                                },
-                                "required": [
-                                    "content"
-                                ]
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "const": "Terms & Conditions HTML page saved successfully."
-                                        },
-                                        "title": {
-                                            "anyOf": [
-                                                {
-                                                    "type": "string"
-                                                },
-                                                {
-                                                    "type": "string",
-                                                    "enum": [
-                                                        "Terms & Conditions"
-                                                    ]
-                                                }
-                                            ]
-                                        },
-                                        "content_html": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "required": [
-                                        "success",
-                                        "message",
-                                        "title",
-                                        "content_html"
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
@@ -24050,7 +24521,7 @@
         },
         "/construction/mobile/construction/attendance/check-out": {
             "post": {
-                "operationId": "mobile.construction.attendanceCheckOut_153",
+                "operationId": "mobile.construction.attendanceCheckOut_157",
                 "description": "Submits field worker daily check-out and computes shift duration.",
                 "summary": "Field Attendance Check-Out",
                 "tags": [
@@ -24276,7 +24747,7 @@
         },
         "/construction/mobile/construction/attendance/{attendance}/check-out": {
             "post": {
-                "operationId": "mobile.construction.attendanceCheckOut_154",
+                "operationId": "mobile.construction.attendanceCheckOut_158",
                 "description": "Submits field worker daily check-out and computes shift duration.",
                 "summary": "Field Attendance Check-Out",
                 "tags": [
@@ -30613,6 +31084,28 @@
                     "status": {
                         "type": "string"
                     },
+                    "rejection_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "rejected_by_member_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "rejected_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "rejection_count": {
+                        "type": "integer"
+                    },
                     "created_at": {
                         "type": [
                             "string",
@@ -30641,6 +31134,10 @@
                     "site_area",
                     "scope_of_work",
                     "status",
+                    "rejection_reason",
+                    "rejected_by_member_id",
+                    "rejected_at",
+                    "rejection_count",
                     "created_at",
                     "updated_at"
                 ],
@@ -30671,6 +31168,37 @@
                         ]
                     },
                     "requested_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "assigned_to_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "assigned_to_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "assigned_by_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "assigned_by_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "assigned_at": {
                         "type": [
                             "string",
                             "null"
@@ -30727,6 +31255,11 @@
                     "requested_by_type",
                     "requested_by_id",
                     "requested_at",
+                    "assigned_to_type",
+                    "assigned_to_id",
+                    "assigned_by_type",
+                    "assigned_by_id",
+                    "assigned_at",
                     "approved_by_type",
                     "approved_by_id",
                     "approved_at",
@@ -30992,6 +31525,12 @@
                             "null"
                         ]
                     },
+                    "task_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
                     "allocated_at": {
                         "type": [
                             "string",
@@ -31121,6 +31660,7 @@
                     "project_id",
                     "equipment_id",
                     "assigned_to_member_id",
+                    "task_id",
                     "allocated_at",
                     "assigned_from",
                     "assigned_to",
@@ -31363,6 +31903,34 @@
                     "updated_at"
                 ],
                 "title": "ExecutionTask"
+            },
+            "ForgotPasswordOtpRequest": {
+                "type": "object",
+                "properties": {
+                    "identifier": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "phone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 20
+                    }
+                },
+                "title": "ForgotPasswordOtpRequest"
             },
             "Job": {
                 "type": "object",
@@ -32094,49 +32662,11 @@
                     "id": {
                         "type": "integer"
                     },
-                    "employee_id": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
                     "uuid": {
                         "type": "string"
                     },
                     "created_by": {
                         "type": "integer"
-                    },
-                    "approved_by": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "approved_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
-                    },
-                    "approval_remark": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "rejected_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time"
-                    },
-                    "approval_notes": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
                     },
                     "assigned_admin_id": {
                         "type": [
@@ -32186,33 +32716,6 @@
                             "null"
                         ]
                     },
-                    "alternate_number": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "aadhaar_number": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "pan_number": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "terms_agreed": {
-                        "type": "integer"
-                    },
-                    "terms_agreed_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
                     "must_change_password": {
                         "type": "boolean"
                     },
@@ -32253,12 +32756,6 @@
                     },
                     "slug": {
                         "type": "string"
-                    },
-                    "otp": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
                     },
                     "otp_expire": {
                         "type": [
@@ -32330,6 +32827,24 @@
                         ],
                         "format": "date-time"
                     },
+                    "latitude": {
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    },
+                    "longitude": {
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    },
+                    "current_address": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
                     "created_at": {
                         "type": [
                             "string",
@@ -32351,12 +32866,6 @@
                         ],
                         "format": "date-time"
                     },
-                    "reset_password_token": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
                     "reset_password_token_expires_at": {
                         "type": [
                             "string",
@@ -32364,23 +32873,45 @@
                         ],
                         "format": "date-time"
                     },
-                    "latitude": {
+                    "reset_otp_expires_at": {
                         "type": [
-                            "number",
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "reset_otp_verified_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "approved_by": {
+                        "type": [
+                            "integer",
                             "null"
                         ]
                     },
-                    "longitude": {
+                    "approved_at": {
                         "type": [
-                            "number",
+                            "string",
                             "null"
-                        ]
+                        ],
+                        "format": "date-time"
                     },
-                    "current_address": {
+                    "approval_remark": {
                         "type": [
                             "string",
                             "null"
                         ]
+                    },
+                    "rejected_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
                     },
                     "location_captured_at": {
                         "type": [
@@ -32495,22 +33026,10 @@
                     },
                     "role_badges": {
                         "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
+                        "items": {}
                     },
                     "roles_formatted": {
-                        "anyOf": [
-                            {
-                                "type": "string"
-                            },
-                            {
-                                "type": "string",
-                                "enum": [
-                                    ""
-                                ]
-                            }
-                        ]
+                        "type": "string"
                     },
                     "employee_code": {
                         "type": "string"
@@ -32518,14 +33037,8 @@
                 },
                 "required": [
                     "id",
-                    "employee_id",
                     "uuid",
                     "created_by",
-                    "approved_by",
-                    "approved_at",
-                    "approval_remark",
-                    "rejected_at",
-                    "approval_notes",
                     "assigned_admin_id",
                     "is_calling_team",
                     "name",
@@ -32536,18 +33049,12 @@
                     "city",
                     "registration_source",
                     "phone",
-                    "alternate_number",
-                    "aadhaar_number",
-                    "pan_number",
-                    "terms_agreed",
-                    "terms_agreed_at",
                     "must_change_password",
                     "status",
                     "roles",
                     "designation",
                     "departments",
                     "slug",
-                    "otp",
                     "otp_expire",
                     "dob",
                     "gender",
@@ -32559,14 +33066,19 @@
                     "resume_mime",
                     "resume_size",
                     "resume_uploaded_at",
-                    "created_at",
-                    "updated_at",
-                    "deleted_at",
-                    "reset_password_token",
-                    "reset_password_token_expires_at",
                     "latitude",
                     "longitude",
                     "current_address",
+                    "created_at",
+                    "updated_at",
+                    "deleted_at",
+                    "reset_password_token_expires_at",
+                    "reset_otp_expires_at",
+                    "reset_otp_verified_at",
+                    "approved_by",
+                    "approved_at",
+                    "approval_remark",
+                    "rejected_at",
                     "location_captured_at",
                     "is_driver",
                     "profile_photo_url",
@@ -33542,18 +34054,6 @@
                     "survey_visit_id": {
                         "type": "integer"
                     },
-                    "task_id": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "execution_task_id": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
                     "submitted_by_member_id": {
                         "type": [
                             "integer",
@@ -33853,8 +34353,6 @@
                     "id",
                     "project_id",
                     "survey_visit_id",
-                    "task_id",
-                    "execution_task_id",
                     "submitted_by_member_id",
                     "submitted_at",
                     "review_notes",
@@ -34511,7 +35009,14 @@
                         ]
                     },
                     "assignment_role": {
-                        "$ref": "#/components/schemas/TaskAssignmentRole"
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/TaskAssignmentRole"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     },
                     "assigned_from": {
                         "type": [
@@ -34584,6 +35089,8 @@
                 "enum": [
                     "owner",
                     "executor",
+                    "surveyor",
+                    "draft_person",
                     "reviewer",
                     "checker",
                     "verifier"
@@ -35274,58 +35781,9 @@
                             "null"
                         ]
                     },
-                    "assignment_type": {
-                        "type": "string"
-                    },
-                    "from_location": {
+                    "task_id": {
                         "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "from_lat": {
-                        "type": [
-                            "number",
-                            "null"
-                        ]
-                    },
-                    "from_lng": {
-                        "type": [
-                            "number",
-                            "null"
-                        ]
-                    },
-                    "to_location": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "to_lat": {
-                        "type": [
-                            "number",
-                            "null"
-                        ]
-                    },
-                    "to_lng": {
-                        "type": [
-                            "number",
-                            "null"
-                        ]
-                    },
-                    "material_list": {
-                        "type": [
-                            "array",
-                            "null"
-                        ],
-                        "items": {}
-                    },
-                    "daily_checkpoint_required": {
-                        "type": "boolean"
-                    },
-                    "notes": {
-                        "type": [
-                            "string",
+                            "integer",
                             "null"
                         ]
                     },
@@ -35345,6 +35803,12 @@
                     },
                     "status": {
                         "type": "string"
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     },
                     "assigned_by_type": {
                         "type": [
@@ -35378,19 +35842,11 @@
                     "project_id",
                     "vehicle_id",
                     "driver_member_id",
-                    "assignment_type",
-                    "from_location",
-                    "from_lat",
-                    "from_lng",
-                    "to_location",
-                    "to_lat",
-                    "to_lng",
-                    "material_list",
-                    "daily_checkpoint_required",
-                    "notes",
+                    "task_id",
                     "assigned_from",
                     "assigned_to",
                     "status",
+                    "notes",
                     "assigned_by_type",
                     "assigned_by_id",
                     "created_at",

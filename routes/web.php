@@ -74,12 +74,8 @@ Route::prefix('super')->name('super.')->group(function () {
         Route::post('/super-admins/{superAdmin}/role', [SuperAdminManageController::class, 'updateRoleSuperAdmin'])->name('super_admins.role_superadmin');
         Route::post('/admins/{member}/role', [SuperAdminManageController::class, 'updateRoleAdmin'])->name('super_admins.role_admin');
 
-        // Permission Approval Requests Routes (Delete & Permission Approval Queue)
-        Route::get('/approval-requests', [ApprovalRequestController::class, 'index'])->name('approval_requests.index');
+        // Admin Delete Approval Request Route
         Route::post('/approval-requests/request-delete', [ApprovalRequestController::class, 'submitDeleteRequest'])->name('approval_requests.submit_delete');
-        Route::post('/approval-requests/{approvalRequest}/approve', [ApprovalRequestController::class, 'approve'])->name('approval_requests.approve');
-        Route::post('/approval-requests/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject'])->name('approval_requests.reject');
-        Route::post('/permission-request/submit', [ApprovalRequestController::class, 'submitPermissionRequest'])->name('permission.request.submit');
 
         // Central System & Project Audit Logs
         Route::get('/audit-logs', [App\Http\Controllers\SuperAdmin\AuditLogController::class, 'index'])->name('audit_logs.index');
@@ -474,12 +470,15 @@ Route::prefix('super/construction')
         Route::post('/projects/{project}/tasks/assign-draftsman', [App\Http\Controllers\Construction\SurveyorToDraftsmanAssignmentController::class, 'store'])
             ->middleware('construction.permission:execution_task.manage,execution.manage,execution.edit')
             ->name('projects.tasks.assign-draftsman');
+        Route::post('/projects/{project}/drafting-jobs/{draftingJob}/review', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'reviewDraftingJob'])
+            ->middleware('construction.permission:drafting.manage,drawing_approval.manage,drawing_approval.approve,execution_task.manage')
+            ->name('projects.drafting-jobs.review');
+        Route::post('/projects/{project}/drawing-approvals/assign-admin', [App\Http\Controllers\Construction\DrawingApprovalAssignmentController::class, 'store'])
+            ->middleware('construction.permission:drawing_approval.assign_admin')
+            ->name('projects.drawing-approvals.assign-admin');
         Route::post('/projects/{project}/tasks-v2/{taskId}/review-survey', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'reviewSurvey'])
             ->middleware('construction.permission:execution_task.manage,survey_submission.review')
             ->name('projects.tasks-v2.review-survey');
-        Route::post('/projects/{project}/drafting-jobs/{draftingJob}/review', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'reviewDraftingJob'])
-            ->middleware('construction.permission:drafting.manage,drawing_approval.manage,execution_task.manage')
-            ->name('projects.drafting-jobs.review');
         Route::post('/projects/{project}/tasks-v2/submit-draft', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'submitDraftDrawing'])
             ->middleware('construction.permission:drafting.manage,document.manage,execution_task.manage')
             ->name('projects.tasks-v2.submit-draft');
@@ -719,6 +718,12 @@ Route::prefix('admin/construction')
         Route::post('/projects/{project}/tasks/assign-draftsman', [App\Http\Controllers\Construction\SurveyorToDraftsmanAssignmentController::class, 'store'])
             ->middleware('construction.permission:execution_task.manage,execution.manage,execution.edit')
             ->name('projects.tasks.assign-draftsman');
+        Route::post('/projects/{project}/drafting-jobs/{draftingJob}/review', [App\Http\Controllers\SuperAdmin\Construction\ProjectTaskController::class, 'reviewDraftingJob'])
+            ->middleware('construction.permission:drafting.manage,drawing_approval.manage,drawing_approval.approve,execution_task.manage')
+            ->name('projects.drafting-jobs.review');
+        Route::post('/projects/{project}/drawing-approvals/assign-admin', [App\Http\Controllers\Construction\DrawingApprovalAssignmentController::class, 'store'])
+            ->middleware('construction.permission:drawing_approval.assign_admin')
+            ->name('projects.drawing-approvals.assign-admin');
         Route::put('/projects/{project}/tasks/{task}', [App\Http\Controllers\Admin\Construction\ProjectController::class, 'updateTask'])
             ->middleware('construction.permission:execution.edit,execution.task.update')
             ->scopeBindings()

@@ -13,6 +13,9 @@ import FieldNotesDisplay from "@/Pages/Construction/Components/FieldNotesDisplay
 import Modal from "@/Components/Modal";
 import ProjectActivityLog from "@/Pages/Construction/Components/ProjectActivityLog";
 import AssignToDraftsmanButton from "@/Pages/Construction/Components/AssignToDraftsmanButton";
+import AssignApprovalAdminButton from "@/Pages/Construction/Components/AssignApprovalAdminButton";
+import PendingCadApprovalAlertBanner from "@/Pages/Construction/Components/PendingCadApprovalAlertBanner";
+import { mergeProjectExecutionTasks } from "@/lib/taskMerge";
 
 const TASKS_PER_PAGE = 10;
 const EXECUTION_TASKS_TITLE_WORDS = ["Execution", "Tasks"];
@@ -22,8 +25,22 @@ const prefersReducedMotion = () =>
     typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export default function ProjectShow({ project, activityLog, workflowSummary, companyDraftsmen = [] }) {
-    const { auth } = usePage().props;
+export default function ProjectShow({
+    project,
+    activityLog,
+    workflowSummary,
+    companyDraftsmen = [],
+    companyApprovalAdmins = [],
+    canAssignApprovalAdmin = false,
+}) {
+    const { props: pageProps } = usePage();
+    const { auth } = pageProps;
+    const pendingCadApprovals = Array.isArray(pageProps?.pending_assigned_cad_approvals)
+        ? pageProps.pending_assigned_cad_approvals
+        : [];
+    const projectPendingCadApprovals = pendingCadApprovals.filter(
+        (item) => Number(item.project_id) === Number(project.id)
+    );
     const userRole = (auth?.user?.role || "").toLowerCase();
     const activeRole = auth?.active_role;
     const activeRoleSlug = String(activeRole?.slug || activeRole || "").toLowerCase();
@@ -56,7 +73,41 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
 
     const canManageChecklist = hasPerm("execution.create") || hasPerm("execution.edit");
     const canAssignDraftsman = isRootSuperAdmin || hasPerm("execution.edit") || hasPerm("execution.manage");
+    const canAssignApprovalAdminPerm =
+        Boolean(canAssignApprovalAdmin) &&
+        (isRootSuperAdmin || hasPerm("drawing_approval.assign_admin"));
+    const canReviewCad =
+        isRootSuperAdmin ||
+        hasPerm("drawing_approval.approve") ||
+        hasPerm("drawing_approval.manage") ||
+        hasPerm("drafting.manage") ||
+        hasPerm("execution_task.manage");
     const canEditScopeOfWork = isRootSuperAdmin || hasPerm("project.edit") || hasPerm("project.manage");
+    const [reviewModalJob, setReviewModalJob] = useState(null);
+    const cadReviewForm = useForm({
+        decision: "approved",
+        remarks: "",
+    });
+    const openCadReviewModal = (job, latestRev) => {
+        cadReviewForm.setData({ decision: "approved", remarks: "" });
+        cadReviewForm.clearErrors();
+        setReviewModalJob({ job, latestRev });
+    };
+    const submitCadReview = (decision) => {
+        if (!reviewModalJob?.job?.id) return;
+        cadReviewForm.transform((data) => ({ ...data, decision }));
+        cadReviewForm.post(route("admin.construction.projects.drafting-jobs.review", [project.id, reviewModalJob.job.id]), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setReviewModalJob(null);
+                toast.success(decision === "approved" ? "CAD drawing approved." : "Revision requested.");
+            },
+            onError: (errors) => {
+                const firstErr = Object.values(errors || {})[0];
+                if (firstErr) toast.error(String(firstErr));
+            },
+        });
+    };
     const [showScopeModal, setShowScopeModal] = useState(false);
     const scopeOfWorkForm = useForm({
         scope_of_work: project.scope_of_work || "",
@@ -131,7 +182,7 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
         : 0;
 
     // Execution Tasks pagination (10 per batch, 2 per row) + GSAP choreography
-    const allAdminTasks = useMemo(() => project.execution_tasks || [], [project.execution_tasks]);
+    const allAdminTasks = useMemo(() => mergeProjectExecutionTasks(project), [project]);
     const [visibleTaskCount, setVisibleTaskCount] = useState(TASKS_PER_PAGE);
     const [isLoadingMoreTasks, setIsLoadingMoreTasks] = useState(false);
     const [isExecutionInView, setIsExecutionInView] = useState(false);
@@ -272,9 +323,20 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
         gsap.to(e.currentTarget, { scale: 1, y: 0, duration: 0.24, ease: "power2.out", overwrite: "auto" });
     }, []);
 
+    const assignedCadAdminName = useMemo(() => {
+        const direct = project?.drawing_approvals || project?.drawingApprovals || [];
+        const jobApprovals = (project?.drafting_jobs || project?.draftingJobs || []).flatMap(
+            (job) => (job?.drawing_revisions || job?.drawingRevisions || []).flatMap((rev) => rev?.approvals || [])
+        );
+        const pending = [...direct, ...jobApprovals]
+            .reverse()
+            .find((a) => String(a?.decision || "").toLowerCase() === "pending" && a?.assigned_to?.name);
+        return pending?.assigned_to?.name || null;
+    }, [project]);
+
     return (
         <ConstructionShell title={project.name} description={`${project.project_code} • ${project.company?.name || ""}`} variant="admin">
-            <WorkflowTracker currentStage={project.current_stage} isLocked={project.is_locked} />
+            <WorkflowTracker currentStage={project.current_stage} isLocked={project.is_locked} assignedAdminName={assignedCadAdminName} />
 
             <div ref={metricsGridRef} className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
                 <StatCard compact label="Team Members" value={project.team_members?.length || 0} />
@@ -325,14 +387,79 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
 
                 {visibleAdminTasks.length ? (
                     <div className="space-y-3">
+                        <PendingCadApprovalAlertBanner
+                            approvals={projectPendingCadApprovals}
+                            className="cad-action-blink-border"
+                        />
                         <div className="grid gap-3 md:grid-cols-2">
-                            {visibleAdminTasks.map((task, taskIndex) => (
+                            {visibleAdminTasks.map((task, taskIndex) => {
+                                const draftingJobs = Array.isArray(project.drafting_jobs) ? project.drafting_jobs : [];
+                                const drawingApprovals = Array.isArray(project.drawing_approvals) ? project.drawing_approvals : [];
+                                const matchedJob = (() => {
+                                    if (!draftingJobs.length) return null;
+                                    if (task.drafting_job_id) {
+                                        const byId = draftingJobs.find((j) => Number(j.id) === Number(task.drafting_job_id));
+                                        if (byId) return byId;
+                                    }
+                                    const subIds = new Set(
+                                        [
+                                            task.survey_submission_id,
+                                            ...((task.survey_visits || []).map((v) => v.submission?.id || v.survey_submission_id)),
+                                        ]
+                                            .filter(Boolean)
+                                            .map(Number)
+                                    );
+                                    if (subIds.size) {
+                                        const bySub = draftingJobs.find((j) => subIds.has(Number(j.survey_submission_id)));
+                                        if (bySub) return bySub;
+                                    }
+                                    const assigneeIds = new Set(
+                                        [
+                                            task.assigned_to_member_id,
+                                            task.assigned_member_id,
+                                            ...((task.assignees || []).map((a) => a.member_id || a.member?.id)),
+                                            ...((task.assignments || []).map((a) => a.assignee_id || a.member_id || a.assignee?.id)),
+                                        ]
+                                            .filter(Boolean)
+                                            .map(Number)
+                                    );
+                                    if (assigneeIds.size) {
+                                        const byMember = draftingJobs.find((j) => assigneeIds.has(Number(j.assigned_to_member_id)));
+                                        if (byMember) return byMember;
+                                    }
+                                    return draftingJobs.length === 1 ? draftingJobs[0] : null;
+                                })();
+                                const revisions = [...(matchedJob?.drawing_revisions || [])].sort(
+                                    (a, b) => (Number(b.revision_no || 0) - Number(a.revision_no || 0)) || (Number(b.id || 0) - Number(a.id || 0))
+                                );
+                                const latestRevision = revisions[0] || null;
+                                const revApprovals = latestRevision?.approvals?.length
+                                    ? latestRevision.approvals
+                                    : drawingApprovals.filter((a) => Number(a.drawing_revision_id) === Number(latestRevision?.id));
+                                const pendingApproval = revApprovals.find((a) => String(a?.decision || "").toLowerCase() === "pending")
+                                    || (revApprovals.length ? revApprovals[revApprovals.length - 1] : null);
+                                const isAssignedToCurrentUser = Boolean(
+                                    pendingApproval &&
+                                    String(pendingApproval.decision || "").toLowerCase() === "pending" &&
+                                    (
+                                        projectPendingCadApprovals.some((p) => Number(p.approval_id) === Number(pendingApproval.id)) ||
+                                        (pendingApproval.assigned_to_id && auth?.user && (
+                                            (String(auth?.guard || "").toLowerCase() === "superadmin" && String(pendingApproval.assigned_to_type || "").includes("SuperAdmin") && Number(pendingApproval.assigned_to_id) === Number(auth.user.id)) ||
+                                            (String(auth?.guard || "").toLowerCase() !== "superadmin" && String(pendingApproval.assigned_to_type || "").includes("Member") && Number(pendingApproval.assigned_to_id) === Number(auth.user.id))
+                                        ))
+                                    )
+                                );
+                                return (
                                 <div
-                                    key={task.id}
+                                    key={task._sourceKey || task.id}
                                     data-et-index={taskIndex}
                                     onMouseEnter={(e) => handleTaskPopEnter(e, { scale: 1.014, y: -3 })}
                                     onMouseLeave={handleTaskPopLeave}
-                                    className="et-task-card rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm transition-colors hover:border-indigo-300/80 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/95 dark:hover:border-indigo-500/40"
+                                    className={`et-task-card rounded-xl border bg-white p-3 shadow-sm transition-colors hover:shadow-md dark:bg-slate-900/95 ${
+                                        isAssignedToCurrentUser
+                                            ? "cad-action-blink-border border-rose-500 bg-rose-50/30 dark:bg-rose-950/20"
+                                            : "border-slate-200/90 hover:border-indigo-300/80 dark:border-slate-800 dark:hover:border-indigo-500/40"
+                                    }`}
                                 >
                                     <div className="flex flex-wrap items-start justify-between gap-2">
                                         <div className="min-w-0 flex-1">
@@ -343,6 +470,11 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
                                                 <div className="scale-90 origin-left">
                                                     <StatusBadge value={task.status} />
                                                 </div>
+                                                {isAssignedToCurrentUser && (
+                                                    <span className="inline-flex items-center rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                                                        Action Needed: CAD Approval
+                                                    </span>
+                                                )}
                                             </div>
                                             <p className="et-task-title mt-1 truncate text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
                                                 {task.title}
@@ -350,15 +482,43 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
                                             <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                                                 Surveyor: <span className="font-semibold text-slate-700 dark:text-slate-200">{task.supervisor?.name || "Unassigned"}</span>
                                             </p>
+                                            {pendingApproval?.assigned_to?.name && String(pendingApproval?.decision || "").toLowerCase() === "pending" && (
+                                                <p className="mt-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                                                    Approval Assigned to: {pendingApproval.assigned_to.name}
+                                                </p>
+                                            )}
                                         </div>
-                                        <div className="flex shrink-0 items-center gap-1.5">
+                                        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                                            <AssignApprovalAdminButton
+                                                projectId={project.id}
+                                                draftingJob={matchedJob}
+                                                latestRevision={latestRevision}
+                                                pendingApproval={pendingApproval}
+                                                companyAdmins={companyApprovalAdmins}
+                                                routeName="admin.construction.projects.drawing-approvals.assign-admin"
+                                                authorized={canAssignApprovalAdminPerm}
+                                            />
+                                            {latestRevision && String(pendingApproval?.decision || "pending").toLowerCase() === "pending" && String(matchedJob?.status || "").toLowerCase() !== "approved" && (canReviewCad || isAssignedToCurrentUser) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openCadReviewModal(matchedJob, latestRevision)}
+                                                    className={`rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white transition ${
+                                                        isAssignedToCurrentUser
+                                                            ? "bg-rose-600 hover:bg-rose-500"
+                                                            : "bg-indigo-600 hover:bg-indigo-500"
+                                                    }`}
+                                                >
+                                                    Review CAD
+                                                </button>
+                                            )}
                                             <AssignToDraftsmanButton
                                                 task={task}
                                                 projectId={project.id}
-                                                taskSource="execution"
+                                                taskSource={task._source === "legacy" ? "execution" : "task"}
                                                 routeName="admin.construction.projects.tasks.assign-draftsman"
                                                 draftsmen={allAdminDraftsmen}
                                                 defaultDraftsmanId={defaultDraftsmanId}
+                                                hasSurveyVisits={(task.survey_visits || []).length > 0}
                                                 authorized={canAssignDraftsman}
                                             />
                                         </div>
@@ -367,13 +527,14 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
                                         <div className="mt-2 flex flex-wrap gap-1.5 border-t border-slate-100 pt-2 dark:border-slate-800">
                                             {task.assignees.map((assignment) => (
                                                 <span key={assignment.id} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                                    {assignment.member?.name || "Employee"} • {assignment.assignment_role}
+                                                    {assignment.member?.name || "Employee"}{assignment.assignment_role ? ` • ${assignment.assignment_role}` : ""}
                                                 </span>
                                             ))}
                                         </div>
                                     ) : null}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         {(hasMoreTasks || visibleAdminTasks.length > TASKS_PER_PAGE) && (
@@ -434,7 +595,87 @@ export default function ProjectShow({ project, activityLog, workflowSummary, com
                         )}
                     </div>
                 ) : (
-                    <EmptyState title="No execution tasks yet." description="Tasks will appear after the project execution plan is created." />
+                    <div className="space-y-3">
+                        <PendingCadApprovalAlertBanner
+                            approvals={projectPendingCadApprovals}
+                            className="cad-action-blink-border"
+                        />
+                        <EmptyState title="No execution tasks yet." description="Tasks will appear after the project execution plan is created." />
+                    </div>
+                )}
+
+                {Boolean(reviewModalJob) && (
+                    <Modal show={Boolean(reviewModalJob)} maxWidth="lg" onClose={() => setReviewModalJob(null)}>
+                        <div className="p-6">
+                            <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-800">
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                                        Review Submitted CAD Drawing
+                                    </h3>
+                                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                        {reviewModalJob.latestRev?.drawing_no || "CAD Revision"}{" "}
+                                        {reviewModalJob.latestRev?.revision_no ? `(Rev ${reviewModalJob.latestRev.revision_no})` : ""}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setReviewModalJob(null)}
+                                    className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:text-slate-400"
+                                >
+                                    Close
+                                </button>
+                            </div>
+
+                            <div className="mt-4 space-y-3">
+                                <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                    <div>Drawing Type: <strong>{reviewModalJob.latestRev?.drawing_type || "-"}</strong></div>
+                                    <div className="mt-1">Scope / Area: <strong>{reviewModalJob.latestRev?.site_area || reviewModalJob.latestRev?.khasra_number || "-"}</strong></div>
+                                    {reviewModalJob.latestRev?.pdf_document?.file_path && (
+                                        <a
+                                            href={`/storage/${reviewModalJob.latestRev.pdf_document.file_path}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="mt-2 inline-block font-semibold text-indigo-600 underline"
+                                        >
+                                            Open CAD PDF
+                                        </a>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                        Review Remarks
+                                    </label>
+                                    <textarea
+                                        rows={3}
+                                        value={cadReviewForm.data.remarks}
+                                        onChange={(e) => cadReviewForm.setData("remarks", e.target.value)}
+                                        placeholder="Enter approval remarks or revision notes..."
+                                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+                                <button
+                                    type="button"
+                                    disabled={cadReviewForm.processing}
+                                    onClick={() => submitCadReview("revision_requested")}
+                                    className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                                >
+                                    Request Revision
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={cadReviewForm.processing}
+                                    onClick={() => submitCadReview("approved")}
+                                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                                >
+                                    {cadReviewForm.processing ? "Submitting..." : "Approve CAD"}
+                                </button>
+                            </div>
+                        </div>
+                    </Modal>
                 )}
             </div>
 

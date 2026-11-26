@@ -10,7 +10,6 @@ import {
     FaSun,
     FaBell,
     FaProjectDiagram,
-    FaClipboardList,
     FaHardHat,
     FaFileInvoiceDollar,
 } from "react-icons/fa";
@@ -399,7 +398,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                 {/* RIGHT SECTION: Actions + EmulationBanner + Avatar */}
                                 <div className="flex items-center gap-2 shrink-0">
                                     <EmulationBanner />
-                                    {!isEmployeeView && hasPerm(["approval_request.manage", "approval_request.view", "project.manage"]) && (
+                                    {!isEmployeeView && hasPerm(["project.manage"]) && (
                                         <div className="hidden sm:flex items-center gap-2 mr-2">
                                             <Link
                                                 href={route("admin.construction.projects.index")}

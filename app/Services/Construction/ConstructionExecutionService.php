@@ -132,7 +132,7 @@ class ConstructionExecutionService
                     $task,
                     [
                         'member_id' => $memberId,
-                        'assignment_role' => $validated['primary_assignment_role'] ?? 'worker',
+                        'assignment_role' => $this->normalizeAssignmentRole($validated['primary_assignment_role'] ?? null),
                         'assigned_from' => $validated['planned_start_date'] ?? null,
                         'assigned_to' => $validated['planned_end_date'] ?? null,
                         'is_primary' => count($validated['assignee_member_ids']) === 1,
@@ -194,7 +194,7 @@ class ConstructionExecutionService
                     $task,
                     [
                         'member_id' => $memberId,
-                        'assignment_role' => $validated['primary_assignment_role'] ?? 'worker',
+                        'assignment_role' => $this->normalizeAssignmentRole($validated['primary_assignment_role'] ?? null),
                         'assigned_from' => $validated['planned_start_date'] ?? null,
                         'assigned_to' => $validated['planned_end_date'] ?? null,
                         'is_primary' => count($newAssigneeIds) === 1,
@@ -230,7 +230,7 @@ class ConstructionExecutionService
             ],
             [
                 'project_id' => $task->project_id,
-                'assignment_role' => $validated['assignment_role'] ?? 'worker',
+                'assignment_role' => $this->normalizeAssignmentRole($validated['assignment_role'] ?? null),
                 'assigned_from' => $validated['assigned_from'] ?? null,
                 'assigned_to' => $validated['assigned_to'] ?? null,
                 'is_primary' => (bool) ($validated['is_primary'] ?? false),
@@ -649,5 +649,19 @@ class ConstructionExecutionService
         }
 
         return false;
+    }
+
+    /**
+     * Normalize an optional assignment role string, returning null when blank.
+     */
+    private function normalizeAssignmentRole(mixed $role): ?string
+    {
+        if ($role === null) {
+            return null;
+        }
+
+        $trimmed = trim((string) $role);
+
+        return $trimmed !== '' ? $trimmed : null;
     }
 }
