@@ -6078,7 +6078,7 @@
                                         "type": "string",
                                         "format": "binary",
                                         "contentMediaType": "application/octet-stream",
-                                        "description": "Maximum file size: 4096 kilobytes."
+                                        "description": "Maximum file size: 10240 kilobytes (10 MB)."
                                     }
                                 },
                                 "required": [
