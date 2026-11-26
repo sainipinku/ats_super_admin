@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, usePage } from "@inertiajs/react";
+import SidebarBrandLogo from "@/Components/SidebarBrandLogo";
 import {
     FaBuilding,
     FaUsers,
@@ -322,27 +323,13 @@ export default function Sidebar({ isOpen, onClose }) {
                 }`}
             >
                 {/* ── Brand Header ─────────────────────────────── */}
-                <div className="relative flex shrink-0 items-center gap-3 border-b border-gray-200/80 px-5 py-4 dark:border-[#5146e64a]">
-                    <img
-                        src="/images/cadmax_con_logo.jpeg"
-                        alt="betaxtech Logo"
-                        className="h-10 w-10 shrink-0 rounded-xl object-contain bg-slate-900/60 p-0.5 border border-indigo-500/20 shadow-lg shadow-indigo-500/20"
-                        onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = "/images/logo.png";
-                        }}
-                    />
-                    <div className="min-w-0">
-                        <p className="truncate text-[15px] uppercase font-bold tracking-tight text-slate-900 dark:text-white">
-                            betaxtech
-                        </p>
-                        <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-300">
-                            {isSuperAdmin
-                                ? "Super Admin"
-                                : (roleDisplayName || (isAdminUser ? "Admin ERP" : "Employee Workspace"))}
-                        </p>
-                    </div>
-                </div>
+                <SidebarBrandLogo
+                    subtitle={
+                        isSuperAdmin
+                            ? "Super Admin"
+                            : (roleDisplayName || (isAdminUser ? "Admin ERP" : "Employee Workspace"))
+                    }
+                />
 
                 {/* ── Current Project ──────────────────────────── */}
                 {currentProject && (

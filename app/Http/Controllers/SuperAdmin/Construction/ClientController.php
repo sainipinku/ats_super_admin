@@ -20,8 +20,6 @@ class ClientController extends Controller
 
     /**
      * Determine if the actor can manage (edit, activate/deactivate, delete) the client.
-     * - Project Owner (SuperAdmin id == 1 or is_project_owner == 1) has global access.
-     * - Super Admin of the company that created/owns the client can manage their company clients.
      */
     public function canActorManageClient(?Model $actor, Client $client): bool
     {
@@ -29,52 +27,34 @@ class ClientController extends Controller
             return false;
         }
 
-        // 1. Project Owner has full access to all clients
-        if ($this->isProjectOwner($actor)) {
-            return true;
-        }
-
-        // 2. Super Admin belonging to the same company or who created the client
-        if ($actor instanceof \App\Models\SuperAdmin) {
-            if (!empty($actor->company_id) && !empty($client->company_id) && (int) $actor->company_id === (int) $client->company_id) {
-                return true;
-            }
-            if ($client->created_by_type === $actor::class && (int) $client->created_by_id === (int) $actor->getKey()) {
-                return true;
-            }
-        }
-
-        // 3. Other roles associated with the same company or direct creator
-        $accessibleCompanyId = $this->getAccessibleCompanyId($actor);
-        if ($accessibleCompanyId && !empty($client->company_id) && (int) $accessibleCompanyId === (int) $client->company_id) {
-            return true;
-        }
-
-        if ($client->created_by_type === $actor::class && (int) $client->created_by_id === (int) $actor->getKey()) {
-            return true;
-        }
-
-        return false;
+        return $this->getAccessibleClientIds($actor)->contains((int) $client->id);
     }
 
     public function index(): Response
     {
         $actor = $this->constructionActor();
         $isProjectOwner = $this->isProjectOwner($actor);
-        $companyId = $isProjectOwner ? null : $this->getAccessibleCompanyId($actor);
+        $clientIds = $this->getAccessibleClientIds($actor);
+        $ownedCompanyIds = $this->getOwnedCompanyIds($actor);
 
-        $clientsQuery = Client::with('company')->withCount('projects');
+        $clients = Client::with('company')
+            ->withCount('projects')
+            ->whereIn('id', $clientIds)
+            ->latest()
+            ->get()
+            ->map(function ($client) use ($actor) {
+                $client->can_manage = $this->canActorManageClient($actor, $client);
+                return $client;
+            });
+
         $companiesQuery = Company::query();
-
-        if ($companyId) {
-            $clientsQuery->where('company_id', $companyId);
+        if ($actor instanceof \App\Models\SuperAdmin) {
+            $companiesQuery->whereIn('id', $ownedCompanyIds);
+        } elseif ($companyId = $this->getAccessibleCompanyId($actor)) {
             $companiesQuery->where('id', $companyId);
+        } else {
+            $companiesQuery->whereIn('id', $ownedCompanyIds);
         }
-
-        $clients = $clientsQuery->latest()->get()->map(function ($client) use ($actor) {
-            $client->can_manage = $this->canActorManageClient($actor, $client);
-            return $client;
-        });
 
         return Inertia::render('SuperAdmin/Construction/Clients/Index', [
             'clients' => $clients,
@@ -87,18 +67,25 @@ class ClientController extends Controller
     public function store(Request $request, ConstructionActivityService $activityService): RedirectResponse
     {
         $actor = $this->constructionActor();
-        $isProjectOwner = $this->isProjectOwner($actor);
-        $companyId = $isProjectOwner ? null : $this->getAccessibleCompanyId($actor);
+        $ownedCompanyIds = $this->getOwnedCompanyIds($actor);
+        $companyId = $this->getAccessibleCompanyId($actor);
 
-        if (!$isProjectOwner && !$companyId && $actor instanceof \App\Models\SuperAdmin && $actor->company_id) {
+        if (!$companyId && $actor instanceof \App\Models\SuperAdmin && $actor->company_id) {
             $companyId = $actor->company_id;
         }
 
         if (!$companyId) {
-            $companyId = $request->input('company_id') ?: Company::where('status', 'active')->value('id');
+            $companyId = $request->input('company_id')
+                ?: ($ownedCompanyIds->isNotEmpty()
+                    ? Company::whereIn('id', $ownedCompanyIds)->where('status', 'active')->value('id')
+                    : Company::where('status', 'active')->value('id'));
         }
 
         if ($companyId) {
+            if ($actor instanceof \App\Models\SuperAdmin) {
+                $excludedCompanyIds = $this->getOtherSuperAdminCompanyIds($actor);
+                abort_if($excludedCompanyIds->contains((int) $companyId), 403, 'Unauthorized. You cannot create clients for another company account.');
+            }
             $request->merge(['company_id' => $companyId]);
         }
 
@@ -155,18 +142,26 @@ class ClientController extends Controller
             abort(403, 'Unauthorized. Only the Project Owner or the Super Admin of the client company can edit this client.');
         }
 
-        $isProjectOwner = $this->isProjectOwner($actor);
-        $companyId = $isProjectOwner ? null : $this->getAccessibleCompanyId($actor);
+        $ownedCompanyIds = $this->getOwnedCompanyIds($actor);
+        $companyId = $this->getAccessibleCompanyId($actor);
 
-        if (!$isProjectOwner && !$companyId && $actor instanceof \App\Models\SuperAdmin && $actor->company_id) {
+        if (!$companyId && $actor instanceof \App\Models\SuperAdmin && $actor->company_id) {
             $companyId = $actor->company_id;
         }
 
         if (!$companyId) {
-            $companyId = $request->input('company_id') ?: ($client->company_id ?: Company::where('status', 'active')->value('id'));
+            $companyId = $request->input('company_id')
+                ?: ($client->company_id
+                    ?: ($ownedCompanyIds->isNotEmpty()
+                        ? Company::whereIn('id', $ownedCompanyIds)->where('status', 'active')->value('id')
+                        : Company::where('status', 'active')->value('id')));
         }
 
         if ($companyId) {
+            if ($actor instanceof \App\Models\SuperAdmin) {
+                $excludedCompanyIds = $this->getOtherSuperAdminCompanyIds($actor);
+                abort_if($excludedCompanyIds->contains((int) $companyId), 403, 'Unauthorized. You cannot assign a client to another company account.');
+            }
             $request->merge(['company_id' => $companyId]);
         }
 

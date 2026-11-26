@@ -19,9 +19,16 @@ class HandoverController extends Controller
 
     public function index(): Response
     {
+        $actor = $this->constructionActor();
+        $projectIds = $this->getAccessibleProjectIds($actor);
+
         return Inertia::render('SuperAdmin/Construction/Handover/Index', [
-            'projects' => Project::orderByDesc('id')->get(['id', 'project_code', 'name', 'status', 'current_stage']),
-            'handovers' => ProjectHandover::with(['project', 'items', 'finalDocument'])->latest()->take(50)->get(),
+            'projects' => Project::whereIn('id', $projectIds)->orderByDesc('id')->get(['id', 'project_code', 'name', 'status', 'current_stage']),
+            'handovers' => ProjectHandover::with(['project', 'items', 'finalDocument'])
+                ->whereIn('project_id', $projectIds)
+                ->latest()
+                ->take(50)
+                ->get(),
         ]);
     }
 
@@ -43,7 +50,7 @@ class HandoverController extends Controller
             'items.*.notes' => ['nullable', 'string'],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
         $handoverService->createHandover($project, $validated, $actor, $request);
 
         return back()->with('success', 'Handover checklist saved successfully.');
@@ -52,6 +59,8 @@ class HandoverController extends Controller
     public function updateItem(ProjectHandoverItem $item, Request $request, ConstructionHandoverService $handoverService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $item->handover->project_id, $actor);
+
         $validated = $request->validate([
             'status' => ['required', 'in:pending,completed,waived'],
             'notes' => ['nullable', 'string'],
@@ -65,6 +74,8 @@ class HandoverController extends Controller
     public function complete(ProjectHandover $handover, Request $request, ConstructionHandoverService $handoverService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $handover->project_id, $actor);
+
         $validated = $request->validate([
             'actual_handover_at' => ['nullable', 'date'],
             'client_signatory_name' => ['required', 'string', 'max:255'],
@@ -80,6 +91,8 @@ class HandoverController extends Controller
     public function close(ProjectHandover $handover, Request $request, ConstructionHandoverService $handoverService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $handover->project_id, $actor);
+
         $validated = $request->validate([
             'closure_date' => ['nullable', 'date'],
             'signoff_notes' => ['nullable', 'string'],

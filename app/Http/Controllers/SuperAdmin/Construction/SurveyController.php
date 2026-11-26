@@ -47,8 +47,8 @@ class SurveyController extends Controller
 
     public function index(): Response
     {
-        $projectIds = Project::query()
-            ->pluck('id')
+        $actor = $this->constructionActor();
+        $projectIds = $this->getAccessibleProjectIds($actor)
             ->map(fn ($projectId) => (int) $projectId)
             ->values();
 
@@ -150,6 +150,7 @@ class SurveyController extends Controller
         );
 
         $surveyPlans = SurveyPlan::query()
+            ->whereIn('project_id', $projectIds)
             ->withCount('visits')
            ->with([
     'project.company',
@@ -180,6 +181,7 @@ class SurveyController extends Controller
             ->get();
 
         $surveySubmissions = SurveySubmission::query()
+            ->whereIn('project_id', $projectIds)
             ->with([
                 'project.company',
                 'submittedBy:id,name,email',
@@ -215,6 +217,7 @@ class SurveyController extends Controller
                     $surveySubmissions,
 
                 'projects' => Project::query()
+                    ->whereIn('id', $projectIds)
                     ->orderBy('name')
                     ->get([
                         'id',
@@ -261,8 +264,9 @@ class SurveyController extends Controller
             )
         );
 
-        $project = Project::findOrFail(
-            $validated['project_id']
+        $project = $this->ensureProjectAccess(
+            (int) $validated['project_id'],
+            $actor
         );
 
         DB::transaction(
@@ -335,6 +339,7 @@ class SurveyController extends Controller
         ConstructionActivityService $activityService
     ): RedirectResponse {
         $actor = $this->superAdminActor();
+        $this->ensureProjectAccess((int) $surveyPlan->project_id, $actor);
 
         $validated = $request->validate(
             $this->planRules(
@@ -420,6 +425,7 @@ public function storeChecklistWorks(
     ConstructionActivityService $activityService
 ): RedirectResponse {
     $actor = $this->superAdminActor();
+    $this->ensureProjectAccess((int) $surveyPlan->project_id, $actor);
 
     $validated = $request->validate([
         'works' => [
@@ -544,6 +550,7 @@ public function storeChecklistWorks(
         ConstructionActivityService $activityService
     ): RedirectResponse {
         $actor = $this->superAdminActor();
+        $this->ensureProjectAccess((int) $surveyPlan->project_id, $actor);
 
         $request->merge([
             'status' =>
@@ -667,6 +674,7 @@ public function storeChecklistWorks(
         ConstructionActivityService $activityService
     ): RedirectResponse {
         $actor = $this->superAdminActor();
+        $this->ensureProjectAccess((int) $surveyPlan->project_id, $actor);
 
         $validated = $request->validate([
             'documents' => [
@@ -832,6 +840,7 @@ public function storeChecklistWorks(
         ConstructionActivityService $activityService
     ): RedirectResponse {
         $actor = $this->superAdminActor();
+        $this->ensureProjectAccess((int) $surveyPlan->project_id, $actor);
 
         abort_unless(
             $document->documentable_type
@@ -885,6 +894,7 @@ public function storeChecklistWorks(
         ConstructionActivityService $activityService
     ): RedirectResponse {
         $actor = $this->superAdminActor();
+        $this->ensureProjectAccess((int) $submission->project_id, $actor);
 
         $request->merge([
             'status' =>

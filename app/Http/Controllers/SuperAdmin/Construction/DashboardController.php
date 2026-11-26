@@ -44,19 +44,23 @@ class DashboardController extends Controller
 
         $actor = $this->constructionActor();
         $isProjectOwner = $this->isProjectOwner($actor);
+        $ownedCompanyIds = $this->getOwnedCompanyIds($actor);
+        $excludedCompanyIds = $actor instanceof SuperAdmin ? $this->getOtherSuperAdminCompanyIds($actor) : collect();
+        $accessibleBaseIds = $this->getAccessibleProjectIds($actor);
 
         $requestedCompanyId = $request->query('company_id') ?: $request->query('id');
         $effectiveCompanyId = $isProjectOwner
             ? ($requestedCompanyId ? (int) $requestedCompanyId : null)
             : $this->getAccessibleCompanyId($actor);
 
-        // 1. Projects scoping
-        $projectsQuery = Project::query();
+        // 1. Projects scoping (every SuperAdmin including Project Owner stays scoped to their own accessible projects)
+        $projectsQuery = Project::whereIn('id', $accessibleBaseIds);
         if ($effectiveCompanyId) {
-            $projectsQuery->where('company_id', $effectiveCompanyId);
-        } elseif (!$isProjectOwner) {
-            $accessibleIds = $this->getAccessibleProjectIds($actor);
-            $projectsQuery->whereIn('id', $accessibleIds);
+            if ($excludedCompanyIds->contains($effectiveCompanyId)) {
+                $projectsQuery->whereRaw('1 = 0');
+            } else {
+                $projectsQuery->where('company_id', $effectiveCompanyId);
+            }
         }
         $accessibleProjectIds = $projectsQuery->pluck('id');
 
@@ -91,7 +95,7 @@ class DashboardController extends Controller
 
         // 2. Employees scoping
         $membersQuery = Member::query();
-        if ($effectiveCompanyId) {
+        if ($effectiveCompanyId && !$excludedCompanyIds->contains($effectiveCompanyId)) {
             $company = Company::find($effectiveCompanyId);
             $companySuperAdminIds = SuperAdmin::where('company_id', $effectiveCompanyId)->pluck('id')->toArray();
             $teamMemberIds = \App\Models\ProjectTeamMember::whereIn('project_id', $accessibleProjectIds)->pluck('member_id')->toArray();
@@ -113,23 +117,18 @@ class DashboardController extends Controller
                     $q->orWhere('created_by', $actor->getKey());
                 }
             });
-        } elseif (!$isProjectOwner) {
-            $teamMemberIds = \App\Models\ProjectTeamMember::whereIn('project_id', $accessibleProjectIds)->pluck('member_id')->toArray();
-            $membersQuery->where(function ($q) use ($teamMemberIds, $actor) {
-                if (!empty($teamMemberIds)) {
-                    $q->whereIn('id', $teamMemberIds);
-                }
-                if ($actor) {
-                    $q->orWhere('created_by', $actor->getKey());
-                }
-            });
+        } else {
+            $ownedMemberIds = $this->getOwnedMemberIds($actor, $ownedCompanyIds);
+            $teamMemberIds = \App\Models\ProjectTeamMember::whereIn('project_id', $accessibleProjectIds)->pluck('member_id');
+            $scopedMemberIds = $ownedMemberIds->merge($teamMemberIds)->unique()->values();
+            $membersQuery->whereIn('id', $scopedMemberIds);
         }
         $totalEmployees = (clone $membersQuery)->count();
         $activeEmployees = (clone $membersQuery)->where(fn($q) => $q->where('status', 1)->orWhere('status', 'active'))->count();
 
         // 3. Vehicles scoping
         $vehiclesQuery = ConstructionVehicle::query();
-        if ($effectiveCompanyId) {
+        if ($effectiveCompanyId && !$excludedCompanyIds->contains($effectiveCompanyId)) {
             $companySuperAdminIds = SuperAdmin::where('company_id', $effectiveCompanyId)->pluck('id')->toArray();
             $vehiclesQuery->where(function ($q) use ($effectiveCompanyId, $accessibleProjectIds, $companySuperAdminIds) {
                 if ($accessibleProjectIds->isNotEmpty()) {
@@ -144,7 +143,7 @@ class DashboardController extends Controller
                     });
                 }
             });
-        } elseif (!$isProjectOwner) {
+        } else {
             $vehiclesQuery->whereIn('project_id', $accessibleProjectIds);
         }
         $totalVehicles = (clone $vehiclesQuery)->count();
@@ -153,7 +152,7 @@ class DashboardController extends Controller
 
         // 4. Equipment scoping
         $equipmentQuery = ConstructionEquipment::query();
-        if ($effectiveCompanyId) {
+        if ($effectiveCompanyId && !$excludedCompanyIds->contains($effectiveCompanyId)) {
             $companySuperAdminIds = SuperAdmin::where('company_id', $effectiveCompanyId)->pluck('id')->toArray();
             $equipmentQuery->where(function ($q) use ($effectiveCompanyId, $accessibleProjectIds, $companySuperAdminIds) {
                 if ($accessibleProjectIds->isNotEmpty()) {
@@ -168,7 +167,7 @@ class DashboardController extends Controller
                     });
                 }
             });
-        } elseif (!$isProjectOwner) {
+        } else {
             $equipmentQuery->whereIn('project_id', $accessibleProjectIds);
         }
         $totalEquipment = (clone $equipmentQuery)->count();
@@ -178,12 +177,10 @@ class DashboardController extends Controller
             ->count('equipment_id');
 
         // 5. Clients scoping
-        $clientsQuery = Client::query();
+        $accessibleClientIds = $this->getAccessibleClientIds($actor);
+        $clientsQuery = Client::whereIn('id', $accessibleClientIds);
         if ($effectiveCompanyId) {
             $clientsQuery->where('company_id', $effectiveCompanyId);
-        } elseif (!$isProjectOwner) {
-            $clientIds = Project::whereIn('id', $accessibleProjectIds)->whereNotNull('client_id')->pluck('client_id');
-            $clientsQuery->whereIn('id', $clientIds);
         }
         $totalClients = (clone $clientsQuery)->count();
         $companyClients = (clone $clientsQuery)->where('client_type', 'company')->count();
@@ -193,14 +190,14 @@ class DashboardController extends Controller
         $attendanceQuery = AttendanceRecord::query();
         if ($accessibleProjectIds->isNotEmpty()) {
             $attendanceQuery->whereIn('project_id', $accessibleProjectIds);
-        } elseif ($effectiveCompanyId) {
+        } elseif ($effectiveCompanyId && !$excludedCompanyIds->contains($effectiveCompanyId)) {
             $attendanceMemberIds = (clone $membersQuery)->pluck('id');
             if ($attendanceMemberIds->isNotEmpty()) {
                 $attendanceQuery->whereIn('member_id', $attendanceMemberIds);
             } else {
                 $attendanceQuery->whereRaw('1 = 0');
             }
-        } elseif (!$isProjectOwner) {
+        } else {
             $attendanceQuery->whereRaw('1 = 0');
         }
         $todayAttendance = (clone $attendanceQuery)->where('attendance_date', $today)->count();
@@ -231,19 +228,28 @@ class DashboardController extends Controller
 
         // 10. Activity logs scoping
         $activityQuery = ConstructionActivityLog::with(['project'])->latest('created_at');
-        if ($effectiveCompanyId) {
+        if ($effectiveCompanyId && !$excludedCompanyIds->contains($effectiveCompanyId)) {
             $activityQuery->where(function ($q) use ($effectiveCompanyId, $accessibleProjectIds) {
                 $q->where('company_id', $effectiveCompanyId);
                 if ($accessibleProjectIds->isNotEmpty()) {
                     $q->orWhereIn('project_id', $accessibleProjectIds);
                 }
             });
-        } elseif (!$isProjectOwner) {
-            if ($accessibleProjectIds->isNotEmpty()) {
-                $activityQuery->whereIn('project_id', $accessibleProjectIds);
-            } else {
-                $activityQuery->whereRaw('1 = 0');
-            }
+        } else {
+            $activityQuery->where(function ($q) use ($accessibleProjectIds, $ownedCompanyIds) {
+                $hasCondition = false;
+                if ($accessibleProjectIds->isNotEmpty()) {
+                    $q->orWhereIn('project_id', $accessibleProjectIds);
+                    $hasCondition = true;
+                }
+                if ($ownedCompanyIds->isNotEmpty()) {
+                    $q->orWhereIn('company_id', $ownedCompanyIds);
+                    $hasCondition = true;
+                }
+                if (!$hasCondition) {
+                    $q->whereRaw('1 = 0');
+                }
+            });
         }
         $recentActivity = $activityQuery->take(10)->get();
 
@@ -288,7 +294,7 @@ class DashboardController extends Controller
                 ],
                 'stageDistribution' => $projectStageDistribution,
 
-                'companies' => $isProjectOwner ? Company::count() : ($effectiveCompanyId ? 1 : 0),
+                'companies' => $isProjectOwner ? $ownedCompanyIds->count() : ($effectiveCompanyId ? 1 : 0),
                 'clientsLegacy' => $totalClients,
                 'projectsLegacy' => $totalProjects,
                 'budgetPending' => Project::whereIn('id', $accessibleProjectIds)->where('current_stage', 'budget_pending')->count(),
@@ -303,7 +309,7 @@ class DashboardController extends Controller
             ],
             'recentProjects' => $projects,
             'recentActivity' => $recentActivity,
-            'companies' => $isProjectOwner ? Company::orderBy('name')->get(['id', 'name']) : [],
+            'companies' => $isProjectOwner ? Company::whereIn('id', $ownedCompanyIds)->orderBy('name')->get(['id', 'name']) : [],
             'selected_company_id' => $effectiveCompanyId,
             'is_project_owner' => $isProjectOwner,
             'projectStatusOptions' => [

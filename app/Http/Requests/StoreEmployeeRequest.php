@@ -33,13 +33,12 @@ class StoreEmployeeRequest extends FormRequest
             $roles = json_decode($roles, true) ?? [$roles];
         }
 
-        $hasDriverRole = collect((array) $roles)->contains(
-            fn ($role) => in_array(
-                strtolower(trim((string) $role)),
-                ['driver', 'vehicle driver', 'vehicle_driver', '6'],
-                true
-            )
-        );
+        $normalizedRoles = EmployeeController::normalizeRoleSlugs((array) $roles);
+        if ($this->has('roles')) {
+            $this->merge(['roles' => $normalizedRoles]);
+        }
+
+        $hasDriverRole = in_array('vehicle_driver', $normalizedRoles, true);
 
         if ($hasDriverRole) {
             $this->merge([
@@ -56,7 +55,12 @@ class StoreEmployeeRequest extends FormRequest
         $memberId = null;
         $department = $this->input('department');
         $designationOptions = EmployeeController::getDepartmentDesignationsMap()[$department] ?? [];
-        $isProjectOwner = (int) Auth::guard('superadmin')->id() === 1;
+        $currentSuperAdmin = Auth::guard('superadmin')->user();
+        $isProjectOwner = $currentSuperAdmin instanceof \App\Models\SuperAdmin && (
+            (int) $currentSuperAdmin->id === 1
+            || (string) $currentSuperAdmin->id === '1'
+            || (int) ($currentSuperAdmin->is_project_owner ?? 0) === 1
+        );
 
         if ($employeeUuid) {
             $employee = \App\Models\Employee::where('uuid', $employeeUuid)->first();
@@ -84,12 +88,29 @@ class StoreEmployeeRequest extends FormRequest
             'roles' => ['nullable', 'array'],
             'roles.*' => [
                 'string',
-                Rule::exists('construction_roles', 'slug')
-                    ->where('status', 'active')
-                    ->whereNull('deleted_at')
-                    ->where('slug', '!=', 'super_admin'),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $slug = strtolower(trim((string) $value));
+                    if (in_array($slug, ['super_admin', 'superadmin', 'admin', 'project_admin', 'project-admin'], true)) {
+                        $fail('Select only active employee roles.');
+                        return;
+                    }
+
+                    $existsInConstruction = \App\Models\ConstructionRole::where('slug', $slug)
+                        ->where('status', 'active')
+                        ->whereNull('deleted_at')
+                        ->exists();
+
+                    $existsInRoles = \App\Models\Role::where('slug', $slug)
+                        ->where('status', 1)
+                        ->whereNull('deleted_at')
+                        ->exists();
+
+                    if (!$existsInConstruction && !$existsInRoles) {
+                        $fail('Select only active employee roles.');
+                    }
+                },
             ],
-            'role' => ['required', Rule::in(['member'])],
+            'role' => ['nullable', Rule::in(['member'])],
             'company_id' => [
                 $isProjectOwner ? 'required' : 'nullable',
                 'integer',

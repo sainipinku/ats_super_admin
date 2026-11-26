@@ -23,7 +23,12 @@ class DraftingController extends Controller
 
     public function index(): Response
     {
+        $actor = $this->constructionActor();
+        $projectIds = $this->getAccessibleProjectIds($actor);
+        $memberIds = $this->getOwnedMemberIds($actor);
+
         $members = Member::where('status', 1)
+            ->whereIn('id', $memberIds)
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'departments', 'designation', 'roles', 'slug']);
 
@@ -55,10 +60,12 @@ class DraftingController extends Controller
                 'drawingRevisions.pdfDocument',
                 'drawingRevisions.approvals.approvedBy',
             ])
+                ->whereIn('project_id', $projectIds)
                 ->latest()
                 ->get(),
             'approvedSurveySubmissions' => SurveySubmission::with('project')
-                ->where('status',SurveySubmission::STATUS_APPROVED)
+                ->whereIn('project_id', $projectIds)
+                ->where('status', SurveySubmission::STATUS_APPROVED)
                 ->orderByDesc('submitted_at')
                 ->get(),
             'members' => $members,
@@ -79,6 +86,7 @@ class DraftingController extends Controller
         ]);
 
         $submission = SurveySubmission::with('project')->findOrFail($validated['survey_submission_id']);
+        $this->ensureProjectAccess((int) $submission->project_id, $actor);
 
         $job = DraftingJob::create([
             'project_id' => $submission->project_id,
@@ -122,6 +130,7 @@ class DraftingController extends Controller
     public function updateJob(DraftingJob $draftingJob, Request $request, ConstructionActivityService $activityService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $draftingJob->project_id, $actor);
 
         $validated = $request->validate([
             'assigned_to_member_id' => ['nullable', 'exists:members,id'],
@@ -176,6 +185,7 @@ class DraftingController extends Controller
     ): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $draftingJob->project_id, $actor);
 
         $validated = $request->validate([
             'notes' => ['nullable', 'string'],
@@ -277,6 +287,7 @@ class DraftingController extends Controller
     public function approveDrawing(DrawingApproval $drawingApproval, Request $request, ConstructionActivityService $activityService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $drawingApproval->project_id, $actor);
 
         $validated = $request->validate([
             'decision' => ['required', 'in:approved,revision_requested,rejected'],

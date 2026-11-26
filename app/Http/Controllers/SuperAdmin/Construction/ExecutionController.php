@@ -23,31 +23,47 @@ class ExecutionController extends Controller
 
     public function index(): Response
     {
+        $actor = $this->constructionActor();
+        $projectIds = $this->getAccessibleProjectIds($actor);
+        $memberIds = $this->getOwnedMemberIds($actor);
+
         return Inertia::render('SuperAdmin/Construction/Execution/Index', [
             'stats' => [
-                'plans' => ExecutionPlan::count(),
-                'tasks' => ExecutionTask::count(),
-                'activeTasks' => ExecutionTask::whereIn('status', ['planned', 'in_progress', 'blocked'])->count(),
-                'pendingReports' => DailyProgressReport::where('status', 'submitted')->count(),
-                'pendingAttendance' => AttendanceRecord::where('status', 'pending')->count(),
+                'plans' => ExecutionPlan::whereIn('project_id', $projectIds)->count(),
+                'tasks' => ExecutionTask::whereIn('project_id', $projectIds)->count(),
+                'activeTasks' => ExecutionTask::whereIn('project_id', $projectIds)
+                    ->whereIn('status', ['planned', 'in_progress', 'blocked'])
+                    ->count(),
+                'pendingReports' => DailyProgressReport::whereIn('project_id', $projectIds)
+                    ->where('status', 'submitted')
+                    ->count(),
+                'pendingAttendance' => AttendanceRecord::whereIn('project_id', $projectIds)
+                    ->where('status', 'pending')
+                    ->count(),
             ],
             'projects' => Project::with(['company', 'client'])
+                ->whereIn('id', $projectIds)
                 ->orderBy('name')
                 ->get(['id', 'company_id', 'client_id', 'name', 'project_code', 'current_stage', 'status']),
             'executionPlans' => ExecutionPlan::with(['project', 'tasks'])
+                ->whereIn('project_id', $projectIds)
                 ->latest()
                 ->get(),
             'executionTasks' => ExecutionTask::with(['project', 'executionPlan', 'supervisor', 'assignees.member'])
+                ->whereIn('project_id', $projectIds)
                 ->latest()
                 ->get(),
             'dailyProgressReports' => DailyProgressReport::with(['project', 'executionTask', 'submittedBy', 'reviewedBy', 'items', 'supportingDocument'])
+                ->whereIn('project_id', $projectIds)
                 ->latest('report_date')
                 ->get(),
             'attendanceRecords' => AttendanceRecord::with(['project', 'executionTask', 'member', 'reviewedBy'])
+                ->whereIn('project_id', $projectIds)
                 ->latest('attendance_date')
                 ->get(),
-            'members' => Member::orderBy('name')->get(['id', 'name', 'email']),
+            'members' => Member::whereIn('id', $memberIds)->orderBy('name')->get(['id', 'name', 'email']),
             'projectTeamMembers' => ProjectTeamMember::with(['member', 'project', 'role'])
+                ->whereIn('project_id', $projectIds)
                 ->where('status', 'active')
                 ->get(['id', 'project_id', 'member_id', 'status']),
         ]);
@@ -66,7 +82,7 @@ class ExecutionController extends Controller
             'status' => ['required', 'in:planned,active'],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
         $executionService->createPlan($project, $validated, $actor, $request);
 
         return back()->with('success', 'Execution plan created successfully.');
@@ -75,6 +91,7 @@ class ExecutionController extends Controller
     public function updatePlan(ExecutionPlan $executionPlan, Request $request, ConstructionExecutionService $executionService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $executionPlan->project_id, $actor);
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -111,7 +128,7 @@ class ExecutionController extends Controller
             'primary_assignment_role' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
         $plan = ExecutionPlan::findOrFail($validated['execution_plan_id']);
 
         abort_unless((int) $plan->project_id === (int) $project->id, 422, 'Execution plan does not belong to the selected project.');
@@ -124,6 +141,7 @@ class ExecutionController extends Controller
     public function updateTask(ExecutionTask $task, Request $request, ConstructionExecutionService $executionService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $task->project_id, $actor);
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -147,6 +165,7 @@ class ExecutionController extends Controller
     public function assignTask(ExecutionTask $task, Request $request, ConstructionExecutionService $executionService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $task->project_id, $actor);
 
         $validated = $request->validate([
             'member_id' => ['required', 'exists:members,id'],
@@ -164,6 +183,7 @@ class ExecutionController extends Controller
     public function updateTaskProgress(ExecutionTask $task, Request $request, ConstructionExecutionService $executionService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $task->project_id, $actor);
 
         $validated = $request->validate([
             'progress_percent' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -204,7 +224,7 @@ class ExecutionController extends Controller
             'items.*.remarks' => ['nullable', 'string'],
         ]);
 
-        $project = Project::findOrFail($validated['project_id']);
+        $project = $this->ensureProjectAccess((int) $validated['project_id'], $actor);
         $executionService->submitDailyProgress($project, $validated, $actor, $request);
 
         return back()->with('success', 'Daily progress report submitted successfully.');
@@ -213,6 +233,7 @@ class ExecutionController extends Controller
     public function reviewDailyProgress(DailyProgressReport $report, Request $request, ConstructionExecutionService $executionService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $report->project_id, $actor);
 
         $validated = $request->validate([
             'status' => ['required', 'in:approved,revision_requested,rejected'],
@@ -227,6 +248,7 @@ class ExecutionController extends Controller
     public function reviewAttendance(AttendanceRecord $attendance, Request $request, ConstructionExecutionService $executionService): RedirectResponse
     {
         $actor = $this->constructionActor();
+        $this->ensureProjectAccess((int) $attendance->project_id, $actor);
 
         $validated = $request->validate([
             'status' => ['required', 'in:approved,rejected'],

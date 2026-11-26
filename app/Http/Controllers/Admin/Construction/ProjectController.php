@@ -1155,14 +1155,8 @@ class ProjectController extends Controller
         $draftRoleIds = \App\Models\Role::whereIn('slug', ['draft_person', 'draftsman', 'drafter', 'draft_man'])
             ->orWhere('slug', 'like', '%draft%')
             ->pluck('id')
+            ->map(fn ($id) => (int) $id)
             ->all();
-
-        $draftConstructionRoleIds = \App\Models\ConstructionRole::whereIn('slug', ['draft_person', 'draftsman', 'drafter', 'draft_man'])
-            ->orWhere('slug', 'like', '%draft%')
-            ->pluck('id')
-            ->all();
-
-        $allDraftRoleIds = array_values(array_unique(array_merge($draftRoleIds, $draftConstructionRoleIds)));
 
         $draftAssignedMemberIds = \App\Models\MemberRoleAssignment::where('status', 1)
             ->whereHas('role', fn ($q) => $q->whereIn('slug', ['draft_person', 'draftsman', 'drafter', 'draft_man'])->orWhere('slug', 'like', '%draft%'))
@@ -1207,13 +1201,13 @@ class ProjectController extends Controller
         $draftDesignationIds = \App\Models\Designation::where('name', 'like', '%draft%')->pluck('id')->all();
 
         return $candidates
-            ->filter(function ($member) use ($draftAssignedMemberIds, $projectDraftMemberIds, $allDraftRoleIds, $draftDesignationIds) {
+            ->filter(function ($member) use ($draftAssignedMemberIds, $projectDraftMemberIds, $draftRoleIds, $draftDesignationIds) {
                 if (in_array((int) $member->id, $projectDraftMemberIds, true) || in_array((int) $member->id, $draftAssignedMemberIds, true)) {
                     return true;
                 }
                 $roles = is_array($member->roles) ? $member->roles : (json_decode((string) $member->getRawOriginal('roles'), true) ?: []);
                 foreach ($roles as $r) {
-                    if (is_numeric($r) && in_array((int) $r, $allDraftRoleIds, true)) {
+                    if (is_numeric($r) && in_array((int) $r, $draftRoleIds, true)) {
                         return true;
                     }
                     if (is_string($r) && stripos($r, 'draft') !== false) {
